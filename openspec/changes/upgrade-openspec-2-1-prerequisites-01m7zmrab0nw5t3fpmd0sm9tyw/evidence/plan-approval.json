@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "change": "upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw",
+  "plan": "251dd6843966a0f32b8fa7874734e95b0e096b5c",
+  "planDigest": "04014b69cf8c2fafc3a9ad6fb527506c90b7440fe88d07f3336aa347452534db",
+  "base": "20a96ea7b67f4bc954632c87cece3f3a7697b3d4",
+  "operator": "Raphael",
+  "approval": "approved",
+  "reference": "Operator's approve and run reply to the Item 0 freeze card and item0-approve-and-run.md section 1 (SHA-256 23a041defa887a595c5c0913c119220780f93246576c30b4c539708574567f38)",
+  "operatorStatement": "Approve this exact frozen plan and retain advisory F-01 as-is, without planning amendments or refreeze.",
+  "recordedAt": "2026-11-22T16:44:39Z",
+  "scope": "Exact-plan approval only; local execution is separately granted by section 2 of the operator brief. No finish or publication grant.",
+  "executionAuthority": "separate local grant, groups 1.1, 2.1, 3.1 in order"
+}

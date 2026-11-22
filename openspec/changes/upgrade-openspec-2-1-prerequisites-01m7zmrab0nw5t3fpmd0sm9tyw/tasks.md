@@ -7,7 +7,7 @@ change: upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw
 
 ## 1. Qualify in disposable scratch
 
-- [ ] 1.1 Qualify the pinned 2.1.1 CLI and exact seven-workflow Claude generation route without changing tracked adoption surfaces. Pass `node <scratch>/qualification/openspec-cli-compatibility.mjs` and retain read-back evidence of the artifact and Node checks, scratch isolation, selection/layout in both scopes, and validation, sync, archive and metadata controls in design.md. Stop on unqualified behavior; preserve 1.16.0 and leave dependent groups unchecked.
+- [x] 1.1 Qualify the pinned 2.1.1 CLI and exact seven-workflow Claude generation route without changing tracked adoption surfaces. Pass `node <scratch>/qualification/openspec-cli-compatibility.mjs` and retain read-back evidence of the artifact and Node checks, scratch isolation, selection/layout in both scopes, and validation, sync, archive and metadata controls in design.md. Stop on unqualified behavior; preserve 1.16.0 and leave dependent groups unchecked.
 
 ## 2. Adopt and reconcile the current contract
 

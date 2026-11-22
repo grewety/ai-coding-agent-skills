@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "task": "1.1",
+  "plan": "251dd6843966a0f32b8fa7874734e95b0e096b5c",
+  "planDigest": "04014b69cf8c2fafc3a9ad6fb527506c90b7440fe88d07f3336aa347452534db",
+  "command": "node <scratch>/qualification/openspec-cli-compatibility.mjs",
+  "exitCode": 0,
+  "releasePackage": "@fission-ai/openspec@2.1.1",
+  "releaseCommit": "0c737dc1b543249b38b0f4716816fcf493d894dd",
+  "runtime": "Node v24.21.0",
+  "sri": "sha512-GQv1xU4uLrTVJ6MfOKNIxo/BgEk+e8C/XBmjTfzd/W3LNh4v2UMAsfTdn8mjHdjDA/KjfGstwUhZedQW4hdcZQ==",
+  "workflowIds": [
+    "explore",
+    "propose",
+    "update",
+    "apply",
+    "sync",
+    "archive",
+    "verify"
+  ],
+  "observedScopes": [
+    "global",
+    "project"
+  ],
+  "observedGates": [
+    "independent release references",
+    "offline negative controls",
+    "actual Node preflight",
+    "tag, SRI and exact local installation",
+    "CLI identity",
+    "unknown workflow selection refusal",
+    "Claude global custom workflow installation",
+    "Claude project custom workflow installation",
+    "strict validation of tracked current specs and active plan",
+    "synthetic strict validation and independent metadata",
+    "task discovery and progress",
+    "agent-driven sync inputs, formatting and post-sync metadata",
+    "native archive refusal, collision, merge formatting and metadata"
+  ],
+  "limitations": [
+    "CLI-generated skill presence and contents only; no Claude client execution. Sync behavior was exercised as an agent-driven fixture; native archive was tested separately."
+  ],
+  "routineCorrectionCycles": 1,
+  "retainedEvidence": {
+    "reference": "Local operator verification records, item0-execute.n6fd34Cj/qualification-retained",
+    "sha256": {
+      "openspec-cli-compatibility.mjs": "cd44c038c343b2059179c5e664eacb799693b83fb735d617ddc670b80f2cc485",
+      "lifecycle.mjs": "a4c69c42c5ef24c558fa661d1929b4120183e89f22bed7f3884d9e4572dd3db9",
+      "gate.jsonl": "0685d419f7ba636a51084f7beadd4342346244204b0d2a91785df7984e0b132d",
+      "input-hashes.json": "305ff487a16c7704948916e56c645734392027ca1ab440e78214377292ba93f6",
+      "dependencies.json": "8ebac154010c6d38b21657bf2643790d88a2c620216deade7ff5691c4de1be43",
+      "gate.stdout": "a4c33fbb7482ee62cef8613e375e78b1ab6e708115f7312bcdb90a08d4666d7c",
+      "gate.exit": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    "workerTraceSha256": "4e4309635ad8fb9581e9e26f82c66c1e041d412b9f5cd01e87448b6aface9d61",
+    "gateTraceSha256": "cc3914dd82e4fdb76f2f9172cef003ff500d8e920def60d0f619d5f6edecbfa0",
+    "prohibitedProfileAccessObserved": false
+  }
+}
