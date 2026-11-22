@@ -1,0 +1,312 @@
+{
+  "schemaVersion": 1,
+  "change": "one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v",
+  "goal": "Ship one packaged OS-contained Read-only Claude Code reviewer for exact candidate and charter-v1 approach reviews, with bounded safe shared adapter capture and operator guidance; stop rather than relax containment, add backends, or run the packaged live trial without separate authority.",
+  "charter": {
+    "clauses": [
+      "data-only-request-and-exact-packets",
+      "read-only-containment-provider-and-probe",
+      "sealed-handover-and-charter-v1-integrity",
+      "shared-adapter-process-quota-and-sink-hardening",
+      "outcome-groups-and-executable-acceptance",
+      "complete-distribution-versions-and-operator-docs"
+    ],
+    "boundaries": [
+      "Read-only exported packet; no checkout, live profiles, Git, shell or unrelated files",
+      "No direct network; only Anthropic inference through the approved host relay; no live upstream or GitHub queries"
+    ],
+    "tasks": [
+      "1.1",
+      "2.1",
+      "3.1"
+    ],
+    "gates": [
+      "openspec validate <full-name> --strict",
+      "npm run validate:openspec",
+      "npm test",
+      "npm run build",
+      "review-candidate.mjs --probe",
+      "review-candidate.mjs --prepare",
+      "review-candidate.mjs --check",
+      "review-candidate.mjs --mode candidate",
+      "review-candidate.mjs --mode approach",
+      "review-candidate.mjs --verify"
+    ]
+  },
+  "binding": {
+    "route": "terminal-adapter",
+    "qualified": true,
+    "independent": true,
+    "readOnly": true,
+    "client": "claude-code",
+    "model": "claude-sonnet-4-6",
+    "permissions": [
+      "read"
+    ]
+  },
+  "passRule": "charter-v1",
+  "budget": 3,
+  "cumulativeCycles": 0,
+  "entries": [
+    {
+      "inputs": {
+        "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/.openspec.yaml": "6780cbd140e267f34848ed93509ee0e1c20861939579ff1c3bb74a2b85a86700",
+        "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/design.md": "d54b9fefa53ce59a1cde9220cd835ed53fdbff1d0d6771ebd904354045862e83",
+        "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/proposal.md": "f53b4d4ad9c4a67eac457b44164f7b7a3ba083c9e612b2feb64a084ce54033fc",
+        "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/specs/contained-independent-review/spec.md": "4cb9039d2c9eb1f8f583c2d626b961f6294df37a924d27eba24915d462bae501",
+        "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/tasks.md": "632d38f85041a3e32b3c5720e1ebf392fb09450010cc20f0edebfb30785f54cc",
+        "openspec/config.yaml": "e00255bbcd0689f475861788f7e3cacbfab12c16ae6f49a0b730abbba6d2437a"
+      },
+      "authorSession": "hermes-dev/orchestrator/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v",
+      "reviewerSession": "fc448a91-f93a-4969-9eb1-7e30acac3b8e",
+      "reference": "/home/raphael/verification-records/ai-coding-agent-skills/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/r1/report.txt",
+      "coverageLimitations": [
+        {
+          "class": "declared-deferral",
+          "detail": "Live trial and all review-candidate.mjs gate runs (--probe, --prepare, --check, --mode candidate, --mode approach, --verify) plus final openspec validate --strict, npm test, and npm run build against exact live identities are explicitly deferred pending a separate explicit live-trial grant. Sources: tasks.md line 24 (task 3.1 acceptance boundary), design.md line 31 (Migration Plan), proposal.md line 18, charter-context.txt line 1, planning-observations.txt line 1.",
+          "task": "3.1"
+        },
+        {
+          "class": "containment-boundary",
+          "detail": "The dedicated scoped OAuth credential route is explicitly unqualified within this plan. It is permitted only when independently proved to meet the same isolation, egress, startup-check, and policy requirements as the pinned default relay pairing; no automatic route switch, ambient-credential fallback, or OAuth qualification claim is made here. Source: design.md line 19; planning-observations.txt line 1 ('Optional OAuth must meet the same containment policy; do not infer qualification or switch routes').",
+          "boundary": "OAuth route requires separate route-specific qualification evidence before use; no claim of approval is made in this plan"
+        },
+        {
+          "class": "containment-boundary",
+          "detail": "Native OS containment via Bubblewrap user namespaces is scoped to Linux/WSL. Non-Linux platforms support offline fixture packaging and synthetic exercise only and must not claim native namespace containment qualification. Source: design.md line 27 ('Linux/WSL confinement depends on host namespaces/runtime and filesystem primitives; refuse weaker fallbacks. Other platforms can package and exercise offline fixtures without claiming native support').",
+          "boundary": "Linux/WSL-only Bubblewrap namespace isolation; non-Linux platforms excluded from live containment qualification"
+        }
+      ],
+      "receipt": {
+        "identity": {
+          "change": "one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v",
+          "goal": "Ship one packaged OS-contained Read-only Claude Code reviewer for exact candidate and charter-v1 approach reviews, with bounded safe shared adapter capture and operator guidance; stop rather than relax containment, add backends, or run the packaged live trial without separate authority.",
+          "charter": {
+            "clauses": [
+              "data-only-request-and-exact-packets",
+              "read-only-containment-provider-and-probe",
+              "sealed-handover-and-charter-v1-integrity",
+              "shared-adapter-process-quota-and-sink-hardening",
+              "outcome-groups-and-executable-acceptance",
+              "complete-distribution-versions-and-operator-docs"
+            ],
+            "boundaries": [
+              "Read-only exported packet; no checkout, live profiles, Git, shell or unrelated files",
+              "No direct network; only Anthropic inference through the approved host relay; no live upstream or GitHub queries"
+            ],
+            "tasks": [
+              "1.1",
+              "2.1",
+              "3.1"
+            ],
+            "gates": [
+              "openspec validate <full-name> --strict",
+              "npm run validate:openspec",
+              "npm test",
+              "npm run build",
+              "review-candidate.mjs --probe",
+              "review-candidate.mjs --prepare",
+              "review-candidate.mjs --check",
+              "review-candidate.mjs --mode candidate",
+              "review-candidate.mjs --mode approach",
+              "review-candidate.mjs --verify"
+            ]
+          },
+          "binding": {
+            "route": "terminal-adapter",
+            "qualified": true,
+            "independent": true,
+            "readOnly": true,
+            "client": "claude-code",
+            "model": "claude-sonnet-4-6",
+            "permissions": [
+              "read"
+            ]
+          },
+          "passRule": "charter-v1",
+          "budget": 3,
+          "cumulativeCycles": 0,
+          "inputs": {
+            "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/.openspec.yaml": "6780cbd140e267f34848ed93509ee0e1c20861939579ff1c3bb74a2b85a86700",
+            "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/design.md": "d54b9fefa53ce59a1cde9220cd835ed53fdbff1d0d6771ebd904354045862e83",
+            "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/proposal.md": "f53b4d4ad9c4a67eac457b44164f7b7a3ba083c9e612b2feb64a084ce54033fc",
+            "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/specs/contained-independent-review/spec.md": "4cb9039d2c9eb1f8f583c2d626b961f6294df37a924d27eba24915d462bae501",
+            "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/tasks.md": "632d38f85041a3e32b3c5720e1ebf392fb09450010cc20f0edebfb30785f54cc",
+            "openspec/config.yaml": "e00255bbcd0689f475861788f7e3cacbfab12c16ae6f49a0b730abbba6d2437a"
+          },
+          "packetHashes": {
+            "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/.openspec.yaml": "6780cbd140e267f34848ed93509ee0e1c20861939579ff1c3bb74a2b85a86700",
+            "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/design.md": "d54b9fefa53ce59a1cde9220cd835ed53fdbff1d0d6771ebd904354045862e83",
+            "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/proposal.md": "f53b4d4ad9c4a67eac457b44164f7b7a3ba083c9e612b2feb64a084ce54033fc",
+            "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/specs/contained-independent-review/spec.md": "4cb9039d2c9eb1f8f583c2d626b961f6294df37a924d27eba24915d462bae501",
+            "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/tasks.md": "632d38f85041a3e32b3c5720e1ebf392fb09450010cc20f0edebfb30785f54cc",
+            "openspec/config.yaml": "e00255bbcd0689f475861788f7e3cacbfab12c16ae6f49a0b730abbba6d2437a",
+            "context/parent-contract.txt": "f802df104632e16420f99d99fabb23bcf7f2fd7380884eee2f1f2c30995dfde6",
+            "context/adapter-locations.txt": "ab7bacb00152440a47d95b697e8c616a49fdc0c22a2a01862b0071f6545309c0",
+            "context/publisher-locations.txt": "1f2b3daaa1473c72d965b5ea0bd10f589d1253611ed19788a18f5831272a28c8",
+            "context/integrated-spec.txt": "1bb3078adf9a79418bfdd3726e06fa8714768da33d9b8956bb55f6089966494a",
+            "context/marketplace.json": "f299221d9e78b46cfc2e18485581a8ec20dfae673c3b1c9bae52d684eb076a67",
+            "context/package.json": "6fd01a755bb60084e4d7bca1a5d780d69d72aabad2b4e5a295d2be50d711a159",
+            "context/task-authoring.md": "afa8c140e72030c834050ed9297e86523a677da4c2305b0b67b3ac9fea5c2c30",
+            "context/charter-context.txt": "67526117bacf2db1275836d3aba5d5200f98160ac4b200e9ff1399d229f60c62",
+            "context/planning-observations.txt": "dd71ee4ed58a4569571de3c1ed632d7e9f12f27baa1ce57ad2d5e57df3116345"
+          },
+          "authorSession": "hermes-dev/orchestrator/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v",
+          "reviewerSession": "fc448a91-f93a-4969-9eb1-7e30acac3b8e",
+          "model": "claude-sonnet-4-6",
+          "ledger": [],
+          "correction": null
+        },
+        "verdict": "Verdict: No findings",
+        "findings": [],
+        "observations": [],
+        "coverageLimitations": [
+          {
+            "class": "declared-deferral",
+            "detail": "Live trial and all review-candidate.mjs gate runs (--probe, --prepare, --check, --mode candidate, --mode approach, --verify) plus final openspec validate --strict, npm test, and npm run build against exact live identities are explicitly deferred pending a separate explicit live-trial grant. Sources: tasks.md line 24 (task 3.1 acceptance boundary), design.md line 31 (Migration Plan), proposal.md line 18, charter-context.txt line 1, planning-observations.txt line 1.",
+            "task": "3.1"
+          },
+          {
+            "class": "containment-boundary",
+            "detail": "The dedicated scoped OAuth credential route is explicitly unqualified within this plan. It is permitted only when independently proved to meet the same isolation, egress, startup-check, and policy requirements as the pinned default relay pairing; no automatic route switch, ambient-credential fallback, or OAuth qualification claim is made here. Source: design.md line 19; planning-observations.txt line 1 ('Optional OAuth must meet the same containment policy; do not infer qualification or switch routes').",
+            "boundary": "OAuth route requires separate route-specific qualification evidence before use; no claim of approval is made in this plan"
+          },
+          {
+            "class": "containment-boundary",
+            "detail": "Native OS containment via Bubblewrap user namespaces is scoped to Linux/WSL. Non-Linux platforms support offline fixture packaging and synthetic exercise only and must not claim native namespace containment qualification. Source: design.md line 27 ('Linux/WSL confinement depends on host namespaces/runtime and filesystem primitives; refuse weaker fallbacks. Other platforms can package and exercise offline fixtures without claiming native support').",
+            "boundary": "Linux/WSL-only Bubblewrap namespace isolation; non-Linux platforms excluded from live containment qualification"
+          }
+        ],
+        "ledgerChecks": [],
+        "readOnly": true,
+        "reference": "/home/raphael/verification-records/ai-coding-agent-skills/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/r1/report.txt"
+      }
+    },
+    {
+      "inputs": {
+        "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/.openspec.yaml": "6780cbd140e267f34848ed93509ee0e1c20861939579ff1c3bb74a2b85a86700",
+        "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/design.md": "d54b9fefa53ce59a1cde9220cd835ed53fdbff1d0d6771ebd904354045862e83",
+        "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/proposal.md": "f53b4d4ad9c4a67eac457b44164f7b7a3ba083c9e612b2feb64a084ce54033fc",
+        "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/specs/contained-independent-review/spec.md": "4cb9039d2c9eb1f8f583c2d626b961f6294df37a924d27eba24915d462bae501",
+        "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/tasks.md": "632d38f85041a3e32b3c5720e1ebf392fb09450010cc20f0edebfb30785f54cc",
+        "openspec/config.yaml": "e00255bbcd0689f475861788f7e3cacbfab12c16ae6f49a0b730abbba6d2437a"
+      },
+      "authorSession": "hermes-dev/orchestrator/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v",
+      "reviewerSession": "ec9e325b-c1e3-4e74-9268-388dab698e56",
+      "reference": "/home/raphael/verification-records/ai-coding-agent-skills/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/r2/report.txt",
+      "coverageLimitations": [
+        {
+          "class": "declared-deferral",
+          "task": "3.1",
+          "detail": "Live packaged trial and all gate executions (--probe, --prepare, --check, --mode candidate, --mode approach, --verify, openspec validate --strict, npm run validate:openspec, npm test, npm run build) are explicitly deferred to task 3.1 pending a separate live-trial grant. Sources: tasks.md:23-26 ('explicitly deferred to task 3.1'), charter-context.txt:1 ('The live trial and its outcome are explicitly deferred to task 3.1'), supplement.txt:1 ('The live packaged trial is a declared deferral to 3.1'). Planning and synthetic fixtures are declared non-substitutes for live results per tasks.md:26."
+        },
+        {
+          "class": "containment-boundary",
+          "boundary": "Read-only exported packet; no checkout, live profiles, Git, shell or unrelated files",
+          "detail": "This planning review operates on the read-only exported packet only and cannot execute or observe the unbuilt review-candidate.mjs CLI, live Bubblewrap containment, the Unix-socket relay, or runtime stream behavior. The planning-observations.txt P4/P5 interim launcher probe (planning-observations.txt:1) qualifies the interim launcher under Claude Code 2.1.330 and Bubblewrap 0.9.0, not the unbuilt packaged CLI; design.md:10 correctly acknowledges this distinction. No live provider, process-tree quiescence, or capture-sink behavior could be observed within this boundary."
+        }
+      ],
+      "receipt": {
+        "identity": {
+          "change": "one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v",
+          "goal": "Ship one packaged OS-contained Read-only Claude Code reviewer for exact candidate and charter-v1 approach reviews, with bounded safe shared adapter capture and operator guidance; stop rather than relax containment, add backends, or run the packaged live trial without separate authority.",
+          "charter": {
+            "clauses": [
+              "data-only-request-and-exact-packets",
+              "read-only-containment-provider-and-probe",
+              "sealed-handover-and-charter-v1-integrity",
+              "shared-adapter-process-quota-and-sink-hardening",
+              "outcome-groups-and-executable-acceptance",
+              "complete-distribution-versions-and-operator-docs"
+            ],
+            "boundaries": [
+              "Read-only exported packet; no checkout, live profiles, Git, shell or unrelated files",
+              "No direct network; only Anthropic inference through the approved host relay; no live upstream or GitHub queries"
+            ],
+            "tasks": [
+              "1.1",
+              "2.1",
+              "3.1"
+            ],
+            "gates": [
+              "openspec validate <full-name> --strict",
+              "npm run validate:openspec",
+              "npm test",
+              "npm run build",
+              "review-candidate.mjs --probe",
+              "review-candidate.mjs --prepare",
+              "review-candidate.mjs --check",
+              "review-candidate.mjs --mode candidate",
+              "review-candidate.mjs --mode approach",
+              "review-candidate.mjs --verify"
+            ]
+          },
+          "binding": {
+            "route": "terminal-adapter",
+            "qualified": true,
+            "independent": true,
+            "readOnly": true,
+            "client": "claude-code",
+            "model": "claude-sonnet-4-6",
+            "permissions": [
+              "read"
+            ]
+          },
+          "passRule": "charter-v1",
+          "budget": 3,
+          "cumulativeCycles": 0,
+          "inputs": {
+            "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/.openspec.yaml": "6780cbd140e267f34848ed93509ee0e1c20861939579ff1c3bb74a2b85a86700",
+            "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/design.md": "d54b9fefa53ce59a1cde9220cd835ed53fdbff1d0d6771ebd904354045862e83",
+            "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/proposal.md": "f53b4d4ad9c4a67eac457b44164f7b7a3ba083c9e612b2feb64a084ce54033fc",
+            "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/specs/contained-independent-review/spec.md": "4cb9039d2c9eb1f8f583c2d626b961f6294df37a924d27eba24915d462bae501",
+            "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/tasks.md": "632d38f85041a3e32b3c5720e1ebf392fb09450010cc20f0edebfb30785f54cc",
+            "openspec/config.yaml": "e00255bbcd0689f475861788f7e3cacbfab12c16ae6f49a0b730abbba6d2437a"
+          },
+          "packetHashes": {
+            "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/.openspec.yaml": "6780cbd140e267f34848ed93509ee0e1c20861939579ff1c3bb74a2b85a86700",
+            "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/design.md": "d54b9fefa53ce59a1cde9220cd835ed53fdbff1d0d6771ebd904354045862e83",
+            "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/proposal.md": "f53b4d4ad9c4a67eac457b44164f7b7a3ba083c9e612b2feb64a084ce54033fc",
+            "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/specs/contained-independent-review/spec.md": "4cb9039d2c9eb1f8f583c2d626b961f6294df37a924d27eba24915d462bae501",
+            "openspec/changes/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/tasks.md": "632d38f85041a3e32b3c5720e1ebf392fb09450010cc20f0edebfb30785f54cc",
+            "openspec/config.yaml": "e00255bbcd0689f475861788f7e3cacbfab12c16ae6f49a0b730abbba6d2437a",
+            "context/parent-contract.txt": "f802df104632e16420f99d99fabb23bcf7f2fd7380884eee2f1f2c30995dfde6",
+            "context/adapter-locations.txt": "ab7bacb00152440a47d95b697e8c616a49fdc0c22a2a01862b0071f6545309c0",
+            "context/publisher-locations.txt": "1f2b3daaa1473c72d965b5ea0bd10f589d1253611ed19788a18f5831272a28c8",
+            "context/integrated-spec.txt": "1bb3078adf9a79418bfdd3726e06fa8714768da33d9b8956bb55f6089966494a",
+            "context/marketplace.json": "f299221d9e78b46cfc2e18485581a8ec20dfae673c3b1c9bae52d684eb076a67",
+            "context/package.json": "6fd01a755bb60084e4d7bca1a5d780d69d72aabad2b4e5a295d2be50d711a159",
+            "context/task-authoring.md": "afa8c140e72030c834050ed9297e86523a677da4c2305b0b67b3ac9fea5c2c30",
+            "context/charter-context.txt": "67526117bacf2db1275836d3aba5d5200f98160ac4b200e9ff1399d229f60c62",
+            "context/planning-observations.txt": "dd71ee4ed58a4569571de3c1ed632d7e9f12f27baa1ce57ad2d5e57df3116345",
+            "context/supplement.txt": "3ffcfd2b46316c3a54e9fd76beb15877c672da39a7f811691912e5f5926fa650"
+          },
+          "authorSession": "hermes-dev/orchestrator/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v",
+          "reviewerSession": "ec9e325b-c1e3-4e74-9268-388dab698e56",
+          "model": "claude-sonnet-4-6",
+          "ledger": [],
+          "correction": null
+        },
+        "verdict": "Verdict: No findings",
+        "findings": [],
+        "observations": [],
+        "coverageLimitations": [
+          {
+            "class": "declared-deferral",
+            "task": "3.1",
+            "detail": "Live packaged trial and all gate executions (--probe, --prepare, --check, --mode candidate, --mode approach, --verify, openspec validate --strict, npm run validate:openspec, npm test, npm run build) are explicitly deferred to task 3.1 pending a separate live-trial grant. Sources: tasks.md:23-26 ('explicitly deferred to task 3.1'), charter-context.txt:1 ('The live trial and its outcome are explicitly deferred to task 3.1'), supplement.txt:1 ('The live packaged trial is a declared deferral to 3.1'). Planning and synthetic fixtures are declared non-substitutes for live results per tasks.md:26."
+          },
+          {
+            "class": "containment-boundary",
+            "boundary": "Read-only exported packet; no checkout, live profiles, Git, shell or unrelated files",
+            "detail": "This planning review operates on the read-only exported packet only and cannot execute or observe the unbuilt review-candidate.mjs CLI, live Bubblewrap containment, the Unix-socket relay, or runtime stream behavior. The planning-observations.txt P4/P5 interim launcher probe (planning-observations.txt:1) qualifies the interim launcher under Claude Code 2.1.330 and Bubblewrap 0.9.0, not the unbuilt packaged CLI; design.md:10 correctly acknowledges this distinction. No live provider, process-tree quiescence, or capture-sink behavior could be observed within this boundary."
+          }
+        ],
+        "ledgerChecks": [],
+        "readOnly": true,
+        "reference": "/home/raphael/verification-records/ai-coding-agent-skills/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/r2/report.txt"
+      }
+    }
+  ],
+  "ledger": []
+}
