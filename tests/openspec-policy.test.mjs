@@ -132,3 +132,14 @@ test("contributor grant binds all declared or changed contracts to exact pre-fre
   for (const override of [{ plan: "f".repeat(40) }, { planDigest: "e".repeat(64) }, { paths: [...paths, "extra/AGENTS.md"] }]) assert.throws(() => api.verifyContractGrant({ ...request, binding, ...override }), /grant|binding/);
   assert.throws(() => api.contractChangePaths({ declared: ["../AGENTS.md"], changed: [], designations: [] }), /path/);
 });
+
+test('convergence is an integrated-parent opt-in with strict fallback', async () => {
+  const api = await policy();
+  const base = { phase: 'freeze', context: context(), selection: { ...selection(), preExecutionReview: true }, contractPaths: [], orchestrationAvailable: true, reviewAcceptance: { action: 'freeze-ready', reference: 'receipt', inputs } };
+  assert.equal(api.resolveDeliveryPolicy(base).approachPolicy, 'strict');
+  const selected = { ...base, selection: { ...base.selection, approachConvergence: true }, reviewAcceptance: { ...base.reviewAcceptance, policy: 'charter-v1' } };
+  assert.equal(api.resolveDeliveryPolicy(selected).approachPolicy, 'charter-v1');
+  assert.throws(() => api.resolveDeliveryPolicy({ ...selected, selection: { ...selected.selection, revision: plan } }), /parent/);
+  assert.throws(() => api.resolveDeliveryPolicy({ ...selected, reviewAcceptance: base.reviewAcceptance }), /review/);
+  assert.throws(() => api.resolveDeliveryPolicy({ ...base, selection: { ...base.selection, approachConvergence: true, preExecutionReview: false } }), /review/);
+});

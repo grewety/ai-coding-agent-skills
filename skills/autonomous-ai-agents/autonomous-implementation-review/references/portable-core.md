@@ -225,3 +225,66 @@ Preserve session evidence and worker scratch. The pure decision never stops a pr
 No next group or next change is implied. Before admitting any terminal worker's
 report, use `readHandoff` under [worker-handoff.md](worker-handoff.md). Execution
 completion, review verdict and delivery acceptance are separate gates.
+
+## Optional charter-bound approach evidence contract
+
+The pure `startConvergenceReview`, `convergencePacket` and
+`acceptConvergenceReview` exports provide a separate contract for a selecting
+policy. They do not select that policy or alter the strict procedure above. Before
+launch, supply a fixed `change`, `goal`, `passRule: "charter-v1"`, positive
+`budget` at most three, and `charter` with unique string arrays `clauses`,
+`boundaries`, `tasks` and `gates`. The latter two are the actual reviewed task IDs
+and named executable gates, not invented exceptions. The binding has exactly
+`route: "terminal-adapter"`, `qualified`, `independent`, `readOnly` all true,
+`client`, `model`, and `permissions: ["read"]`. The client must have an existing
+qualified adapter record permitting the approach-reviewer role. Verify these observations and the
+actual route independently before calling: the check cannot qualify a route or
+prevent a launch. A refused binding must not be launched. The returned record starts
+at zero with empty entries and ledger; retain it from review #1 with the fixed terms.
+
+Supply the complete path/hash inventory, nonempty `packetHashes` for the complete
+review packet evidence, distinct author and fresh reviewer session
+to `convergencePacket`. Deliver its entire identity and retained ledger to the
+reviewer. For changed planning bytes, supply a `correction` with `verified: true`,
+`reference`, exact `beforeInputs` and `amendedInputs`, and zero `strictExitCode`
+and `metadataExitCode`. Verify the correction and its authority independently;
+the accepted fresh review consumes one cycle. This check does not decide whether
+the correction is routine or authorized. Re-enumerate inputs and packet evidence after review, supply `currentPacketHashes`, and
+verify the retained record and external reports before asserting
+`recordIntegrityVerified: true`. Never reconstruct a zero count after loss.
+
+The receipt repeats the whole packet `identity`, `readOnly: true`, a retained
+`reference`, native `verdict`, and explicit `findings`, `observations`,
+`coverageLimitations` and `ledgerChecks` arrays. In-scope findings have stable
+`id`, original `severity` (`High`, `Medium`, `Low`), `path`, positive `line`,
+`impact`, `trigger`, `remedy` and a fixed charter `clause`. Out-of-scope
+observations are separate, with `clause: null` and
+`scopeDisposition: "outside-charter"`; their severity is retained. A no-findings
+verdict cannot accompany in-scope findings; `Verdict: Findings` requires findings.
+Every open ledger ID needs a check: `persistent`, `regression`, or `resolved`.
+Resolution requires either `disposition: "applied"`, evidence and the current
+receipt's `reReviewReference`, or `disposition: "unfounded"`, evidence and reason.
+A reappearing resolved ID must explicitly mark `regression: true`; severity and
+scope cannot be rewritten. An empty verdict cannot erase an open blocker.
+
+Each limitation keeps the reviewer's classification: `packet-gap` with `detail`,
+`declared-deferral` with a charter `task` or `gate`, `containment-boundary` with a
+charter `boundary`, or `unclassified`. Invalid or unclassified limitations block;
+verified deferrals remain in the retained receipt for later closure evidence. One
+packet-gap result per unchanged inventory returns `repair-packet`; a subsequent
+gap blocks and prevents another packet for that snapshot before launch. A fresh reviewer must verify the repair; neither the planning bytes
+nor cycle count change. Open in-scope High/Medium findings block; Low findings and
+out-of-scope observations remain advisory. `freeze-ready` grants no freeze, plan
+approval, execution or remote authority. The orchestrator must retain the complete
+returned record and original reports; these checks do not authenticate evidence.
+
+
+### Operator procedure for selected convergence
+
+Use only when delivery verifies that the integrated parent explicitly selects charter-v1; otherwise use the strict procedure above. The introducing change remains on its inherited strict gate through integration. Before review #1 fix and retain the charter, pass rule, maximum three correction cycles (or narrower grant), qualified independent read-only binding and exact planning, validation and review authority. Admit the binding with `startConvergenceReview` before any launch. Retain its zero-count record and complete packet, reports and launch attempts across stops and resumes. This package supplies no launch backend.
+
+For each fresh review enumerate and hash every planning input and packet evidence, call `convergencePacket`, launch only the admitted fixed route under the existing grant, and call `acceptConvergenceReview` after re-hashing. Retain the returned record and the original receipt. A first packet gap permits one packet-only repair and fresh review of the unchanged snapshot; a repeated gap stops. A successful receipt is readiness only. Preserve verified deferrals for candidate closure.
+
+For a blocker, `convergenceDecision` checks the retained record, exact grant observation (`reference`, `write`, `validate`, `review`), positive preflight, launch-failure count, drift/repetition/contradiction observations, validation status, grounded finding and authorized paths. The caller must independently verify each observation and the fixed route; the helper cannot authenticate them. A single failed or timed-out launch may retry once on the same binding, with no correction charge; a second failure stops. Only an authorized routine remedy may proceed: apply it in authorized planning paths, retain before and after hashes and consumed count, run strict OpenSpec and metadata validation, then create a fresh complete packet and review. A failed validation, unexplained drift, repeated or contradictory finding, non-routine decision, exhausted narrower or record budget, or missing authority stops. Never reset counts on resume, substitute a route, or request an operator relay for an already-granted routine correction. Retain a stop decision card with the reason, two to four options and a recommendation.
+
+`freeze-ready` never freezes or approves a plan, authorizes execution, or grants remote writes. Freeze requires separate commit authority; exact-plan approval binds the frozen SHA and digest. Existing candidate review and publication gates remain unchanged.

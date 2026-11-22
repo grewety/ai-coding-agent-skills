@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "change": "planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne",
+  "plan": "d67a1b18f91d4761eb2f3b13772920a66b17e385",
+  "planDigest": "1b328fea78bf9c691ad5c21bd115438ff2737fccbbe99fbc3c602e776ecc43ce",
+  "base": "27a126d8117b45ebe2838ffd38bbff0e779ac6b5",
+  "operator": "Raphael",
+  "approval": "approved",
+  "reference": "Operator reply in this conversation, following the Item 0.5 freeze approval card.",
+  "operatorStatement": "I approve the exact frozen plan for planning-gate-convergence at commit d67a1b18f91d4761eb2f3b13772920a66b17e385 with planDigest 1b328fea78bf9c691ad5c21bd115438ff2737fccbbe99fbc3c602e776ecc43ce. Record this approval only; do not start implementation yet",
+  "recordedAt": "2026-11-22T13:51:59Z",
+  "scope": "Exact frozen plan approval only; no grant to execute or publish.",
+  "executionAuthority": "not granted",
+  "implementationStatus": "not started"
+}

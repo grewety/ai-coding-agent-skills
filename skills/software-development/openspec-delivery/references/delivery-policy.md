@@ -86,13 +86,15 @@ legacy evidence. Context contains `change`, `parent`, integrated `target`, `inpu
 and `ok: true` only after actual ancestry verification. For prospective freeze,
 `plan`/`planDigest` can be null; execution requires full literal frozen identities.
 Selection contains that exact parent `revision`, retained contract-readback
-`reference` and explicit boolean `preExecutionReview`/`continuousGoal` decisions.
+`reference` and explicit boolean `preExecutionReview`/`continuousGoal` decisions and optional `approachConvergence` decision.
 These are derived observations of contributor policy, not a new configuration
 file or permission flags. Never infer them from the working-tree contract.
 
 - Without explicit parent selection: single-group continuation and existing plan
   approval behavior; no retroactive approach review. Policy selected after freeze
   cannot widen that change or invalidate its existing approval.
+- With pre-execution review and no explicit convergence selection, retain the strict literal no-findings, empty-findings and empty-limitations gate. A working-tree edit is inert for its own change.
+- With explicit `approachConvergence: true` in the verified integrated parent and pre-execution review selected, use the charter-v1 bounded procedure in orchestration’s `references/portable-core.md`; supply its matching acceptance with `policy: "charter-v1"`. Selection never grants a launch or writes.
 - With pre-execution review: invoke the orchestration core's approach protocol,
   re-hash all inputs, and retain its `reviewReadiness` result. Supply the matching
   `reviewAcceptance` (`action: freeze-ready`, complete `inputs`, retained `reference`)

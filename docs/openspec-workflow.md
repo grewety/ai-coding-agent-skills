@@ -676,6 +676,8 @@ Independent changes may be specified and implemented at the same time.
 
 ## Documentation and review
 
+For later changes whose verified integrated parent explicitly selects charter-v1 approach convergence, use the bounded operator procedure in [the portable core](../skills/autonomous-ai-agents/autonomous-implementation-review/references/portable-core.md). The introducing change retains its inherited strict approach and candidate gates. Readiness grants no freeze, exact-plan approval, execution, or remote writes; the qualified reviewer route and launch authority remain separate.
+
 GitHub is the documentation and review surface. It is not the specification
 system and not an execution lock.
 
@@ -779,8 +781,8 @@ Orchestration is optional. It requires the workflow plugin, explicit role and
 model configuration, and a supported host. Package installation does not create
 those roles.
 
-Current source: delivery 1.2.1 in `openspec-development` 1.2.1;
-`openspec-next` 0.3.0 and core skill 0.17.0 in `autonomous-orchestration` 1.7.0.
+Current source: delivery 1.3.0 in `openspec-development` 1.3.0;
+`openspec-next` 0.4.0 and core skill 0.18.0 in `autonomous-orchestration` 1.8.0.
 Representation support adds no upstream workflow, runtime dependency or
 installation route. Package availability/byte checks do not establish account
 sync, host execution, native client discovery, Desktop acceptance or scanner approval.

@@ -735,9 +735,9 @@ no generated skill copies are committed. Its explicit skill lists separate the
 OpenSpec companion workflow from opt-in orchestration. Bump every affected plugin's version when
 its bundled content changes. See the [Claude release checks](docs/claude-installation.md#maintainer-verification).
 
-Current source versions are delivery 1.2.1 and its affected
-`openspec-development` plugin 1.2.1; `openspec-next` is 0.3.0 and
-`autonomous-orchestration` is 1.7.0 (core skill 0.17.0). Complete well-known output, the delivery
+Current source versions are delivery 1.3.0 and its affected
+`openspec-development` plugin 1.3.0; `openspec-next` is 0.4.0 and
+`autonomous-orchestration` is 1.8.0 (core skill 0.18.0). Complete well-known output, the delivery
 skill ZIP, workflow plugin ZIP and isolated native copies must retain the lossless
 reference/helper pair byte-for-byte. Source assertions are not executed packaging
 proof or a claim of updated public downloads, native client discovery, Desktop

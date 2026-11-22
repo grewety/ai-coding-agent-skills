@@ -1,0 +1,261 @@
+{
+  "schemaVersion": 1,
+  "change": "planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne",
+  "goal": "Make the opt-in pre-freeze planning gate converge within three automatic routine correction cycles without operator relays or weakening independent review, exact-plan approval, or separate authority.",
+  "cumulativeCycles": 2,
+  "countReference": "Initialized before review #1; cycle 1 applies F1 from r2/admitted.json sha256:ffb45fd49ce2e89cfd2855b075a8df5cb268a2f2d5435bcf5c3739617ea3a1bd. Cycle 2 applies F3 from r5/admitted.json sha256:0b522a056662853e3d09e03aeda36e4bdc6ab764fe88edb1377bd8a4470e9a51.",
+  "correctionVerification": {
+    "cycle": 1,
+    "findingId": "F1",
+    "status": "Strict and required-issue metadata validation passed. The first re-review report failed JSON framing; the same-binding retry returned a verified clean report. Neither retry consumed another correction cycle.",
+    "reviewAttempt": "r3/report.txt sha256:830a0000d2b07cf2a20545504876ae16f3870b1af7cf92cadca8dba9d7da6e0f",
+    "validation": {
+      "strict": "r3/strict.stdout sha256:e9badea5c7f7b78c7657cdaa0b6a1f54b9788b6dd6ced11b44c284938b036549",
+      "metadata": "r3/metadata.stdout sha256:313c471962a8a04b067b686e47023c69e73d0b0d178891adc42898681abfed92"
+    }
+  },
+  "reviewCharter": {
+    "policyBase": "27a126d8117b45ebe2838ffd38bbff0e779ac6b5",
+    "scope": "Complete draft: goal, fail-closed invariants, consistency, factual pins, affected inventory and versions, and executable planning acceptance.",
+    "exclusions": "Runtime results assigned to future implementation, helper mechanics, style, and parked Item 0.",
+    "passRule": "Existing integrated gate: latest independent matching fresh receipt, literal Verdict: No findings, empty findings and coverage limitations, and disposition of all retained findings.",
+    "routineCorrectionLimit": 3,
+    "authority": "Operator authorized interim review and up to three routine in-scope corrections; no freeze, commits, implementation, push, profile edits or change to parked Item 0."
+  },
+  "reviewerBinding": {
+    "client": "Claude Code 2.1.330",
+    "model": "claude-sonnet-4-6",
+    "containment": "Fresh minimal-rootfs bwrap; read-only allowlisted inputs; Read only; dontAsk; no built-in plugins, skills, MCP or persistence; scrubbed environment; Anthropic-only host credential and inference relay."
+  },
+  "initialAttempt": {
+    "reviewerSession": "6d417559-fd54-4816-854b-0d71acf271fd",
+    "packetSha256": "5b422658c9977fc4b9703d72e6891f4acb8bb6c89f5146c4547315f50367c7ea",
+    "manifestSha256": "76187365204f9024376c53f2cda91ead679ac59f353e5472ce2cbba4047bc235",
+    "outcome": "Timed out at the supervisor deadline before a terminal result; no receipt admitted and no correction charged.",
+    "transcriptSha256": "e0e247149c6b8b492c32a728d330922eb1ccf0d4ea64c5179233cf61d83e4770"
+  },
+  "initialRetry": {
+    "reviewerSession": "2422da0f-ff62-4f45-83c3-dbac986b80c5",
+    "packetSha256": "ed81d138a3d8b75bbfd74124f676d983b4d831ad2362040040061dbaa47a9708",
+    "manifestSha256": "76187365204f9024376c53f2cda91ead679ac59f353e5472ce2cbba4047bc235"
+  },
+  "entries": [
+    {
+      "inputs": {
+        "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/.openspec.yaml": "6780cbd140e267f34848ed93509ee0e1c20861939579ff1c3bb74a2b85a86700",
+        "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/design.md": "55e675ab325acbc6e12c52c8c9de27b57334d499a3efd9a89d4b099719fdf5d9",
+        "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/proposal.md": "649de70037607141783a87655fc9b52f79ccf62bb2840b883c20f2636d4df525",
+        "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/specs/openspec-integration/spec.md": "93d9905d8de952736c13195ba39a92bb0b65732a8274459c33526971d03e2fd4",
+        "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/tasks.md": "fb85711b80f17d399fb6a7b9161b517455e195d7c3dd80f010b019f1b12a1537",
+        "openspec/config.yaml": "5719878578ec6a96877ee711a20ff22cda46f92dfc41f96d41b313b9b5ddbd31"
+      },
+      "reference": "r2/admitted.json sha256:ffb45fd49ce2e89cfd2855b075a8df5cb268a2f2d5435bcf5c3739617ea3a1bd",
+      "authorSession": "orchestrator-item-0.5-432e38ea-a0ca-4b96-bb89-72800408eff2",
+      "reviewerSession": "2422da0f-ff62-4f45-83c3-dbac986b80c5",
+      "readOnly": true,
+      "automaticCycle": false,
+      "verdict": "Verdict: Findings",
+      "findings": [
+        {
+          "id": "F1",
+          "severity": "Medium",
+          "blocking": true,
+          "evidence": "specs/openspec-integration/spec.md:41; full finding in retained native report",
+          "summary": "The finite packet-only re-review allowance in the design is not explicit in the delta."
+        },
+        {
+          "id": "F2",
+          "severity": "Low",
+          "blocking": true,
+          "evidence": "tasks.md:10; full finding in retained native report",
+          "summary": "Reviewer reports a missing fourth limitation class."
+        }
+      ],
+      "coverageLimitations": [
+        "The semantics of `packet-gap` and the supervisor-packet boundary used in the Packet-only failure scenario are defined in the existing autonomous-implementation-review protocol (portable-core.md) and not restated in this delta spec; scenario execution depends on that external definition."
+      ]
+    },
+    {
+      "inputs": {
+        "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/.openspec.yaml": "6780cbd140e267f34848ed93509ee0e1c20861939579ff1c3bb74a2b85a86700",
+        "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/design.md": "55e675ab325acbc6e12c52c8c9de27b57334d499a3efd9a89d4b099719fdf5d9",
+        "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/proposal.md": "649de70037607141783a87655fc9b52f79ccf62bb2840b883c20f2636d4df525",
+        "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/specs/openspec-integration/spec.md": "6984bd8634aed088270dc1f58a334e96a5f9e181e21f67d5ca5ae16a6c8ef861",
+        "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/tasks.md": "fb85711b80f17d399fb6a7b9161b517455e195d7c3dd80f010b019f1b12a1537",
+        "openspec/config.yaml": "5719878578ec6a96877ee711a20ff22cda46f92dfc41f96d41b313b9b5ddbd31"
+      },
+      "reference": "r4/admitted.json sha256:b07d2619601656378ad5b58a7467eb951ed7187d354e3cebee8b7fda503addb6",
+      "authorSession": "orchestrator-item-0.5-432e38ea-a0ca-4b96-bb89-72800408eff2",
+      "reviewerSession": "d3d6670e-2c2b-4a88-b71a-56ee535d6583",
+      "readOnly": true,
+      "automaticCycle": true,
+      "verdict": "Verdict: No findings",
+      "nativeFindings": [],
+      "findings": [
+        {
+          "id": "F2",
+          "severity": "Low",
+          "blocking": false,
+          "disposition": "unfounded",
+          "evidence": "Original retained delta (r2 packet) lines 30, 38 and 42",
+          "reason": "The original delta already named declared-deferral, containment-boundary, unclassified and packet-gap."
+        }
+      ],
+      "coverageLimitations": [],
+      "correction": {
+        "finding": {
+          "id": "F1",
+          "classification": "routine",
+          "severity": "Medium",
+          "blocking": false,
+          "disposition": "applied",
+          "evidence": "specs/openspec-integration/spec.md:41–43 plus exact re-review and strict/metadata validation",
+          "remedy": "Specify the packet-gap trigger and retain the existing one-rerun bound in the delta.",
+          "reReviewReference": "r4/admitted.json sha256:b07d2619601656378ad5b58a7467eb951ed7187d354e3cebee8b7fda503addb6",
+          "inputs": {
+            "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/.openspec.yaml": "6780cbd140e267f34848ed93509ee0e1c20861939579ff1c3bb74a2b85a86700",
+            "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/design.md": "55e675ab325acbc6e12c52c8c9de27b57334d499a3efd9a89d4b099719fdf5d9",
+            "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/proposal.md": "649de70037607141783a87655fc9b52f79ccf62bb2840b883c20f2636d4df525",
+            "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/specs/openspec-integration/spec.md": "93d9905d8de952736c13195ba39a92bb0b65732a8274459c33526971d03e2fd4",
+            "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/tasks.md": "fb85711b80f17d399fb6a7b9161b517455e195d7c3dd80f010b019f1b12a1537",
+            "openspec/config.yaml": "5719878578ec6a96877ee711a20ff22cda46f92dfc41f96d41b313b9b5ddbd31"
+          }
+        },
+        "beforeInputs": {
+          "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/.openspec.yaml": "6780cbd140e267f34848ed93509ee0e1c20861939579ff1c3bb74a2b85a86700",
+          "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/design.md": "55e675ab325acbc6e12c52c8c9de27b57334d499a3efd9a89d4b099719fdf5d9",
+          "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/proposal.md": "649de70037607141783a87655fc9b52f79ccf62bb2840b883c20f2636d4df525",
+          "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/specs/openspec-integration/spec.md": "93d9905d8de952736c13195ba39a92bb0b65732a8274459c33526971d03e2fd4",
+          "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/tasks.md": "fb85711b80f17d399fb6a7b9161b517455e195d7c3dd80f010b019f1b12a1537",
+          "openspec/config.yaml": "5719878578ec6a96877ee711a20ff22cda46f92dfc41f96d41b313b9b5ddbd31"
+        },
+        "amendedInputs": {
+          "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/.openspec.yaml": "6780cbd140e267f34848ed93509ee0e1c20861939579ff1c3bb74a2b85a86700",
+          "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/design.md": "55e675ab325acbc6e12c52c8c9de27b57334d499a3efd9a89d4b099719fdf5d9",
+          "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/proposal.md": "649de70037607141783a87655fc9b52f79ccf62bb2840b883c20f2636d4df525",
+          "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/specs/openspec-integration/spec.md": "6984bd8634aed088270dc1f58a334e96a5f9e181e21f67d5ca5ae16a6c8ef861",
+          "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/tasks.md": "fb85711b80f17d399fb6a7b9161b517455e195d7c3dd80f010b019f1b12a1537",
+          "openspec/config.yaml": "5719878578ec6a96877ee711a20ff22cda46f92dfc41f96d41b313b9b5ddbd31"
+        },
+        "reReviewReference": "r4/admitted.json sha256:b07d2619601656378ad5b58a7467eb951ed7187d354e3cebee8b7fda503addb6"
+      }
+    },
+    {
+      "inputs": {
+        "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/.openspec.yaml": "6780cbd140e267f34848ed93509ee0e1c20861939579ff1c3bb74a2b85a86700",
+        "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/design.md": "55e675ab325acbc6e12c52c8c9de27b57334d499a3efd9a89d4b099719fdf5d9",
+        "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/proposal.md": "649de70037607141783a87655fc9b52f79ccf62bb2840b883c20f2636d4df525",
+        "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/specs/openspec-integration/spec.md": "6984bd8634aed088270dc1f58a334e96a5f9e181e21f67d5ca5ae16a6c8ef861",
+        "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/tasks.md": "fb85711b80f17d399fb6a7b9161b517455e195d7c3dd80f010b019f1b12a1537",
+        "openspec/config.yaml": "5719878578ec6a96877ee711a20ff22cda46f92dfc41f96d41b313b9b5ddbd31"
+      },
+      "authorSession": "orchestrator-item-0.5-432e38ea-a0ca-4b96-bb89-72800408eff2",
+      "reviewerSession": "5517bcd4-7701-444e-9520-4737a2521381",
+      "reference": "r5/admitted.json sha256:0b522a056662853e3d09e03aeda36e4bdc6ab764fe88edb1377bd8a4470e9a51",
+      "readOnly": true,
+      "automaticCycle": false,
+      "verdict": "Verdict: Findings",
+      "findings": [
+        {
+          "severity": "Low",
+          "path": "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/tasks.md",
+          "line": 11,
+          "impact": "Task 1.1 requires test evidence for 'all four limitation classes,' but the spec delta names only three coverage limitation classes by name: `declared-deferral`, `containment-boundary`, and `unclassified`. The fourth class is not enumerated in the spec's Charter-based approach acceptance requirement or its blockers scenario, leaving one required test case without a spec-derivable definition and preventing independent verification that the test suite is complete.",
+          "trigger": "`packet-gap` is defined in its own scenario as a reviewer-identified finding type that triggers a separate packet-only re-review path; the spec does not list it as a coverage limitation class alongside the other three named classes, so counting named classes in the Charter-based acceptance requirement yields three, not four, while tasks.md asserts four.",
+          "remedy": "In the spec delta, explicitly enumerate all four coverage limitation class names within the Charter-based approach acceptance requirement (or add a normative enumeration that includes `packet-gap` or whichever fourth class is intended); alternatively, reconcile tasks.md line 11 to match the three classes the spec currently defines and confirm no fourth class is intended.",
+          "classification": "routine",
+          "id": "F3",
+          "blocking": true,
+          "evidence": "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/tasks.md:11"
+        }
+      ],
+      "coverageLimitations": []
+    },
+    {
+      "inputs": {
+        "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/.openspec.yaml": "6780cbd140e267f34848ed93509ee0e1c20861939579ff1c3bb74a2b85a86700",
+        "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/design.md": "55e675ab325acbc6e12c52c8c9de27b57334d499a3efd9a89d4b099719fdf5d9",
+        "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/proposal.md": "649de70037607141783a87655fc9b52f79ccf62bb2840b883c20f2636d4df525",
+        "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/specs/openspec-integration/spec.md": "50d797e4855e3b179764d402f9af97869b1a8de18f5dcf1f920cf8db8e190691",
+        "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/tasks.md": "fb85711b80f17d399fb6a7b9161b517455e195d7c3dd80f010b019f1b12a1537",
+        "openspec/config.yaml": "5719878578ec6a96877ee711a20ff22cda46f92dfc41f96d41b313b9b5ddbd31"
+      },
+      "authorSession": "orchestrator-item-0.5-432e38ea-a0ca-4b96-bb89-72800408eff2",
+      "reviewerSession": "f6b50c59-fd31-46c4-a38e-27c82ab54933",
+      "reference": "r6/admitted.json sha256:808d405f3ab25084b746e233fa00b6ceb58f6b93d8999558c7a2957a6d3d2ed8",
+      "readOnly": true,
+      "automaticCycle": true,
+      "verdict": "Verdict: No findings",
+      "findings": [],
+      "coverageLimitations": [],
+      "correction": {
+        "finding": {
+          "severity": "Low",
+          "path": "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/tasks.md",
+          "line": 11,
+          "impact": "Task 1.1 requires test evidence for 'all four limitation classes,' but the spec delta names only three coverage limitation classes by name: `declared-deferral`, `containment-boundary`, and `unclassified`. The fourth class is not enumerated in the spec's Charter-based approach acceptance requirement or its blockers scenario, leaving one required test case without a spec-derivable definition and preventing independent verification that the test suite is complete.",
+          "trigger": "`packet-gap` is defined in its own scenario as a reviewer-identified finding type that triggers a separate packet-only re-review path; the spec does not list it as a coverage limitation class alongside the other three named classes, so counting named classes in the Charter-based acceptance requirement yields three, not four, while tasks.md asserts four.",
+          "remedy": "In the spec delta, explicitly enumerate all four coverage limitation class names within the Charter-based approach acceptance requirement (or add a normative enumeration that includes `packet-gap` or whichever fourth class is intended); alternatively, reconcile tasks.md line 11 to match the three classes the spec currently defines and confirm no fourth class is intended.",
+          "classification": "routine",
+          "id": "F3",
+          "blocking": false,
+          "evidence": "specs/openspec-integration/spec.md:26–27, 41–43; native strict and required-issue metadata passed; fresh re-review matched the amended hashes.",
+          "disposition": "applied",
+          "inputs": {
+            "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/.openspec.yaml": "6780cbd140e267f34848ed93509ee0e1c20861939579ff1c3bb74a2b85a86700",
+            "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/design.md": "55e675ab325acbc6e12c52c8c9de27b57334d499a3efd9a89d4b099719fdf5d9",
+            "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/proposal.md": "649de70037607141783a87655fc9b52f79ccf62bb2840b883c20f2636d4df525",
+            "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/specs/openspec-integration/spec.md": "6984bd8634aed088270dc1f58a334e96a5f9e181e21f67d5ca5ae16a6c8ef861",
+            "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/tasks.md": "fb85711b80f17d399fb6a7b9161b517455e195d7c3dd80f010b019f1b12a1537",
+            "openspec/config.yaml": "5719878578ec6a96877ee711a20ff22cda46f92dfc41f96d41b313b9b5ddbd31"
+          },
+          "reReviewReference": "r6/admitted.json sha256:808d405f3ab25084b746e233fa00b6ceb58f6b93d8999558c7a2957a6d3d2ed8"
+        },
+        "beforeInputs": {
+          "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/.openspec.yaml": "6780cbd140e267f34848ed93509ee0e1c20861939579ff1c3bb74a2b85a86700",
+          "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/design.md": "55e675ab325acbc6e12c52c8c9de27b57334d499a3efd9a89d4b099719fdf5d9",
+          "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/proposal.md": "649de70037607141783a87655fc9b52f79ccf62bb2840b883c20f2636d4df525",
+          "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/specs/openspec-integration/spec.md": "6984bd8634aed088270dc1f58a334e96a5f9e181e21f67d5ca5ae16a6c8ef861",
+          "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/tasks.md": "fb85711b80f17d399fb6a7b9161b517455e195d7c3dd80f010b019f1b12a1537",
+          "openspec/config.yaml": "5719878578ec6a96877ee711a20ff22cda46f92dfc41f96d41b313b9b5ddbd31"
+        },
+        "amendedInputs": {
+          "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/.openspec.yaml": "6780cbd140e267f34848ed93509ee0e1c20861939579ff1c3bb74a2b85a86700",
+          "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/design.md": "55e675ab325acbc6e12c52c8c9de27b57334d499a3efd9a89d4b099719fdf5d9",
+          "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/proposal.md": "649de70037607141783a87655fc9b52f79ccf62bb2840b883c20f2636d4df525",
+          "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/specs/openspec-integration/spec.md": "50d797e4855e3b179764d402f9af97869b1a8de18f5dcf1f920cf8db8e190691",
+          "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/tasks.md": "fb85711b80f17d399fb6a7b9161b517455e195d7c3dd80f010b019f1b12a1537",
+          "openspec/config.yaml": "5719878578ec6a96877ee711a20ff22cda46f92dfc41f96d41b313b9b5ddbd31"
+        },
+        "reReviewReference": "r6/admitted.json sha256:808d405f3ab25084b746e233fa00b6ceb58f6b93d8999558c7a2957a6d3d2ed8"
+      }
+    },
+    {
+      "inputs": {
+        "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/.openspec.yaml": "6780cbd140e267f34848ed93509ee0e1c20861939579ff1c3bb74a2b85a86700",
+        "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/design.md": "55e675ab325acbc6e12c52c8c9de27b57334d499a3efd9a89d4b099719fdf5d9",
+        "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/proposal.md": "649de70037607141783a87655fc9b52f79ccf62bb2840b883c20f2636d4df525",
+        "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/specs/openspec-integration/spec.md": "50d797e4855e3b179764d402f9af97869b1a8de18f5dcf1f920cf8db8e190691",
+        "openspec/changes/planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne/tasks.md": "fb85711b80f17d399fb6a7b9161b517455e195d7c3dd80f010b019f1b12a1537",
+        "openspec/config.yaml": "5719878578ec6a96877ee711a20ff22cda46f92dfc41f96d41b313b9b5ddbd31"
+      },
+      "authorSession": "orchestrator-item-0.5-432e38ea-a0ca-4b96-bb89-72800408eff2",
+      "reviewerSession": "620e61d2-95c5-4e4a-a792-800c9fba334e",
+      "reference": "r7/admitted.json sha256:c2c96d2ec768e32ab179a72f9f58880bf073030c2d66eb35d61bc00e7ff4afaa",
+      "readOnly": true,
+      "automaticCycle": false,
+      "verdict": "Verdict: No findings",
+      "findings": [],
+      "coverageLimitations": []
+    }
+  ],
+  "cycle2Verification": {
+    "strict": "r6/strict.stdout sha256:e9badea5c7f7b78c7657cdaa0b6a1f54b9788b6dd6ced11b44c284938b036549",
+    "metadata": "r6/metadata.stdout sha256:313c471962a8a04b067b686e47023c69e73d0b0d178891adc42898681abfed92",
+    "reReview": "r6/admitted.json sha256:808d405f3ab25084b746e233fa00b6ceb58f6b93d8999558c7a2957a6d3d2ed8"
+  },
+  "finalValidation": {
+    "strict": "r7/strict.stdout sha256:e9badea5c7f7b78c7657cdaa0b6a1f54b9788b6dd6ced11b44c284938b036549",
+    "metadata": "r7/metadata.stdout sha256:313c471962a8a04b067b686e47023c69e73d0b0d178891adc42898681abfed92"
+  }
+}

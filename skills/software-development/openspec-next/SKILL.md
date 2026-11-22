@@ -1,7 +1,7 @@
 ---
 name: openspec-next
 description: Find and advance the next approved OpenSpec task group.
-version: 0.3.0
+version: 0.4.0
 author: Raphael (forgegod), Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -113,3 +113,5 @@ Report the selected full identity, actual group and workspace, approval/dependen
 checks, executed verification and candidate/review identities or the exact blocker.
 In inspect mode report no mutations. In execution mode preserve uncompleted work,
 keep `tasks.md` as the sole task authority and stop at the authorized boundary.
+
+For parent-selected charter-v1 convergence, follow delivery policy and the bounded operator procedure in `autonomous-implementation-review/references/portable-core.md`; stop at a decision card when its limits or authority require it. Readiness is not freeze, approval, execution or remote authority.

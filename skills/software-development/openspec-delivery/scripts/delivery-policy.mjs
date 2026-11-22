@@ -89,11 +89,14 @@ export function resolveDeliveryPolicy({ phase, context, selection, contractPaths
     const declared = canonicalPaths(declaredContractPaths);
     requireThat(paths.every((p) => declared.includes(p)), "Undeclared contributor-contract edit requires operator disposition");
   }
+  requireThat(selection.approachConvergence === undefined || typeof selection.approachConvergence === "boolean", "Invalid convergence selection");
+  requireThat(selection.approachConvergence !== true || selection.preExecutionReview === true, "Convergence requires approach review");
   if (selection.preExecutionReview || selection.continuousGoal) requireThat(orchestrationAvailable === true, "Selected policy requires the orchestration package");
   if (selection.preExecutionReview) requireThat(reviewAcceptance?.action === "freeze-ready" && text(reviewAcceptance.reference) &&
-    sameInputs(reviewAcceptance.inputs, context.inputs), "Missing matching complete approach-review acceptance");
+    sameInputs(reviewAcceptance.inputs, context.inputs) &&
+    (selection.approachConvergence === true ? reviewAcceptance.policy === "charter-v1" : reviewAcceptance.policy === undefined || reviewAcceptance.policy === "strict"), "Missing matching complete approach-review acceptance");
   return { continuation: selection.continuousGoal ? "continuous-goal" : "single-group", requireApproachReview: selection.preExecutionReview,
-    integrityGuards: !exempt, policyRevision, planApproved: false, executionAuthorized: false };
+    approachPolicy: selection.approachConvergence === true ? "charter-v1" : "strict", integrityGuards: !exempt, policyRevision, planApproved: false, executionAuthorized: false };
 }
 
 export function continuationDecision({ policy, change, group, authority, restrictions, observed }) {

@@ -62,3 +62,5 @@ scope and safety. Accept the two examples only for their stated assumptions,
 not as a universal one-task or two-task template. Tests check the generated
 instruction text and these representative boundary examples; a planning reviewer
 still judges the actual plan's completeness and semantic minimality.
+
+When the integrated parent selects charter-v1 approach convergence, use the bounded review procedure in `autonomous-implementation-review/references/portable-core.md` before freeze. Do not rewrite frozen tasks or infer freeze, approval, execution, or remote authority from readiness. Otherwise retain the strict approach gate.
