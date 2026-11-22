@@ -13,6 +13,6 @@ Stop at accepted review-gate evidence or a failed check, non-routine change, or 
 
 ## 2. Opt-in delivery workflow
 
-- [ ] 2.1 After 1.1 is accepted, deliver integrated-parent selection and the operator-facing loop, with synchronized workflow guidance and all affected skill and plugin version bumps. Prove a synthetic routine draft reaches freeze-ready in at most three automatic cycles with no operator turn; exercise strict fallback, inert-for-self, budget and retry stops, and no implicit freeze, approval, execution or remote grant. Run `npm test`, `npm run build`, `openspec validate --all --strict`, and `npm run validate:openspec -- --require-issue` on the resulting tree, and check operator docs against actual behavior.
+- [x] 2.1 After 1.1 is accepted, deliver integrated-parent selection and the operator-facing loop, with synchronized workflow guidance and all affected skill and plugin version bumps. Prove a synthetic routine draft reaches freeze-ready in at most three automatic cycles with no operator turn; exercise strict fallback, inert-for-self, budget and retry stops, and no implicit freeze, approval, execution or remote grant. Run `npm test`, `npm run build`, `openspec validate --all --strict`, and `npm run validate:openspec -- --require-issue` on the resulting tree, and check operator docs against actual behavior.
 
 Stop at verified local candidate evidence or a failed gate, non-routine change, or exhausted inherited authority/correction budget. Publication and integration are not local task completion.
