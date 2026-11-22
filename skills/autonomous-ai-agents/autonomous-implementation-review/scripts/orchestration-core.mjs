@@ -1,3 +1,4 @@
+import { CANDIDATE_RECORDS, isRecordQualified } from "./terminal-adapters.mjs";
 // Pure packet/evidence checks plus re-exported adapter handoff/supervision helpers.
 // Pure core functions do no client launch or process control; adapter execution lives in terminal-adapters.mjs.
 // No Git or task-progress writes; inputs are retained observations, not authenticated grants.
@@ -202,4 +203,86 @@ export function acceptCandidateReview({ packet, review, currentHead, currentPlan
     review.planDigest === packet.authority.planDigest, "Candidate or plan changed after review");
   requireThat(completeNoFindings(review), "Missing complete literal no-findings candidate review");
   return { accepted: true, head: packet.head, planDigest: packet.authority.planDigest, reference: review.reference, publicationAuthorized: false };
+}
+
+// Structural checks over retained observations; never launches or authenticates a reviewer.
+const need = (ok, message) => { if (!ok) throw new Error(message); };
+const strings = (v) => Array.isArray(v) && v.every(text) && new Set(v).size === v.length;
+const equal = (a, b) => JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
+function canonical(v) {
+  if (Array.isArray(v)) return v.map(canonical);
+  if (v && typeof v === 'object') return Object.fromEntries(Object.keys(v).sort().map((k) => [k, canonical(v[k])]));
+  return v;
+}
+function validateFixed(r) {
+  need(r?.schemaVersion === 1 && text(r.goal) && text(r.change) && r.passRule === 'charter-v1' && Number.isSafeInteger(r.budget) && r.budget > 0 && r.budget <= 3, 'Invalid fixed terms');
+  need(r.charter && ['clauses', 'boundaries', 'tasks', 'gates'].every((k) => strings(r.charter[k])) && r.charter.clauses.length > 0, 'Invalid charter');
+  const b = r.binding;
+  need(b && equal(Object.keys(b).sort(), ['client', 'independent', 'model', 'permissions', 'qualified', 'readOnly', 'route']) && b.route === 'terminal-adapter' && b.qualified === true && b.independent === true && b.readOnly === true && text(b.client) && isRecordQualified(CANDIDATE_RECORDS[b.client], b.client) && CANDIDATE_RECORDS[b.client].roles.includes('approach-reviewer') && text(b.model) && equal(b.permissions, ['read']), 'Unqualified review binding');
+  need(Number.isSafeInteger(r.cumulativeCycles) && r.cumulativeCycles >= 0 && r.cumulativeCycles <= r.budget && Array.isArray(r.entries) && Array.isArray(r.ledger), 'Invalid continuity record');
+}
+export function startConvergenceReview({ change, goal, charter, binding, passRule, budget }) {
+  const record = { schemaVersion: 1, change, goal, charter, binding, passRule, budget, cumulativeCycles: 0, entries: [], ledger: [] };
+  validateFixed(record);
+  need(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(change), 'Invalid change');
+  return structuredClone(record);
+}
+export function convergencePacket({ record, inputs, packetHashes, authorSession, reviewerSession, correction }) {
+  validateFixed(record); inventory(record.change, inputs);
+  need(packetHashes && typeof packetHashes === 'object' && !Array.isArray(packetHashes) && Object.keys(packetHashes).length > 0 && Object.entries(packetHashes).every(([k, v]) => text(k) && /^[a-f0-9]{64}$/.test(v)), 'Missing packet hashes');
+  need(text(authorSession) && text(reviewerSession) && authorSession !== reviewerSession && !record.entries.some((e) => e.reviewerSession === reviewerSession), 'Reviewer session must be fresh and independent');
+  need(record.entries.filter((e) => equal(e.inputs, inputs) && e.coverageLimitations.some((l) => l.class === 'packet-gap')).length < 2, 'Packet-gap retry exhausted for planning snapshot');
+  const latest = record.entries.at(-1);
+  if (latest && !equal(latest.inputs, inputs)) {
+    need(correction?.verified === true && text(correction.reference) && correction.strictExitCode === 0 && correction.metadataExitCode === 0 && equal(correction.beforeInputs, latest.inputs) && equal(correction.amendedInputs, inputs) && record.cumulativeCycles < record.budget, 'Missing validated plan correction');
+  } else need(correction === undefined, 'Unexpected plan correction');
+  const identity = { change: record.change, goal: record.goal, charter: record.charter, binding: record.binding, passRule: record.passRule, budget: record.budget, cumulativeCycles: record.cumulativeCycles, inputs, packetHashes, authorSession, reviewerSession, model: record.binding.model, ledger: record.ledger, correction: correction ?? null };
+  return structuredClone({ identity });
+}
+function validFinding(f, charter, outside) {
+  return f && text(f.id) && ['High', 'Medium', 'Low'].includes(f.severity) && text(f.path) && Number.isSafeInteger(f.line) && f.line > 0 && text(f.impact) && text(f.trigger) && text(f.remedy) &&
+    (outside ? f.scopeDisposition === 'outside-charter' && f.clause === null : charter.clauses.includes(f.clause));
+}
+export function acceptConvergenceReview({ record, packet, review, currentInputs, currentPacketHashes, recordIntegrityVerified }) {
+  need(recordIntegrityVerified === true, 'Unverified retained record');
+  const i = packet?.identity;
+  need(i, 'Missing packet');
+  const expected = convergencePacket({ record, inputs: i.inputs, packetHashes: i.packetHashes, authorSession: i.authorSession, reviewerSession: i.reviewerSession, ...(i.correction ? { correction: i.correction } : {}) });
+  need(equal(packet, expected) && equal(review?.identity, i) && equal(currentInputs, i.inputs) && equal(currentPacketHashes, i.packetHashes), 'Review identity or input drift');
+  need(review.readOnly === true && text(review.reference) && Array.isArray(review.findings) && Array.isArray(review.observations) && Array.isArray(review.coverageLimitations) && Array.isArray(review.ledgerChecks), 'Incomplete receipt');
+  need(['Verdict: No findings', 'Verdict: Findings'].includes(review.verdict) && (review.verdict === 'Verdict: No findings') === (review.findings.length === 0), 'Contradictory verdict');
+  const all = [...review.findings, ...review.observations];
+  need(review.findings.every((f) => validFinding(f, record.charter, false)) && review.observations.every((f) => validFinding(f, record.charter, true)) && new Set(all.map((f) => f.id)).size === all.length, 'Invalid findings');
+  const next = structuredClone(record);
+  const open = next.ledger.filter((f) => f.status === 'open');
+  need(review.ledgerChecks.length === open.length && new Set(review.ledgerChecks.map((c) => c.id)).size === open.length && open.every((f) => review.ledgerChecks.some((c) => c.id === f.id)), 'Incomplete ledger checks');
+  for (const c of review.ledgerChecks) {
+    const f = open.find((x) => x.id === c.id);
+    need(f && ['persistent', 'regression', 'resolved'].includes(c.status), 'Invalid ledger check');
+    if (c.status === 'resolved') {
+      need((c.disposition === 'applied' && text(c.evidence) && c.reReviewReference === review.reference) || (c.disposition === 'unfounded' && text(c.evidence) && text(c.reason)), 'Invalid disposition');
+      f.status = 'resolved'; f.dispositions.push(structuredClone(c));
+    } else f.dispositions.push(structuredClone(c));
+  }
+  for (const f of all) {
+    const old = next.ledger.find((x) => x.id === f.id);
+    if (old) {
+      need(old.severity === f.severity && old.scope === (review.findings.includes(f) ? 'in-scope' : 'outside-charter') && (old.status === 'open' || f.regression === true), 'Finding identity or severity changed');
+      if (old.status === 'resolved') { old.status = 'open'; old.dispositions.push({ status: 'regression', reference: review.reference }); }
+    } else next.ledger.push({ ...structuredClone(f), scope: review.findings.includes(f) ? 'in-scope' : 'outside-charter', status: 'open', dispositions: [] });
+  }
+  let gap = false, bad = false;
+  for (const l of review.coverageLimitations) {
+    need(l && text(l.class), 'Invalid limitation');
+    if (l.class === 'packet-gap') { need(text(l.detail), 'Missing packet gap detail'); gap = true; }
+    else if (l.class === 'declared-deferral') { if (!((text(l.task) && record.charter.tasks.includes(l.task)) || (text(l.gate) && record.charter.gates.includes(l.gate)))) bad = true; }
+    else if (l.class === 'containment-boundary') { if (!record.charter.boundaries.includes(l.boundary)) bad = true; }
+    else bad = true;
+  }
+  const priorGap = record.entries.some((e) => equal(e.inputs, i.inputs) && e.coverageLimitations.some((l) => l.class === 'packet-gap'));
+  if (i.correction) next.cumulativeCycles++;
+  next.entries.push({ inputs: structuredClone(i.inputs), authorSession: i.authorSession, reviewerSession: i.reviewerSession, reference: review.reference, coverageLimitations: structuredClone(review.coverageLimitations), receipt: structuredClone(review) });
+  const blockers = next.ledger.some((f) => f.status === 'open' && f.scope === 'in-scope' && f.severity !== 'Low');
+  const action = gap && !priorGap && !bad ? 'repair-packet' : gap || bad || blockers ? 'blocked' : 'freeze-ready';
+  return { action, record: next, planApproved: false, executionAuthorized: false, remoteAuthorized: false };
 }
