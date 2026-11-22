@@ -8,8 +8,8 @@ before the upstream propose workflow invokes `openspec new change`; artifact
 context from `openspec/config.yaml` alone is not a pre-creation hook. Do not modify
 installed adapters or add a competing propose skill. OpenSpec owns scaffolding.
 
-The operator still types `/openspec-propose add-dark-mode` (or `/opsx:propose`
-on hosts using that spelling). The agent handles the identifier; the operator
+The operator still types `/openspec-propose add-dark-mode` on a host
+that uses slash invocation. The agent handles the identifier; the operator
 does not have to type or memorize a ULID. Natural-language requests first yield
 a readable lowercase kebab-case slug. Do not silently repair an explicit invalid
 identifier; ask for a corrected slug.

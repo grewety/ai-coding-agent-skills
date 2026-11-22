@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { cp, mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, open, readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -151,36 +151,26 @@ test("legacy unsuffixed change names stay valid while active and after an archiv
   assert.ok(JSON.parse(archived.stdout).files.includes("openspec/changes/archive/2026-10-30-legacy-change/proposal.md"));
 });
 
-test("opt-in upstream probe gives npm only an allowlisted execution environment", async () => {
-  const { executionEnvironment } = await import("./openspec-cli-compatibility.mjs");
-  const home = path.join(os.tmpdir(), "probe-home");
-  const inherited = {
-    PATH: "/usr/local/bin:/usr/bin", TMPDIR: "/tmp", TMP: "/tmp", TEMP: "/tmp",
-    SystemRoot: "C:\\Windows", WINDIR: "C:\\Windows", ComSpec: "C:\\Windows\\cmd.exe", PATHEXT: ".EXE;.CMD",
-    USERPROFILE: "C:\\Users\\probe", APPDATA: "C:\\Users\\probe\\AppData\\Roaming", LOCALAPPDATA: "C:\\Users\\probe\\AppData\\Local",
-    NPM_TOKEN: "secret", GH_TOKEN: "secret", AWS_SECRET_ACCESS_KEY: "secret", OPENAI_API_KEY: "secret",
-    npm_config_registry: "https://registry.evil.test", npm_config_userconfig: "/home/real/.npmrc",
-    NODE_OPTIONS: "--require /tmp/payload.mjs", HERMES_PROFILE: "default",
-  };
-  const posixNames = ["HOME", "XDG_CONFIG_HOME", "OPENSPEC_TELEMETRY", "PATH", "TMPDIR", "TMP", "TEMP"];
-  const win32Names = ["SystemRoot", "WINDIR", "ComSpec", "PATHEXT", "USERPROFILE", "APPDATA", "LOCALAPPDATA"];
-  const posix = executionEnvironment(inherited, { home, platform: "linux" });
-  assert.deepEqual(Object.keys(posix).sort(), posixNames.slice().sort());
-  assert.equal(posix.HOME, home);
-  assert.equal(posix.XDG_CONFIG_HOME, path.join(home, ".config"));
-  assert.equal(posix.OPENSPEC_TELEMETRY, "0");
-  assert.equal(posix.PATH, inherited.PATH);
-  const windows = executionEnvironment(inherited, { home, platform: "win32" });
-  assert.deepEqual(Object.keys(windows).sort(), [...posixNames, ...win32Names].sort(), "Windows needs only its own platform execution variables");
-  assert.equal(windows.USERPROFILE, home, "Windows user profile must stay in scratch");
-  assert.equal(windows.APPDATA, path.join(home, "AppData", "Roaming"));
-  assert.equal(windows.LOCALAPPDATA, path.join(home, "AppData", "Local"));
-  for (const secret of ["NPM_TOKEN", "GH_TOKEN", "AWS_SECRET_ACCESS_KEY", "OPENAI_API_KEY", "npm_config_registry", "npm_config_userconfig", "NODE_OPTIONS", "HERMES_PROFILE"]) {
-    assert.equal(secret in posix, false, `${secret} must not reach the npm child`);
-    assert.equal(secret in windows, false, `${secret} must not reach the npm child`);
+test("opt-in upstream probe runs scratch controls offline", { skip: process.platform !== "linux" }, async (t) => {
+  const scratch = await mkdtemp(path.join(os.tmpdir(), "openspec-offline-"));
+  t.after(() => rm(scratch, { recursive: true, force: true }));
+  const probe = path.join(root, "tests/openspec-cli-compatibility.mjs");
+  const capturePath = path.join(scratch, "output");
+  const capture = await open(capturePath, "wx");
+  let result;
+  try {
+    result = spawnSync(process.execPath, [probe, "--offline-controls"], {
+      env: { TMPDIR: scratch },
+      stdio: ["ignore", capture.fd, capture.fd],
+      timeout: 30_000,
+    });
+  } finally {
+    await capture.close();
   }
-  const minimal = executionEnvironment({ PATH: "/bin" }, { home, platform: "linux" });
-  assert.deepEqual(Object.keys(minimal).sort(), ["HOME", "OPENSPEC_TELEMETRY", "PATH", "XDG_CONFIG_HOME"]);
+  const output = await readFile(capturePath, "utf8");
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, output);
+  assert.match(output, /PASS offline controls/);
 });
 
 test("checker fails closed on empty sources, symlinks, invalid UTF-8 and malformed paths", async (t) => {
@@ -201,13 +191,13 @@ test("checker fails closed on empty sources, symlinks, invalid UTF-8 and malform
   assert.equal(invoke(repo).status, 1);
 });
 
-test("delta specs keep native syntax because upstream strict validation rejects frontmatter", async (t) => {
+test("repository metadata policy rejects frontmatter on otherwise native delta specs", async (t) => {
   const { repo } = await fixture(t);
+  const { validateMetadata } = await import("../scripts/validate-openspec-metadata.mjs");
   const relative = `openspec/changes/${change}/specs/nested/example/spec.md`;
+  assert.ok((await validateMetadata({ root: repo })).files.includes(relative));
   await writeFile(path.join(repo, relative), header("delta-spec", "capability: nested/example\n") + "## ADDED Requirements\n");
-  const result = invoke(repo);
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /delta spec.*frontmatter/);
+  await assert.rejects(validateMetadata({ root: repo }), /delta spec must not have frontmatter by repository policy/);
 });
 
 test("CLI rejects duplicate options and missing values", async (t) => {

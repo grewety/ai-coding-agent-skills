@@ -9,7 +9,7 @@ The process is [OpenSpec plus these companion skills](docs/openspec-workflow.md)
 OpenSpec propose, apply, sync and archive own the change package and current behavior specs. This repository does not vendor those actions.
 
 Before using the workflow, follow [Install the upstream OpenSpec prerequisites](docs/openspec-installation.md):
-CLI **1.16.0** (the npm package requires Node **22.12.0+**), Git, and **seven required upstream workflow skills**,
+CLI **2.1.1** (the npm package requires Node **22.20.0+**), Git, and **seven required upstream workflow skills**,
 including advisory verification. The guide separates Hermes profile enablement,
 Claude account uploads versus Code execution, and Codex user-global setup.
 The five packages below are companions, not a replacement for those prerequisites.
@@ -735,8 +735,8 @@ no generated skill copies are committed. Its explicit skill lists separate the
 OpenSpec companion workflow from opt-in orchestration. Bump every affected plugin's version when
 its bundled content changes. See the [Claude release checks](docs/claude-installation.md#maintainer-verification).
 
-Current source versions are delivery 1.3.0 and its affected
-`openspec-development` plugin 1.3.0; `openspec-next` is 0.4.0 and
+Current source versions are delivery 1.3.1 and its affected
+`openspec-development` plugin 1.3.1; `openspec-next` is 0.4.0 and
 `autonomous-orchestration` is 1.8.0 (core skill 0.18.0). Complete well-known output, the delivery
 skill ZIP, workflow plugin ZIP and isolated native copies must retain the lossless
 reference/helper pair byte-for-byte. Source assertions are not executed packaging

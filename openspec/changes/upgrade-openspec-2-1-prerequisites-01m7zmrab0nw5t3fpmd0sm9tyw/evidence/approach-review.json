@@ -1,0 +1,348 @@
+{
+  "schemaVersion": 1,
+  "change": "upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw",
+  "goal": "Adopt OpenSpec 2.1.1 only if the supported noninteractive isolated Claude generation route selects exactly the seven required workflows with validation and conflict detection intact. Otherwise retain the 1.16.0 contract and stop before adoption.",
+  "charter": {
+    "clauses": [
+      "immutable-release-and-scratch-isolation",
+      "exact-seven-and-supported-init-route",
+      "project-metadata-and-capability-scope",
+      "complete-current-adoption-and-shipped-package-versions",
+      "outcome-group-order-and-executable-acceptance",
+      "final-tree-claim-audit-and-no-publication"
+    ],
+    "boundaries": [
+      "read-only exported files; no checkout, profiles, Git or shell access",
+      "no reviewer network access beyond Anthropic inference via the host relay; no live upstream or GitHub queries"
+    ],
+    "tasks": [
+      "1.1",
+      "2.1",
+      "3.1"
+    ],
+    "gates": [
+      "node <scratch>/qualification/openspec-cli-compatibility.mjs",
+      "npm run test:openspec",
+      "npm run validate:openspec",
+      "npm test",
+      "npm run build"
+    ]
+  },
+  "binding": {
+    "route": "terminal-adapter",
+    "qualified": true,
+    "independent": true,
+    "readOnly": true,
+    "client": "claude-code",
+    "model": "claude-sonnet-4-6",
+    "permissions": [
+      "read"
+    ]
+  },
+  "passRule": "charter-v1",
+  "budget": 3,
+  "cumulativeCycles": 0,
+  "entries": [
+    {
+      "inputs": {
+        "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/.openspec.yaml": "5354b7028230e74b1f9295986352ad4a8253375220377f8a7a98bdbaf9251dc9",
+        "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/design.md": "ea2edc47e2411ed904f4f12ef58080243be53c0aff104746177e708dbeeba985",
+        "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/proposal.md": "8c8c57242ab02b41bd98a842077a780f134c29172148b24dfc1298fbe8da2a6c",
+        "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/specs/openspec-integration/spec.md": "0ef03d8c1015f5c9d95cc11072e9f66edc08ec896a519e09030124b1e686f2a0",
+        "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/tasks.md": "769778f7dda38a6a1bd8c4e7fc568ba6068bf0c2501b2febf82cf814b6e0ee0f",
+        "openspec/config.yaml": "e00255bbcd0689f475861788f7e3cacbfab12c16ae6f49a0b730abbba6d2437a"
+      },
+      "authorSession": "hermes-dev-orchestrator/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw",
+      "reviewerSession": "240b0c80-1a4c-4017-bbf5-b9399be8f6dd",
+      "reference": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/run/r1/report.txt",
+      "coverageLimitations": [
+        {
+          "class": "packet-gap",
+          "detail": "Pinned upstream skill template files from the OpenSpec repository at commit 0c737dc1b543249b38b0f4716816fcf493d894dd are absent from the review packet. design.md requires verifying generated skill identity contents against 'independent pinned skill references' and mapping each of the seven skill identities (openspec-explore, openspec-propose, openspec-update-change, openspec-apply-change, openspec-sync-specs, openspec-archive-change, openspec-verify-change) to pinned source content. Without those excerpts the reviewer cannot independently validate that the design's identity-to-workflow mapping is complete and correct.",
+          "task": "1.1"
+        },
+        {
+          "class": "packet-gap",
+          "detail": "Two planning evidence files referenced in proposal.md—'evidence/planning-sources/context/issue-37-historical-readback.json' (historical issue body snapshot) and 'evidence/planning-sources/release/npm.json' (npm artifact metadata capture)—are not included in the review packet. proposal.md cites them as planning context for the issue body match and artifact pin respectively. Their absence prevents the reviewer from verifying the historical issue body claim or cross-checking the SRI pin source against the npm record.",
+          "task": "2.1"
+        }
+      ],
+      "receipt": {
+        "identity": {
+          "change": "upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw",
+          "goal": "Adopt OpenSpec 2.1.1 only if the supported noninteractive isolated Claude generation route selects exactly the seven required workflows with validation and conflict detection intact. Otherwise retain the 1.16.0 contract and stop before adoption.",
+          "charter": {
+            "clauses": [
+              "immutable-release-and-scratch-isolation",
+              "exact-seven-and-supported-init-route",
+              "project-metadata-and-capability-scope",
+              "complete-current-adoption-and-shipped-package-versions",
+              "outcome-group-order-and-executable-acceptance",
+              "final-tree-claim-audit-and-no-publication"
+            ],
+            "boundaries": [
+              "read-only exported files; no checkout, profiles, Git or shell access",
+              "no reviewer network access beyond Anthropic inference via the host relay; no live upstream or GitHub queries"
+            ],
+            "tasks": [
+              "1.1",
+              "2.1",
+              "3.1"
+            ],
+            "gates": [
+              "node <scratch>/qualification/openspec-cli-compatibility.mjs",
+              "npm run test:openspec",
+              "npm run validate:openspec",
+              "npm test",
+              "npm run build"
+            ]
+          },
+          "binding": {
+            "route": "terminal-adapter",
+            "qualified": true,
+            "independent": true,
+            "readOnly": true,
+            "client": "claude-code",
+            "model": "claude-sonnet-4-6",
+            "permissions": [
+              "read"
+            ]
+          },
+          "passRule": "charter-v1",
+          "budget": 3,
+          "cumulativeCycles": 0,
+          "inputs": {
+            "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/.openspec.yaml": "5354b7028230e74b1f9295986352ad4a8253375220377f8a7a98bdbaf9251dc9",
+            "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/design.md": "ea2edc47e2411ed904f4f12ef58080243be53c0aff104746177e708dbeeba985",
+            "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/proposal.md": "8c8c57242ab02b41bd98a842077a780f134c29172148b24dfc1298fbe8da2a6c",
+            "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/specs/openspec-integration/spec.md": "0ef03d8c1015f5c9d95cc11072e9f66edc08ec896a519e09030124b1e686f2a0",
+            "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/tasks.md": "769778f7dda38a6a1bd8c4e7fc568ba6068bf0c2501b2febf82cf814b6e0ee0f",
+            "openspec/config.yaml": "e00255bbcd0689f475861788f7e3cacbfab12c16ae6f49a0b730abbba6d2437a"
+          },
+          "packetHashes": {
+            "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/.openspec.yaml": "5354b7028230e74b1f9295986352ad4a8253375220377f8a7a98bdbaf9251dc9",
+            "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/design.md": "ea2edc47e2411ed904f4f12ef58080243be53c0aff104746177e708dbeeba985",
+            "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/proposal.md": "8c8c57242ab02b41bd98a842077a780f134c29172148b24dfc1298fbe8da2a6c",
+            "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/specs/openspec-integration/spec.md": "0ef03d8c1015f5c9d95cc11072e9f66edc08ec896a519e09030124b1e686f2a0",
+            "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/tasks.md": "769778f7dda38a6a1bd8c4e7fc568ba6068bf0c2501b2febf82cf814b6e0ee0f",
+            "openspec/config.yaml": "e00255bbcd0689f475861788f7e3cacbfab12c16ae6f49a0b730abbba6d2437a",
+            "context/integrated-contract.md": "8eec246b9a3f8339dd7a8a0e7ef8d5916c0654ea7abe7b131fcc7d9c423e1b98",
+            "context/current-requirement.md": "bc303fd6ba9164ade4d52e56a08895879a9853101efa8722cb37a3e5a8f0f69f",
+            "context/marketplace.json": "73f6ed1b10a4193a733a1e26e0bf27eb2cb485d8c3f5ddeb6c28343747e2ed83",
+            "context/minimum-outcome-tasks.md": "afa8c140e72030c834050ed9297e86523a677da4c2305b0b67b3ac9fea5c2c30",
+            "context/upstream-excerpts.txt": "188150b8e86516c946e5c366f01da37438c4f2afedd370dbfcc2ea8452213f81",
+            "context/observations.md": "3a31e38c197b1335292df9ee185d18076fb57114f08306263ccfa2eef4a8cb6d"
+          },
+          "authorSession": "hermes-dev-orchestrator/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw",
+          "reviewerSession": "240b0c80-1a4c-4017-bbf5-b9399be8f6dd",
+          "model": "claude-sonnet-4-6",
+          "ledger": [],
+          "correction": null
+        },
+        "verdict": "Verdict: Findings",
+        "findings": [
+          {
+            "id": "F-01",
+            "severity": "Low",
+            "path": "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/specs/openspec-integration/spec.md",
+            "line": 4,
+            "impact": "The delta requirement body changes 'SHALL use the versioned YAML frontmatter contract' (current-requirement.md line 131–132) to 'SHALL use versioned YAML frontmatter', dropping the normative pointer to docs/openspec-metadata.md. Required per-artifact field constraints—metadata_version, artifact, change, github_issue only on proposals, capability-only identity for current specs—are no longer explicitly referenced from the spec text and must be inferred from config.yaml or the referenced document. This narrowing goes beyond the stated modification scope (rationale change for delta frontmatter only) and could cause a metadata validator reconciled against spec text alone to omit field-level contract enforcement that the original wording implied by reference.",
+            "trigger": "proposal.md describes the modification scope as: 'delta specs remain frontmatter-free by repository policy, not because 2.1.1 strict validation rejects frontmatter.' Dropping 'contract' alters the normative strength of the unrelated main-body sentence about proposals, designs, task files and current specs, extending the modification beyond its declared scope.",
+            "clause": "project-metadata-and-capability-scope",
+            "remedy": "Restore the word 'contract': change 'SHALL use versioned YAML frontmatter' back to 'SHALL use versioned YAML frontmatter contract' on line 4. No other wording in the delta needs adjustment; the rationale change for delta specs (lines 5–7) and the strengthened Invalid metadata scenario (line 23) are correct as written."
+          }
+        ],
+        "observations": [],
+        "coverageLimitations": [
+          {
+            "class": "packet-gap",
+            "detail": "Pinned upstream skill template files from the OpenSpec repository at commit 0c737dc1b543249b38b0f4716816fcf493d894dd are absent from the review packet. design.md requires verifying generated skill identity contents against 'independent pinned skill references' and mapping each of the seven skill identities (openspec-explore, openspec-propose, openspec-update-change, openspec-apply-change, openspec-sync-specs, openspec-archive-change, openspec-verify-change) to pinned source content. Without those excerpts the reviewer cannot independently validate that the design's identity-to-workflow mapping is complete and correct.",
+            "task": "1.1"
+          },
+          {
+            "class": "packet-gap",
+            "detail": "Two planning evidence files referenced in proposal.md—'evidence/planning-sources/context/issue-37-historical-readback.json' (historical issue body snapshot) and 'evidence/planning-sources/release/npm.json' (npm artifact metadata capture)—are not included in the review packet. proposal.md cites them as planning context for the issue body match and artifact pin respectively. Their absence prevents the reviewer from verifying the historical issue body claim or cross-checking the SRI pin source against the npm record.",
+            "task": "2.1"
+          }
+        ],
+        "ledgerChecks": [],
+        "readOnly": true,
+        "reference": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/run/r1/report.txt"
+      }
+    },
+    {
+      "inputs": {
+        "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/.openspec.yaml": "5354b7028230e74b1f9295986352ad4a8253375220377f8a7a98bdbaf9251dc9",
+        "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/design.md": "ea2edc47e2411ed904f4f12ef58080243be53c0aff104746177e708dbeeba985",
+        "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/proposal.md": "8c8c57242ab02b41bd98a842077a780f134c29172148b24dfc1298fbe8da2a6c",
+        "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/specs/openspec-integration/spec.md": "0ef03d8c1015f5c9d95cc11072e9f66edc08ec896a519e09030124b1e686f2a0",
+        "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/tasks.md": "769778f7dda38a6a1bd8c4e7fc568ba6068bf0c2501b2febf82cf814b6e0ee0f",
+        "openspec/config.yaml": "e00255bbcd0689f475861788f7e3cacbfab12c16ae6f49a0b730abbba6d2437a"
+      },
+      "authorSession": "hermes-dev-orchestrator/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw",
+      "reviewerSession": "57a68484-98cd-4e97-b976-17db95e50d4a",
+      "reference": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/run/r2-retry/report.txt",
+      "coverageLimitations": [
+        {
+          "class": "containment-boundary",
+          "detail": "Reviewer has no network access to live npm registry; SRI value and tag-to-commit resolution (sha512-GQv1xU4... and 0c737dc1) are accepted from retained-planning-sources.json and observations.md as captured planning inputs and cannot be independently re-verified against the live registry.",
+          "boundary": "no reviewer network access beyond Anthropic inference via the host relay; no live upstream or GitHub queries"
+        },
+        {
+          "class": "containment-boundary",
+          "detail": "Upstream source files (src/commands/config.ts, src/core/init.ts, docs/cli.md) are provided only as curated excerpts in context/upstream-excerpts.txt; full file text is unavailable for complete behavioural verification beyond the excerpted spans.",
+          "boundary": "read-only exported files; no checkout, profiles, Git or shell access"
+        }
+      ],
+      "receipt": {
+        "identity": {
+          "change": "upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw",
+          "goal": "Adopt OpenSpec 2.1.1 only if the supported noninteractive isolated Claude generation route selects exactly the seven required workflows with validation and conflict detection intact. Otherwise retain the 1.16.0 contract and stop before adoption.",
+          "charter": {
+            "clauses": [
+              "immutable-release-and-scratch-isolation",
+              "exact-seven-and-supported-init-route",
+              "project-metadata-and-capability-scope",
+              "complete-current-adoption-and-shipped-package-versions",
+              "outcome-group-order-and-executable-acceptance",
+              "final-tree-claim-audit-and-no-publication"
+            ],
+            "boundaries": [
+              "read-only exported files; no checkout, profiles, Git or shell access",
+              "no reviewer network access beyond Anthropic inference via the host relay; no live upstream or GitHub queries"
+            ],
+            "tasks": [
+              "1.1",
+              "2.1",
+              "3.1"
+            ],
+            "gates": [
+              "node <scratch>/qualification/openspec-cli-compatibility.mjs",
+              "npm run test:openspec",
+              "npm run validate:openspec",
+              "npm test",
+              "npm run build"
+            ]
+          },
+          "binding": {
+            "route": "terminal-adapter",
+            "qualified": true,
+            "independent": true,
+            "readOnly": true,
+            "client": "claude-code",
+            "model": "claude-sonnet-4-6",
+            "permissions": [
+              "read"
+            ]
+          },
+          "passRule": "charter-v1",
+          "budget": 3,
+          "cumulativeCycles": 0,
+          "inputs": {
+            "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/.openspec.yaml": "5354b7028230e74b1f9295986352ad4a8253375220377f8a7a98bdbaf9251dc9",
+            "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/design.md": "ea2edc47e2411ed904f4f12ef58080243be53c0aff104746177e708dbeeba985",
+            "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/proposal.md": "8c8c57242ab02b41bd98a842077a780f134c29172148b24dfc1298fbe8da2a6c",
+            "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/specs/openspec-integration/spec.md": "0ef03d8c1015f5c9d95cc11072e9f66edc08ec896a519e09030124b1e686f2a0",
+            "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/tasks.md": "769778f7dda38a6a1bd8c4e7fc568ba6068bf0c2501b2febf82cf814b6e0ee0f",
+            "openspec/config.yaml": "e00255bbcd0689f475861788f7e3cacbfab12c16ae6f49a0b730abbba6d2437a"
+          },
+          "packetHashes": {
+            "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/.openspec.yaml": "5354b7028230e74b1f9295986352ad4a8253375220377f8a7a98bdbaf9251dc9",
+            "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/design.md": "ea2edc47e2411ed904f4f12ef58080243be53c0aff104746177e708dbeeba985",
+            "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/proposal.md": "8c8c57242ab02b41bd98a842077a780f134c29172148b24dfc1298fbe8da2a6c",
+            "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/specs/openspec-integration/spec.md": "0ef03d8c1015f5c9d95cc11072e9f66edc08ec896a519e09030124b1e686f2a0",
+            "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/tasks.md": "769778f7dda38a6a1bd8c4e7fc568ba6068bf0c2501b2febf82cf814b6e0ee0f",
+            "openspec/config.yaml": "e00255bbcd0689f475861788f7e3cacbfab12c16ae6f49a0b730abbba6d2437a",
+            "context/integrated-contract.md": "8eec246b9a3f8339dd7a8a0e7ef8d5916c0654ea7abe7b131fcc7d9c423e1b98",
+            "context/current-requirement.md": "bc303fd6ba9164ade4d52e56a08895879a9853101efa8722cb37a3e5a8f0f69f",
+            "context/marketplace.json": "73f6ed1b10a4193a733a1e26e0bf27eb2cb485d8c3f5ddeb6c28343747e2ed83",
+            "context/minimum-outcome-tasks.md": "afa8c140e72030c834050ed9297e86523a677da4c2305b0b67b3ac9fea5c2c30",
+            "context/upstream-excerpts.txt": "188150b8e86516c946e5c366f01da37438c4f2afedd370dbfcc2ea8452213f81",
+            "context/upstream-workflow-oracle.md": "c192538d32ae975c9f584d8fa28a7686ccf17a1efbe9908add65b41a584dbd8d",
+            "context/retained-planning-sources.json": "1456e250b29aa74a451b335225bb5858137880702a78919a4e41d3cbbbfeb781",
+            "context/observations.md": "3a31e38c197b1335292df9ee185d18076fb57114f08306263ccfa2eef4a8cb6d"
+          },
+          "authorSession": "hermes-dev-orchestrator/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw",
+          "reviewerSession": "57a68484-98cd-4e97-b976-17db95e50d4a",
+          "model": "claude-sonnet-4-6",
+          "ledger": [
+            {
+              "id": "F-01",
+              "severity": "Low",
+              "path": "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/specs/openspec-integration/spec.md",
+              "line": 4,
+              "impact": "The delta requirement body changes 'SHALL use the versioned YAML frontmatter contract' (current-requirement.md line 131–132) to 'SHALL use versioned YAML frontmatter', dropping the normative pointer to docs/openspec-metadata.md. Required per-artifact field constraints—metadata_version, artifact, change, github_issue only on proposals, capability-only identity for current specs—are no longer explicitly referenced from the spec text and must be inferred from config.yaml or the referenced document. This narrowing goes beyond the stated modification scope (rationale change for delta frontmatter only) and could cause a metadata validator reconciled against spec text alone to omit field-level contract enforcement that the original wording implied by reference.",
+              "trigger": "proposal.md describes the modification scope as: 'delta specs remain frontmatter-free by repository policy, not because 2.1.1 strict validation rejects frontmatter.' Dropping 'contract' alters the normative strength of the unrelated main-body sentence about proposals, designs, task files and current specs, extending the modification beyond its declared scope.",
+              "clause": "project-metadata-and-capability-scope",
+              "remedy": "Restore the word 'contract': change 'SHALL use versioned YAML frontmatter' back to 'SHALL use versioned YAML frontmatter contract' on line 4. No other wording in the delta needs adjustment; the rationale change for delta specs (lines 5–7) and the strengthened Invalid metadata scenario (line 23) are correct as written.",
+              "scope": "in-scope",
+              "status": "open",
+              "dispositions": []
+            }
+          ],
+          "correction": null
+        },
+        "verdict": "Verdict: Findings",
+        "findings": [
+          {
+            "id": "F-01",
+            "severity": "Low",
+            "path": "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/specs/openspec-integration/spec.md",
+            "line": 4,
+            "impact": "The delta requirement body changes 'SHALL use the versioned YAML frontmatter contract' (current-requirement.md line 131–132) to 'SHALL use versioned YAML frontmatter', dropping the normative pointer to docs/openspec-metadata.md. Required per-artifact field constraints—metadata_version, artifact, change, github_issue only on proposals, capability-only identity for current specs—are no longer explicitly referenced from the spec text and must be inferred from config.yaml or the referenced document. This narrowing goes beyond the stated modification scope (rationale change for delta frontmatter only) and could cause a metadata validator reconciled against spec text alone to omit field-level contract enforcement that the original wording implied by reference.",
+            "trigger": "proposal.md declares the modification scope as 'delta specs remain frontmatter-free by repository policy, not because 2.1.1 strict validation rejects frontmatter.' Dropping 'contract' alters the normative strength of the unrelated main-body sentence about proposals, designs, task files and current specs, extending the modification beyond its declared scope. The word 'contract' remains absent in the mounted spec.md; no corrective revision is in evidence.",
+            "remedy": "Restore the word 'contract': change 'SHALL use versioned YAML frontmatter' back to 'SHALL use versioned YAML frontmatter contract' on line 4. No other wording in the delta needs adjustment; the rationale change for delta specs (lines 5–7) and the strengthened Invalid metadata scenario (line 23) are correct as written.",
+            "clause": "project-metadata-and-capability-scope"
+          }
+        ],
+        "observations": [],
+        "coverageLimitations": [
+          {
+            "class": "containment-boundary",
+            "detail": "Reviewer has no network access to live npm registry; SRI value and tag-to-commit resolution (sha512-GQv1xU4... and 0c737dc1) are accepted from retained-planning-sources.json and observations.md as captured planning inputs and cannot be independently re-verified against the live registry.",
+            "boundary": "no reviewer network access beyond Anthropic inference via the host relay; no live upstream or GitHub queries"
+          },
+          {
+            "class": "containment-boundary",
+            "detail": "Upstream source files (src/commands/config.ts, src/core/init.ts, docs/cli.md) are provided only as curated excerpts in context/upstream-excerpts.txt; full file text is unavailable for complete behavioural verification beyond the excerpted spans.",
+            "boundary": "read-only exported files; no checkout, profiles, Git or shell access"
+          }
+        ],
+        "ledgerChecks": [
+          {
+            "id": "F-01",
+            "severity": "Low",
+            "status": "persistent",
+            "regression": false,
+            "evidence": "The mounted spec.md (openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/specs/openspec-integration/spec.md) line 4 still reads 'Proposals, designs, task files and current specs SHALL use versioned YAML' continuing to line 5 'frontmatter.' — the word 'contract' is absent. No corrective revision is present in this cycle's packet; the finding condition is unchanged from the prior ledger entry."
+          }
+        ],
+        "readOnly": true,
+        "reference": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/run/r2-retry/report.txt"
+      }
+    }
+  ],
+  "ledger": [
+    {
+      "id": "F-01",
+      "severity": "Low",
+      "path": "openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/specs/openspec-integration/spec.md",
+      "line": 4,
+      "impact": "The delta requirement body changes 'SHALL use the versioned YAML frontmatter contract' (current-requirement.md line 131–132) to 'SHALL use versioned YAML frontmatter', dropping the normative pointer to docs/openspec-metadata.md. Required per-artifact field constraints—metadata_version, artifact, change, github_issue only on proposals, capability-only identity for current specs—are no longer explicitly referenced from the spec text and must be inferred from config.yaml or the referenced document. This narrowing goes beyond the stated modification scope (rationale change for delta frontmatter only) and could cause a metadata validator reconciled against spec text alone to omit field-level contract enforcement that the original wording implied by reference.",
+      "trigger": "proposal.md describes the modification scope as: 'delta specs remain frontmatter-free by repository policy, not because 2.1.1 strict validation rejects frontmatter.' Dropping 'contract' alters the normative strength of the unrelated main-body sentence about proposals, designs, task files and current specs, extending the modification beyond its declared scope.",
+      "clause": "project-metadata-and-capability-scope",
+      "remedy": "Restore the word 'contract': change 'SHALL use versioned YAML frontmatter' back to 'SHALL use versioned YAML frontmatter contract' on line 4. No other wording in the delta needs adjustment; the rationale change for delta specs (lines 5–7) and the strengthened Invalid metadata scenario (line 23) are correct as written.",
+      "scope": "in-scope",
+      "status": "open",
+      "dispositions": [
+        {
+          "id": "F-01",
+          "severity": "Low",
+          "status": "persistent",
+          "regression": false,
+          "evidence": "The mounted spec.md (openspec/changes/upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw/specs/openspec-integration/spec.md) line 4 still reads 'Proposals, designs, task files and current specs SHALL use versioned YAML' continuing to line 5 'frontmatter.' — the word 'contract' is absent. No corrective revision is present in this cycle's packet; the finding condition is unchanged from the prior ledger entry."
+        }
+      ]
+    }
+  ]
+}

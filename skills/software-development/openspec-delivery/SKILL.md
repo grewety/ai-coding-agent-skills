@@ -1,7 +1,7 @@
 ---
 name: openspec-delivery
 description: Automate setup, execution and closeout of OpenSpec changes.
-version: 1.3.0
+version: 1.3.1
 author: Raphael (forgegod), Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -126,9 +126,9 @@ before approval and keep it unchanged by default. No PR metadata or second index
 is needed. Follow the project's metadata validator; keep identity metadata covered
 by the plan digest. An authorized correction after approval requires reapproval.
 Archive moves preserve change identity; current specs must not inherit it.
-With OpenSpec 1.16.0, keep delta specs free of frontmatter: strict validation
-rejects it. Proposal/design/tasks and current specs can carry the project's
-identity schema. After spec sync, add the schema to newly created current specs
+When the project requires frontmatter-free deltas, keep their identity
+path-derived and run its metadata checker independently of upstream validation.
+Proposal/design/tasks and current specs can carry the project's identity schema. After spec sync, add the schema to newly created current specs
 under the same authorized scope and revalidate; native OpenSpec does not add it.
 
 Before a pull request is merged, and before its branch is deleted, require a

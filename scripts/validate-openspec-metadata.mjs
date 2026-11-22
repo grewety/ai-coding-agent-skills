@@ -72,7 +72,7 @@ export async function validateMetadata({ root = defaultRoot, requireIssue = fals
     catch { throw new Error(`${relative}: expected valid UTF-8`); }
     if (expected.capability) requireThat(expected.capability.split("/").every((part) => /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(part)), `${relative}: invalid capability path`);
     if (expected.artifact === "delta-spec") {
-      requireThat(!/^\uFEFF?---(?:\r?\n|$)/.test(source), `${relative}: delta spec must not have frontmatter (upstream strict validation)`);
+      requireThat(!/^\uFEFF?---(?:\r?\n|$)/.test(source), `${relative}: delta spec must not have frontmatter by repository policy`);
       requireThat(source.trim(), `${relative}: empty delta spec`);
       files.push(relative);
       return;

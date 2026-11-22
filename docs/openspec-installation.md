@@ -3,8 +3,8 @@
 This is the prerequisite guide for the [OpenSpec SDLC](openspec-workflow.md), not
 an installer or permission to execute a change. Complete four separate steps:
 
-1. Make OpenSpec CLI **1.16.0** available through its npm package on Node
-   **22.12.0+**, with Git, in the actual execution host. A Desktop account upload
+1. Make OpenSpec CLI **2.1.1** available through its npm package on Node
+   **22.20.0+**, with Git, in the actual execution host. A Desktop account upload
    does not install local executables.
 2. Install and enable the seven upstream workflows below in the intended host.
 3. Install this repository's [companion packages](../README.md#catalog) separately:
@@ -27,7 +27,7 @@ This adds no upstream skill or runtime dependency. Package installation/validati
 does not establish native Git behavior; missing native macOS/Windows results remain
 hardening completion blockers, and WSL or case simulations do not replace them.
 
-Delivery 1.3.0 (in `openspec-development` 1.3.0) also includes
+Delivery 1.3.1 (in `openspec-development` 1.3.1) also includes
 `references/evidence-retention.md` and `scripts/evidence-retention.mjs`; keep both
 in complete companion copies and ZIPs. This is local lossless representation and
 claim-support checking, not a Git helper, gate runner, reviewer authenticator or
@@ -84,33 +84,31 @@ version mismatch; do not silently upgrade the project's pin. After reviewing and
 authorizing installation into your chosen npm prefix, the pinned npm route is:
 
 ```sh
-npm install --global @fission-ai/openspec@1.16.0
+npm install --global --ignore-scripts @fission-ai/openspec@2.1.1
 openspec --version
 ```
 
-For disposable checks without changing a global installation:
+The expected CLI version is `2.1.1`. A skill's own `metadata.version` is separate.
+The release is [pinned to commit `0c737dc1b543249b38b0f4716816fcf493d894dd`](https://github.com/Fission-AI/OpenSpec/tree/0c737dc1b543249b38b0f4716816fcf493d894dd/skills).
+The compatibility probe installs the exact npm tarball from
+[the npm registry](https://registry.npmjs.org/@fission-ai/openspec/-/openspec-2.1.1.tgz)
+after checking this SHA-512 integrity value:
 
-```sh
-OPENSPEC_TELEMETRY=0 npx --yes --package=@fission-ai/openspec@1.16.0 openspec --version
+```text
+sha512-GQv1xU4uLrTVJ6MfOKNIxo/BgEk+e8C/XBmjTfzd/W3LNh4v2UMAsfTdn8mjHdjDA/KjfGstwUhZedQW4hdcZQ==
 ```
 
-`npx` can download code into its cache; it is not a no-network check. The result
-must be `1.16.0`. The package's CLI version and a skill's `metadata.version` are
-not the same version namespace. The v1.16.0 CLI already exposes `context` and
-`store`; seeing those commands in a skill is not evidence of incompatibility.
-
-Use the [v1.16.0 upstream packages](https://github.com/Fission-AI/OpenSpec/tree/v1.16.0/skills),
-reviewed at commit `27c0515724decc633818c735ee596481eec78a8b`. In a fresh review
+In a fresh review
 directory outside this distribution and outside an agent's installed skills:
 
 ```sh
 # Release source and explicit workflow selection; reuse in the sections below.
 set -eu
 export OPENSPEC_TELEMETRY=0 DISABLE_TELEMETRY=1 DO_NOT_TRACK=1
-OPENSPEC_REF=27c0515724decc633818c735ee596481eec78a8b
-OPENSPEC_SOURCE="$PWD/openspec-v1.16.0-review"
+OPENSPEC_REF=0c737dc1b543249b38b0f4716816fcf493d894dd
+OPENSPEC_SOURCE="$PWD/openspec-v2.1.1-review"
 OPENSPEC_SKILLS='openspec-explore openspec-propose openspec-update-change openspec-apply-change openspec-sync-specs openspec-archive-change openspec-verify-change'
-git clone --depth 1 --branch v1.16.0 https://github.com/Fission-AI/OpenSpec.git "$OPENSPEC_SOURCE"
+git clone --depth 1 --branch v2.1.1 https://github.com/Fission-AI/OpenSpec.git "$OPENSPEC_SOURCE"
 test "$(git -C "$OPENSPEC_SOURCE" rev-parse HEAD)" = "$OPENSPEC_REF"
 git -C "$OPENSPEC_SOURCE" status --short
 for skill in $OPENSPEC_SKILLS; do
@@ -134,26 +132,48 @@ The explicit `skills/` source avoids discovering upstream-maintainer packages
 elsewhere in the checkout. Still select only the seven names above, never
 `--all` or `--skill '*'`. `skills-sh/fission-ai/openspec/<name>` in Hermes and
 `npx skills add Fission-AI/OpenSpec` resolve moving upstream content, not our
-1.16.0 release pin. Directory discovery is neither release compatibility evidence
+2.1.1 release pin. Directory discovery is neither release compatibility evidence
 nor Hermes scanner approval. Optional discovery telemetry is disabled above.
 
 ### What native initialization does
 
-Upstream [`openspec init`](https://openspec.dev/docs/setup) creates project
-`openspec/` scaffolding and tool-specific skill/command adapters. It is not a
-Hermes profile installer or a user-global skill installer. The upstream core set
-omits verification; a generated setup needs an explicitly selected profile that
-includes it. Do not run init in this existing repository just to acquire adapters.
-Use the reviewed release checkout above instead. For another project's authorized
-initialization, inspect the matching CLI's `init --help` and profile configuration
-in a disposable workspace first; installation alone never authorizes scaffolding.
+The probe qualified Linux CLI generation for Claude using a custom profile.
+Run this recipe in a disposable working directory with a fresh scratch HOME
+and XDG config. These commands write OpenSpec configuration and generated
+files; project scope also initializes project scaffolding. Use separate fresh
+fixtures for the two scopes. Installation alone grants no authority to
+initialize a target repository or modify a live profile.
 
-A directory skill installs `/openspec-propose` in Claude Code, not `/opsx:propose`.
-The latter spelling (and `/opsx:verify`) applies only when the corresponding
-`.claude/commands/opsx/` command files were actually generated/installed. Codex
-uses skills directly. See the [upstream tool matrix](https://openspec.dev/docs/supported-tools);
-current online documentation can describe newer releases, so check the pinned
-CLI and source before adopting new flags or paths.
+```sh
+openspec config set profile custom
+openspec config set workflows '["explore","propose","update","apply","sync","archive","verify"]'
+openspec config get workflows
+openspec init --tools claude --profile custom --no-animation
+```
+
+For the project fixture, repeat the configuration and readback, then run
+`openspec init --tools claude --profile custom --scope project --no-animation`.
+Verify the configured IDs exactly. An unknown ID can be saved and ignored by
+generation, so successful exit alone is insufficient. The `update` ID selects
+the planning skill `openspec-update-change`.
+
+Global scope writes the seven packages under `$HOME/.agents/skills` with links
+from `$HOME/.claude/skills`. Project scope uses the corresponding directories
+under the project root and writes a tool marker in `.agents/skills`. Verify
+the seven names, package bytes and exact link targets. In Claude Code the
+direct skill spelling is `/openspec-propose`, for example. See the
+[workflow invocation table](openspec-workflow.md#lifecycle-picture) for the
+other names. This generation probe covers neither client loading nor execution.
+Other host routes below use reviewed copies, scanning or uploads as applicable.
+
+Before an authorized migration, check both directories at the intended scope
+for existing copies, links, and customizations. Back up and resolve collisions
+outside discovery paths first. Init can replace the selected skill paths.
+For existing projects that only need reviewed skill copies, use the copy
+route below. The
+[pinned CLI reference](https://github.com/Fission-AI/OpenSpec/blob/0c737dc1b543249b38b0f4716816fcf493d894dd/docs/cli.md)
+and [init source](https://github.com/Fission-AI/OpenSpec/blob/0c737dc1b543249b38b0f4716816fcf493d894dd/src/core/init.ts)
+describe native generation.
 
 ## Hermes: selected profile, scanning and enablement
 
@@ -299,7 +319,7 @@ skills use `/openspec-propose`; do not use that write workflow as an installatio
 smoke test. Ask instead: “Read the installed OpenSpec skill instructions and
 report their paths and prerequisites. Do not create, edit, apply or archive.”
 
-The host needs local OpenSpec 1.16.0 through its npm package on Node 22.12.0+,
+The host needs local OpenSpec 2.1.1 through its npm package on Node 22.20.0+,
 Git, project tools and repository permissions. A local directory copy is not a
 Claude account upload and does not
 sync back to the account. Avoid a second account/plugin/directory copy of the
@@ -341,7 +361,7 @@ this packaging step, choose a new output directory outside the source checkout:
 ```sh
 # Local ZIP preparation only; does not upload or install anything.
 export OPENSPEC_SOURCE OPENSPEC_SKILLS
-OPENSPEC_ZIPS="$PWD/openspec-v1.16.0-zips"
+OPENSPEC_ZIPS="$PWD/openspec-v2.1.1-zips"
 export OPENSPEC_ZIPS
 python3 - <<'PY'
 import os
@@ -425,7 +445,7 @@ Updates belong to the route that installed the copy:
   `hermes -p "$PROFILE" skills check <skill-name>`, then explicitly authorize
   `hermes -p "$PROFILE" skills update <skill-name>` after review. A commit-qualified
   URL stays on that commit; update does not choose a newer release. Moving
-  skills.sh sources can advance independently of CLI 1.16.0. Preserve edits and
+  skills.sh sources can advance independently of CLI 2.1.1. Preserve edits and
   registrations before an operator-reviewed source migration; never force it.
 - **Native copies above:** there is no updater registration. Review a new matching
   source revision, back up existing packages outside discovery paths, resolve
@@ -435,9 +455,12 @@ Updates belong to the route that installed the copy:
   commands only for copies it owns; review source/ref tracking and collisions.
   Do not assume `skills update` preserves a release pin or manages manual copies.
   See the [skills CLI reference](https://github.com/vercel-labs/skills/blob/main/docs/commands.md).
-- **Generated adapters:** `openspec update` refreshes project adapters from the
-  installed CLI/profile. It does not update user-global copies, account uploads
-  or Hermes profiles. Review its project diff under separate authority.
+- **Generated skills:** Review the new release and its generation in scratch.
+  Preflight both shared packages and client links at the selected scope, including
+  duplicate manual, project or synced copies. Back up complete packages and
+  links outside discovery before separately authorized replacement or removal.
+  Verify exact identities, bytes and resolved links, then verify loading in the
+  intended client. Keep unrelated packages and links.
 - **Uploaded ZIPs:** snapshots. Prepare/review new complete ZIPs, preserve
   customizations and explicitly resolve replacement prompts in the account UI.
   Account sync is not an independent upstream updater.
