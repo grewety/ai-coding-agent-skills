@@ -7,7 +7,7 @@ change: planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne
 
 ## 1. Independently verifiable review gate
 
-- [ ] 1.1 Deliver the charter-bound review and continuity contract with its portable documentation and synthetic tests: prove route refusal before launch, first-review record and ledger continuity, exact fresh-review identity, pass/block cases for all four limitation classes and severity thresholds, and packet-only re-review without a plan byte or cycle change.
+- [x] 1.1 Deliver the charter-bound review and continuity contract with its portable documentation and synthetic tests: prove route refusal before launch, first-review record and ledger continuity, exact fresh-review identity, pass/block cases for all four limitation classes and severity thresholds, and packet-only re-review without a plan byte or cycle change.
 
 Stop at accepted review-gate evidence or a failed check, non-routine change, or exhausted inherited authority/correction budget.
 
