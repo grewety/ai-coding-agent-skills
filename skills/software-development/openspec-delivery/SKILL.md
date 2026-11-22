@@ -1,7 +1,7 @@
 ---
 name: openspec-delivery
 description: Automate setup, execution and closeout of OpenSpec changes.
-version: 1.2.1
+version: 1.3.0
 author: Raphael (forgegod), Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -271,3 +271,5 @@ receipt/archive, the receipt file's SHA-256 and closure readbacks separately. A
 local `ok: true` means only that the helper's structural checks passed; incomplete
 or unperformed remote steps remain explicitly pending. Stop at the operator's
 authorized boundary.
+
+Parent-selected charter-v1 convergence uses the bounded operator procedure in `autonomous-implementation-review/references/portable-core.md`; strict review remains the fallback and readiness grants no freeze, approval, execution or remote writes.

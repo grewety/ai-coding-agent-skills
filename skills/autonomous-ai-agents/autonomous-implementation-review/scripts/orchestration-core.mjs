@@ -284,5 +284,23 @@ export function acceptConvergenceReview({ record, packet, review, currentInputs,
   next.entries.push({ inputs: structuredClone(i.inputs), authorSession: i.authorSession, reviewerSession: i.reviewerSession, reference: review.reference, coverageLimitations: structuredClone(review.coverageLimitations), receipt: structuredClone(review) });
   const blockers = next.ledger.some((f) => f.status === 'open' && f.scope === 'in-scope' && f.severity !== 'Low');
   const action = gap && !priorGap && !bad ? 'repair-packet' : gap || bad || blockers ? 'blocked' : 'freeze-ready';
-  return { action, record: next, planApproved: false, executionAuthorized: false, remoteAuthorized: false };
+  return { action, record: next, inputs: structuredClone(i.inputs), reference: review.reference, policy: record.passRule, planApproved: false, executionAuthorized: false, remoteAuthorized: false };
+}
+
+// Decision only: the caller retains observations and performs any authorized work.
+export function convergenceDecision({ record, authority, preflight, launchFailures, priorAttempt, repeated, contradictory, drift, validation, finding, currentInputs, authorizedPaths }) {
+  const authorityResult = { freeze: false, approval: false, execution: false, remote: false };
+  const stop = (reason) => ({ action: 'stop', reason, options: ['inspect evidence', 'request disposition'], recommendation: 'inspect evidence', authority: authorityResult });
+  try { validateFixed(record); } catch { return stop('Invalid retained record'); }
+  if (!text(authority?.reference) || !['write', 'validate', 'review'].every((key) => authority[key] === true)) return stop('Missing exact authority');
+  if (preflight !== true || drift !== false || repeated !== false || contradictory !== false || validation !== 'pass') return stop('Preflight, drift, repetition, contradiction or validation');
+  if (!Number.isSafeInteger(launchFailures) || launchFailures < 0 || launchFailures >= 2) return stop('Launch retry exhausted');
+  if (launchFailures === 1) {
+    if (priorAttempt?.verified !== true || !text(priorAttempt.reference) || !equal(priorAttempt.binding, record.binding) || !equal(priorAttempt.inputs, currentInputs)) return stop('Missing matching verified prior launch');
+    return { action: 'retry-launch', authority: authorityResult };
+  }
+  if (record.cumulativeCycles >= record.budget) return stop('Correction budget exhausted');
+  const decision = planningCorrection({ goal: record.goal, frozen: false, finding, currentInputs, authorizedPaths, cumulativeCycles: record.cumulativeCycles, repeated, contradictory });
+  if (decision.action !== 'apply-validate-review') return stop('Correction is not authorized and routine');
+  return { action: decision.action, cumulativeCycles: decision.cumulativeCycles, authority: authorityResult };
 }

@@ -277,3 +277,14 @@ nor cycle count change. Open in-scope High/Medium findings block; Low findings a
 out-of-scope observations remain advisory. `freeze-ready` grants no freeze, plan
 approval, execution or remote authority. The orchestrator must retain the complete
 returned record and original reports; these checks do not authenticate evidence.
+
+
+### Operator procedure for selected convergence
+
+Use only when delivery verifies that the integrated parent explicitly selects charter-v1; otherwise use the strict procedure above. The introducing change remains on its inherited strict gate through integration. Before review #1 fix and retain the charter, pass rule, maximum three correction cycles (or narrower grant), qualified independent read-only binding and exact planning, validation and review authority. Admit the binding with `startConvergenceReview` before any launch. Retain its zero-count record and complete packet, reports and launch attempts across stops and resumes. This package supplies no launch backend.
+
+For each fresh review enumerate and hash every planning input and packet evidence, call `convergencePacket`, launch only the admitted fixed route under the existing grant, and call `acceptConvergenceReview` after re-hashing. Retain the returned record and the original receipt. A first packet gap permits one packet-only repair and fresh review of the unchanged snapshot; a repeated gap stops. A successful receipt is readiness only. Preserve verified deferrals for candidate closure.
+
+For a blocker, `convergenceDecision` checks the retained record, exact grant observation (`reference`, `write`, `validate`, `review`), positive preflight, launch-failure count, drift/repetition/contradiction observations, validation status, grounded finding and authorized paths. The caller must independently verify each observation and the fixed route; the helper cannot authenticate them. A single failed or timed-out launch may retry once on the same binding, with no correction charge; a second failure stops. Only an authorized routine remedy may proceed: apply it in authorized planning paths, retain before and after hashes and consumed count, run strict OpenSpec and metadata validation, then create a fresh complete packet and review. A failed validation, unexplained drift, repeated or contradictory finding, non-routine decision, exhausted narrower or record budget, or missing authority stops. Never reset counts on resume, substitute a route, or request an operator relay for an already-granted routine correction. Retain a stop decision card with the reason, two to four options and a recommendation.
+
+`freeze-ready` never freezes or approves a plan, authorizes execution, or grants remote writes. Freeze requires separate commit authority; exact-plan approval binds the frozen SHA and digest. Existing candidate review and publication gates remain unchanged.

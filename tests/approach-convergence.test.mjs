@@ -60,3 +60,42 @@ test('one packet-only re-review per snapshot preserves cycle and inputs', () => 
   assert.throws(() => packet(out.record, 'review-2'));
   assert.throws(() => packet(out.record, 'review-3'), /packet/i);
 });
+
+test('bounded loop decisions preserve authority, retry and correction boundaries', async () => {
+  const { convergenceDecision } = await import('../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/orchestration-core.mjs');
+  const record = start();
+  const base = { record, authority: { reference: 'grant', write: true, validate: true, review: true }, preflight: true, launchFailures: 0, repeated: false, contradictory: false, drift: false, validation: 'pass', finding: { id: 'F', classification: 'routine', inputs, paths: ['proposal'], evidence: 'e', remedy: 'fix' }, currentInputs: inputs, authorizedPaths: ['proposal'] };
+  assert.equal(convergenceDecision(base).action, 'apply-validate-review');
+  for (const update of [{ preflight: false }, { drift: true }, { repeated: true }, { contradictory: true }, { validation: 'fail' }, { launchFailures: 2 }, { authority: { ...base.authority, review: false } }, { record: { ...record, cumulativeCycles: 3 } }]) assert.equal(convergenceDecision({ ...base, ...update }).action, 'stop');
+  const attempt = { verified: true, reference: 'attempt', binding, inputs };
+  assert.equal(convergenceDecision({ ...base, launchFailures: 1 }).action, 'stop');
+  assert.equal(convergenceDecision({ ...base, launchFailures: 1, priorAttempt: attempt }).action, 'retry-launch');
+  for (const priorAttempt of [{ ...attempt, verified: false }, { ...attempt, reference: '' }, { ...attempt, binding: { ...binding, model: 'other' } }, { ...attempt, inputs: { ...inputs, 'openspec/config.yaml': 'e'.repeat(64) } }]) assert.equal(convergenceDecision({ ...base, launchFailures: 1, priorAttempt }).action, 'stop');
+  assert.deepEqual(convergenceDecision(base).authority, { freeze: false, approval: false, execution: false, remote: false });
+});
+
+test('synthetic routine corrections reach readiness without an operator relay', async () => {
+  const { convergenceDecision } = await import('../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/orchestration-core.mjs');
+  let record = start(), current = inputs, p = packet(record), out = accept(record, p, receipt(p, { verdict: 'Verdict: Findings', findings: [finding('F1')] }));
+  record = out.record;
+  for (let cycle = 1; cycle <= 3; cycle++) {
+    const request = { record, authority: { reference: 'grant', write: true, validate: true, review: true }, preflight: true, launchFailures: 0, repeated: false, contradictory: false, drift: false, validation: 'pass', finding: { id: 'F1', classification: 'routine', inputs: current, paths: ['proposal'], evidence: 'e', remedy: 'fix' }, currentInputs: current, authorizedPaths: ['proposal'] };
+    assert.equal(convergenceDecision(request).action, 'apply-validate-review');
+    const amended = { ...current, 'openspec/config.yaml': String(cycle).repeat(64) };
+    p = convergencePacket({ record, inputs: amended, packetHashes, authorSession: 'author', reviewerSession: `review-${cycle + 1}`, correction: { verified: true, reference: 'validation', beforeInputs: current, amendedInputs: amended, strictExitCode: 0, metadataExitCode: 0 } });
+    const check = cycle < 3 ? { id: 'F1', status: 'persistent' } : { id: 'F1', status: 'resolved', disposition: 'applied', evidence: 'fixed', reReviewReference: `receipt-review-${cycle + 1}` };
+    out = accept(record, p, receipt(p, { ledgerChecks: [check] }), amended);
+    assert.equal(out.action, cycle < 3 ? 'blocked' : 'freeze-ready');
+    record = out.record; current = amended;
+    if (out.action === 'freeze-ready') break;
+  }
+  assert.equal(record.cumulativeCycles, 3); assert.equal(out.remoteAuthorized, false);
+  assert.deepEqual(out.inputs, current); assert.equal(out.reference, 'receipt-review-4'); assert.equal(out.policy, 'charter-v1');
+  const { resolveDeliveryPolicy } = await import('../skills/software-development/openspec-delivery/scripts/delivery-policy.mjs');
+  const parent = 'e'.repeat(40);
+  const request = { phase: 'freeze', context: { ok: true, change, parent, target: parent, inputs: current }, selection: { revision: parent, reference: 'parent', preExecutionReview: true, continuousGoal: false, approachConvergence: true }, contractPaths: [], orchestrationAvailable: true, reviewAcceptance: out };
+  const policy = resolveDeliveryPolicy(request);
+  assert.equal(policy.approachPolicy, 'charter-v1'); assert.equal(policy.planApproved, false); assert.equal(policy.executionAuthorized, false);
+  assert.throws(() => resolveDeliveryPolicy({ ...request, context: { ...request.context, inputs } }), /review/);
+  assert.throws(() => resolveDeliveryPolicy({ ...request, selection: { ...request.selection, approachConvergence: false } }), /review/);
+});

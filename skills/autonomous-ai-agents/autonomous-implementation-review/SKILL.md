@@ -1,7 +1,7 @@
 ---
 name: autonomous-implementation-review
 description: Implement changes with an independent review loop.
-version: 0.17.0
+version: 0.18.0
 author: Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -25,12 +25,12 @@ One authorized OpenSpec change, one named task group per worker; no GitHub write
 
 ## Portable core
 
-Follow [references/portable-core.md](references/portable-core.md),
-[references/terminal-adapters.md](references/terminal-adapters.md),
-[references/profile-preparation.md](references/profile-preparation.md) and
-`references/openspec.md`, without Hermes or Herdr. Use
-[references/worker-handoff.md](references/worker-handoff.md). Dispatch uses a
-qualified adapter; replacement readiness precedes retirement; no fallback.
+Follow `references/portable-core.md`, `references/terminal-adapters.md`,
+`references/profile-preparation.md`, `references/openspec.md`, and
+`references/worker-handoff.md` without Hermes or Herdr. Dispatch uses a qualified
+adapter; replacement readiness precedes retirement; no fallback. For integrated-parent
+charter-v1 review, the portable core bounds readiness; it grants no freeze, approval,
+execution or remote writes.
 
 ## Legacy host execution
 
