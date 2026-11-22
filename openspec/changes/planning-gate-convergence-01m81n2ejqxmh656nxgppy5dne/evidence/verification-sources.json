@@ -1,0 +1,155 @@
+{
+  "sourceScope": "Integrated source verification only; no deployment or closeout PR result claimed.",
+  "node": "v24.21.0",
+  "integratedEnvironment": "WSL/Linux isolated Item 0.5 closure worktree; npm ci; OpenSpec telemetry disabled for gates",
+  "candidateReview": {
+    "source": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-spec-review-N3SLEH/accepted-candidate.json",
+    "sha256": "b6be5c5f9453f37372cb1cfbfc9a27794c9c0cae533f30045a1874846e5698d0"
+  },
+  "checksRaw": {
+    "source": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-finish-zoVQgN/checks.pages",
+    "sha256": "943c551fad70c80d0aeaaa6df0873e3d1ba2d51c2d460b2f22815d36c976045e"
+  },
+  "premergeThreads": {
+    "source": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-finish-zoVQgN/threads.pages",
+    "sha256": "0267eb7b930823f124e3407968d5e15928885d678afdceb460cf3e708b49c166",
+    "observedAt": "2026-11-22T15:24:12Z",
+    "scope": "Paginated exact-head review thread readback; all threads resolved"
+  },
+  "merge": {
+    "source": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-finish-zoVQgN/merged-pr.json",
+    "sha256": "7c28a9987b63dd159e6b08af591dc1ea6425e4e5059040f502d9969e30dcfc41",
+    "mergedAt": "2026-11-22T15:24:22Z",
+    "integrated": "bb8ade7547e055a3506f5e04411e497fa83a9fa4"
+  },
+  "main": {
+    "source": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-finish-zoVQgN/merged-main.json",
+    "sha256": "6b7f38fb75ec060f3860fdd78b102593d6a64bc29ad628796fb13b2fe30fcb8b",
+    "head": "bb8ade7547e055a3506f5e04411e497fa83a9fa4"
+  },
+  "candidate": [
+    {
+      "gate": {
+        "command": "npm test",
+        "commit": "d2112714421ab337ebc03bbea3d40a1b366e5e1a",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-spec-sync-eEttKG/candidate-gates/npm-test.json"
+      },
+      "recordSha256": "91b89d5907ec71f7dc8a175c9bb8f6d3b613e79667cbfb43ad0a3f1bd4160418",
+      "stdoutSha256": "95a2f95c197615ad7e452c462f1e869fc8b17cb746bf38f82eb1693201f8579d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "gate": {
+        "command": "npm run build",
+        "commit": "d2112714421ab337ebc03bbea3d40a1b366e5e1a",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-spec-sync-eEttKG/candidate-gates/npm-build.json"
+      },
+      "recordSha256": "71fca0404b4cb9877494a3de8f50e661987a3d5835b7da79633bad52497a5ac8",
+      "stdoutSha256": "b149e4402718b00767e0507ef38f99dfb805508c29bbabca458bc6d1d8678b6d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "gate": {
+        "command": "openspec validate --all --strict",
+        "commit": "d2112714421ab337ebc03bbea3d40a1b366e5e1a",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-spec-sync-eEttKG/candidate-gates/strict.json"
+      },
+      "recordSha256": "72b10556344915dfed9a23f04e3f5c671ae405e67e1903c143e3e5edd2de198c",
+      "stdoutSha256": "e9badea5c7f7b78c7657cdaa0b6a1f54b9788b6dd6ced11b44c284938b036549",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "gate": {
+        "command": "npm run validate:openspec -- --require-issue",
+        "commit": "d2112714421ab337ebc03bbea3d40a1b366e5e1a",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-spec-sync-eEttKG/candidate-gates/metadata.json"
+      },
+      "recordSha256": "73f1246b908dbb26a8371b2e90fdb683963e98bc50debc209a7f3b9235db093d",
+      "stdoutSha256": "b19cd28c17b59d9939b0b320acffb58cf76a3f52aeb47c8dc065922b76a776d1",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "gate": {
+        "command": "git diff --check",
+        "commit": "d2112714421ab337ebc03bbea3d40a1b366e5e1a",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-spec-sync-eEttKG/candidate-gates/diff-check.json"
+      },
+      "recordSha256": "9587a981797a547377eab2c48d9d211eb1d3f55906e853ce4e18dda59b36900f",
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "gate": {
+        "command": "node /home/raphael/.hermes/profiles/hermes-dev/skills/software-development/openspec-delivery/scripts/change-guard.mjs candidate --repo /home/raphael/src/ai-coding-agent-skills--planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne --change planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne --base 27a126d8117b45ebe2838ffd38bbff0e779ac6b5 --head d2112714421ab337ebc03bbea3d40a1b366e5e1a --plan d67a1b18f91d4761eb2f3b13772920a66b17e385 --expect-plan 1b328fea78bf9c691ad5c21bd115438ff2737fccbbe99fbc3c602e776ecc43ce",
+        "commit": "d2112714421ab337ebc03bbea3d40a1b366e5e1a",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-spec-sync-eEttKG/candidate-gates/candidate-guard.json"
+      },
+      "recordSha256": "d637c60376103a2afba1e2557f6a00418515be58037b27d5912c32643711f80f",
+      "stdoutSha256": "aed5de23212143f04f5ac1bbf2b66b06c5d540e9ed7ae7b1b1836d29e56a30b3",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "integrated": [
+    {
+      "gate": {
+        "command": "npm test",
+        "commit": "bb8ade7547e055a3506f5e04411e497fa83a9fa4",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-finish-zoVQgN/integrated-gates/npm-test.json"
+      },
+      "recordSha256": "88d682e5e2b108e11d34a677a1dfbcee6c0c9c7e49acbe1feedc4b18ad48c10e",
+      "stdoutSha256": "54ecf18ebfd8baab0ab1e79e7f542a4eb7953df93b9c8fd8f599f6d92be9d6c7",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "gate": {
+        "command": "npm run build",
+        "commit": "bb8ade7547e055a3506f5e04411e497fa83a9fa4",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-finish-zoVQgN/integrated-gates/npm-build.json"
+      },
+      "recordSha256": "70801395bb80844192a5c7717781b50f5271dfbef75c993fca1f2c5df5f0f573",
+      "stdoutSha256": "86b2d1b5ad98b88d31ea8978c664435a0a9a5c743f1d1fe114997e679ab1ecb9",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "gate": {
+        "command": "openspec validate --all --strict",
+        "commit": "bb8ade7547e055a3506f5e04411e497fa83a9fa4",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-finish-zoVQgN/integrated-gates/strict.json"
+      },
+      "recordSha256": "eaa9d76514ee8130a848375709186fcf9fcaefcb2c77388b62166b868bab489c",
+      "stdoutSha256": "e9badea5c7f7b78c7657cdaa0b6a1f54b9788b6dd6ced11b44c284938b036549",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "gate": {
+        "command": "npm run validate:openspec -- --require-issue",
+        "commit": "bb8ade7547e055a3506f5e04411e497fa83a9fa4",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-finish-zoVQgN/integrated-gates/metadata.json"
+      },
+      "recordSha256": "e3c844e57a7db5796f7c099be72da89f7968db2d09adff551a5024179f91289b",
+      "stdoutSha256": "b19cd28c17b59d9939b0b320acffb58cf76a3f52aeb47c8dc065922b76a776d1",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "gate": {
+        "command": "git diff --check",
+        "commit": "bb8ade7547e055a3506f5e04411e497fa83a9fa4",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-finish-zoVQgN/integrated-gates/diff-check.json"
+      },
+      "recordSha256": "980866efe37c766db1acc1f04995b99823ba5e49ccadf942cc9e1e8b23ee1007",
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}
