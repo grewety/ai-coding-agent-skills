@@ -1,0 +1,81 @@
+{
+  "schemaVersion": 1,
+  "change": "upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw",
+  "issueUrl": "https://github.com/grewety/ai-coding-agent-skills/issues/37",
+  "base": "20a96ea7b67f4bc954632c87cece3f3a7697b3d4",
+  "head": "b3a28c165fdf0e6a41acd8696b9db39ed3950046",
+  "plan": "251dd6843966a0f32b8fa7874734e95b0e096b5c",
+  "planDigest": "04014b69cf8c2fafc3a9ad6fb527506c90b7440fe88d07f3336aa347452534db",
+  "integrated": "d718f124cff567ab33629903c04922839795fcee",
+  "verified": "d718f124cff567ab33629903c04922839795fcee",
+  "review": {
+    "schemaVersion": 1,
+    "change": "upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw",
+    "issueUrl": "https://github.com/grewety/ai-coding-agent-skills/issues/37",
+    "head": "b3a28c165fdf0e6a41acd8696b9db39ed3950046",
+    "planDigest": "04014b69cf8c2fafc3a9ad6fb527506c90b7440fe88d07f3336aa347452534db",
+    "verdict": "pass",
+    "findings": [],
+    "reviewer": "claude-code/claude-sonnet-4-6/6afb6711-d0d2-4819-97c8-b3b1a3eabfc8",
+    "reference": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/review3/report.txt",
+    "gates": [
+      {
+        "command": "npm run test:openspec",
+        "commit": "b3a28c165fdf0e6a41acd8696b9db39ed3950046",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-gates-final/openspec.stdout"
+      },
+      {
+        "command": "npm run validate:openspec",
+        "commit": "b3a28c165fdf0e6a41acd8696b9db39ed3950046",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-gates-final/metadata.stdout"
+      },
+      {
+        "command": "npm test",
+        "commit": "b3a28c165fdf0e6a41acd8696b9db39ed3950046",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-gates-final/full.stdout"
+      },
+      {
+        "command": "npm run build",
+        "commit": "b3a28c165fdf0e6a41acd8696b9db39ed3950046",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-gates-final/build.stdout"
+      },
+      {
+        "command": "python3 audit.py --candidate b3a28c165fdf0e6a41acd8696b9db39ed3950046 (retained residual-claim audit)",
+        "commit": "b3a28c165fdf0e6a41acd8696b9db39ed3950046",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-audit-retained/final-candidate/result.json"
+      }
+    ]
+  },
+  "integrationReference": "https://github.com/grewety/ai-coding-agent-skills/pull/41",
+  "gates": [
+    {
+      "command": "npm run validate:openspec",
+      "commit": "d718f124cff567ab33629903c04922839795fcee",
+      "exitCode": 0,
+      "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/integrated/metadata.stdout"
+    },
+    {
+      "command": "npm test",
+      "commit": "d718f124cff567ab33629903c04922839795fcee",
+      "exitCode": 0,
+      "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/integrated/full.stdout"
+    },
+    {
+      "command": "npm run build",
+      "commit": "d718f124cff567ab33629903c04922839795fcee",
+      "exitCode": 0,
+      "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/integrated/build.stdout"
+    },
+    {
+      "command": "npm run test:openspec",
+      "commit": "d718f124cff567ab33629903c04922839795fcee",
+      "exitCode": 0,
+      "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/integrated/openspec.stdout"
+    }
+  ]
+}
