@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "task": "3.1",
+  "inputParent": "a85070bd6e07314a12d31e7699c976536b4622c3",
+  "plan": "251dd6843966a0f32b8fa7874734e95b0e096b5c",
+  "planDigest": "04014b69cf8c2fafc3a9ad6fb527506c90b7440fe88d07f3336aa347452534db",
+  "inputsSha256": {
+    "docs/openspec-metadata.md": "ca3b6b66dc06df163b6dc5093c7e9f1cb347bbcaec6894b369341d1fd615ab93",
+    "docs/openspec-workflow.md": "e02f4de726fb244605f679eb65e0c0ee99c80cead432a1c91f0985b78295b14f"
+  },
+  "gates": [
+    {
+      "command": "npm run test:openspec",
+      "exitCode": 0,
+      "stdoutSha256": "7f99ba294d0cf8ca92c29fb45e07b00ddf1fdd82449fbd5ae30ae3e09ec0650a",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "traceSha256": "251268d2ad9d8faef57d487d234e609d2afb43fd03775126f771d2567f61849a"
+    },
+    {
+      "command": "npm run validate:openspec",
+      "exitCode": 0,
+      "stdoutSha256": "290565acdc0707752e2d98f476812bf0607ff59d24a0899c934b3b8bff3e2d5d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "traceSha256": "b3e304cf48de71a2222370d05be1d52f4ba6e325581e4ccd9b2e8634561bfc0b"
+    },
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "stdoutSha256": "b32335b222495c71c6fbb6bdc657eec9f0852ea1197bd4b1f101ac56f26c30e3",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "traceSha256": "a008e36a7e489348587fd67448a61a0993c161f5ea2f094d49b26c38ed8bb97a"
+    },
+    {
+      "command": "npm run build",
+      "exitCode": 0,
+      "stdoutSha256": "82c28ffaadfa60d0f8068b3c55552767e4ebbdd5f44b5c151e31d4d12261cec6",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "traceSha256": "5b27e1cd7c540058146da79dc80c2fdef6acacdde57b83b21663aea85a12dad0"
+    }
+  ],
+  "gateEvidence": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-gates-c1",
+  "claimAudit": {
+    "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-audit-retained",
+    "runnerSha256": "9208071fb2b3e2cc3590c3ff9d2c4e7bd985ce3799e731ac27caaafd1304b94f",
+    "authoritySha256": "fde2b14f915138f3dbdfa874717ed54729b0e140047188f9c5019bae55115aa5",
+    "preCommitResultSha256": "ad77b63349fb08f3c88736533114e99cc14c2bdcf044e9db8ee905667af2fa71",
+    "shippingInventorySha256": "0d31726fb829991d5cae07bbf446bb64db9d4342cb55c2619c0e315877cbeecf",
+    "shippingInputs": 110,
+    "hits": 153,
+    "blockedHits": 0,
+    "controlsPassed": 17,
+    "note": "The shipping inventory excludes this active planning package and archived records, as required by the frozen plan. The committed candidate is re-audited and read back externally."
+  },
+  "notes": [
+    "Exact OpenSpec 2.1.1 validate --all --strict passed on a disposable repository copy.",
+    "All 368 tests passed; the build emitted five skills and two Claude plugins.",
+    "One bounded correction removed two unsupported documentation claims. No prohibited profile access was observed in the worker and gate traces."
+  ]
+}

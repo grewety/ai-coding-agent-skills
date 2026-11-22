@@ -15,7 +15,7 @@ change: upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw
 
 ## 3. Verify the final tree
 
-- [ ] 3.1 After 2.1, verify the final tree: run `npm run test:openspec` (including exact-CLI `validate --all --strict` on a disposable repository copy), `npm run validate:openspec`, `npm test`, and `npm run build`; run and retain the mandatory final-tree claim audit in design.md, including new shipping inputs. Verify the final scope and retained evidence; a failed gate blocks integration.
+- [x] 3.1 After 2.1, verify the final tree: run `npm run test:openspec` (including exact-CLI `validate --all --strict` on a disposable repository copy), `npm run validate:openspec`, `npm test`, and `npm run build`; run and retain the mandatory final-tree claim audit in design.md, including new shipping inputs. Verify the final scope and retained evidence; a failed gate blocks integration.
 
 ## Workflow follow-up
 

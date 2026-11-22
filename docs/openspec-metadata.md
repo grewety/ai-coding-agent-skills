@@ -98,8 +98,8 @@ syncing requirements must preserve current-spec identity. If upstream creates a
 current spec without frontmatter, add its
 `spec`/capability header as part of the explicitly authorized spec-sync work,
 then run both checks. New capability deltas should include a meaningful
-`## Purpose` section so native spec creation does not leave a placeholder that
-fails strict validation. Do not patch installed OpenSpec adapters.
+`## Purpose` section to supply the purpose for the new current spec.
+Do not patch installed OpenSpec adapters.
 
 ## Vault integration
 

@@ -829,6 +829,6 @@ of the exact candidate. Do not replace retained failures with prototype results.
 
 Local authority is defined above, not attributed to upstream:
 
-- [OpenSpec actions](https://github.com/Fission-AI/OpenSpec/blob/0c737dc1b543249b38b0f4716816fcf493d894dd/docs/workflows.md)
+- [OpenSpec skill actions by host](#lifecycle-picture) for the direct-directory Claude Code and Hermes routes and Codex skill mentions.
 - [OpenSpec verification skill](https://github.com/Fission-AI/OpenSpec/blob/0c737dc1b543249b38b0f4716816fcf493d894dd/skills/openspec-verify-change/SKILL.md)
 - [OpenSpec configuration](https://github.com/Fission-AI/OpenSpec/blob/0c737dc1b543249b38b0f4716816fcf493d894dd/docs/customization.md)
