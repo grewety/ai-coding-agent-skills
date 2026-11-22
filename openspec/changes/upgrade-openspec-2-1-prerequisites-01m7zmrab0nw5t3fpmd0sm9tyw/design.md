@@ -1,0 +1,36 @@
+---
+metadata_version: 1
+artifact: design
+change: upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw
+---
+# Design
+
+## Context
+
+The 2026-11-22 isolated probe installed 2.1.1 with `--ignore-scripts`, passed `validate --all --strict` on all three current specs, and generated the exact seven workflows with `init` in global and project scope. It observed Claude links into `.agents/skills`. `init` replaces colliding OpenSpec skill paths in both locations; do not rely on preservation there. Preservation of edited legacy `.claude/commands/opsx/*` in the observed project fixture does not imply protection of current skill paths. Keep collision checks before any operator-facing migration and do not run these commands against real profiles for this change.
+
+## Decisions
+
+### Qualify the immutable release in scratch
+
+Verify tag `v2.1.1` resolves to `0c737dc1b543249b38b0f4716816fcf493d894dd` and `@fission-ai/openspec@2.1.1` requires Node `>=22.20.0`. Fetch `https://registry.npmjs.org/@fission-ai/openspec/-/openspec-2.1.1.tgz` and verify `sha512-GQv1xU4uLrTVJ6MfOKNIxo/BgEk+e8C/XBmjTfzd/W3LNh4v2UMAsfTdn8mjHdjDA/KjfGstwUhZedQW4hdcZQ==` before installing that exact file with `--ignore-scripts` into an empty prefix. Verify installed identity and run only the resolved in-prefix CLI with the preflighted Node executable. Reject too-old Node and tampered input. Retain the resolved dependency inventory; the top-level SRI does not pin transitive resolution.
+
+Use a credential-minimized environment with disposable project, HOME, XDG config, explicit npm user/global config and cache paths, and `OPENSPEC_TELEMETRY=0`, `DISABLE_TELEMETRY=1`, `DO_NOT_TRACK=1`. Verify rejection of ambient contaminants and unsafe paths or links; check generated paths and resolved links stay in scratch. This environment reduces accidental access; it is not an OS sandbox. Never read or write real agent profiles or npm configuration, run this CLI from the owning worktree, or run `openspec update` anywhere. Preserve exact fixture inputs, commands, outputs and verification evidence outside the disposable roots before any separately authorized cleanup.
+
+### Verify the supported setup rather than a documentation keyword
+
+In fresh scratch, run `config set profile custom`, then `config set workflows '["explore","propose","update","apply","sync","archive","verify"]'`, then `init --tools claude --profile custom` (global/default scope and separately with `--scope project`). `update` in the JSON is a workflow ID, not an executed command. [Pinned CLI documentation](https://github.com/Fission-AI/OpenSpec/blob/0c737dc1b543249b38b0f4716816fcf493d894dd/docs/cli.md) documents generic configuration and custom-profile initialization; the [config handler](https://github.com/Fission-AI/OpenSpec/blob/0c737dc1b543249b38b0f4716816fcf493d894dd/src/commands/config.ts) and [init implementation](https://github.com/Fission-AI/OpenSpec/blob/0c737dc1b543249b38b0f4716816fcf493d894dd/src/core/init.ts) supply selection semantics. Require reproduced behavior, not a literal `workflows` example in `cli.md`. Do not depend on the retired `delivery` setting or accept a source-copy route as qualification.
+
+Require these exact generated identities, not just a count: `openspec-explore`, `openspec-propose`, `openspec-update-change`, `openspec-apply-change`, `openspec-sync-specs`, `openspec-archive-change`, `openspec-verify-change`. Map them in order to the workflow IDs above. Verify their contents against the independent pinned skill references, their scope and link targets, and rejection of unknown or mismatched selections. Advertise only invocation spellings supported by pinned evidence and, for the exercised Claude route, matching output or generated content. Treat layout, migration/removal, and invocation syntax as separate claims. Other hosts may have documented routes, but are not qualified by this probe.
+
+Verify strict validation on current specs and synthetic deltas (including allowed upstream frontmatter, modified-requirement warning, invalid and conflicting inputs), task discovery, sync, safe archive refusal and generated formatting, and current-spec metadata after sync. Keep project metadata validation independent: delta specs are frontmatter-free, identity remains path-derived, and current specs carry only capability identity. Carry the frozen delta into the current requirement once; protected closeout must not reapply an already integrated delta. The modified body must stay within 480 Unicode code points after trimming and collapsing whitespace, excluding the heading and scenarios.
+
+### Adopt and audit without changing the package boundary
+
+Once 1.1 passes, transfer the proven behavior to the tracked probe. Its URL and SRI must work without any active or archived change evidence directory. Reconcile the metadata diagnostic/tests and all affected current prerequisite and installation routes (README, prerequisite, SDLC, Claude and metadata guides, config and companion guidance), including version/source pins, host prerequisites, inventory, install/update/removal and verification. Audit the frozen `openspec/config.yaml` read-only. Keep all five canonical packages and existing bundle membership. Bump each changed shipped skill and every plugin bundling it (including `openspec-development` for changes to its contents), or just the affected plugin for plugin-only changes; unshipped docs alone do not require a bump. Verify resulting versions and inventories with focused tests.
+
+Task 3.1 repeats the claim audit on the final tree. Include current source, docs, config, specs and tests, including new files intended to ship; exclude archived records and this active planning package. Search `1.16.0`, `22.12.0`, `27c0515724decc633818c735ee596481eec78a8b`, other OpenSpec source pins, old version statements, `.claude/commands/opsx`, `/opsx:`, and stale validation rationale (including wrapped text). Semantically check pins, paths, install/removal routes, layout, invocation and validation claims against supported 2.1.1 evidence. Retain the runnable audit, path/SHA-256 inventory, per-hit dispositions, controls and result; rehash before acceptance. Fail on stale, ambiguous or unsupported claims. Precise search-definition spans are not compatibility claims. Only in the compatibility probe may an exact legacy token in a true negative assertion be paired with an immediately preceding `// LEGACY_NEGATIVE_CONTROL: <exact-token>`; demonstrate rejection of unrelated, positive, diagnostic-only, wrong-file, mismatched or orphaned markers. No file-wide exception.
+
+## Migration and stops
+
+Keep group 1 disposable and the tracked 1.16.0 contract unchanged until qualification succeeds. On failure retain evidence and stop before adoption with dependent tasks unchecked. Group 2 owns the adoption changes and their focused tests/docs. Group 3 verifies cross-surface integration on the final tree; any unresolved failure blocks integration. No fallback to ambient CLI, profile access, cleanup, rollback, or publication is implied. Every group requires exact-plan approval and separate execution authority; each has at most two routine execution correction/review cycles, bounded further by the execution grant. An exhausted budget or material boundary conflict stops for operator disposition.
