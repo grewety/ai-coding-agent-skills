@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "kind": "lossless-evidence-representation",
+  "encoding": "utf8",
+  "content": "{\n  \"head\": \"d2112714421ab337ebc03bbea3d40a1b366e5e1a\",\n  \"checks\": [\n    {\n      \"id\": \"137254785925\",\n      \"conclusion\": \"success\",\n      \"completedAt\": \"2026-11-22T15:19:37Z\",\n      \"detail\": \"https://github.com/grewety/ai-coding-agent-skills/actions/runs/45037627567/job/137254785925\"\n    },\n    {\n      \"id\": \"137254733149\",\n      \"conclusion\": \"success\",\n      \"completedAt\": \"2026-11-22T15:19:29Z\",\n      \"detail\": \"https://github.com/grewety/ai-coding-agent-skills/actions/runs/45037610288/job/137254733149\"\n    }\n  ]\n}\n",
+  "storedArtifactSha256": "4764d223c64173668cc9bf6473fa49d65d0ec468d74399359c742411f56a394d",
+  "decodedOriginalSha256": "4764d223c64173668cc9bf6473fa49d65d0ec468d74399359c742411f56a394d",
+  "provenance": {
+    "source": "GitHub REST, retained paginated exact-head check-runs SHA-256 943c551fad70c80d0aeaaa6df0873e3d1ba2d51c2d460b2f22815d36c976045e",
+    "command": [
+      "gh",
+      "api",
+      "--paginate",
+      "repos/grewety/ai-coding-agent-skills/commits/d2112714421ab337ebc03bbea3d40a1b366e5e1a/check-runs?per_page=100"
+    ],
+    "environmentScope": "Existing authenticated GitHub CLI; no credentials retained",
+    "exitStatus": 0,
+    "observedAt": "2026-11-22T15:24:10Z",
+    "extractedAt": "2026-11-22T15:26:06.319Z",
+    "revision": "d2112714421ab337ebc03bbea3d40a1b366e5e1a",
+    "scope": "All verify check runs from GitHub Actions app 15368 at the exact implementation head",
+    "pagination": "complete",
+    "readbackType": "historical-extract"
+  },
+  "labels": {
+    "representation": "historical-extract",
+    "completeness": "complete",
+    "confidentiality": "publishable"
+  },
+  "wrapperSha256": "2e4de098812a60df632f46f8f6171304f2604a08533cd8efd46ae5c9c20f9e80"
+}

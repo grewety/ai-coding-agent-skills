@@ -1,0 +1,93 @@
+{
+  "schemaVersion": 1,
+  "change": "planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne",
+  "issueUrl": "https://github.com/grewety/ai-coding-agent-skills/issues/38",
+  "base": "27a126d8117b45ebe2838ffd38bbff0e779ac6b5",
+  "head": "d2112714421ab337ebc03bbea3d40a1b366e5e1a",
+  "plan": "d67a1b18f91d4761eb2f3b13772920a66b17e385",
+  "planDigest": "1b328fea78bf9c691ad5c21bd115438ff2737fccbbe99fbc3c602e776ecc43ce",
+  "integrated": "bb8ade7547e055a3506f5e04411e497fa83a9fa4",
+  "verified": "bb8ade7547e055a3506f5e04411e497fa83a9fa4",
+  "review": {
+    "schemaVersion": 1,
+    "change": "planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne",
+    "issueUrl": "https://github.com/grewety/ai-coding-agent-skills/issues/38",
+    "head": "d2112714421ab337ebc03bbea3d40a1b366e5e1a",
+    "planDigest": "1b328fea78bf9c691ad5c21bd115438ff2737fccbbe99fbc3c602e776ecc43ce",
+    "verdict": "pass",
+    "findings": [],
+    "reviewer": "Claude Code 2.1.330 / claude-sonnet-4-6 / 4dad6aa5-cff4-4eeb-84f4-1e1adfaa437c",
+    "reference": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-spec-review-N3SLEH/admitted-review.json sha256:c830abe730e959af9bdc4774b7d77e0a0ac4a2dcc7aaab88e27bc827409d9eb0",
+    "gates": [
+      {
+        "command": "npm test",
+        "commit": "d2112714421ab337ebc03bbea3d40a1b366e5e1a",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-spec-sync-eEttKG/candidate-gates/npm-test.json"
+      },
+      {
+        "command": "npm run build",
+        "commit": "d2112714421ab337ebc03bbea3d40a1b366e5e1a",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-spec-sync-eEttKG/candidate-gates/npm-build.json"
+      },
+      {
+        "command": "openspec validate --all --strict",
+        "commit": "d2112714421ab337ebc03bbea3d40a1b366e5e1a",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-spec-sync-eEttKG/candidate-gates/strict.json"
+      },
+      {
+        "command": "npm run validate:openspec -- --require-issue",
+        "commit": "d2112714421ab337ebc03bbea3d40a1b366e5e1a",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-spec-sync-eEttKG/candidate-gates/metadata.json"
+      },
+      {
+        "command": "git diff --check",
+        "commit": "d2112714421ab337ebc03bbea3d40a1b366e5e1a",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-spec-sync-eEttKG/candidate-gates/diff-check.json"
+      },
+      {
+        "command": "node /home/raphael/.hermes/profiles/hermes-dev/skills/software-development/openspec-delivery/scripts/change-guard.mjs candidate --repo /home/raphael/src/ai-coding-agent-skills--planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne --change planning-gate-convergence-01m81n2ejqxmh656nxgppy5dne --base 27a126d8117b45ebe2838ffd38bbff0e779ac6b5 --head d2112714421ab337ebc03bbea3d40a1b366e5e1a --plan d67a1b18f91d4761eb2f3b13772920a66b17e385 --expect-plan 1b328fea78bf9c691ad5c21bd115438ff2737fccbbe99fbc3c602e776ecc43ce",
+        "commit": "d2112714421ab337ebc03bbea3d40a1b366e5e1a",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-spec-sync-eEttKG/candidate-gates/candidate-guard.json"
+      }
+    ]
+  },
+  "integrationReference": "https://github.com/grewety/ai-coding-agent-skills/pull/39",
+  "gates": [
+    {
+      "command": "npm test",
+      "commit": "bb8ade7547e055a3506f5e04411e497fa83a9fa4",
+      "exitCode": 0,
+      "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-finish-zoVQgN/integrated-gates/npm-test.json"
+    },
+    {
+      "command": "npm run build",
+      "commit": "bb8ade7547e055a3506f5e04411e497fa83a9fa4",
+      "exitCode": 0,
+      "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-finish-zoVQgN/integrated-gates/npm-build.json"
+    },
+    {
+      "command": "openspec validate --all --strict",
+      "commit": "bb8ade7547e055a3506f5e04411e497fa83a9fa4",
+      "exitCode": 0,
+      "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-finish-zoVQgN/integrated-gates/strict.json"
+    },
+    {
+      "command": "npm run validate:openspec -- --require-issue",
+      "commit": "bb8ade7547e055a3506f5e04411e497fa83a9fa4",
+      "exitCode": 0,
+      "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-finish-zoVQgN/integrated-gates/metadata.json"
+    },
+    {
+      "command": "git diff --check",
+      "commit": "bb8ade7547e055a3506f5e04411e497fa83a9fa4",
+      "exitCode": 0,
+      "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/pgc-finish-zoVQgN/integrated-gates/diff-check.json"
+    }
+  ]
+}
