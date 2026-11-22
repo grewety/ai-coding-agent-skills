@@ -35,12 +35,11 @@ a capability outlives individual changes. Never copy change/issue metadata from
 a delta into the current spec. Keep OpenSpec's Markdown headings and task syntax.
 `.openspec.yaml` remains OpenSpec-owned; do not duplicate its schema/created fields.
 
-Delta specs deliberately have **no frontmatter**. OpenSpec 1.16.0 strict validation
-rejects text above the first `## ` section as content archive will not carry into
-the main spec. The compatibility probe locks in this negative control. Keep native
-delta headings; derive change/capability from their directory paths instead. Do
-not disable strict validation, hide YAML in comments, or patch upstream adapters.
-The local checker rejects frontmatter on deltas and still inventories those files.
+Delta specs have **no frontmatter** by repository policy. Keep native delta
+headings and derive change and capability identity from directory paths.
+OpenSpec 2.1.1 strict validation accepts the frontmatter-bearing test delta.
+The read-only local checker inventories deltas and rejects their frontmatter
+independently. Run both checks.
 
 This convention uses plain YAML scalars and is compatible with Dataview fields
 and Obsidian properties. It is not the Agent Skills `SKILL.md` metadata schema.
@@ -81,13 +80,17 @@ metadata hashing exemption and no extra Markdown index.
   issue exists, is in the intended repository, or was authorized; exact GitHub
   readback remains the operator's responsibility.
 - `npm test` runs offline metadata fixtures and checks the actual repository.
-- `npm run test:openspec` is an opt-in pinned OpenSpec 1.16.0 compatibility probe
-  in an isolated scratch HOME/project. It exercises strict validation, task
-  discovery and real spec-update/archive behavior with synthetic completed work.
-  It is not validation of real implementation, permission to archive this change,
-  or a test of the Obsidian GUI. It requires npm/network access to the pinned CLI.
-  Pinning a version and redirecting HOME is not an OS sandbox or a supply-chain
-  integrity guarantee. Review/trust the upstream package before running it.
+- `npm run test:openspec` is the opt-in OpenSpec 2.1.1 compatibility probe.
+  On Linux it requires Node 22.20.0+, npm alongside Node, Git, curl and network
+  access. It checks the release tag commit, tarball SRI, and seven generated
+  Claude skills against pinned content hashes in both global and project scope.
+  It also checks strict validation on an isolated copy of the repository's
+  OpenSpec tree and exercises task discovery, agent-driven sync and native
+  archive in synthetic fixtures. HOME, XDG paths and npm config/cache are
+  separate per fixture. The allowlist minimizes inherited credentials without
+  providing OS sandboxing. SRI pins the top-level tarball; the probe retains the
+  resolved dependency inventory and captures command/fixture evidence at the
+  reported scratch path. Client loading and execution require separate checks.
 
 Run both the metadata checker and upstream strict validation before approval.
 After sync/archive, validate again: moving a change preserves its frontmatter;

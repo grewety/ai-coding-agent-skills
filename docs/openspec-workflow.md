@@ -9,11 +9,11 @@ already keep older records leave those records in place.
 OpenSpec's own CLI and native workflows remain a separate prerequisite. Follow
 [Install the upstream OpenSpec prerequisites](openspec-installation.md) for the
 authoritative seven-skill inventory, host-specific installation/enablement and
-loading checks. This repository does not vendor them. Use OpenSpec 1.16.0 through
-its npm package on Node 22.12.0+, with Git. Review upstream packages before
+loading checks. This repository does not vendor them. Use OpenSpec 2.1.1 through
+its npm package on Node 22.20.0+, with Git. Review upstream packages before
 executing them. Verification is
 a mandatory setup skill but an advisory workflow: `/openspec-verify-change` for
-a direct Claude skill, or `/opsx:verify` only with that command adapter installed.
+a direct Claude skill.
 It is not an `openspec verify` CLI command and does not block archival by itself.
 
 The picture and the field-notes walk-through below are unexecuted examples.
@@ -231,27 +231,24 @@ links. It does not own either task list.
 Host spelling differs. The documented direct-directory Claude Code and Hermes
 routes use `/openspec-<action>` with the exact skill names below. Codex uses
 `/skills` to select the skill or `$openspec-<action>` with the same exact name.
-The `/opsx:*` spelling is valid only when the corresponding generated
-command-adapter files were actually installed (for Claude Code,
-`.claude/commands/opsx/`). A directory skill copy does not install those adapters.
-Do not run `openspec init` in this existing repository just to acquire them.
+The qualified Claude generation route writes the same named skills under
+`.agents/skills` and links them from `.claude/skills`. Verify actual loading in the
+intended client separately.
 
 This SDLC assumes all seven setup skills in the
-[authoritative prerequisite inventory](openspec-installation.md#required-upstream-inventory),
-not the upstream six-skill core profile alone. The table maps those actions to
-host invocations; it does not define a separate setup inventory. Examples in this
-document use the direct-directory Claude Code/Hermes spelling; Codex users select
-the same skill through `/skills` or replace the leading `/` with `$`.
+[authoritative prerequisite inventory](openspec-installation.md#required-upstream-inventory).
+Examples use the direct Claude Code/Hermes spelling. Codex users select the
+same skill through `/skills` or use the skill mention below.
 
-| Action | Direct-directory Claude Code / Hermes | Codex skill mention | Generated adapter only, if installed |
-| --- | --- | --- | --- |
-| Think before a plan | `/openspec-explore` | `$openspec-explore` | `/opsx:explore` |
-| Create the change and its planning artifacts | `/openspec-propose` | `$openspec-propose` | `/opsx:propose` |
-| Revise planning artifacts | `/openspec-update-change` | `$openspec-update-change` | `/opsx:update` |
-| Implement tasks | `/openspec-apply-change` | `$openspec-apply-change` | `/opsx:apply` |
-| Merge accepted delta specs into current specs | `/openspec-sync-specs` | `$openspec-sync-specs` | `/opsx:sync` |
-| Move the finished change to the archive | `/openspec-archive-change` | `$openspec-archive-change` | `/opsx:archive` |
-| Review completeness, correctness and coherence | `/openspec-verify-change` | `$openspec-verify-change` | `/opsx:verify` |
+| Action | Direct-directory Claude Code / Hermes | Codex skill mention |
+| --- | --- | --- |
+| Think before a plan | `/openspec-explore` | `$openspec-explore` |
+| Create the change and its planning artifacts | `/openspec-propose` | `$openspec-propose` |
+| Revise planning artifacts | `/openspec-update-change` | `$openspec-update-change` |
+| Implement tasks | `/openspec-apply-change` | `$openspec-apply-change` |
+| Merge accepted delta specs into current specs | `/openspec-sync-specs` | `$openspec-sync-specs` |
+| Move the finished change to the archive | `/openspec-archive-change` | `$openspec-archive-change` |
+| Review completeness, correctness and coherence | `/openspec-verify-change` | `$openspec-verify-change` |
 
 Verification is required at setup but advisory in use. It does not replace project
 gates, independently block archive, or archive the change. It is not an
@@ -781,7 +778,7 @@ Orchestration is optional. It requires the workflow plugin, explicit role and
 model configuration, and a supported host. Package installation does not create
 those roles.
 
-Current source: delivery 1.3.0 in `openspec-development` 1.3.0;
+Current source: delivery 1.3.1 in `openspec-development` 1.3.1;
 `openspec-next` 0.4.0 and core skill 0.18.0 in `autonomous-orchestration` 1.8.0.
 Representation support adds no upstream workflow, runtime dependency or
 installation route. Package availability/byte checks do not establish account
@@ -832,7 +829,6 @@ of the exact candidate. Do not replace retained failures with prototype results.
 
 Local authority is defined above, not attributed to upstream:
 
-- [OpenSpec team workflow](https://github.com/Fission-AI/OpenSpec/blob/6d04a1b58dedc95729d34e4f223d9d483aae210a/docs/team-workflow.md)
-- [OpenSpec actions](https://github.com/Fission-AI/OpenSpec/blob/6d04a1b58dedc95729d34e4f223d9d483aae210a/docs/workflows.md)
-- [OpenSpec verification](https://github.com/Fission-AI/OpenSpec/blob/6d04a1b58dedc95729d34e4f223d9d483aae210a/docs/reviewing-changes.md)
-- [OpenSpec configuration](https://github.com/Fission-AI/OpenSpec/blob/6d04a1b58dedc95729d34e4f223d9d483aae210a/docs/customization.md)
+- [OpenSpec actions](https://github.com/Fission-AI/OpenSpec/blob/0c737dc1b543249b38b0f4716816fcf493d894dd/docs/workflows.md)
+- [OpenSpec verification skill](https://github.com/Fission-AI/OpenSpec/blob/0c737dc1b543249b38b0f4716816fcf493d894dd/skills/openspec-verify-change/SKILL.md)
+- [OpenSpec configuration](https://github.com/Fission-AI/OpenSpec/blob/0c737dc1b543249b38b0f4716816fcf493d894dd/docs/customization.md)

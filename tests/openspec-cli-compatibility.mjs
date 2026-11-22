@@ -1,434 +1,401 @@
-// Opt-in real upstream probe. All CLI writes stay in a disposable project/HOME.
-// The child environment is an allowlist, not a sandbox: it prevents accidental inheritance of
-// credentials and npm configuration, and does not restrict filesystem or network access.
+// Opt-in real upstream probe. The credential-minimized child environment is not an OS sandbox.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { cp, lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import * as fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { validateMetadata } from "../scripts/validate-openspec-metadata.mjs";
+import { lifecycle } from "./openspec-cli-lifecycle.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-const pinned = "1.16.0";
-const win32Names = ["SystemRoot", "WINDIR", "ComSpec", "PATHEXT"];
+const packageName = "@fission-ai/openspec";
+const version = "2.1.1";
+const commit = "0c737dc1b543249b38b0f4716816fcf493d894dd";
+const url = "https://registry.npmjs.org/@fission-ai/openspec/-/openspec-2.1.1.tgz";
+const sri = "sha512-GQv1xU4uLrTVJ6MfOKNIxo/BgEk+e8C/XBmjTfzd/W3LNh4v2UMAsfTdn8mjHdjDA/KjfGstwUhZedQW4hdcZQ==";
+// SHA-256 of each independent SKILL.md at the pinned upstream tag commit.
+const workflowSkills = {
+  explore: ["openspec-explore", "8eb7074d34277cf09e630ebd189a127154b8007d48445824b2c4c676806d501a"],
+  propose: ["openspec-propose", "e353e74472fdef44af4af2c646348085b5b87df60efe06949ca401ff00c972e6"],
+  update: ["openspec-update-change", "ca7ef061078b2260be47c2654e7df29b4c81ac1173dc73cbd565c3ea40879e87"],
+  apply: ["openspec-apply-change", "a8933b263ab01b4ce0a04ac805bd5321cadab78c84b6717b8617fea7eb2dc7dc"],
+  sync: ["openspec-sync-specs", "75556d2ca69892525698a0c681e0c3deead1e25f3b7b9be5449eaaf1621f026b"],
+  archive: ["openspec-archive-change", "8ea5eb23ac050a781616c7b951228c9763f62fccb7e0a6537f286679f1c01a08"],
+  verify: ["openspec-verify-change", "3b86fbb9734fdb6b942dd12d0afa4247457aa7f212bb48832eae133f5e66880a"],
+};
+const workflows = Object.keys(workflowSkills);
+const names = Object.values(workflowSkills).map(([name]) => name).sort();
+const hash = (bytes, algorithm = "sha256", encoding = "hex") =>
+  createHash(algorithm).update(bytes).digest(encoding);
+const assertSri = (bytes) => assert.equal(
+  `sha512-${hash(bytes, "sha512", "base64")}`, sri, "OpenSpec tarball SRI",
+);
 
-// Minimal platform execution allowlist plus scratch HOME/XDG/telemetry. Nothing else is inherited:
-// credentials, NPM_TOKEN-style variables, npm_config_* and NODE_OPTIONS must not reach the child.
-export function executionEnvironment(source, { home, platform = process.platform } = {}) {
-  assert.ok(home, "executionEnvironment requires a scratch home");
-  const env = { HOME: home, XDG_CONFIG_HOME: path.join(home, ".config"), OPENSPEC_TELEMETRY: "0" };
-  if (platform === "win32") Object.assign(env, {
-    USERPROFILE: home,
-    APPDATA: path.join(home, "AppData", "Roaming"),
-    LOCALAPPDATA: path.join(home, "AppData", "Local"),
-  });
-  for (const name of ["PATH", "TMPDIR", "TMP", "TEMP", ...(platform === "win32" ? win32Names : [])]) {
-    if (typeof source[name] === "string") env[name] = source[name];
-  }
-  return env;
+function checkNode(value) {
+  const match = /^v(\d+)\.(\d+)\.(\d+)$/.exec(value);
+  assert.ok(match, `Expected stable Node version, observed ${value}`);
+  const [, major, minor] = match.map(Number);
+  assert.ok(major > 22 || (major === 22 && minor >= 20), `Node >=22.20.0 required, observed ${value}`);
 }
 
-const header = (artifact, extra = "", name) => `---\nmetadata_version: 1\nartifact: ${artifact}\n${artifact === "spec" ? "" : `change: ${name}\n`}${extra}---\n`;
-
-// Upstream core has six workflows. This does not redefine this repository's
-// seven-workflow prerequisite inventory (which also requires verification).
-const coreSkills = [
-  "openspec-propose", "openspec-explore", "openspec-apply-change",
-  "openspec-update-change", "openspec-sync-specs", "openspec-archive-change",
-].sort();
-const coreCommands = ["propose.md", "explore.md", "apply.md", "update.md", "sync.md", "archive.md"].sort();
-const requiredCoreFiles = [
-  ...coreSkills.map((name) => `.claude/skills/${name}/SKILL.md`),
-  ...coreCommands.map((name) => `.claude/commands/opsx/${name}`),
-].sort();
-const forbiddenReferences = [
-  "/openspec-new-change", "/openspec-continue-change", "/openspec-ff-change",
-  "/openspec-bulk-archive-change", "/openspec-verify-change", "/openspec-onboard",
-  "/opsx:new", "/opsx:continue", "/opsx:ff", "/opsx:bulk-archive", "/opsx:verify", "/opsx:onboard",
-  "/openspec-new", "/openspec-continue", "/openspec-ff", "/openspec-bulk-archive", "/openspec-verify",
-];
-
-function assertCoreInventory(skills, commands) {
-  assert.deepEqual([...skills].sort(), coreSkills, "core skill inventory");
-  assert.deepEqual([...commands].sort(), coreCommands, "core command inventory");
+function inside(root, target) {
+  const relative = path.relative(root, target);
+  assert.ok(relative && relative !== ".." && !relative.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relative), `Path escapes ${root}: ${target}`);
+  return relative;
 }
 
-function assertCoreReferences(relative, content) {
-  // Tokenize first so ordinary words, native CLI fallbacks and longer unrelated
-  // names are not banned. Hyphenated variants of omitted workflows remain banned.
-  const tokens = content.matchAll(/(?<![\w/-])(?:\/?openspec-[\w-]+|\/opsx:[\w-]+)/g);
-  for (const [token] of tokens) {
-    const invocation = token.startsWith("/") ? token : `/${token}`;
-    assert.ok(!forbiddenReferences.some((forbidden) => invocation === forbidden || invocation.startsWith(`${forbidden}-`)), `${relative}: forbidden optional workflow reference ${token}`);
+// Check each component before accessing the next one. Only the explicit Claude
+// leaf is allowed to be a symlink, and its resolved target must match exactly.
+async function regularPath(root, target, kind) {
+  const parts = inside(root, target).split(path.sep);
+  let current = root;
+  for (const [index, part] of parts.entries()) {
+    current = path.join(current, part);
+    const stat = await fs.lstat(current);
+    const expected = index === parts.length - 1 ? kind : "directory";
+    assert.ok(expected === "directory" ? stat.isDirectory() : stat.isFile(),
+      `Expected real ${expected}: ${current}`);
   }
+  return target;
 }
 
-async function collectCoreFiles(project) {
-  async function directory(relative) {
-    const stat = await lstat(path.join(project, relative));
-    assert.ok(stat.isDirectory() && !stat.isSymbolicLink(), `${relative}: expected a real directory`);
-    return readdir(path.join(project, relative), { withFileTypes: true });
-  }
-  await directory(".claude");
-  const skills = await directory(".claude/skills");
-  const commandsRoot = await directory(".claude/commands");
-  assert.deepEqual(commandsRoot.map((entry) => entry.name).sort(), ["opsx"], "core command namespace inventory");
-  const commands = await directory(".claude/commands/opsx");
-  assertCoreInventory(skills.map((entry) => entry.name), commands.filter((entry) => !entry.isDirectory()).map((entry) => entry.name));
-  for (const skill of coreSkills) await directory(`.claude/skills/${skill}`);
-  const files = new Map();
-  async function walk(relative) {
-    for (const entry of await directory(relative)) {
-      const child = `${relative}/${entry.name}`;
-      const stat = await lstat(path.join(project, child));
-      assert.ok(!stat.isSymbolicLink(), `${child}: symlinks are not generated regular files`);
-      if (stat.isDirectory()) await walk(child);
-      else {
-        assert.ok(stat.isFile(), `${child}: expected a regular file`);
-        const content = await readFile(path.join(project, child), "utf8");
-        assert.ok(content.trim().length > 0, `${child}: empty generated file`);
-        files.set(child, content);
+function environment(base, node) {
+  const home = path.join(base, "home");
+  const temp = path.join(base, "tmp");
+  return {
+    HOME: home, XDG_CONFIG_HOME: path.join(base, "config"),
+    XDG_CACHE_HOME: path.join(base, "cache"), XDG_STATE_HOME: path.join(base, "state"),
+    XDG_DATA_HOME: path.join(base, "data"),
+    TMPDIR: temp, TMP: temp, TEMP: temp,
+    PATH: [path.dirname(node), "/usr/bin", "/bin"].join(path.delimiter),
+    LANG: "C", TZ: "UTC", CI: "1", NO_COLOR: "1",
+    OPENSPEC_TELEMETRY: "0", DISABLE_TELEMETRY: "1", DO_NOT_TRACK: "1",
+    npm_config_userconfig: path.join(base, "user.npmrc"),
+    npm_config_globalconfig: path.join(base, "global.npmrc"),
+    npm_config_cache: path.join(base, "npm-cache"),
+    npm_config_registry: "https://registry.npmjs.org/",
+    npm_config_ignore_scripts: "true",
+    GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null",
+    GIT_TERMINAL_PROMPT: "0",
+  };
+}
+
+async function inventory(root) {
+  const result = {};
+  async function walk(dir) {
+    for (const name of (await fs.readdir(dir)).sort()) {
+      const target = path.join(dir, name);
+      const relative = inside(root, target);
+      const stat = await fs.lstat(target);
+      if (stat.isSymbolicLink()) {
+        const link = await fs.readlink(target);
+        inside(root, path.resolve(dir, link));
+        // Check the immediate target without following any intermediate links.
+        await regularPath(root, path.resolve(dir, link), "directory");
+        result[relative] = { link };
+      } else if (stat.isDirectory()) {
+        result[relative] = { directory: true };
+        await walk(target);
+      } else {
+        assert.ok(stat.isFile(), `Unexpected file type: ${target}`);
+        result[relative] = { sha256: hash(await fs.readFile(target)) };
       }
     }
   }
-  await walk(".claude/skills");
-  await walk(".claude/commands");
-  for (const relative of requiredCoreFiles) assert.ok(files.has(relative), `${relative}: missing required regular file from scan`);
-  return { skills: skills.map((entry) => entry.name).sort(), commands: commands.filter((entry) => !entry.isDirectory()).map((entry) => entry.name).sort(), files };
+  await walk(root);
+  return result;
 }
 
-function referenceControls() {
-  const harmless = "Use /openspec-propose, /openspec-explore, /openspec-apply-change, /openspec-update-change, /openspec-sync-specs and /openspec-archive-change.\n"
-    + "Use /opsx:propose /opsx:explore /opsx:apply /opsx:update /opsx:sync /opsx:archive.\n"
-    + "Continue, verify, onboard, new and bulk-archive are ordinary words; run openspec new change or openspec continue.\n"
-    + "Unrelated names /openspec-newish and /opsx:verifyish are not omitted workflows.\n";
-  const surfaces = [".claude/skills/openspec-propose/SKILL.md", ".claude/commands/opsx/propose.md"];
-  for (const relative of surfaces) {
-    assert.doesNotThrow(() => assertCoreReferences(relative, harmless));
-    for (const token of forbiddenReferences) {
-      for (const insertion of [`Next: ${token}.`, `Next:${token}`, `\`\`\`text\n${token}\n\`\`\``, `(${token})`, `${token}-extra`]) {
-        assert.throws(() => assertCoreReferences(relative, `${harmless}\n${insertion}`), (error) => error instanceof assert.AssertionError && error.message.includes(relative) && error.message.includes(token));
-      }
-    }
-    for (const token of forbiddenReferences.filter((token) => token.startsWith("/openspec-"))) {
-      assert.throws(() => assertCoreReferences(relative, token.slice(1)), { code: "ERR_ASSERTION" });
-    }
-  }
-  console.log(`PASS: ${forbiddenReferences.length} forbidden spellings on both surfaces, prose/fenced/punctuation/suffix controls, bare skill names and harmless core/CLI references.`);
+function assertExact(actual, expected, label) {
+  assert.deepEqual([...actual].sort(), [...expected].sort(), label);
 }
 
-async function inventoryControls(scratch) {
-  assertCoreInventory(coreSkills, coreCommands);
-  for (const [skills, commands] of [
-    [[], coreCommands], [coreSkills, []],
-    [[...coreSkills, "openspec-verify-change"], coreCommands],
-    [coreSkills, [...coreCommands, "verify.md"]],
-    [[...coreSkills, coreSkills[0]], coreCommands],
-    [coreSkills, [...coreCommands, coreCommands[0]]],
-    ...coreSkills.map((name) => [coreSkills.filter((skill) => skill !== name), coreCommands]),
-    ...coreCommands.map((name) => [coreSkills, coreCommands.filter((command) => command !== name)]),
-  ]) assert.throws(() => assertCoreInventory(skills, commands), { code: "ERR_ASSERTION" });
-
-  // Handwritten controls are deliberately separate from the upstream fixture.
-  const project = path.join(scratch, "inventory-controls");
-  const supportFiles = [".claude/skills/openspec-propose/references/nested/help.txt", ".claude/commands/opsx/support/nested/help.txt"];
-  const expected = [...requiredCoreFiles, ...supportFiles].sort();
-  const put = async (relative, content = "Use /opsx:propose or openspec new change.\n") => {
-    await mkdir(path.dirname(path.join(project, relative)), { recursive: true });
-    await writeFile(path.join(project, relative), content);
-  };
-  try {
-    for (const relative of expected) await put(relative);
-    const valid = await collectCoreFiles(project);
-    assert.deepEqual([...valid.files.keys()].sort(), expected, "recursive scan must include non-Markdown nested support files");
-    for (const [relative, content] of valid.files) assertCoreReferences(relative, content);
-    for (const relative of supportFiles) {
-      await put(relative, "/opsx:verify\n");
-      const mutated = await collectCoreFiles(project);
-      assert.throws(() => {
-        for (const [file, content] of mutated.files) assertCoreReferences(file, content);
-      }, (error) => error instanceof assert.AssertionError && error.message.includes(relative) && error.message.includes("/opsx:verify"));
-      await put(relative);
-    }
-    for (const relative of requiredCoreFiles) {
-      await rm(path.join(project, relative));
-      await assert.rejects(collectCoreFiles(project), { code: "ERR_ASSERTION" });
-      await put(relative, " \n");
-      await assert.rejects(collectCoreFiles(project), /empty generated file/);
-      await rm(path.join(project, relative));
-      await mkdir(path.join(project, relative));
-      await assert.rejects(collectCoreFiles(project), { code: "ERR_ASSERTION" });
-      await rm(path.join(project, relative), { recursive: true });
-      await put(relative);
-    }
-    for (const relative of [".claude/skills/openspec-onboard/SKILL.md", ".claude/commands/opsx/onboard.md", ".claude/commands/extra.md"]) {
-      await put(relative);
-      await assert.rejects(collectCoreFiles(project), { code: "ERR_ASSERTION" });
-      await rm(path.join(project, relative.includes("/skills/") ? ".claude/skills/openspec-onboard" : relative), { recursive: true });
-    }
-    // Directory junctions avoid requiring Windows file-symlink privileges.
-    // This exercises the actual platform, not a simulated native filesystem.
-    const target = path.join(scratch, "inventory-link-target");
-    await mkdir(target);
-    const link = path.join(project, ".claude/skills/openspec-propose/references/unsafe");
-    await symlink(target, link, process.platform === "win32" ? "junction" : "dir");
-    await assert.rejects(collectCoreFiles(project), /symlink/);
-    await rm(link);
-    if (process.platform !== "win32") {
-      const file = path.join(project, requiredCoreFiles[0]);
-      await rm(file);
-      await symlink(path.join(project, supportFiles[0]), file);
-      await assert.rejects(collectCoreFiles(project), /symlink/);
-      await rm(file);
-      await put(requiredCoreFiles[0]);
-    }
-    for (const relative of [".claude/commands/opsx", ".claude/commands", ".claude/skills", ".claude"]) {
-      const absolute = path.join(project, relative);
-      await rm(absolute, { recursive: true });
-      await assert.rejects(collectCoreFiles(project), (error) => error.code === "ENOENT" || (error instanceof assert.AssertionError && error.message.includes("core command namespace inventory")));
-      await mkdir(absolute);
-      await assert.rejects(collectCoreFiles(project), (error) => error.code === "ERR_ASSERTION" || error.code === "ENOENT");
-      await rm(absolute, { recursive: true });
-      await writeFile(absolute, "not a directory");
-      await assert.rejects(collectCoreFiles(project), /expected a real directory/);
-      await rm(absolute);
-      await symlink(target, absolute, process.platform === "win32" ? "junction" : "dir");
-      await assert.rejects(collectCoreFiles(project), /expected a real directory/);
-      await rm(absolute);
-      for (const file of expected) await put(file);
-    }
-    console.log(`PASS: exact inventories; missing/extra/duplicate/empty/non-regular/symlink controls; recursive support-file scans (${process.platform}).`);
-  } finally {
-    await rm(project, { recursive: true, force: true });
-    await rm(path.join(scratch, "inventory-link-target"), { recursive: true, force: true });
-  }
+function assertWorkflowSelection(actual) {
+  assertExact(actual, workflows, "required workflow identities");
 }
 
-async function retainLogAndCleanup(logPath, log, disposable) {
-  try {
-    await writeFile(logPath, JSON.stringify(log, null, 2));
-  } finally {
-    // Attempt every removal even if one fails; log-write failures cannot skip it.
-    const results = await Promise.allSettled(disposable.map((directory) => rm(directory, { recursive: true, force: true })));
-    for (const result of results) if (result.status === "rejected") throw result.reason;
+async function inspectSkills(runRoot, target, other, scope, expectedSkills = workflowSkills) {
+  const shared = await regularPath(runRoot, path.join(target, ".agents/skills"), "directory");
+  const claude = await regularPath(runRoot, path.join(target, ".claude/skills"), "directory");
+  // The release writes a tool-list marker for project setup.
+  const projectMarker = ".openspec-target";
+  const sharedEntries = scope === "project" ? [...names, projectMarker] : names;
+  assertExact(await fs.readdir(shared), sharedEntries, "shared skill selection");
+  if (scope === "project") {
+    const marker = await regularPath(runRoot, path.join(shared, projectMarker), "file");
+    assert.equal(await fs.readFile(marker, "utf8"), "claude own-files\n", "project tool-list marker");
   }
-}
-
-async function cleanupControls(scratch) {
-  const control = path.join(scratch, "cleanup-controls");
-  try {
-    for (const workFails of [false, true]) for (const logFails of [false, true]) {
-      const directory = path.join(control, `work-${workFails}-log-${logFails}`);
-      const disposable = ["home", "core-home", "npm-cache"].map((name) => path.join(directory, name));
-      for (const target of disposable) {
-        await mkdir(target, { recursive: true });
-        await writeFile(path.join(target, "synthetic-state"), "scratch only");
-      }
-      const retained = path.join(directory, "generated.txt");
-      await writeFile(retained, "retained fixture");
-      const logPath = path.join(directory, "probe-log.json");
-      if (logFails) await mkdir(logPath);
-      const log = [{ args: ["synthetic-control"], status: workFails ? 1 : 0, stdout: "raw stdout", stderr: "raw stderr", error: "synthetic error" }];
-      const failure = new Error("synthetic work failure");
-      const exercise = async () => {
-        try {
-          if (workFails) throw failure;
-        } finally {
-          await retainLogAndCleanup(logPath, log, disposable);
-        }
-      };
-      if (logFails) await assert.rejects(exercise(), (error) => ["EISDIR", "EPERM", "EACCES"].includes(error.code));
-      else if (workFails) await assert.rejects(exercise(), (error) => error === failure);
-      else await exercise();
-      for (const target of disposable) await assert.rejects(lstat(target), { code: "ENOENT" });
-      assert.equal(await readFile(retained, "utf8"), "retained fixture");
-      if (!logFails) assert.deepEqual(JSON.parse(await readFile(logPath, "utf8")), log);
-    }
-    console.log("PASS: cleanup after success, work failure, log-write failure and combined failure; raw logs and fixtures retained when writable.");
-  } finally {
-    await rm(control, { recursive: true, force: true });
+  assertExact(await fs.readdir(claude), names, "Claude skill selection");
+  for (const dir of [".agents", ".claude"]) {
+    await assert.rejects(fs.lstat(path.join(other, dir)), { code: "ENOENT" });
   }
-}
-
-async function isolationControls(scratch, env, coreEnv, log) {
-  for (const name of ["HOME", "XDG_CONFIG_HOME"]) {
-    assert.notEqual(coreEnv[name], env[name], `${name}: fixtures must not share a profile`);
-    for (const value of [env[name], coreEnv[name]]) {
-      const relative = path.relative(scratch, value);
-      assert.ok(relative && !relative.startsWith("..") && !path.isAbsolute(relative), `${name}: must be inside scratch`);
-    }
+  await assert.rejects(fs.lstat(path.join(target, ".claude/commands")), { code: "ENOENT" });
+  const observed = {};
+  for (const [workflow, [name, expectedHash]] of Object.entries(expectedSkills)) {
+    const skillDir = await regularPath(runRoot, path.join(shared, name), "directory");
+    assertExact(await fs.readdir(skillDir), ["SKILL.md"], `${name} package inventory`);
+    const link = path.join(claude, name);
+    assert.ok((await fs.lstat(link)).isSymbolicLink(), `Expected Claude skill link: ${link}`);
+    const rawLink = await fs.readlink(link);
+    assert.equal(path.resolve(claude, rawLink), skillDir, `${name}: Claude link target`);
+    assert.equal(await fs.realpath(link), skillDir, `${name}: resolved Claude target`);
+    const bytes = await fs.readFile(await regularPath(runRoot, path.join(skillDir, "SKILL.md"), "file"));
+    const actualHash = hash(bytes);
+    assert.equal(actualHash, expectedHash, `${name}: generated SHA-256 differs from pinned GitHub file`);
+    assert.match(bytes.toString(), new RegExp(`^---\\nname: ${name}\\n`));
+    observed[workflow] = { name, sha256: actualHash, rawLink, resolved: skillDir };
   }
-  assert.equal(coreEnv.OPENSPEC_TELEMETRY, "0");
-  const contaminants = {
-    HERMES_PROFILE: "synthetic-profile", CLAUDE_CONFIG_DIR: "/synthetic/claude", CODEX_HOME: "/synthetic/codex",
-    NPM_TOKEN: "synthetic-token", GH_TOKEN: "synthetic-token", AWS_SECRET_ACCESS_KEY: "synthetic-key", OPENAI_API_KEY: "synthetic-key",
-    npm_config_registry: "https://registry.invalid", npm_config_userconfig: "/synthetic/.npmrc", NPM_CONFIG_CACHE: "/synthetic/cache",
-    NODE_OPTIONS: "--require /synthetic/must-not-load.cjs",
-  };
-  const source = {
-    HOME: "/synthetic/host-home", XDG_CONFIG_HOME: "/synthetic/host-config", OPENSPEC_TELEMETRY: "1",
-    USERPROFILE: "C:\\synthetic", APPDATA: "C:\\synthetic\\Roaming", LOCALAPPDATA: "C:\\synthetic\\Local",
-    PATH: "/synthetic/bin", TMPDIR: scratch, TMP: scratch, TEMP: scratch,
-    SystemRoot: "C:\\Windows", WINDIR: "C:\\Windows", ComSpec: "C:\\Windows\\cmd.exe", PATHEXT: ".EXE;.CMD",
-    ...contaminants,
-  };
-  for (const platform of ["linux", "win32"]) {
-    const isolated = executionEnvironment(source, { home: coreEnv.HOME, platform });
-    const expected = { HOME: coreEnv.HOME, XDG_CONFIG_HOME: path.join(coreEnv.HOME, ".config"), OPENSPEC_TELEMETRY: "0", PATH: source.PATH, TMPDIR: scratch, TMP: scratch, TEMP: scratch };
-    if (platform === "win32") {
-      Object.assign(expected, { USERPROFILE: coreEnv.HOME, APPDATA: path.join(coreEnv.HOME, "AppData", "Roaming"), LOCALAPPDATA: path.join(coreEnv.HOME, "AppData", "Local") });
-      for (const name of win32Names) expected[name] = source[name];
-    }
-    assert.deepEqual(isolated, expected, `${platform}: constructor contract (not native execution)`);
-  }
-  // Only allowlisted real execution paths are used; contaminant values are synthetic.
-  const childSource = { ...source };
-  for (const name of ["PATH", "TMPDIR", "TMP", "TEMP", ...win32Names]) {
-    delete childSource[name];
-    if (Object.hasOwn(coreEnv, name)) childSource[name] = coreEnv[name];
-  }
-  const childEnv = executionEnvironment(childSource, { home: coreEnv.HOME });
-  assert.deepEqual(childEnv, coreEnv, "synthetic host contamination must not change the native fixture environment");
-  const before = (await readdir(scratch, { recursive: true })).sort();
-  const args = ["--input-type=module", "-e", `const module = await import(${JSON.stringify(import.meta.url)}); if (Object.keys(module).join() !== 'executionEnvironment') throw new Error('export contract'); process.stdout.write(JSON.stringify(process.env));`];
-  const child = spawnSync(process.execPath, args, { cwd: scratch, env: childEnv, encoding: "utf8", timeout: 10_000, maxBuffer: 1024 * 1024 });
-  log.push({ executable: process.execPath, cwd: scratch, home: childEnv.HOME, args, status: child.status, stdout: child.stdout, stderr: child.stderr, error: child.error?.message });
-  assert.equal(child.status, 0, `${child.error?.message ?? ""}\n${child.stderr}`);
-  const observed = JSON.parse(child.stdout);
-  for (const [name, value] of Object.entries(coreEnv)) assert.equal(observed[name], value, `child ${name}`);
-  for (const name of Object.keys(contaminants)) assert.equal(Object.hasOwn(observed, name), false, `child must omit ${name}`);
-  if (process.platform !== "win32") for (const name of ["USERPROFILE", "APPDATA", "LOCALAPPDATA", ...win32Names]) assert.equal(Object.hasOwn(observed, name), false, `child must omit ${name}`);
-  assert.deepEqual((await readdir(scratch, { recursive: true })).sort(), before, "import must not create fixtures or invoke npm");
-  console.log(`PASS: synthetic contamination filtered; scratch HOME/XDG and telemetry observed in ${process.platform} child; import has no probe side effects.`);
+  return observed;
 }
 
 async function main() {
-  const scratch = await mkdtemp(path.join(os.tmpdir(), "openspec-compatibility-"));
-  const project = path.join(scratch, "fixture");
-  const home = path.join(scratch, "home");
-  const coreProject = path.join(scratch, "core-fixture");
-  const coreHome = path.join(scratch, "core-home");
-  const log = [];
-  // Allowlisted execution environment; upstream runs with the scratch HOME, no inherited profile.
-  const env = executionEnvironment(process.env, { home });
-  const coreEnv = executionEnvironment(process.env, { home: coreHome });
-  const name = "metadata-fixture-01arz3ndektsv4rrffq69g5fav";
-  const changeDir = `openspec/changes/${name}`;
-  async function put(relative, content) {
-    const target = path.join(project, relative);
-    await mkdir(path.dirname(target), { recursive: true });
-    await writeFile(target, content);
-  }
-  function run(cwd, args, expectedStatus = 0, executionEnv = env) {
-    const result = spawnSync("npm", ["exec", "--cache", path.join(scratch, "npm-cache"), "--yes", "--ignore-scripts", `--package=@fission-ai/openspec@${pinned}`, "--", "openspec", ...args], { cwd, env: executionEnv, input: "", stdio: "pipe", encoding: "utf8", timeout: 180_000, maxBuffer: 8 * 1024 * 1024 });
-    log.push({ cwd, home: executionEnv.HOME, args, status: result.status, stdout: result.stdout, stderr: result.stderr, error: result.error?.message });
-    assert.equal(result.status, expectedStatus, `${args.join(" ")}: ${result.error?.message ?? ""}\n${result.stdout}\n${result.stderr}`);
-    return result.stdout;
-  }
-  const cli = (cwd, ...args) => run(cwd, args);
-  try {
-    referenceControls();
-    await inventoryControls(scratch);
-    await cleanupControls(scratch);
-    await mkdir(project, { recursive: true });
-    await mkdir(home, { recursive: true });
-    await mkdir(coreProject);
-    await mkdir(coreHome);
-    await isolationControls(scratch, env, coreEnv, log);
-    const config = path.join(coreEnv.XDG_CONFIG_HOME, "openspec/config.json");
-    await mkdir(path.dirname(config), { recursive: true });
-    await writeFile(config, JSON.stringify({ profile: "core", delivery: "both" }));
-    assert.deepEqual(await readdir(coreProject), [], "core init must start in an independent empty project");
-    assert.equal(run(coreProject, ["--version"], 0, coreEnv).trim(), pinned);
-    run(coreProject, ["init", "--tools", "claude", "--profile", "core", "--no-animation"], 0, coreEnv);
-    const core = await collectCoreFiles(coreProject);
-    const observed = { skills: core.skills, commands: core.commands, files: [...core.files.keys()].sort() };
-    await writeFile(path.join(scratch, "core-inventory.json"), JSON.stringify(observed, null, 2));
-    for (const [relative, content] of core.files) assertCoreReferences(relative, content);
-    for (const relative of [".claude/skills/openspec-propose/SKILL.md", ".claude/commands/opsx/propose.md"]) {
-      const original = core.files.get(relative);
-      const mutated = `${original}\n\`\`\`text\n/openspec-verify-change\n\`\`\`\n`;
-      assert.throws(() => assertCoreReferences(relative, mutated), (error) => error instanceof assert.AssertionError && error.message.includes(relative) && error.message.includes("/openspec-verify-change"));
-      assert.equal(await readFile(path.join(coreProject, relative), "utf8"), original, "in-memory negative controls must not mutate generated evidence");
+  assert.equal(process.platform, "linux", "Qualification models the Linux Claude symlink layout");
+  const args = process.argv.slice(2);
+  assert.ok(!args.length || (args.length === 1 && args[0] === "--offline-controls"),
+    "Usage: node openspec-cli-compatibility.mjs [--offline-controls]");
+  const runRoot = await fs.mkdtemp(path.join(await fs.realpath(os.tmpdir()), "openspec-compatibility-"));
+  const log = path.join(runRoot, "gate.jsonl");
+  let gate = "preflight";
+  const emit = (record) => fs.appendFile(log, JSON.stringify({ gate, ...record }) + "\n");
+  const step = async (label, probe) => {
+    gate = label;
+    await emit({ state: "start" });
+    const result = await probe();
+    await emit({ state: "pass" });
+    return result;
+  };
+  const putJson = (file, data) => fs.writeFile(file, JSON.stringify(data, null, 2) + "\n", { flag: "wx" });
+  const fixture = async (label) => {
+    const base = await fs.mkdtemp(path.join(runRoot, `${label}-`));
+    const env = environment(base, process.execPath);
+    const cwd = path.join(base, "project");
+    for (const dir of [cwd, env.HOME, env.TMPDIR, env.XDG_CONFIG_HOME, env.XDG_CACHE_HOME,
+      env.XDG_DATA_HOME, env.XDG_STATE_HOME, env.npm_config_cache]) await fs.mkdir(dir);
+    for (const file of [env.npm_config_userconfig, env.npm_config_globalconfig]) await fs.writeFile(file, "");
+    return { base, cwd, env };
+  };
+  let commandIndex = 0;
+  const run = async ({ cwd, env }, executable, argv, expected = 0, timeout = 30_000) => {
+    await regularPath(runRoot, cwd, "directory");
+    const capture = await fs.mkdtemp(path.join(runRoot, `command-${++commandIndex}-`));
+    const command = { executable, argv, cwd, env, timeout, capture };
+    await emit({ command });
+    const stdin = await fs.open("/dev/null", "r");
+    const stdoutFile = await fs.open(path.join(capture, "stdout"), "wx+");
+    const stderrFile = await fs.open(path.join(capture, "stderr"), "wx+");
+    let result;
+    try {
+      result = spawnSync(executable, argv, {
+        cwd, env, stdio: [stdin.fd, stdoutFile.fd, stderrFile.fd],
+        timeout, killSignal: "SIGKILL",
+      });
+      await emit({ command, status: result.status, signal: result.signal, error: result.error?.message });
+      for (const [label, file] of [["stdout", stdoutFile], ["stderr", stderrFile]]) {
+        const { size } = await file.stat();
+        assert.ok(size <= 16 * 1024 * 1024, `Excessive ${label}, raw bytes at ${capture}`);
+        const bytes = await fs.readFile(path.join(capture, label));
+        result[label] = bytes.toString("utf8");
+        await emit({ capture, stream: label, size, sha256: hash(bytes) });
+      }
+    } finally {
+      await Promise.all([stdin.close(), stdoutFile.close(), stderrFile.close()]);
     }
-    console.log(`PASS: pinned OpenSpec ${pinned} Claude core/both fixture, exhaustive scan and in-memory generated skill/command mutations. Observed inventory:\n${JSON.stringify(observed, null, 2)}`);
-    assert.equal(cli(project, "--version").trim(), pinned);
-    // Validate actual artifacts in a copy, without changing their open tasks.
-    const actual = path.join(scratch, "repository-copy");
-    await mkdir(actual);
-    await cp(path.join(root, "openspec"), path.join(actual, "openspec"), { recursive: true });
-    cli(actual, "validate", "--all", "--strict", "--json", "--no-interactive");
-    await validateMetadata({ root: actual });
+    assert.ifError(result.error);
+    assert.ok(result.status !== null &&
+      (expected === null || (Array.isArray(expected) ? expected : [expected]).includes(result.status)),
+      `${executable} ${argv.join(" ")} exited ${result.status}\n${result.stdout}\n${result.stderr}`);
+    return { stdout: result.stdout, stderr: result.stderr, status: result.status };
+  };
 
-    await put("openspec/config.yaml", "schema: spec-driven\n");
-    cli(project, "new", "change", name, "--json");
-    const artifacts = {
-      "proposal.md": header("proposal", "github_issue: https://github.com/example/project/issues/40\n", name) + "# Proposal\n\n## Why\nProve frontmatter interoperability using synthetic records only.\n\n## What Changes\n- Add a new capability and extend an existing capability.\n\n## Capabilities\n\n### New Capabilities\n- `fresh`: Fixture capability.\n\n### Modified Capabilities\n- `existing`: Additional fixture behavior.\n\n## Impact\nScratch files only; no external writes.\n",
-      "design.md": header("design", "", name) + "# Design\n\n## Context\nSynthetic compatibility probe.\n\n## Decisions\nKeep identity outside behavior requirements.\n",
-      "tasks.md": header("tasks", "", name) + "# Tasks\n\n## 1. Fixture\n- [ ] 1.1 Verify metadata interoperability\n",
-      "specs/existing/spec.md": "## ADDED Requirements\n\n### Requirement: Additional behavior\nThe system SHALL retain metadata while extending the capability.\n\n#### Scenario: Extension\n- **WHEN** the extension is requested\n- **THEN** the additional behavior is available\n",
-      "specs/fresh/spec.md": "## Purpose\nProvide an isolated fixture response for checking metadata interoperability across native spec creation and archival.\n\n## ADDED Requirements\n\n### Requirement: Fresh behavior\nThe system SHALL provide the new fixture behavior.\n\n#### Scenario: Request\n- **WHEN** the new behavior is requested\n- **THEN** the fixture responds\n",
-    };
-    const existingHeader = header("spec", "capability: existing\n", name);
-    await put("openspec/specs/existing/spec.md", existingHeader + "# Existing\n\n## Purpose\nProvide stable baseline behavior for a synthetic metadata interoperability probe.\n\n## Requirements\n\n### Requirement: Baseline behavior\nThe system SHALL retain its baseline behavior.\n\n#### Scenario: Baseline\n- **WHEN** baseline behavior is requested\n- **THEN** it remains available\n");
-    for (const [relative, content] of Object.entries(artifacts)) await put(`${changeDir}/${relative}`, content);
-    await validateMetadata({ root: project, requireIssue: true });
-    cli(project, "validate", name, "--strict", "--json");
-    const deltaPath = `${changeDir}/specs/existing/spec.md`;
-    await put(deltaPath, header("delta-spec", "capability: existing\n", name) + artifacts["specs/existing/spec.md"]);
-    const rejected = run(project, ["validate", name, "--strict", "--json"], 1);
-    assert.match(rejected, /Text above the first/);
-    await put(deltaPath, artifacts["specs/existing/spec.md"]);
-    const apply = cli(project, "instructions", "apply", "--change", name, "--json");
-    const pending = JSON.parse(apply);
-    assert.deepEqual(pending.progress, { total: 1, complete: 0, remaining: 1 });
-    assert.equal(pending.state, "ready");
-    assert.equal(pending.tasks.length, 1);
-    assert.equal(pending.tasks[0].description, "1.1 Verify metadata interoperability");
-    assert.equal(pending.tasks[0].done, false);
-    artifacts["tasks.md"] = artifacts["tasks.md"].replace("- [ ]", "- [x]");
-    await put(`${changeDir}/tasks.md`, artifacts["tasks.md"]);
-    // This completes only a synthetic task, never a real change task.
-    const completed = cli(project, "instructions", "apply", "--change", name, "--json");
-    const done = JSON.parse(completed);
-    assert.deepEqual(done.progress, { total: 1, complete: 1, remaining: 0 });
-    assert.equal(done.state, "all_done");
-    assert.equal(done.tasks.length, 1);
-    assert.equal(done.tasks[0].done, true);
-    cli(project, "archive", name, "--yes", "--json");
-    const archives = await readdir(path.join(project, "openspec/changes/archive"));
-    assert.equal(archives.length, 1);
-    assert.match(archives[0], new RegExp(`^\\d{4}-\\d{2}-\\d{2}-${name}$`));
-    for (const [relative, content] of Object.entries(artifacts)) assert.equal(await readFile(path.join(project, "openspec/changes/archive", archives[0], relative), "utf8"), content);
-    assert.equal((await readdir(path.join(project, "openspec/changes"))).includes(name), false);
-    const existing = await readFile(path.join(project, "openspec/specs/existing/spec.md"), "utf8");
-    assert.ok(existing.startsWith(existingHeader), "Upstream must preserve existing current-spec metadata");
-    assert.match(existing, /### Requirement: Baseline behavior/);
-    assert.match(existing, /### Requirement: Additional behavior/);
-    const freshPath = "openspec/specs/fresh/spec.md";
-    const fresh = await readFile(path.join(project, freshPath), "utf8");
-    assert.match(fresh, /### Requirement: Fresh behavior/);
-    assert.doesNotMatch(fresh, /artifact: delta-spec|change:|github_issue:/);
-    // Native archive creates a current spec, not project-specific metadata.
-    if (!fresh.startsWith("---\n")) {
-      await assert.rejects(validateMetadata({ root: project }), /missing YAML frontmatter/);
-      await put(freshPath, header("spec", "capability: fresh\n", name) + fresh);
-      console.log("New current spec required a project-owned identity header after native spec update.");
+  console.log(`OpenSpec compatibility evidence: ${runRoot}`);
+  try {
+    await putJson(path.join(runRoot, "release.json"), { packageName, version, commit, url, sri, workflowSkills });
+
+    await step("offline negative controls", async () => {
+      const control = await fixture("controls");
+      for (const bad of ["v20.20.0", "v22.19.99", "v22.20.0-rc.1"]) assert.throws(() => checkNode(bad), /Node/);
+      for (const good of ["v22.20.0", "v24.0.0"]) checkNode(good);
+      assert.throws(() => assertSri(Buffer.from("synthetic tampered artifact")), /tarball SRI/);
+      const contaminants = {
+        HOME: "/synthetic/home", XDG_CONFIG_HOME: "/synthetic/config", NODE_OPTIONS: "--require /synthetic/module",
+        PATH: "/synthetic/bin", CLAUDE_CONFIG_DIR: "/synthetic/claude", HERMES_HOME: "/synthetic/hermes",
+        CODEX_HOME: "/synthetic/codex", GH_TOKEN: "synthetic-token", NPM_TOKEN: "synthetic-token",
+        AWS_SECRET_ACCESS_KEY: "synthetic-key", OPENAI_API_KEY: "synthetic-key",
+        npm_config_userconfig: "/synthetic/.npmrc", NPM_CONFIG_REGISTRY: "https://synthetic.invalid",
+        OPENSPEC_TELEMETRY: "1", DISABLE_TELEMETRY: "0", DO_NOT_TRACK: "0",
+      };
+      // The launcher starts from a clean environment and builds another allowlist
+      // while the synthetic host contaminants are present in its process.env.
+      const source = `
+        Object.assign(process.env, ${JSON.stringify(contaminants)});
+        process.stdout.write(JSON.stringify((${environment.toString()})(${JSON.stringify(control.base)}, process.execPath)));
+      `;
+      const childScript = `import path from "node:path";\n${source}`;
+      const observed = await run(control, process.execPath, ["--input-type=module", "-e", childScript]);
+      assert.deepEqual(JSON.parse(observed.stdout), control.env);
+      const childEnv = await run(control, process.execPath, ["-p", "JSON.stringify(process.env)"]);
+      assert.deepEqual(JSON.parse(childEnv.stdout), control.env);
+
+      assert.throws(() => inside(control.base, path.join(runRoot, "outside-control")), /escapes/);
+      const wrong = path.join(runRoot, "wrong-target");
+      await fs.mkdir(wrong);
+      const link = path.join(control.cwd, "escape");
+      await fs.symlink(wrong, link);
+      await assert.rejects(regularPath(control.base, path.join(link, "SKILL.md"), "file"), /Expected real directory/);
+      await assert.rejects(inventory(control.base), /escapes/);
+      assert.throws(() => assertExact(names.slice(1), names, "missing selection"), /missing selection/);
+      assert.throws(() => assertExact([...names, "openspec-unexpected"], names, "extra selection"), /extra selection/);
+
+      const layout = await fixture("layout-control");
+      const shared = path.join(layout.cwd, ".agents/skills");
+      const claude = path.join(layout.cwd, ".claude/skills");
+      await fs.mkdir(claude, { recursive: true });
+      const syntheticSkills = {};
+      for (const [workflow, [name]] of Object.entries(workflowSkills)) {
+        const bytes = Buffer.from(`---\nname: ${name}\n---\nSynthetic fixture.\n`);
+        syntheticSkills[workflow] = [name, hash(bytes)];
+        await fs.mkdir(path.join(shared, name), { recursive: true });
+        await fs.writeFile(path.join(shared, name, "SKILL.md"), bytes);
+        await fs.symlink(path.relative(claude, path.join(shared, name)), path.join(claude, name));
+      }
+      await inspectSkills(runRoot, layout.cwd, layout.env.HOME, "global", syntheticSkills);
+
+      // Keep each failing control as a separate tree or retained input.
+      const wrongLayout = await fixture("bad-layout-control");
+      await fs.cp(layout.cwd, wrongLayout.cwd, { recursive: true, verbatimSymlinks: true });
+      const first = names[0];
+      const wrongLink = path.join(wrongLayout.cwd, ".claude/skills", first);
+      await fs.rename(wrongLink, path.join(wrongLayout.base, "original-link"));
+      await fs.symlink(path.join(wrongLayout.cwd, ".agents/skills", names[1]), wrongLink);
+      await assert.rejects(inspectSkills(runRoot, wrongLayout.cwd, wrongLayout.env.HOME, "global", syntheticSkills), /Claude link target/);
+      const changedLayout = await fixture("bad-bytes-control");
+      await fs.cp(layout.cwd, changedLayout.cwd, { recursive: true, verbatimSymlinks: true });
+      await fs.appendFile(path.join(changedLayout.cwd, ".agents/skills", first, "SKILL.md"), "\nSynthetic mutation.\n");
+      await assert.rejects(inspectSkills(runRoot, changedLayout.cwd, changedLayout.env.HOME, "global", syntheticSkills), /generated SHA-256 differs/);
+      await emit({ controls: ["Node minimum", "tarball SRI", "ambient environment",
+        "escaping path and link", "missing and extra identity", "wrong Claude target", "mutated generated bytes"] });
+    });
+    if (args.length) {
+      console.log("PASS offline controls");
+      return;
     }
-    const inventory = await validateMetadata({ root: project, requireIssue: true });
-    assert.equal(inventory.files.length, 7);
-    cli(project, "validate", "--all", "--strict", "--json", "--no-interactive");
-    cli(project, "validate", "--archived", "--json", "--no-interactive");
-    console.log("PASS: pinned OpenSpec validation, task discovery, spec updates, byte-preserving archive and post-sync metadata validation.");
-  } finally {
-    // Retain fixture outputs and evidence, but remove both scratch profiles/cache,
-    // including when CLI/assertion failure or raw-log write failure unwinds main.
-    await retainLogAndCleanup(path.join(scratch, "probe-log.json"), log, [home, coreHome, path.join(scratch, "npm-cache")]);
-    console.log(`Probe log: ${path.join(scratch, "probe-log.json")}`);
+
+    await step("actual Node preflight", async () => {
+      const runtime = await fixture("node");
+      checkNode((await run(runtime, process.execPath, ["--version"])).stdout.trim());
+    });
+
+    const install = await fixture("install");
+    const prefix = install.cwd;
+    const tarball = path.join(install.base, "openspec-2.1.1.tgz");
+    const npm = path.join(path.dirname(process.execPath), "npm");
+    const cli = await step("tag, SRI and exact local installation", async () => {
+      const tagRef = `refs/tags/v${version}`;
+      const tag = await run(install, "/usr/bin/git", ["ls-remote", "--exit-code",
+        "https://github.com/Fission-AI/OpenSpec.git", tagRef, `${tagRef}^{}`], 0, 60_000);
+      const refs = new Map(tag.stdout.trim().split("\n").map((line) => line.split("\t").reverse()));
+      assert.equal(refs.get(`${tagRef}^{}`) ?? refs.get(tagRef), commit, "release tag commit");
+      await run(install, "/usr/bin/curl", ["--disable", "--fail", "--silent", "--show-error",
+        "--proto", "=https", "--max-time", "90", "--output", tarball, url], 0, 95_000);
+      const artifact = await fs.readFile(await regularPath(runRoot, tarball, "file"));
+      assertSri(artifact);
+      const tampered = Buffer.from(artifact);
+      tampered[0] ^= 1;
+      await fs.writeFile(path.join(install.base, "tampered.tgz"), tampered);
+      assert.throws(() => assertSri(tampered), /tarball SRI/);
+      await emit({ sri, sha256: hash(artifact), tamperedSha256: hash(tampered), byteLength: artifact.length });
+      assertExact(await fs.readdir(prefix), [], "npm prefix must start empty");
+      await run(install, process.execPath, [npm, "install", "--prefix", prefix, "--ignore-scripts",
+        "--no-audit", "--no-fund", "--fetch-retries=0", "--fetch-timeout=60000", "--save-exact", tarball], 0, 180_000);
+      const packageDir = path.join(prefix, "node_modules", packageName);
+      const pkg = JSON.parse(await fs.readFile(await regularPath(runRoot, path.join(packageDir, "package.json"), "file"), "utf8"));
+      assert.deepEqual([pkg.name, pkg.version, pkg.engines.node, pkg.bin.openspec],
+        [packageName, version, ">=22.20.0", "./bin/openspec.js"]);
+      const lock = JSON.parse(await fs.readFile(await regularPath(runRoot, path.join(prefix, "package-lock.json"), "file"), "utf8"));
+      assert.equal(lock.packages[`node_modules/${packageName}`].integrity, sri, "installed lock integrity");
+      assert.match(lock.packages[`node_modules/${packageName}`].resolved, /^file:/, "installed from local tarball");
+      assert.equal(path.resolve(prefix, lock.packages[`node_modules/${packageName}`].resolved.slice(5)),
+        tarball, "lock must resolve the SRI-verified file");
+      const binary = await regularPath(prefix, path.join(packageDir, pkg.bin.openspec), "file");
+      const deps = await run(install, process.execPath, [npm, "ls", "--prefix", prefix, "--all", "--json"]);
+      await putJson(path.join(runRoot, "dependencies.json"), JSON.parse(deps.stdout));
+      await emit({ binary, sha256: hash(await fs.readFile(binary)) });
+      return async (fixture, argv, expected) => {
+        assert.ok(["--version", "config", "init", "validate", "new", "instructions", "status", "archive"].includes(argv[0]),
+          `CLI operation outside probe scope: ${argv[0]}`);
+        await regularPath(prefix, binary, "file");
+        return run(fixture, process.execPath, [binary, ...argv], expected);
+      };
+    });
+
+    await step("CLI identity", async () => {
+      assert.equal((await cli(await fixture("version"), ["--version"])).stdout.trim(), version);
+    });
+    await step("unknown workflow selection refusal", async () => {
+      const context = await fixture("unknown-workflow");
+      const unknownId = "unknown-fixture-workflow";
+      const requested = [...workflows, unknownId];
+      const config = (argv, expected) => cli(context, ["config", ...argv], expected);
+      await config(["set", "profile", "custom"]);
+      const set = await config(["set", "workflows", JSON.stringify(requested)], null);
+      const readback = await config(["get", "workflows"], null);
+      const configured = readback.status === 0 ? JSON.parse(readback.stdout) : null;
+      assert.throws(() => assertWorkflowSelection(requested), /required workflow identities/);
+      const includesUnknown = Array.isArray(configured) && configured.includes(unknownId);
+      if (set.status === 0) assert.ok(includesUnknown, "Native accepted the write but did not retain the unknown identity");
+      if (includesUnknown) {
+        assert.throws(() => assertWorkflowSelection(configured), /required workflow identities/);
+      }
+
+      const init = await cli(context, ["init", "--tools", "claude", "--profile", "custom",
+        "--scope", "project", "--no-animation"], null);
+      const project = await inventory(context.cwd);
+      const home = await inventory(context.env.HOME);
+      await putJson(path.join(context.base, "unknown-selection.json"), {
+        requested, configured, setStatus: set.status, readbackStatus: readback.status,
+        initStatus: init.status, project, home,
+      });
+      const emitted = [...Object.keys(project), ...Object.keys(home)];
+      assert.ok(emitted.every((entry) => !entry.includes(unknownId)), "Unknown workflow emitted an install path");
+      if (init.status === 0) {
+        // Native init may ignore the unknown identity. Only the seven pinned
+        // skills can be emitted and the requested selection still fails.
+        await inspectSkills(runRoot, context.cwd, context.env.HOME, "project");
+      }
+    });
+    for (const scope of ["global", "project"]) {
+      await step(`Claude ${scope} custom workflow installation`, async () => {
+        const context = await fixture(scope);
+        const config = (argv, expected) => cli(context, ["config", ...argv], expected);
+        await config(["set", "profile", "custom"]);
+        assert.equal((await config(["get", "profile"])).stdout.trim(), "custom");
+        await config(["set", "workflows", JSON.stringify(workflows)]);
+        const configured = JSON.parse((await config(["get", "workflows"])).stdout);
+        assertWorkflowSelection(configured);
+        assert.deepEqual(configured, workflows, "workflow configuration readback");
+        const target = scope === "global" ? context.env.HOME : context.cwd;
+        const other = scope === "global" ? context.cwd : context.env.HOME;
+        const init = await cli(context, ["init", "--tools", "claude", "--profile", "custom",
+          ...(scope === "project" ? ["--scope", "project"] : []), "--no-animation"]);
+        assert.match(init.stdout, /7 skills in (?:~\/)?\.agents\/skills\//);
+        const observed = await inspectSkills(runRoot, target, other, scope);
+        await putJson(path.join(context.base, "generated.json"), {
+          observed, project: await inventory(context.cwd), home: await inventory(context.env.HOME),
+        });
+      });
+    }
+    await lifecycle({
+      step, fixture, cli, inventory, root, putJson,
+    });
+    console.log("PASS OpenSpec 2.1.1 compatibility");
+  } catch (error) {
+    await emit({ state: "fail", error: error.stack });
+    throw new Error(`Gate "${gate}" failed. Evidence: ${log}\n${error.message}`, { cause: error });
   }
 }
 
-if (process.argv[1] && await realpath(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && await fs.realpath(process.argv[1]) === fileURLToPath(import.meta.url)) {
   await main();
 }

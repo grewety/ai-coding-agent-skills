@@ -8,7 +8,7 @@ scripts before enabling; do not use another client to evade an unresolved securi
 
 This guide installs our five companion packages, not upstream OpenSpec. Complete
 the [separate OpenSpec prerequisite setup](openspec-installation.md) for CLI
-1.16.0, Node 22.12.0+ for the OpenSpec npm package, Git and the seven required
+2.1.1, Node 22.20.0+ for the OpenSpec npm package, Git and the seven required
 upstream workflows. Its
 [account upload section](openspec-installation.md#claude-desktop-account-uploads-and-cowork)
 covers preparing complete individual upstream ZIPs and the unverified metadata/
@@ -164,8 +164,8 @@ files plus their generated plugin metadata, README, and license.
 
 Bump the affected plugin version in the catalog whenever its selected skills or
 support files change; skill versions alone do not update the enclosing plugin.
-The source catalog's `openspec-development` 1.3.0 includes `openspec-delivery`
-1.3.0 with its shared `scripts/git-environment.mjs` and
+The source catalog's `openspec-development` 1.3.1 includes `openspec-delivery`
+1.3.1 with its shared `scripts/git-environment.mjs` and
 `references/git-environment.md` for the Git guard/workspace helpers. Also preserve
 `references/evidence-retention.md` and `scripts/evidence-retention.mjs` in complete
 copies and skill/plugin ZIP exports: this separate local representation support

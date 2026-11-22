@@ -11,7 +11,7 @@ change: upgrade-openspec-2-1-prerequisites-01m7zmrab0nw5t3fpmd0sm9tyw
 
 ## 2. Adopt and reconcile the current contract
 
-- [ ] 2.1 After 1.1 passes, adopt the qualified behavior in the tracked compatibility probe and reconcile the current capability, metadata validator, current docs, package/version guidance and tests. Prove the tracked probe is self-contained, frontmatter-free delta policy is enforced independently, and all five companion packages and required version bumps are correct, with `npm run test:openspec`, `npm run validate:openspec` and affected focused tests passing.
+- [x] 2.1 After 1.1 passes, adopt the qualified behavior in the tracked compatibility probe and reconcile the current capability, metadata validator, current docs, package/version guidance and tests. Prove the tracked probe is self-contained, frontmatter-free delta policy is enforced independently, and all five companion packages and required version bumps are correct, with `npm run test:openspec`, `npm run validate:openspec` and affected focused tests passing.
 
 ## 3. Verify the final tree
 

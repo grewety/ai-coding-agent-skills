@@ -128,11 +128,13 @@ findings are dispositioned.
 - **THEN** merge and branch deletion stop
 
 ### Requirement: Queryable identity metadata
-Proposals, designs, task files and current specs SHALL use the versioned YAML
-frontmatter contract. Delta specs SHALL remain native Markdown without frontmatter
-because pinned upstream strict validation rejects it; their identity is path-derived.
-Metadata SHALL describe identity and navigation, not task progress, approval or
-PR state, and SHALL remain included in the existing planning digest.
+Proposals, designs, task files and current specs SHALL use versioned YAML
+frontmatter. Delta specs SHALL remain native Markdown without frontmatter by
+repository policy. Their identity is path-derived, and the local metadata checker
+rejects delta frontmatter independently of upstream strict validation. Metadata
+SHALL describe identity and navigation, not task
+progress, approval or PR state, and SHALL remain included in the existing planning
+digest.
 
 #### Scenario: Stable proposal association
 - **WHEN** the proposal's documentation issue is read back successfully
@@ -145,7 +147,7 @@ PR state, and SHALL remain included in the existing planning digest.
 - **AND** a same-files vault can query the new location without a second mutable tracker
 
 #### Scenario: Invalid metadata
-- **WHEN** metadata has duplicate YAML keys, wrong types, unsupported fields or identities inconsistent with its native path
+- **WHEN** metadata has duplicate YAML keys, wrong types, unsupported fields, identities inconsistent with its native path, or delta-spec frontmatter
 - **THEN** the read-only metadata check fails without repairing files or bypassing upstream validation
 
 ### Requirement: Short bounded delivery invocations

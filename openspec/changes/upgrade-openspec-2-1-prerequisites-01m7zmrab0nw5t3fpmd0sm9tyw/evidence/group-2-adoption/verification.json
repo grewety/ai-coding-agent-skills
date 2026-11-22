@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "task": "2.1",
+  "inputParent": "dd65d78da375fb1f98c9cee04004b77b8e642ef1",
+  "plan": "251dd6843966a0f32b8fa7874734e95b0e096b5c",
+  "planDigest": "04014b69cf8c2fafc3a9ad6fb527506c90b7440fe88d07f3336aa347452534db",
+  "inputsSha256": {
+    ".claude-plugin/marketplace.json": "f299221d9e78b46cfc2e18485581a8ec20dfae673c3b1c9bae52d684eb076a67",
+    "README.md": "fa24cb8318693c5ef3df79a7e274f37b647a2103b1c3c23f2a8b1138d82daee0",
+    "docs/claude-installation.md": "eb596e4add205d9a03f1b8979baa85b5fe95f273cda18c263f1386ee8430a574",
+    "docs/openspec-installation.md": "04b0b3e960222efe1dae3dbb757c6e9b8dc9cd08f95030531b5974b7b7ed9138",
+    "docs/openspec-metadata.md": "a373c162ddb04a6474733f3949d00bd3041127862648d1947e9164eda27f72a6",
+    "docs/openspec-workflow.md": "ae2498b73e0dad97af6dc91747ff474a03615637d593dca7c18b18ed34d2cae0",
+    "openspec/specs/openspec-integration/spec.md": "fb9fa355e14cc3e2a5742dfc3488ab07816aa0f1102672b86bbd30ae0cef5e1f",
+    "scripts/validate-openspec-metadata.mjs": "6ac84b9c2b94583a6a9850772f04b82498a09d3843aaefe0e817715e32d51186",
+    "skills/software-development/openspec-delivery/SKILL.md": "61fe27964dcc0f7f4f27fa1fb406f99abb1e84b5abc8c151098eca6ba038d182",
+    "skills/software-development/openspec-delivery/references/naming.md": "2789c76f9a5e27fb394bdeec4abe0c705e4b17124f3d04f835f2f7a35a52028c",
+    "tests/claude-packaging.test.mjs": "6359f6ce88e795fb5471df3052dfc9e287f3de9ff923bf2c4cbaf1f786fcef93",
+    "tests/openspec-cli-compatibility.mjs": "10fbd73d38d30112c6e2175f40d52c3ec031d6d42845f87f9c3feb39f6e77f53",
+    "tests/openspec-cli-lifecycle.mjs": "a16ddfa6d56751a71d492fce2f370a8a184458365aeaff81b2ab8298afa0c03a",
+    "tests/openspec-integration.test.mjs": "a9f359c0b707fdd9bc8b20b486e84051ef19cb075bde5436cdb7bfb52bc453b9",
+    "tests/openspec-metadata.test.mjs": "21e22b3477bd79de7a8b9422420e9ba586499524e878b40f486290f13ef3e952"
+  },
+  "gates": [
+    {
+      "command": "npm run test:openspec",
+      "exitCode": 0,
+      "stdoutSha256": "e4869090dafc9d34913cf1508be783a1ba7aa18c1fc6fabcd3265918b54988ee",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "traceSha256": "790261b93082f28a5b8f4b125346614121bbaf7bebf09b3cc2fb910c43c57730"
+    },
+    {
+      "command": "npm run validate:openspec",
+      "exitCode": 0,
+      "stdoutSha256": "290565acdc0707752e2d98f476812bf0607ff59d24a0899c934b3b8bff3e2d5d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "traceSha256": "1385deb691287aebb599e1327b2916e4ca80d9810a466cc20b327071866700aa"
+    },
+    {
+      "command": "node --test tests/openspec-integration.test.mjs tests/openspec-metadata.test.mjs tests/claude-packaging.test.mjs",
+      "exitCode": 0,
+      "stdoutSha256": "d4a0068400a771051f319cccd1d1d64ba67601ee108ab9f431dbe9e4991fd2bb",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "traceSha256": "95a51caa0e2d1aad44de489413035886db234981c66c851c876aa8b1870eb745"
+    }
+  ],
+  "retainedEvidence": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g2-gates-c1",
+  "notes": [
+    "The operator authorized restoring only scripts/AGENTS.md from the parent; all other bytes were verified unchanged by that scope repair.",
+    "One routine correction excluded non-capability entries from strict validation expectations while preserving the full scratch copy.",
+    "Focused tests: 77 passed. No prohibited profile access observed in the worker and gate traces."
+  ]
+}
