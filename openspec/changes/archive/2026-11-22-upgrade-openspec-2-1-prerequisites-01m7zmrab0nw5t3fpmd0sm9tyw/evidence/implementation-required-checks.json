@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "kind": "lossless-evidence-representation",
+  "encoding": "utf8",
+  "content": "{\n  \"head\": \"b3a28c165fdf0e6a41acd8696b9db39ed3950046\",\n  \"checks\": [\n    {\n      \"id\": \"137332845308\",\n      \"conclusion\": \"success\",\n      \"completedAt\": \"2026-11-22T19:50:42Z\",\n      \"detail\": \"https://github.com/grewety/ai-coding-agent-skills/actions/runs/45062991963/job/137332845308\"\n    },\n    {\n      \"id\": \"137332732194\",\n      \"conclusion\": \"success\",\n      \"completedAt\": \"2026-11-22T19:50:19Z\",\n      \"detail\": \"https://github.com/grewety/ai-coding-agent-skills/actions/runs/45062955556/job/137332732194\"\n    }\n  ]\n}\n",
+  "storedArtifactSha256": "d8f2ba19b5fcfd3ecca1ad7a857e5cd8a5443b0e91e552bb71728c3a059dd614",
+  "decodedOriginalSha256": "d8f2ba19b5fcfd3ecca1ad7a857e5cd8a5443b0e91e552bb71728c3a059dd614",
+  "provenance": {
+    "source": "GitHub REST retained check-runs /home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/implementation-check-runs.raw SHA-256 b6307a29a5daa26758b589079c972e27bb8784e2a86d05f378a186053390a29b",
+    "command": [
+      "gh",
+      "api",
+      "--paginate",
+      "repos/grewety/ai-coding-agent-skills/commits/b3a28c165fdf0e6a41acd8696b9db39ed3950046/check-runs?per_page=100"
+    ],
+    "environmentScope": "Authenticated GitHub CLI; credentials not retained",
+    "exitStatus": 0,
+    "observedAt": "2026-11-22T19:51:49Z",
+    "extractedAt": "2026-11-22T19:56:33.458Z",
+    "revision": "b3a28c165fdf0e6a41acd8696b9db39ed3950046",
+    "scope": "Complete exact-head GitHub Actions verify check runs matching the required-check readback; app 15368",
+    "pagination": "complete",
+    "readbackType": "historical-extract"
+  },
+  "labels": {
+    "representation": "historical-extract",
+    "completeness": "complete",
+    "confidentiality": "publishable"
+  },
+  "wrapperSha256": "e89d96828dcb54a8ee8458ae075217750053f5edb94506c0808a8c6a60818d0c"
+}

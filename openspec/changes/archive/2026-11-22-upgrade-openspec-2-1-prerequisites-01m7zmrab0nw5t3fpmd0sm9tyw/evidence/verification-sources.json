@@ -1,0 +1,278 @@
+{
+  "sourceScope": "Integrated source verification only. No host discovery, deployment, issue close, or closure PR outcome is claimed.",
+  "node": "v24.21.0",
+  "npm": "11.19.0",
+  "integratedEnvironment": "Detached WSL/Linux tree, credential-minimized HOME and XDG config, distinct empty user/global npmrc, isolated npm cache and TMPDIR, telemetry disabled, npm ci --ignore-scripts.",
+  "integratedBootstrap": [
+    {
+      "exitCode": 1,
+      "stdout": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/integrated/bootstrap.stdout",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/integrated/bootstrap.stderr",
+        "sha256": "250e369d730a46c4d41df37449a5c58c169b4b1d2ab546951a8bed0285805a95"
+      }
+    },
+    {
+      "exitCode": 0,
+      "stdout": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/integrated/bootstrap-retry.stdout",
+        "sha256": "f7a18e7b7623039691573d1f6e44dd4fb4d622a418367b684821b128c5619f06"
+      },
+      "stderr": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/integrated/bootstrap-retry.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "candidateReview": {
+    "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/review3/review-receipt.json",
+    "sha256": "83da1dda4c681c70e04825c2f11abd79cb327c5c5245c9eb58628a4cdd02d725",
+    "report": {
+      "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/review3/report.txt",
+      "sha256": "85006a48fec51d9e4870d7b9f3b3f79db3264a54adc0d2d7f608e33992df21ac"
+    },
+    "admission": {
+      "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/review3/admission.json",
+      "sha256": "2332ad7afdeec7c716faa730041143c5754540153f1a8837b3cfc66acf856871"
+    }
+  },
+  "checksRaw": {
+    "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/implementation-check-runs.raw",
+    "sha256": "b6307a29a5daa26758b589079c972e27bb8784e2a86d05f378a186053390a29b"
+  },
+  "requiredChecks": {
+    "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/implementation-required.tsv",
+    "sha256": "d60eb89dd624ed486f6cf5173728f87332d71135d938966d2fa9cb514ca672c5"
+  },
+  "ruleset": {
+    "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/main-ruleset.json",
+    "sha256": "e01792a660b54817e2fd994c6a1cef8590de1d2b6d3e59af9a2b4b49e8fd2767"
+  },
+  "premergeThreads": {
+    "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/implementation-threads.raw",
+    "sha256": "bdef5e59dea5b53b51f73eb83268a85a84619c0e12f7584737b5093cf82597a7",
+    "observedAt": "2026-11-22T19:51:49Z",
+    "scope": "Complete exact-head PR review-thread inventory; no unresolved threads."
+  },
+  "merge": {
+    "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/implementation-merge.json",
+    "sha256": "5937c326ddbb4f63b4ec960e76786c489e8525eccb9b8c04ac17a6a9f828ed05",
+    "integrated": "d718f124cff567ab33629903c04922839795fcee",
+    "mergedAt": "2026-11-22T19:51:57Z"
+  },
+  "main": {
+    "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/implementation-remote-refs.tsv",
+    "sha256": "5e8ac981352152216cc85939637076b3af9615a58cd49d9d8f8eb9c90c8bd73d",
+    "head": "d718f124cff567ab33629903c04922839795fcee"
+  },
+  "candidate": [
+    {
+      "gate": {
+        "command": "npm run test:openspec",
+        "commit": "b3a28c165fdf0e6a41acd8696b9db39ed3950046",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-gates-final/openspec.stdout"
+      },
+      "stdout": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-gates-final/openspec.stdout",
+        "sha256": "22579114408a617ae2c07185cbf36aef06b75945d4e744b432e63fd6d7a52c6e"
+      },
+      "stderr": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-gates-final/openspec.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "record": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-gates-final/final-readback.json",
+        "sha256": "05facab1840b6bc98dbc8b2d112cd011bfa2368a524e7ce2f5809523175dd991"
+      }
+    },
+    {
+      "gate": {
+        "command": "npm run validate:openspec",
+        "commit": "b3a28c165fdf0e6a41acd8696b9db39ed3950046",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-gates-final/metadata.stdout"
+      },
+      "stdout": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-gates-final/metadata.stdout",
+        "sha256": "290565acdc0707752e2d98f476812bf0607ff59d24a0899c934b3b8bff3e2d5d"
+      },
+      "stderr": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-gates-final/metadata.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "record": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-gates-final/final-readback.json",
+        "sha256": "05facab1840b6bc98dbc8b2d112cd011bfa2368a524e7ce2f5809523175dd991"
+      }
+    },
+    {
+      "gate": {
+        "command": "npm test",
+        "commit": "b3a28c165fdf0e6a41acd8696b9db39ed3950046",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-gates-final/full.stdout"
+      },
+      "stdout": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-gates-final/full.stdout",
+        "sha256": "b1caacd7ab87fdfcff56be892ff3acc251f395de38ef1b841bae2424ad779254"
+      },
+      "stderr": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-gates-final/full.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "record": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-gates-final/final-readback.json",
+        "sha256": "05facab1840b6bc98dbc8b2d112cd011bfa2368a524e7ce2f5809523175dd991"
+      }
+    },
+    {
+      "gate": {
+        "command": "npm run build",
+        "commit": "b3a28c165fdf0e6a41acd8696b9db39ed3950046",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-gates-final/build.stdout"
+      },
+      "stdout": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-gates-final/build.stdout",
+        "sha256": "82c28ffaadfa60d0f8068b3c55552767e4ebbdd5f44b5c151e31d4d12261cec6"
+      },
+      "stderr": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-gates-final/build.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "record": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-gates-final/final-readback.json",
+        "sha256": "05facab1840b6bc98dbc8b2d112cd011bfa2368a524e7ce2f5809523175dd991"
+      }
+    },
+    {
+      "gate": {
+        "command": "python3 audit.py --candidate b3a28c165fdf0e6a41acd8696b9db39ed3950046 (retained residual-claim audit)",
+        "commit": "b3a28c165fdf0e6a41acd8696b9db39ed3950046",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-audit-retained/final-candidate/result.json"
+      },
+      "result": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-audit-retained/final-candidate/result.json",
+        "sha256": "6e7697352a44a21a09dd6069fe123be508af44bee80fb8b4327b960fd6a5b36a"
+      },
+      "record": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-convergence-launcher/item0-execute.n6fd34Cj/g3-gates-final/final-readback.json",
+        "sha256": "05facab1840b6bc98dbc8b2d112cd011bfa2368a524e7ce2f5809523175dd991"
+      }
+    }
+  ],
+  "integrated": [
+    {
+      "gate": {
+        "command": "npm run validate:openspec",
+        "commit": "d718f124cff567ab33629903c04922839795fcee",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/integrated/metadata.stdout"
+      },
+      "argv": [
+        "npm",
+        "run",
+        "validate:openspec"
+      ],
+      "startedAt": "2026-11-22T19:54:04Z",
+      "completedAt": "2026-11-22T19:54:04Z",
+      "stdout": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/integrated/metadata.stdout",
+        "sha256": "290565acdc0707752e2d98f476812bf0607ff59d24a0899c934b3b8bff3e2d5d"
+      },
+      "stderr": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/integrated/metadata.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "exit": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/integrated/metadata.exit",
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+      }
+    },
+    {
+      "gate": {
+        "command": "npm test",
+        "commit": "d718f124cff567ab33629903c04922839795fcee",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/integrated/full.stdout"
+      },
+      "argv": [
+        "npm",
+        "test"
+      ],
+      "startedAt": "2026-11-22T19:54:04Z",
+      "completedAt": "2026-11-22T19:54:19Z",
+      "stdout": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/integrated/full.stdout",
+        "sha256": "287e1d7ab674e2391ff23c73e15c2a6593303a2052ce599b1456f72ba2e9da3b"
+      },
+      "stderr": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/integrated/full.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "exit": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/integrated/full.exit",
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+      }
+    },
+    {
+      "gate": {
+        "command": "npm run build",
+        "commit": "d718f124cff567ab33629903c04922839795fcee",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/integrated/build.stdout"
+      },
+      "argv": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "startedAt": "2026-11-22T19:54:19Z",
+      "completedAt": "2026-11-22T19:54:20Z",
+      "stdout": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/integrated/build.stdout",
+        "sha256": "8d90e032b86edae8761b39f2769d7dcd33843fe776a7b40a390ff5d41169ac19"
+      },
+      "stderr": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/integrated/build.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "exit": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/integrated/build.exit",
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+      }
+    },
+    {
+      "gate": {
+        "command": "npm run test:openspec",
+        "commit": "d718f124cff567ab33629903c04922839795fcee",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/integrated/openspec.stdout"
+      },
+      "argv": [
+        "npm",
+        "run",
+        "test:openspec"
+      ],
+      "startedAt": "2026-11-22T19:54:20Z",
+      "completedAt": "2026-11-22T19:54:33Z",
+      "stdout": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/integrated/openspec.stdout",
+        "sha256": "7ea39ac4cc73b69c374a61394b1e65054d4fd7329c7423718fd1bdf5f2b183c0"
+      },
+      "stderr": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/integrated/openspec.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "exit": {
+        "source": "/home/raphael/verification-records/ai-coding-agent-skills/item0-finish.b4jjJ5La/integrated/openspec.exit",
+        "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+      }
+    }
+  ]
+}
