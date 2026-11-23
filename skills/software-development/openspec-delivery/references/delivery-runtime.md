@@ -1,0 +1,155 @@
+# Delivery runtime
+
+Resolve `<runtime>` to this package's `scripts/delivery-cli.mjs`. The runtime
+uses Node 22+ and local Git. It consumes independently retained observations
+from the orchestrator and uses the existing portable role verifier when handover
+verification is requested. Keep the verified companion package complete.
+
+```sh
+node <runtime> policy --input <request.json> --json
+node <runtime> preflight --input <request.json> --json
+node <runtime> workspace --input <request.json> --json
+node <runtime> decision --input <request.json> --json
+node <runtime> status --input <request.json> --json
+node <runtime> handover --input <request.json> --json
+node <runtime> finish-readiness --input <request.json> --json
+```
+
+Use canonical absolute local paths, a single request file, and literal full
+commit IDs. The commands print one JSON object. A nonzero exit signals a failed
+invocation. Read the structured state or predicate even on a successful
+invocation. These inspection commands execute no worktree, task, commit,
+reviewer, profile, or remote mutation. Positive decisions are advisory.
+
+## Policy and workspace inputs
+
+`policy` takes `repo` (the primary checkout), `change`, `plan`, `target`,
+`selection`, and `deliveryBoundary`. The target is a separately verified locally
+available target revision. The committed context checks the plan's single
+integrated parent, inventories raw planning bytes, and computes the Task-Guided
+digest. The runtime derives mode from that context and the declared delivery
+boundary. The selection carries `revision`, `reference`, `preExecutionReview`,
+`continuousGoal`, and optional `approachConvergence`. Pass applicable
+`declaredContractPaths`, `contractDesignations`, `orchestrationAvailable`, and
+matching `reviewAcceptance`. The existing narrowly scoped `legacy` and
+`recovery` inputs remain supported. For a draft use `phase: "freeze"`, the
+checkout with the draft, `parent`, and `target`, with no `plan`. The draft
+exposes its raw inventory and any prospective `goalContractDigest`. The
+approved plan digest is still null. See [delivery-policy.md](delivery-policy.md).
+
+`workspace` takes `repo`, `change`, and `base`. It reports at most one
+registered implementation worktree and one registered closure worktree using
+`change/<change>` and `closure/<change>` by default. Pass `branch` or
+`closureBranch` for a project-selected branch. An optional `workspace` must
+match the verified implementation checkout. Detached entries have their own
+inventory. Select one by matching `verificationWorkspace` and `verificationSha`.
+A missing, repinned, locked or ambiguous selected workspace needs recovery. See
+[workspace.md](workspace.md) for authorized lifecycle commands.
+
+## Preflight observations
+
+Supply a `preflight` object of independently retained observations. With a
+frozen plan, include the policy inputs. Before a proposal, P7 verifies the
+observed integrated policy revision against the retained live target. Each supplied item uses `verified: true` and a stable `reference`.
+Omit an observation to report `pending`. A supplied observation with a mismatch
+reports `blocked`.
+
+| ID | Input | Required observed fields |
+| --- | --- | --- |
+| P1 | `live` | `head`, `branch`, `remote`, and canonical repository identity. |
+| P2 | `auth` | Matching `repository`, `authenticated`, `requiredScopesPresent`. Retain no credential material. |
+| P3 | `local` | `activeChangeInventoryVerified`. The command compares primary HEAD, local target branch and tracking ref with the retained live target and checks local tracked/untracked cleanliness. |
+| P4 | `reviewer` | Passing `outcome`, observed and expected reviewer configuration hashes, and the matching reviewer package hash from P8. |
+| P5 | `relay` | `ready`, `materialRetained: false`, and the reviewer configuration hash. |
+| P6 | `runtime` | Observed and expected `node` and `openspec` versions. |
+| P7 | `checkpoint` | Matching live `head`, `policyRevision`, and `prerequisitesVerified`. |
+| P8 | `companions` | Complete `actual` and `expected` maps from package names to source inventory hashes, including the `reviewer` entry if P4 applies. |
+
+The summary contains a fixed-order item list, `ready`, the first unresolved
+item in `followUp`, and the reviewer probe authority observation. Missing or
+drifted reviewer evidence stays pending or blocked. A fresh paid probe requires
+a separate grant. Supply local authentication and relay readbacks without account
+details or secrets.
+
+## Local decisions and status
+
+`decision`, `status` and `finish-readiness` take the policy inputs and use the
+registered implementation workspace. For `decision`, supply `deliveryPhase`
+of `dispatch`, `boundary`, `correction`, or `result`. They consume
+
+- Separate `approval` and `grant` records binding the selected `change`, frozen
+  `plan`, mode-specific `planDigest`, `mode`, `policyRevision` and absolute
+  `workspace`. Supply the stable references and normalized fields in
+  [delivery-policy.md](delivery-policy.md).
+- `restrictions` with explicit `inspect`, `noCommits` and `group` (selected
+  native group or null). Keep the narrower retained restrictions on every call.
+  Supply P1–P8 observations at dispatch.
+- `observed` with matching plan identity, `ownership: "exclusive"`,
+  `host: "ready"`, `humanInput: "none"`, `remoteRequired: false`,
+  `stopReached: false`, phase alignment and, for Goal-First, `adaptations`.
+  Supply `minutesUsed`, `groupMinutesUsed`, `correctionsUsed`, and the
+  cumulative `correctionHistory`. Name actionable failures with
+  `failure: "routine-in-scope"` and `failureReference`. Each correction
+  record retains its `group` (`goal` in Goal-First), rejected SHA, successor
+  SHA and unique reference. Ancestry is checked against the frozen plan and
+  selected candidate. A bookkeeping commit requires fresh result evidence.
+- For Task-Guided, `taskGuidance` is a verified retained interpretation
+  (`reference`, `planDigest`, `groups`, `acceptedGroups`). Each group supplies
+  `id`, ordered `taskIds`, earlier `requires`, `authority` (`local` or
+  `external`), declared `stop`, gate argv arrays in `gates`, and a
+  `resultBudget` with `minutes` and `corrections`. Supply the applicable
+  inherited dispatch and continuation observations in
+  [delivery-policy.md](delivery-policy.md). Each accepted-group record binds its `id`,
+  `candidateSha`, `planDigest`, `gateReference`, and `reviewReference` with
+  `verified: true`. The reviewed SHA must carry the group's native checkbox
+  progress and be an ancestor of the current candidate. A checkbox alone leaves
+  the group pending.
+- At result verification, name the full `head`, the pinned `gateRun` reference
+  (`{file, sha256}`), the independently observed `activeAttempt.group` and
+  `activeAttempt.implementerSession` in `observed`, and `attempt.id` plus
+  `handover` for the exact reviewer attempt. The sealed reviewer request lists
+  `gate-run:<wrapperSha256>` in its acceptance list. The runtime matches the
+  reviewer to the candidate, plan, raw input hashes, authority and held attempt.
+  Same-SHA executable evidence and an independent, read-only, complete
+  no-findings review are required even after accepted corrections.
+
+Inspection uses the same evidence checks. The v1 status object always has
+`schemaVersion`, `change`, `mode`, `state`, `candidateSha`, `planDigest`,
+`activeAttemptId`, `stopPredicate`, `contextHint` and
+`recommendedNextAction`, in that order. Unknown identity is `null`.
+States are `unresolved`, `draft`, `approval-pending`, `local-ready`,
+`active`, `result-review-pending`, `local-verified`, `finish-ready`,
+`closed` and `blocked`. A matched retained `phaseBoundary` can supply
+`same-session` or `fresh-session` for the verified active attempt. Status
+uses no wall clock. Its recommendation includes a stable `code` and the
+selected `subject`. It performs no action.
+
+## Handover and finish readiness
+
+A `portable-role` handover takes an absolute path to the trusted companion
+`worker-handoff.mjs` in `verifier`, its independently pinned
+`verifierSha256`, plus `expected` and `runtime` from the companion's handover
+contract. It delegates sealed request, native verdict, lifecycle, output hashes
+and independent runtime checks to the companion. For a `review-candidate`
+handover, pin the companion's `review-candidate.mjs` and supply its `request`,
+`requestFileSha256`, `expect`, `exportDirectory` and `output` for replay through
+`--verify`. These paths point to the existing complete read-only reviewer package
+and retained files. Caller-owned verifier code and its package are trusted.
+
+Before a terminal handover exists, the `active-attempt` variant reads the
+companion's sealed request and a separately pinned `active.json` in that same
+evidence root. Provide `expected`, `runtime`, `activeFile` and `activeSha256`.
+The record carries v1 `kind: "active-attempt-observation"`, matching
+`identity`, `requestSha256`, `session`, and state `working` or `waiting`.
+A missing, misplaced, changed or contradictory handover blocks admission.
+Handover verification never accepts the delivery on its own.
+
+Finish readiness requires local acceptance and completed native tasks at the
+exact candidate. It checks each native delta against its corresponding committed
+current spec. The portable checker expects the identity-only plain YAML header
+(`metadata_version: 1`, `artifact: spec`, exact `capability`). Copy added or
+modified requirement blocks and scenarios into the current spec, preserve
+renamed content, and remove declared removals. A mismatch reports the capability,
+file and reason. The result requires separate finish authority. A `closeout`
+request may additionally prove the selected candidate's closure using the
+offline assertions in [evidence-retention.md](evidence-retention.md).

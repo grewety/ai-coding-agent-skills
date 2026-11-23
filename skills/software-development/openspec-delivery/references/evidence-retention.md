@@ -119,3 +119,65 @@ retention, and target readbacks. Use [recovery.md](recovery.md) when evidence is
 missing, a gate fails, or a review is rejected. Use [continuation.md](continuation.md)
 to select the next authorized delivery boundary. Those references retain their
 existing authority rules; this file does not widen them.
+
+## Runnable capture and offline assertions
+
+The separate `scripts/evidence-cli.mjs` command consumes one request JSON.
+The lossless representation library remains the verifier for the captured
+content. Paths are absolute and canonical. Approve execution and bind the
+checkout before using a capture command. Command output is retained in a fresh
+restricted file outside the checkout; the CLI emits its reference and hashes.
+
+```sh
+node <evidence-cli> capture --input <capture.json>
+node <evidence-cli> gate-capture --input <gate-run.json>
+node <evidence-cli> seal --input <seal.json>
+node <evidence-cli> verify --input <verify.json>
+node <evidence-cli> assert-closeout --input <readbacks.json>
+```
+
+- `capture` takes `argv`, `cwd`, `timeoutMs`, `scope`, `environmentScope`,
+  `output` and optional exact `revision`; use `detached: true` for a named
+  detached checkout. Store the exact argument array, observation UTC time,
+  exit status and sealed stdout and stderr. Timeouts and overflow retain
+  partial bytes and an interruption. An actual failed exit cannot pass a gate.
+- `gate-capture` takes `implementation`, separate detached `checkout`,
+  `change`, `base`, `plan`, `head`, applicable `mode`, `target`,
+  `planDigest`, and fresh `output`. Supply `bootstrap` and `gates` as
+  command arrays of `{argv, timeoutMs}` objects, and `generated` as explicit
+  checkout-relative ignored output paths. It verifies an initially clean,
+  exact checkout, retains captured streams and checks the workspace
+  after each command. Retain the raw file hash and inner gate wrapper hash
+  independently. Commands and local dependencies are trusted under the
+  existing grant. Pass only the full gate set required by the approved plan.
+- `seal` takes an `original` file, `provenance`, `labels`, and fresh
+  `output`. `verify` takes the independently retained `{file, sha256}`
+  reference and, for a disposable gate run, `expected` with `head`, `tree`,
+  `implementation` and any required gate argv arrays. Include the expected
+  change, mode, plan and plan digest when asserting a local result. A file pin complements
+  the wrapper seal. A successful representation read does not upgrade partial
+  or failed evidence into acceptance.
+
+For `assert-closeout`, supply `pullRequest`, `expectedHead`,
+`applicableCheckIds`, `observedNotBefore` and the `readbacks` map of
+independently retained `{file, sha256}` references. Use complete successful
+source readbacks for the same PR scope, revision and requested observation
+window. The decoded JSON for each key carries matching `pullRequest` and
+`head`, plus these observed fields:
+
+| Key | Provenance source | Decoded readback fields |
+| --- | --- | --- |
+| `pr` | `github-pull-request` | `state` is `OPEN` or `MERGED`, with matching `mergedAt` (null when open) and `mergeCommit` when merged. |
+| `checks` | `github-applicable-checks` | The applicable `checks` array with IDs, conclusions and completion instants. |
+| `checkRuns` | `github-check-runs` | The `checks` array with each run also bound to its exact `head`. |
+| `threads` | `github-review-threads` | All `threads` with stable `id` and resolved state. |
+| `closure` | `github-closure-readback` | `integrated`, `verifiedRevision`, closed `issue` and `issueState`, `archive`, `receiptSha256`, and verified `recordOnly`. |
+
+For a merged claim, supply the expected `mergedAt`. To claim closure supply
+`closureExpected` with the separately observed `verifiedRevision`, canonical
+`issue`, archive identity and receipt SHA-256. The checks reuse the historical
+claim eligibility above and emit supported assertions with source wrapper
+references, any remaining predicates, or the precise refused assertion.
+Capture actual command output and preserve provenance when extracting fields;
+keep incomplete, restricted and incompatible historical observations explicit.
+This command performs no collection, polling, repair, publication or remote write.

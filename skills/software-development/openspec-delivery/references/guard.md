@@ -175,3 +175,32 @@ Keep evidence factual and secret-free. The receipt describes verification at
 Closure CI validates the receipt/archive diff, and exact readback of the merge and
 the `receiptSha256` establishes the later outcome without creating another
 attestation PR.
+
+## Shared planning and checkout limits
+
+Draft, committed planning, policy-context and candidate checks share the
+same inventory budget. The limits are 256 files, 512 total entries, 16 MiB
+aggregate planning bytes, 4 MiB per file, 16 repository-relative path
+components and 128 KiB of path/output accounting. The guard refuses the
+entire inventory on overflow, an unsafe path or an inconsistent read.
+Existing normalized Task-Guided digests retain their framing. The
+`inventory` observation carries counts and total bytes alongside raw hashes.
+Aikido 1151615147 is exercised by oversized synthetic inventories at the
+count, byte, depth and output boundaries.
+
+Candidate, review and receipt checkout checks include ignored files and
+hidden Git index flags. Aikido 1151615165 is exercised by ignored-input,
+stale SHA and same-checkout rejection fixtures. Start applicable gates in a
+separate disposable, detached checkout at the exact candidate commit with a
+clean input inventory. Apply authorized bootstrap only after that initial
+observation. Permit only explicitly declared ignored output roots generated
+inside that run. Reject any unclassified input or tracked checkout mutation,
+and keep gate output and its seals outside both workspaces.
+
+The Task-Guided snapshot interface stays available. Add
+`--gate-run <file> --gate-run-sha256 <retained-file-digest>` to verify a
+pinned disposable capture against the committed candidate. A snapshot alone
+does not demonstrate execution. Goal-First snapshot checks use
+`--mode goal-first --target <verified-target-sha> --expect-plan <goal-digest>`.
+For either mode, [delivery-runtime.md](delivery-runtime.md) uses the applicable
+gate commands and exact read-only handover before it reports a verified result.

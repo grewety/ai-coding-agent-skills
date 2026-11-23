@@ -248,3 +248,59 @@ A new artifact directory links its predecessor but does not reset this count.
 Budget exhaustion is a stop, not an iteration cap. Existing integrated handoff
 gates still constrain already-frozen changes; this source revision grants no new
 handoff authority to the change implementing it.
+
+## Mode selection and local result
+
+The optional integrated root contributor marker is
+`<!-- openspec-delivery-mode: goal-first -->` on its own line. The guard reads
+it from the frozen plan's verified integrated parent, using root `AGENTS.md`
+or root `CLAUDE.md` when `AGENTS.md` is absent. A change's own marker edit
+is inert for that change. A missing, ambiguous or inactive marker, a legacy
+plan, a prescribed method, ordered dependencies, staged authority, or an
+unproved reversible local boundary selects Task-Guided. Supply the observed
+`reversibleLocal`, `prescribedMethod`, `orderedDependencies` and `stagedAuthority`
+booleans as the `deliveryBoundary`. Keep the frozen interpretation on resume.
+
+Goal-First uses one fenced `openspec-goal-contract` JSON block in the native
+proposal and at least one native spec delta. Its v1 fields are
+
+| Field | Meaning |
+| --- | --- |
+| `outcome` | The local result being approved. |
+| `scope` | Allowed repository-relative paths or directory prefixes. |
+| `invariants`, `nonGoals` | Explicit hard requirements and excluded outcomes. |
+| `adaptableAssumptions` | Named legacy assumptions that can be revised within the same contract. Use an empty list if none apply. |
+| `acceptance`, `gates` | Verifiable criteria and the exact ordered command argument arrays. |
+| `localAuthority` | An explicit `commits` boolean and a declared `stop`. |
+| `budgets` | Maximum active `minutes` and cumulative `corrections`. |
+
+Use one native local outcome checkbox and place external closeout predicates
+outside that checkbox. The Goal Contract digest binds the contract, integrated
+policy revision, OpenSpec config, change metadata and spec inputs. Native
+checkbox progress and implementation decisions preserve the digest. The guard
+checks frozen task wording, changed paths and approved acceptance commands.
+Approach review, where selected, still covers all raw draft planning inputs.
+
+Normalize independently retained authority into two v1 records. The first has
+`kind: "exact-goal-approval"` or `"exact-plan-approval"`, `approved: true`,
+`verified: true` and a stable `reference`. The second has
+`kind: "local-execution-grant"`, `verified: true`, its own `reference`,
+a matching `approvalReference`, `localOnly: true`, finite `budgets`,
+`commits` and `stop`. Both bind `change`, `workspace`, `plan`,
+`planDigest`, `mode` and `policyRevision`. Task-Guided also carries
+`eligibleGroups` and the inherited continuation `budget`. The grant and
+selected group can narrow time, corrections and commits independently.
+One operator reply can express both decisions if each record identifies
+its own authority.
+
+At each phase and after each correction, retain alignment of Goal-First
+`scope`, `invariants`, `nonGoals`, `acceptance` and `localAuthority`,
+or Task-Guided `frozen-plan`, `order` and `localAuthority`. Each
+is `aligned` or `conflict`. Record in-scope assumption adaptations as
+`{assumption, evidence}`. Conflict returns `DIRECTION_DRIFT_CHOICE` with
+the affected clause. Missing ownership, unrecoverable host failures, declared
+stops, exhausted time or correction budgets and separate authority needs
+also stop or queue the run. An actionable in-scope failure consumes the
+held correction budget. Retain its rejected evidence and successor; repin
+gates and independent result review every time the candidate SHA changes.
+See [delivery-runtime.md](delivery-runtime.md) for the runnable interfaces.
