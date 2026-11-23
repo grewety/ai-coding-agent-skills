@@ -131,6 +131,7 @@ test("well-known build publishes every skill and all advertised files", async ()
       "scripts/change-guard.mjs",
       "scripts/change-name.mjs",
       "scripts/change-workspace.mjs",
+      "scripts/delegated-delivery.mjs",
       "scripts/delivery-cli.mjs",
       "scripts/delivery-control.mjs",
       "scripts/delivery-policy.mjs",

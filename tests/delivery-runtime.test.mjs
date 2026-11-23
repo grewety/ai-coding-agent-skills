@@ -2,12 +2,18 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { chmod, mkdir, mkdtemp, readdir, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { sha256 } from "../skills/software-development/openspec-delivery/scripts/evidence-cli.mjs";
-import { createAttempt, publishResult } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/worker-handoff.mjs";
+import { deliveryCommand } from "../skills/software-development/openspec-delivery/scripts/delivery-cli.mjs";
+import { createAttempt, publishResult, requestBytes } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/worker-handoff.mjs";
+import { roleQualificationBinding } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-bindings.mjs";
+import { claimPath } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-claims.mjs";
+import { observeImplementer, runImplementers, runtimeIdentity } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-runtime.mjs";
+import { readState } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-state.mjs";
+import { privateCheckoutIdentity } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/worker-runtime-policy.mjs";
 import { runReview } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-candidate.mjs";
 import { buildExport, jsonBytes, prepareExport } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-inputs.mjs";
 import { bubblewrapVersion, claudeVersion } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-runtime.mjs";
@@ -32,7 +38,7 @@ function exec(executable, args) {
   assert.equal(result.error, undefined);
   return result;
 }
-async function fixture(t, { integratedOptIn = true, staged = false } = {}) {
+async function fixture(t, { integratedOptIn = true, staged = false, exclusive = false, continuous = false } = {}) {
   const root = await realpath(await mkdtemp(path.join(os.tmpdir(), "delivery-runtime-")));
   t.after(async () => {
     // The contained reviewer seals export and output directories at 0500.
@@ -63,11 +69,13 @@ async function fixture(t, { integratedOptIn = true, staged = false } = {}) {
     return git(dir, "rev-parse", "HEAD");
   };
   git(repo, "init", "-b", "main");
-  await write(repo, "AGENTS.md", `# Fixtures\n${integratedOptIn ? "<!-- openspec-delivery-mode: goal-first -->\n" : ""}`);
+  await write(repo, "AGENTS.md", `# Fixtures\n${integratedOptIn ? "<!-- openspec-delivery-mode: goal-first -->\n" : ""}` +
+    (exclusive ? "<!-- openspec-worker-runtime: exclusive -->\n" : ""));
   await write(repo, ".gitignore", "/dist/\n/ignored-input\n");
   await write(repo, "widget.txt", "old");
   const base = commit(repo, "Integrated policy and product");
   git(repo, "update-ref", "refs/remotes/origin/main", base);
+  git(repo, "remote", "add", "origin", "git@github.com:Example/Fixture.git");
   git(repo, "worktree", "add", "-b", `change/${change}`, workspace, base);
   const contract = { schemaVersion: 1, outcome: "Deliver the widget", scope: [current, "widget.txt"],
     invariants: ["Use only local synthetic fixture data"], nonGoals: ["Publish"],
@@ -81,7 +89,7 @@ async function fixture(t, { integratedOptIn = true, staged = false } = {}) {
     write(workspace, `${own}/tasks.md`, "# Tasks\n\n## 1. Widget\n- [ ] 1.1 Pass the widget gate\n" +
       (staged ? "\n## 2. External\n- [ ] 2.1 Run separate preview\n" : "")),
   ]);
-  if (!integratedOptIn) await write(workspace, "AGENTS.md", "# Unintegrated opt-in\n<!-- openspec-delivery-mode: goal-first -->\n");
+  if (!integratedOptIn && !exclusive) await write(workspace, "AGENTS.md", "# Unintegrated opt-in\n<!-- openspec-delivery-mode: goal-first -->\n");
   let index = 0;
   const run = async (command, input, cli = delivery) => {
     const file = path.join(root, `input-${++index}.json`);
@@ -92,16 +100,17 @@ async function fixture(t, { integratedOptIn = true, staged = false } = {}) {
   };
   const draft = await run("policy", {
     repo: workspace, change, phase: "freeze", parent: base, target: base,
-    selection: { revision: base, reference: "retained:draft-policy", preExecutionReview: false, continuousGoal: false },
-    deliveryBoundary: { ...boundary, stagedAuthority: staged }, declaredContractPaths: integratedOptIn ? [] : ["AGENTS.md"],
+    selection: { revision: base, reference: "retained:draft-policy", preExecutionReview: false, continuousGoal: continuous },
+    deliveryBoundary: { ...boundary, stagedAuthority: staged }, declaredContractPaths: integratedOptIn || exclusive ? [] : ["AGENTS.md"],
+    orchestrationAvailable: continuous,
   });
   assert.equal(draft.status, 0, draft.stdout);
   assert.equal(draft.value.planDigest, null);
   assert.equal(draft.value.policy.executionAuthorized, false);
   const plan = commit(workspace, "Freeze plan");
-  const selection = { revision: base, reference: "retained:integrated-policy", preExecutionReview: false, continuousGoal: false };
+  const selection = { revision: base, reference: "retained:integrated-policy", preExecutionReview: false, continuousGoal: continuous };
   const defaults = { repo, change, plan, target: base, workspace, selection, deliveryBoundary: { ...boundary, stagedAuthority: staged },
-    declaredContractPaths: integratedOptIn ? [] : ["AGENTS.md"] };
+    declaredContractPaths: integratedOptIn || exclusive ? [] : ["AGENTS.md"], orchestrationAvailable: continuous };
   const evaluated = (await run("policy", defaults)).value;
   assert.equal(evaluated.policy.mode, integratedOptIn && !staged ? "goal-first" : "task-guided");
   const { planDigest, policy } = evaluated;
@@ -195,6 +204,7 @@ async function createHandover(f, head, gateReference, attempt, role = "reviewer"
 
 async function containedHandover(f, workspace, head, gates, attempt, {
   base = f.plan, identity = {}, gateReference = gates.captured.value.wrapperSha256, coverageLimitations = [], findings = [],
+  authority = {}, session = randomUUID(), configurationSha256 = sha256("synthetic contained runtime"), goalDigest, work,
 } = {}) {
   const root = path.join(f.root, attempt);
   await mkdir(root, { mode: 0o700 });
@@ -211,9 +221,17 @@ async function containedHandover(f, workspace, head, gates, attempt, {
   assert.equal(diff.status, 0, diff.stderr);
   const worker = workerRequest(f, head, gateReference, attempt, output);
   if (gateReference === null) worker.acceptance = ["Widget loads"];
+  if (goalDigest) worker.acceptance.push(`goal-contract:${goalDigest}`);
+  if (work) {
+    worker.outcome = work.outcome;
+    worker.scope = work.scope;
+    worker.nonGoals = work.nonGoals;
+    worker.acceptance = [...new Set([...worker.acceptance, ...work.acceptance])];
+  }
+  Object.assign(worker.authority, authority);
   const planDigest = f.evaluated.context.planDigest;
   Object.assign(worker.identity, { workspace, planDigest, ...identity });
-  const record = { schemaVersion: 1, mode: "candidate", session: randomUUID(), worker,
+  const record = { schemaVersion: 1, mode: "candidate", session, worker,
     snapshot: { base, target: head, plan: f.plan, planDigest, diffSha256: sha256(diff.stdout),
       gates: [{ command: "Check widget", commit: head, exitCode: 0, evidence }] },
     attachments: { [evidence]: sha256(evidenceBytes) }, limits: { diffBytes: 65_536 } };
@@ -221,7 +239,7 @@ async function containedHandover(f, workspace, head, gates, attempt, {
   await writeFile(request, bytes, { mode: 0o400 });
   const prepared = await buildExport(record);
   const binding = { schemaVersion: 1, requestSha256: sha256(bytes), exportSha256: await prepareExport(exportDirectory, record, null),
-    configurationSha256: sha256("synthetic contained runtime"), model: "claude-fixture" };
+    configurationSha256, model: "claude-fixture" };
   const replay = await runReview({ request: record, expect: binding, prepared, directory: output, excluded: [exportDirectory],
     run: async ({ files, prompt, session }) => {
       const events = [];
@@ -250,9 +268,10 @@ async function containedHandover(f, workspace, head, gates, attempt, {
     },
   });
   assert.equal(replay.phase, "complete");
-  await writeFile(expect, jsonBytes({ ...binding, statusSha256: replay.statusSha256 }), { mode: 0o400 });
+  const expectationBytes = jsonBytes({ ...binding, statusSha256: replay.statusSha256 });
+  await writeFile(expect, expectationBytes, { mode: 0o400 });
   return { kind: "review-candidate", verifier: containedVerifier, verifierSha256: sha256(await readFile(containedVerifier)),
-    request, requestFileSha256: sha256(bytes), expect, exportDirectory, output };
+    request, requestFileSha256: sha256(bytes), expect, expectFileSha256: sha256(expectationBytes), exportDirectory, output };
 }
 
 test("read-only runtime preflights P1–P8, reconciles dedicated worktrees and checks sealed handover", async (t) => {
@@ -457,7 +476,7 @@ test("Task-Guided results admit a sealed isolated review of the full frozen-plan
   changedRequest.worker.identity.inputs[tasks] = sha256(ticked);
   const changedBytes = jsonBytes(changedRequest);
   const changedHandover = { ...handover, request: path.join(f.root, "wrong-inputs.json"),
-    expect: path.join(f.root, "wrong-inputs-expect.json"), requestFileSha256: sha256(changedBytes) };
+    expect: path.join(f.root, "wrong-inputs-expect.json"), expectFileSha256: undefined, requestFileSha256: sha256(changedBytes) };
   const expectation = JSON.parse(await readFile(handover.expect, "utf8"));
   await writeFile(changedHandover.request, changedBytes);
   await writeFile(changedHandover.expect, jsonBytes({ ...expectation, requestSha256: changedHandover.requestFileSha256 }));
@@ -524,4 +543,358 @@ test("finish checks current-spec promotion in the exact accepted candidate", asy
   assert.equal(result.value.issue.path, current);
   assert.equal((await f.run("status", input)).value.state, "blocked");
   assert.equal((await f.route("finish-readiness", input)).stdout, result.stdout);
+});
+
+const fakeCodex = `#!/usr/bin/python3
+import json, pathlib, sys, uuid
+fence = chr(96) * 3
+request = json.loads(sys.stdin.read().split(fence + "json\\n", 1)[1].split("\\n" + fence, 1)[0])
+def emit(kind, **fields):
+    print(json.dumps(dict(type=kind, **fields)), flush=True)
+emit("thread.started", thread_id=str(uuid.uuid4()))
+emit("turn.started")
+if "synthetic cap" in request["acceptance"]:
+    emit("item.completed", item=dict(type="agent_message", text="Partial synthetic progress"))
+    emit("turn.failed", error=dict(code="turn_limit"))
+    sys.exit(12)
+for name in request["mutablePaths"]:
+    pathlib.Path(name).write_text("new" if request["identity"]["task"] == "1.1" else "next")
+emit("item.completed", item=dict(type="agent_message", text="Synthetic implementation result"))
+emit("turn.completed", usage=dict(output_tokens=3))
+`;
+
+async function exclusiveFixture(f) {
+  const registry = path.join(f.root, "exclusive-registry");
+  const trusted = path.join(f.root, "trusted-worker-inputs");
+  const evidence = path.join(f.root, "worker-evidence");
+  const paths = ["worker-home", "worker-xdg", "worker-codex", "review-slot"].map((name) => path.join(f.root, name));
+  const [home, xdg, codexHome, reviewSlot] = paths;
+  await Promise.all([trusted, evidence, ...paths].map((dir) => mkdir(dir, { mode: 0o700 })));
+  const pin = async (name, bytes, mode = 0o400) => {
+    const file = path.join(trusted, name);
+    await writeFile(file, bytes, { mode, flag: "wx" });
+    return { path: file, sha256: sha256(bytes) };
+  };
+  const retain = (name, value) => pin(name, jsonBytes(value));
+  const runtimeSha256 = await runtimeIdentity();
+  const binary = await pin("synthetic-native", fakeCodex, 0o700);
+  const codexConfiguration = await retain("codex-configuration.json", {
+    schemaVersion: 1, role: "implementer", auth: "dedicated-file", disableHostDiscovery: true, permissionMode: "named-workspace-write",
+  });
+  const reviewerConfiguration = await retain("review-configuration.json", {
+    schemaVersion: 1, bwrap: binary, claude: binary, node: binary, libraries: [], model: "claude-fixture",
+    relay: { route: "same-uid-key", keyFile: path.join(f.root, "synthetic-relay-pin"), keyFormat: "raw" },
+    timeoutMs: 2000, maxTurns: 4, maxBudgetUsd: 1, requirePreExposureAttestation: false,
+  });
+  const inventory = async (name) => [await pin(name + "-skill.md", "Synthetic skill"), await pin(name + "-helper.mjs", "Synthetic helper")];
+  const pair = {
+    implementer: { client: "codex", provider: "openai", model: "fixture-codex", version: "0.171.0", route: "codex-native-named-workspace-write",
+      configuration: codexConfiguration, inventory: await inventory("implementer"), slot: codexHome, home, xdg, codexHome, executable: binary },
+    reviewer: { client: "claude-code", provider: "anthropic", model: "claude-fixture", version: claudeVersion, route: "claude-bubblewrap-read-only",
+      configuration: reviewerConfiguration, inventory: await inventory("reviewer"), slot: reviewSlot, session: randomUUID() },
+  };
+  for (const [name, role] of Object.entries(pair)) {
+    const { client, provider, version, model, route, configuration } = role;
+    role.qualification = await retain(name + "-qualification.json", {
+      schemaVersion: 1, kind: "exclusive-runtime-qualification", status: "qualified", role: name, client, provider, version, model,
+      route, configurationSha256: configuration.sha256, inventorySha256: sha256(jsonBytes(role.inventory)), runtimeSha256,
+      bindingSha256: roleQualificationBinding(role), supervisor: name + "-synthetic-controller", positiveControl: true,
+      deniedPublication: true, protectedPaths: true, settlementVerified: true, inventoryUnchanged: true,
+    });
+  }
+  const repository = "github.com/example/fixture";
+  const { change, plan, planDigest, mode, policyRevision, workspace } = f.request.approval;
+  const base = { schemaVersion: 1, change, plan, planDigest, mode, policyRevision, workspace, repository,
+    branch: `refs/heads/change/${change}`, orchestrator: "fixture-owner", authorSession: "fixture-author" };
+  const issuedAt = Date.now() - 1000;
+  const expiresAt = issuedAt + 240000;
+  const approval = await retain("approval.json", { ...base, kind: f.request.approval.kind, approved: true, approvedAt: issuedAt });
+  const implementer = path.join(path.dirname(verifier), "run-implementer.mjs");
+  const verifierSha256 = sha256(await readFile(implementer));
+  const decide = (input) => deliveryCommand("decision", input, { registry });
+  const status = (input) => deliveryCommand("status", input, { registry });
+  const readClaim = (attempt) => path.join(claimPath(registry, repository, change), "attempt-" + attempt);
+
+  async function assignment(attempt, {
+    task = "1.1", predecessor = null, continuation = null, accepted = [], initialHead = plan, reviewSession = pair.reviewer.session,
+    noCommits = false, behavior,
+  } = {}) {
+    const host = await retain(attempt + "-host.json", {
+      schemaVersion: 1, runtimeSha256, pair: { ...pair, reviewer: { ...pair.reviewer, session: reviewSession } }, override: null,
+      restrictions: { allowedClients: ["codex", "claude-code"], allowedModels: ["fixture-codex", "claude-fixture"],
+        allowedProviders: ["openai", "anthropic"], requireDistinctModels: true },
+    });
+    const grantFile = path.join(trusted, attempt + "-grant.json");
+    const group = task.split(".")[0];
+    const request = workerRequest(f, null, "", attempt, path.join(evidence, attempt), "implementer");
+    Object.assign(request, { outcome: mode === "goal-first" ? f.contract.outcome : "Deliver the fixture group",
+      scope: mode === "goal-first" ? f.contract.scope : ["widget.txt"], acceptance: mode === "goal-first" ? f.contract.acceptance :
+        ["Widget loads", ...(behavior ? [behavior] : [])], stop: "Scope conflict", budget: { limit: 1, unit: "minutes" },
+      mutablePaths: ["widget.txt"], requiredEvidence: ["native.txt", "lifecycle.jsonl", "stdout.jsonl", "stderr.log", "launch.json"],
+    });
+    Object.assign(request.identity, { group, task, action: task, predecessor });
+    Object.assign(request.authority, { approvalReference: approval.path, executionReference: grantFile });
+    if (noCommits) request.restrictions.push("no commits");
+    const requestSha256 = sha256(requestBytes(request));
+    const inference = await retain(attempt + "-inference.json", { schemaVersion: 1, kind: "worker-inference-authority", attempt,
+      requestSha256, hostSha256: host.sha256, orchestrator: base.orchestrator, maxRuns: 1, expiresAt });
+    const grant = await retain(attempt + "-grant.json", {
+      ...base, kind: "local-execution-grant", localOnly: true, requestSha256, hostSha256: host.sha256, approvalSha256: approval.sha256,
+      checkoutIdentity: await privateCheckoutIdentity(workspace), head: initialHead, eligibleTasks: [task], accepted, knownWorkspaces: [],
+      mutablePaths: request.mutablePaths, restrictions: request.restrictions, stop: request.stop, issuedAt, expiresAt, overrideSha256: null,
+      limits: { timeoutMs: 3500, stdoutBytes: 16384, stderrBytes: 16384, maxTurns: 1, totalMs: 240000, groupMs: 180000,
+        corrections: 1, batchSize: 1 }, continuation, inference,
+      ...(mode === "goal-first" ? { normalizedPlanDigest: f.evaluated.context.planDigest } : {}),
+    });
+    const entry = { request, host, approval, grant };
+    const reviewerInventory = sha256(jsonBytes(pair.reviewer.inventory));
+    const preflight = { ...f.request.preflight,
+      live: { ...f.request.preflight.live, repository }, auth: { ...f.request.preflight.auth, repository },
+      reviewer: { ...f.request.preflight.reviewer, configurationSha256: reviewerConfiguration.sha256,
+        expectedConfigurationSha256: reviewerConfiguration.sha256, packageSha256: reviewerInventory },
+      relay: { ...f.request.preflight.relay, configurationSha256: reviewerConfiguration.sha256 },
+      companions: { ...f.request.preflight.companions, actual: { reviewer: reviewerInventory }, expected: { reviewer: reviewerInventory } },
+    };
+    const input = { ...f.request, approval: { ...f.request.approval, reference: approval.path },
+      grant: { ...f.request.grant, reference: grant.path, approvalReference: approval.path, stop: request.stop, eligibleGroups: ["1", "2"] },
+      preflight, delegation: { verifier: implementer, verifierSha256, runtimeSha256, assignment: await retain(attempt + "-input.json",
+        { schemaVersion: 1, assignments: [entry] }) } };
+    return { entry, input, reviewSession };
+  }
+
+  async function settled(attempt, options = {}) {
+    const [outcome] = await runImplementers([attempt.entry], { registry, runProbe: async () => ({ proof: [] }), ...options });
+    return outcome;
+  }
+
+  async function release(attempt, result) {
+    const id = attempt.entry.request.identity.attempt;
+    const { claimId } = await readState(readClaim(id), "launch.json");
+    const proof = await retain(id + "-release.json", {
+      schemaVersion: 1, kind: "exclusive-runtime-release", action: "release-slot", claimId, change, attempt: id,
+      orchestrator: base.orchestrator, settlementSha256: result.settlementSha256, quiescent: true, falloutVerified: true,
+    });
+    const released = await observeImplementer(attempt.entry, { registry, action: "release-slot", release: proof });
+    assert.equal(released.phase, "slot-released", released.reason);
+    return readState(readClaim(id), "publication.json");
+  }
+
+  async function review(attempt, runtime, head, gates, label, overrides = {}) {
+    const checkout = path.join(f.root, label + "-checkout");
+    f.git(f.repo, "worktree", "add", "--detach", checkout, head);
+    const { task, group, action, attempt: predecessor } = attempt.entry.request.identity;
+    return containedHandover(f, checkout, head, gates, label, {
+      identity: { task, group, action, predecessor, implementerSession: runtime.result.runtime.session },
+      authority: attempt.entry.request.authority, work: attempt.entry.request, session: attempt.reviewSession, configurationSha256: reviewerConfiguration.sha256,
+      ...(mode === "goal-first" ? { goalDigest: f.planDigest } : {}), ...overrides,
+    });
+  }
+  return { registry, assignment, settled, decide, status, retain, release, review, readClaim, pair };
+}
+
+test("exclusive Goal-First reads the original worker, checks output scope and binds exact gates and paired review", { skip: process.platform !== "linux" }, async (t) => {
+  const f = await fixture(t, { exclusive: true });
+  const w = await exclusiveFixture(f);
+  const attempt = await w.assignment("goal-first", { noCommits: true });
+  const { input } = attempt;
+  assert.equal((await f.route("next", f.request)).value.reason, "DELEGATED_RUNTIME_UNVERIFIED");
+  assert.equal((await f.route("inspect", f.request)).value.stopPredicate, "DELEGATED_RUNTIME_UNVERIFIED");
+  const dispatch = await w.decide(input);
+  assert.equal(dispatch.action, "dispatch", JSON.stringify(dispatch));
+  assert.equal(dispatch.requiresExclusiveAdmission, true);
+  assert.equal(dispatch.commits, false);
+  const unrelated = { ...input, preflight: { ...input.preflight, reviewer: { ...input.preflight.reviewer,
+    configurationSha256: "1".repeat(64), expectedConfigurationSha256: "1".repeat(64) },
+    relay: { ...input.preflight.relay, configurationSha256: "1".repeat(64) } } };
+  assert.equal((await w.decide(unrelated)).reason, "PREFLIGHT_PENDING");
+  await assert.rejects(readFile(path.join(w.registry, "owner.json")), { code: "ENOENT" });
+  const runtime = await w.settled(attempt);
+  assert.equal(runtime.phase, "completed", runtime.reason);
+  const boundary = { ...input, deliveryPhase: "boundary" };
+  assert.equal((await w.decide(input)).reason, "WORKSPACE_DIRTY");
+  let verdict = await w.decide(boundary);
+  assert.equal(verdict.action, "continue", JSON.stringify(verdict));
+  assert.equal(verdict.commits, false);
+  assert.equal((await w.status(boundary)).activeAttemptId, attempt.entry.request.identity.attempt);
+
+  await f.write(f.workspace, "outside.txt", "out-of-scope fixture");
+  assert.equal((await w.decide(boundary)).reason, "POST_WORKER_SCOPE_UNVERIFIED");
+  await rm(path.join(f.workspace, "outside.txt"));
+  const head = f.commit(f.workspace, "Synthetic orchestrator candidate");
+  const gates = await gateFixture(f, head, "exclusive-goal");
+  assert.equal(gates.captured.status, 0, gates.captured.stdout);
+  const result = { ...input, deliveryPhase: "result", head, gateRun: gates.gateRun };
+  assert.equal((await w.decide(result)).reason, "EXACT_REVIEW_PENDING");
+  assert.equal((await w.decide({ ...result, gateRun: { ...gates.gateRun, sha256: "1".repeat(64) } })).reason, "EXACT_GATES_UNVERIFIED");
+
+  const handover = await w.review(attempt, runtime, head, gates, "exclusive-goal-review");
+  const accepted = { ...result, handover, attempt: { id: "exclusive-goal-review" } };
+  verdict = await w.decide(accepted);
+  assert.equal(verdict.action, "accept-result", JSON.stringify(verdict));
+  assert.equal(verdict.head, head);
+  assert.equal(verdict.commits, false);
+  assert.equal((await w.status(accepted)).state, "local-verified");
+  const wrongGoal = await w.review(attempt, runtime, head, gates, "wrong-goal-review", { goalDigest: "2".repeat(64) });
+  assert.equal((await w.decide({ ...result, handover: wrongGoal, attempt: { id: "wrong-goal-review" } })).reason, "HANDOVER_UNVERIFIED");
+  const wrongRole = await w.review(attempt, runtime, head, gates, "wrong-pair-review", { session: randomUUID() });
+  assert.equal((await w.decide({ ...result, handover: wrongRole, attempt: { id: "wrong-pair-review" } })).reason, "HANDOVER_UNVERIFIED");
+  const priorDir = w.readClaim("goal-first");
+  const file = path.join(priorDir, "publication.json");
+  const unpublished = file + ".held";
+  await rename(file, unpublished);
+  try {
+    assert.equal((await w.status({ ...result, restrictions: { ...input.restrictions, inspect: true } })).stopPredicate, "ORIGINAL_RECOVERY_PENDING");
+    await assert.rejects(readFile(file), { code: "ENOENT" }, "inspection must not publish");
+  } finally { await rename(unpublished, file); }
+
+  await f.write(f.workspace, `${own}/tasks.md`,
+    (await readFile(path.join(f.workspace, own, "tasks.md"), "utf8")).replace("[ ]", "[x]"));
+  const progress = f.commit(f.workspace, "Synthetic orchestrator records accepted outcome");
+  const fresh = await gateFixture(f, progress, "goal-progress");
+  const session = randomUUID();
+  const review = await w.review(attempt, runtime, progress, fresh, "goal-progress-review", { session });
+  const { claimId } = await readState(priorDir, "launch.json");
+  review.reviewSessionBinding = await w.retain("goal-progress-authority.json", {
+    schemaVersion: 1, kind: "exclusive-review-session", claimId, change, plan: f.plan, planDigest: f.planDigest,
+    attempt: "goal-first", candidate: progress, orchestrator: "fixture-owner", originalSession: attempt.reviewSession, session,
+    configurationSha256: w.pair.reviewer.configuration.sha256, inventorySha256: sha256(jsonBytes(w.pair.reviewer.inventory)),
+    requestFileSha256: review.requestFileSha256, reviewAuthority: "synthetic single-run approval", maxRuns: 1,
+  });
+  assert.equal((await w.decide({ ...accepted, head: progress, gateRun: fresh.gateRun, handover: review,
+    attempt: { id: "goal-progress-review" } })).action, "accept-result");
+});
+
+test("exclusive Task-Guided dispatch replays exact predecessor gates and review before advising group two", { skip: process.platform !== "linux" }, async (t) => {
+  const f = await fixture(t, { staged: true, exclusive: true, continuous: true });
+  const w = await exclusiveFixture(f);
+  const taskGuidance = twoGroupGuidance(f.planDigest);
+  taskGuidance.groups[1].authority = "local";
+  taskGuidance.groups[1].gates = [[process.execPath, "-e", "process.exit(0)"]];
+  const first = await w.assignment("group-one");
+  const firstInput = { ...first.input, taskGuidance };
+  assert.equal((await w.decide(firstInput)).group, "1");
+  const observed = await w.settled(first);
+  assert.equal(observed.phase, "completed", observed.reason);
+  const tasksFile = `${own}/tasks.md`;
+  await f.write(f.workspace, tasksFile, (await readFile(path.join(f.workspace, tasksFile), "utf8")).replace("[ ]", "[x]"));
+  const head = f.commit(f.workspace, "Synthetic orchestrator accepts first native candidate");
+  const gates = await gateFixture(f, head, "exclusive-task");
+  const handover = await w.review(first, observed, head, gates, "exclusive-task-review");
+  const result = { ...firstInput, deliveryPhase: "result", head, gateRun: gates.gateRun, handover, attempt: { id: "exclusive-task-review" } };
+  const verdict = await w.decide(result);
+  assert.equal(verdict.action, "accept-result", JSON.stringify(verdict));
+
+  const firstResult = await w.release(first, observed);
+  const continuation = await w.retain("ordered-continuation.json", { schemaVersion: 1, kind: "exclusive-runtime-continuation",
+    change, plan: f.plan, planDigest: f.planDigest, orchestrator: "fixture-owner", previousAttempt: "group-one", attempt: "group-two",
+    priorResultSha256: firstResult.resultSha256, priorSettlementSha256: firstResult.settlementSha256, reason: "ordered-successor",
+    task: "2.1", acceptedCandidate: head });
+  const acceptedDependency = { task: "1.1", candidate: head, receipt: await w.retain("accepted-first.json", {
+    kind: "accepted-dependency", task: "1.1", candidate: head, change, plan: f.plan, planDigest: f.planDigest, verdict: "pass",
+  }) };
+  const second = await w.assignment("group-two", { task: "2.1", predecessor: "group-one", continuation, initialHead: head,
+    accepted: [acceptedDependency], reviewSession: randomUUID() });
+  const report = JSON.parse(await readFile(path.join(handover.output, "result.json"), "utf8")).report;
+  const successor = { ...second.input, taskGuidance: { ...taskGuidance, acceptedGroups: [{ id: "1", verified: true,
+    candidateSha: head, planDigest: f.planDigest, reviewReference: report.sha256, gateReference: verdict.gateReference }] },
+    observed: { ...second.input.observed, completedGroups: 1 } };
+  async function next(prior, changes = {}) {
+    const locator = await w.retain(randomUUID() + ".json", prior);
+    return w.decide({ ...successor, ...changes, delegation: { ...successor.delegation, predecessor: locator } });
+  }
+  assert.equal((await next({ ...result, handover: null, attempt: null })).reason, "DELEGATED_RUNTIME_UNVERIFIED");
+  assert.equal((await next({ ...result, head: f.plan })).reason, "DELEGATED_RUNTIME_UNVERIFIED");
+  assert.equal((await next(result, { restrictions: { ...successor.restrictions, group: "1" } })).reason, "GROUP_AUTHORITY_PENDING");
+  await assert.rejects(readFile(path.join(w.readClaim("group-two"), "launch.json")), { code: "ENOENT" });
+  const dispatch = await next(result);
+  assert.equal(dispatch.action, "dispatch", JSON.stringify(dispatch));
+  assert.equal(dispatch.group, "2");
+  assert.equal(dispatch.requiresExclusiveAdmission, true);
+  const secondResult = await w.settled(second);
+  assert.equal(secondResult.phase, "completed", secondResult.reason);
+  assert.equal(await readFile(path.join(f.workspace, "widget.txt"), "utf8"), "next");
+});
+
+test("exclusive correction requires a verified exact finding and carries the consumed cycle to the successor", { skip: process.platform !== "linux" }, async (t) => {
+  const f = await fixture(t, { staged: true, exclusive: true, continuous: true });
+  const w = await exclusiveFixture(f);
+  const taskGuidance = twoGroupGuidance(f.planDigest);
+  const first = await w.assignment("finding-work");
+  const firstInput = { ...first.input, taskGuidance };
+  const firstRuntime = await w.settled(first);
+  assert.equal(firstRuntime.phase, "completed", firstRuntime.reason);
+  const head = f.commit(f.workspace, "Candidate with synthetic finding");
+  const gates = await gateFixture(f, head, "exclusive-finding");
+  const handover = await w.review(first, firstRuntime, head, gates, "exclusive-scope-finding", {
+    findings: [{ severity: "low", path: "widget.txt", line: 1, impact: "Synthetic", trigger: "Read", remedy: "Revise fixture" }],
+  });
+  const report = JSON.parse(await readFile(path.join(handover.output, "result.json"), "utf8")).report;
+  const observed = { ...firstInput.observed, failure: "routine-in-scope", failureReference: report.sha256 };
+  const rejected = { ...firstInput, deliveryPhase: "result", head, gateRun: gates.gateRun, handover, observed,
+    attempt: { id: "exclusive-scope-finding" } };
+  const reviewFailed = await w.decide(rejected);
+  assert.equal(reviewFailed.action, "correct", JSON.stringify(reviewFailed));
+  assert.equal((await w.decide({ ...rejected, deliveryPhase: "correction", handover: null, attempt: null })).reason, "EXACT_REVIEW_PENDING");
+  assert.equal((await w.decide({ ...rejected, observed: { ...observed, correctionHistory: [{ group: "1", reference: "invalid" }] } })).reason,
+    "BUDGET_HISTORY_UNVERIFIED");
+
+  const publication = await w.release(first, firstRuntime);
+  const continuation = await w.retain("finding-control.json", {
+    schemaVersion: 1, kind: "exclusive-runtime-continuation", change, plan: f.plan, planDigest: f.planDigest,
+    orchestrator: "fixture-owner", previousAttempt: "finding-work", attempt: "finding-correction", task: "1.1",
+    priorResultSha256: publication.resultSha256, priorSettlementSha256: publication.settlementSha256,
+    reason: "review-correction", rejectedCandidate: head, reviewSha256: report.sha256, inScopeFinding: true,
+  });
+  const second = await w.assignment("finding-correction", { predecessor: "finding-work", continuation, initialHead: head, reviewSession: randomUUID() });
+  const correction = { ...second.input, taskGuidance, delegation: { ...second.input.delegation,
+    predecessor: await w.retain("rejected-input.json", rejected) } };
+  const dispatch = await w.decide(correction);
+  assert.equal(dispatch.action, "dispatch", JSON.stringify(dispatch));
+  const settled = await w.settled(second);
+  assert.equal(settled.phase, "completed", settled.reason);
+  const tasksFile = `${own}/tasks.md`;
+  await f.write(f.workspace, tasksFile, (await readFile(path.join(f.workspace, tasksFile), "utf8")).replace("[ ]", "[x]"));
+  const successor = f.commit(f.workspace, "Record corrected fixture result");
+  const fresh = await gateFixture(f, successor, "exclusive-corrected");
+  const review = await w.review(second, settled, successor, fresh, "exclusive-re-reviewed");
+  const input = { ...correction, head: successor, deliveryPhase: "result", gateRun: fresh.gateRun, handover: review,
+    attempt: { id: "exclusive-re-reviewed" } };
+  assert.equal((await w.decide(input)).reason, "BUDGET_HISTORY_UNVERIFIED");
+  const accepted = await w.decide({ ...input, observed: { ...input.observed, correctionsUsed: 1,
+    correctionHistory: [{ group: "1", rejectedSha: head, successorSha: successor, reference: report.sha256 }] } });
+  assert.equal(accepted.action, "accept-result", JSON.stringify(accepted));
+});
+
+test("exclusive native cap uses the verified original occurrence and advises at most one same-action successor", { skip: process.platform !== "linux" }, async (t) => {
+  const f = await fixture(t, { staged: true, exclusive: true, continuous: true });
+  const w = await exclusiveFixture(f);
+  const taskGuidance = twoGroupGuidance(f.planDigest);
+  const observed = { ...f.request.observed, onTrack: true, failedGate: false };
+  let previous = null;
+  for (const id of ["cap-original", "cap-successor", "cap-repeated"]) {
+    const attempt = await w.assignment(id, { behavior: "synthetic cap", ...previous?.options });
+    const input = { ...attempt.input, taskGuidance, observed,
+      delegation: { ...attempt.input.delegation, ...(previous ? { predecessor: previous.pin } : {}) } };
+    const decision = await w.decide(input);
+    if (id === "cap-repeated") {
+      assert.equal(decision.reason, "DELEGATED_RUNTIME_UNVERIFIED");
+      assert.match(decision.detail, /already consumed/);
+      break;
+    }
+    assert.equal(decision.action, "dispatch", JSON.stringify(decision));
+    const runtime = await w.settled(attempt);
+    assert.equal(runtime.phase, "capped", runtime.reason);
+    const prior = { ...input, deliveryPhase: "boundary" };
+    assert.equal((await w.decide(prior)).reason, "NATIVE_TURN_CAP");
+    const publication = await w.release(attempt, runtime);
+    previous = {
+      pin: await w.retain(id + "-boundary.json", prior),
+      options: { predecessor: id, reviewSession: randomUUID(), continuation: await w.retain(id + "-continuation.json", {
+        schemaVersion: 1, kind: "exclusive-runtime-continuation", change, plan: f.plan, planDigest: f.planDigest,
+        orchestrator: "fixture-owner", previousAttempt: id, attempt: id === "cap-original" ? "cap-successor" : "cap-repeated",
+        task: "1.1", priorResultSha256: publication.resultSha256, priorSettlementSha256: publication.settlementSha256,
+        reason: "native-turn-cap", verifiedProgress: true, progressSha256: publication.nativeSha256,
+      }) },
+    };
+  }
 });

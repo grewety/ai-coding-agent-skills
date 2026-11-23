@@ -1,7 +1,7 @@
 ---
 name: autonomous-implementation-review
 description: Implement changes with an independent review loop.
-version: 0.19.0
+version: 0.20.0
 author: Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -31,9 +31,10 @@ Follow `references/portable-core.md`, `references/terminal-adapters.md`,
 charter-v1 review, the core bounds readiness and grants no freeze, approval,
 execution or remote writes.
 
-## Optional contained Claude reviewer
+## Optional worker runtime and reviewer
 
-[Contained Claude review](references/review-candidate.md) requires separate launch authority.
+[Exclusive runtime](references/worker-runtime.md) awaits joint live qualification.
+[Contained review](references/review-candidate.md) needs separate launch authority.
 
 ## Legacy host execution
 

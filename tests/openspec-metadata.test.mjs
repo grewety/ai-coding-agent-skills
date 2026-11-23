@@ -1,10 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from "node:fs";
 import { cp, mkdir, mkdtemp, open, readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { checkPromotion } from "../skills/software-development/openspec-delivery/scripts/finish-readiness.mjs";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
 const script = path.join(root, "scripts/validate-openspec-metadata.mjs");
@@ -13,8 +15,37 @@ const proposalPath = `openspec/changes/${change}/proposal.md`;
 const header = (artifact, extra = "") => `---\nmetadata_version: 1\nartifact: ${artifact}\n${artifact === "spec" ? "" : `change: ${change}\n`}${extra}---\n`;
 const proposal = header("proposal", "github_issue: https://github.com/example/project/issues/40\n") + "# Proposal\n\n## Why\nA synthetic fixture.\n";
 function invoke(repo, ...args) {
-  return spawnSync(process.execPath, [script, "--root", repo, ...args], { encoding: "utf8" });
+  const capture = mkdtempSync(path.join(os.tmpdir(), "openspec-metadata-cli-"));
+  let stdout;
+  let stderr;
+  try {
+    const output = path.join(capture, "stdout.txt");
+    const errors = path.join(capture, "stderr.txt");
+    stdout = openSync(output, "wx", 0o600);
+    stderr = openSync(errors, "wx", 0o600);
+    const result = spawnSync(process.execPath, [script, "--root", repo, ...args], { stdio: ["ignore", stdout, stderr] });
+    assert.ifError(result.error);
+    return { status: result.status, stdout: readFileSync(output, "utf8"), stderr: readFileSync(errors, "utf8") };
+  } finally {
+    if (stdout !== undefined) closeSync(stdout);
+    if (stderr !== undefined) closeSync(stderr);
+    rmSync(capture, { recursive: true, force: true });
+  }
 }
+
+test("exclusive worker runtime promotes the full native deltas with capability metadata", async () => {
+  const change = "exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m";
+  const capabilities = new Map([["contained-independent-review", 3], ["exclusive-worker-runtime", 5], ["openspec-integration", 1]]);
+  const deltaRoot = path.join(root, "openspec", "changes", change, "specs");
+  for (const [capability, requirements] of capabilities) {
+    const [delta, current] = await Promise.all([
+      readFile(path.join(deltaRoot, capability, "spec.md"), "utf8"),
+      readFile(path.join(root, "openspec", "specs", capability, "spec.md"), "utf8"),
+    ]);
+    assert.ok(current.startsWith(header("spec", `capability: ${capability}\n`)));
+    assert.equal(checkPromotion({ capability, delta, current }), requirements, capability);
+  }
+});
 async function fixture(t) {
   const repo = await mkdtemp(path.join(os.tmpdir(), "openspec-metadata-"));
   t.after(() => rm(repo, { recursive: true, force: true }));

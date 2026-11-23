@@ -1,7 +1,7 @@
 ---
 name: openspec-delivery
 description: Automate setup, execution and closeout of OpenSpec changes.
-version: 1.4.0
+version: 1.5.0
 author: Raphael (forgegod), Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -200,6 +200,17 @@ For narrower work, append only the exception: `group 1`, `no commits`, or
 restrictions continue until explicitly lifted; a bare `next` never cancels them.
 
 ## Procedure
+
+If the project selected the exclusive worker runtime, use the sealed
+assignment and original-attempt readback in
+[references/delivery-runtime.md](references/delivery-runtime.md#configured-exclusive-worker-runtime).
+Proceed only with the pinned pair, atomic claim and role admission,
+native containment and verified settlement. Validate scoped worker outputs
+before forming the candidate. Both modes require exact gates and contained
+review from the bound independent session. Ordered successors replay
+predecessor acceptance. Corrections retain authority, restrictions and
+consumed budgets. Missing or uncertain evidence stops the selected route.
+Live qualification of the distributed pair is pending separate authority.
 
 1. If the request is `document <name>`, perform only the short invocation above.
    Read back the issue. Stop. Do not continue this procedure.

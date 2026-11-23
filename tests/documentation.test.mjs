@@ -55,6 +55,26 @@ test("current installation guidance matches package versions and preserves hando
   }
 });
 
+test("exclusive runtime guides distinguish the pinned candidate route and the required operator controls", async () => {
+  const root = new URL("../", import.meta.url);
+  const guide = await readFile(new URL("docs/worker-runtime.md", root), "utf8");
+  const profiles = await readFile(new URL("skills/autonomous-ai-agents/autonomous-implementation-review/references/profile-preparation.md", root), "utf8");
+  for (const file of ["README.md", "docs/openspec-installation.md", "docs/openspec-workflow.md",
+    "docs/claude-installation.md", "docs/claude-reviewer.md"]) {
+    const source = await readFile(new URL(file, root), "utf8");
+    assert.ok(source.includes(file === "README.md" ? "(docs/worker-runtime.md)" : "(worker-runtime.md)"), file);
+    assert.match(source, /pending(?:\s+separate)?\s+live\s+qualification/, file);
+  }
+  for (const field of ["Codex 0.171.0", "Claude Code 2.1.330", "Bubblewrap 0.9.0", "CODEX_HOME",
+    "--ignore-user-config", "--enable skip_host_skill_discovery", "no new privileges", "profile_routes", "Group 3.1"]) {
+    assert.ok(guide.includes(field), field);
+  }
+  for (const guard of ["curator lock", "skills.write_approval = true", "skills.creation_nudge_interval = 0",
+    "curator.enabled = false", "auxiliary.background_review.enabled = false", "outside skill discovery", "fresh-session discovery"]) {
+    assert.ok(profiles.includes(guard), guard);
+  }
+});
+
 test("next and delivery spellings preserve authority across native host routes", async () => {
   const root = new URL("../", import.meta.url);
   const workflow = await readFile(new URL("docs/openspec-workflow.md", root), "utf8");

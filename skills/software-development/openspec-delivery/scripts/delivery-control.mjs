@@ -51,14 +51,14 @@ function matchesAuthority(record, identity) {
     Object.entries(identity).every(([key, value]) => record[key] === value);
 }
 
-function reviewMatches(handoff, candidate, gateReference, active, group) {
+function reviewMatches(handoff, candidate, gateReference, active, group, delegated) {
   const result = handoff?.result;
   const request = handoff?.request;
   const id = result?.identity;
   return result?.status === "completed" && id?.role === "reviewer" &&
     id.candidate === candidate.head && id.change === candidate.change &&
-    id.plan === candidate.plan && id.planDigest === candidate.planDigest &&
-    (handoff.reviewSnapshot ? id.group === group?.id && id.group === active?.group && group.taskIds.includes(id.task) :
+    id.plan === candidate.plan && (id.planDigest === candidate.planDigest || delegated && handoff.goalContractDigest === candidate.planDigest) &&
+    (delegated ? id.task === delegated.id.task : handoff.reviewSnapshot ? id.group === group?.id && id.group === active?.group && group.taskIds.includes(id.task) :
       id.workspace === candidate.workspace && (active?.group === id.group || active?.group === id.task)) &&
     candidate.taskIds?.includes(id.task) &&
     id.implementerSession === active?.implementerSession && text(active?.implementerSession) &&
@@ -101,7 +101,7 @@ function correctionHistory(history, correctionCount) {
 }
 
 export function deliveryDecision({ phase, policy, identity, contract, approval, grant, restrictions, observed, taskGroups,
-  candidate, gateRun, handoff }) {
+  candidate, gateRun, handoff, delegated }) {
   const state = (action, reason, detail = {}) => ({ action, reason, remoteWrites: false, tasksComplete: false, ...detail });
   if (restrictions?.inspect === true) return state("inspect", null);
   if (!["dispatch", "boundary", "correction", "result"].includes(phase) ||
@@ -120,7 +120,9 @@ export function deliveryDecision({ phase, policy, identity, contract, approval, 
   if (phase === "dispatch" && observed?.preflightReady !== true) return state("stop", "PREFLIGHT_PENDING");
   if (observed?.stopReached === true) return state("stop", "DECLARED_STOP_REACHED");
   if (observed?.stopReached !== false) return state("stop", "DECLARED_STOP_UNVERIFIED");
-  if (observed?.ownership !== "exclusive") return state("stop", "OWNERSHIP_UNVERIFIED");
+  if (observed?.ownership !== (delegated && phase === "dispatch" ? "runtime-admission" : "exclusive")) {
+    return state("stop", "OWNERSHIP_UNVERIFIED");
+  }
   if (observed.host !== "ready") return state("stop", "ENVIRONMENT_BLOCKED");
   if (observed.humanInput !== "none") return state("stop", "HUMAN_INPUT_PENDING");
   if (observed.remoteRequired !== false) return state("queue", "EXTERNAL_AUTHORITY_PENDING");
@@ -140,6 +142,7 @@ export function deliveryDecision({ phase, policy, identity, contract, approval, 
       activeGroup: phase === "dispatch" ? null : observed.activeAttempt?.group ?? null });
     if (!selection.group) return state("queue", selection.reason);
     group = selection.group;
+    if (delegated && !group.taskIds.includes(delegated.id.task)) return state("stop", "DELEGATED_ACTION_MISMATCH");
   }
   if (observed.plan !== identity.plan || observed.planDigest !== identity.planDigest) {
     return state("stop", "DIRECTION_DRIFT_CHOICE", { clause: goal ? "goal-contract" : "frozen-plan" });
@@ -155,29 +158,40 @@ export function deliveryDecision({ phase, policy, identity, contract, approval, 
   }
 
   if (!goal && phase === "dispatch") {
-    const next = continuationDecision({ policy, change: identity.change, group, authority: grant, restrictions, observed });
+    const next = continuationDecision({ policy, change: identity.change, group, authority: grant, restrictions, observed,
+      runtimeAdmission: Boolean(delegated) });
     if (next.action !== "advance") return state("stop", "TASK_GUIDED_CONTINUATION_BLOCKED", { detail: next.reason });
   }
   const limit = goal ? contract.contract.budgets : group.resultBudget;
   if (!finiteBudget(limit) || !elapsed(observed.minutesUsed) || !elapsed(observed.groupMinutesUsed) ||
       !nonnegative(observed.correctionsUsed) ||
       !correctionHistory(observed.correctionHistory, observed.correctionsUsed) ||
+      (delegated && observed.delegatedCorrectionHistoryVerified === false) ||
       (observed.correctionsUsed > 0 && observed.correctionAncestryVerified !== true)) {
     return state("stop", "BUDGET_HISTORY_UNVERIFIED");
   }
   const inGroup = observed.correctionHistory.filter((entry) => entry.group === (group?.id ?? "goal")).length;
-  if (observed.minutesUsed >= grant.budgets.minutes || observed.groupMinutesUsed >= limit.minutes ||
-      observed.correctionsUsed > grant.budgets.corrections || inGroup > limit.corrections) return state("stop", "BUDGET_EXHAUSTED");
-  const commits = !restrictions.noCommits && grant.commits && (!goal || contract.contract.localAuthority.commits);
+  const runtimeLimits = delegated?.grant.limits;
+  const totalMinutes = Math.min(grant.budgets.minutes, runtimeLimits ? runtimeLimits.totalMs / 60000 : Infinity);
+  const groupMinutes = Math.min(limit.minutes, runtimeLimits ? runtimeLimits.groupMs / 60000 : Infinity);
+  const totalCorrections = grant.budgets.corrections;
+  const groupCorrections = Math.min(limit.corrections, runtimeLimits?.corrections ?? Infinity);
+  if (observed.minutesUsed >= totalMinutes || observed.groupMinutesUsed >= groupMinutes ||
+      observed.correctionsUsed > totalCorrections || inGroup > groupCorrections) return state("stop", "BUDGET_EXHAUSTED");
+  const commits = !restrictions.noCommits && !delegated?.noCommits && grant.commits && (!goal || contract.contract.localAuthority.commits);
   const correct = () => {
     if (observed.failure !== "routine-in-scope" || !text(observed.failureReference) || !sha(candidate?.head)) {
       return state("stop", "CORRECTION_UNVERIFIED");
     }
-    if (observed.correctionsUsed >= grant.budgets.corrections || inGroup >= limit.corrections) return state("stop", "BUDGET_EXHAUSTED");
+    if (observed.correctionsUsed >= totalCorrections || inGroup >= groupCorrections) return state("stop", "BUDGET_EXHAUSTED");
     return state("correct", null, { group: group?.id ?? null, commits, retain: observed.failureReference });
   };
-  if (phase === "correction") return correct();
-  if (phase !== "result") return state(phase === "dispatch" ? "dispatch" : "continue", null, { group: group?.id ?? null, commits });
+  if (phase === "correction" && !delegated) return correct();
+  if (phase !== "result" && phase !== "correction") {
+    return state(phase === "dispatch" ? "dispatch" : "continue", null, {
+      group: group?.id ?? null, commits, ...(delegated && phase === "dispatch" ? { requiresExclusiveAdmission: true } : {}),
+    });
+  }
 
   if (!candidate || candidate.change !== identity.change || candidate.plan !== identity.plan ||
       candidate.planDigest !== identity.planDigest || candidate.workspace !== identity.workspace || !sha(candidate.head)) {
@@ -193,11 +207,18 @@ export function deliveryDecision({ phase, policy, identity, contract, approval, 
   if (!gates.passed) return observed.failure === "routine-in-scope" && observed.failureReference === gates.reference ?
     correct() : state("stop", "EXACT_GATES_FAILED");
   const review = handoff?.result;
-  const exactReview = reviewMatches(handoff, candidate, gates.reference, observed.activeAttempt, group);
+  const exactReview = reviewMatches(handoff, candidate, gates.reference, observed.activeAttempt, group, delegated);
   if (review?.status === "completed" && review.verdict === "findings" && (!handoff.reviewSnapshot || exactReview) &&
-      observed.failure === "routine-in-scope" && observed.failureReference === review.report?.sha256) return correct();
+      observed.failure === "routine-in-scope" && observed.failureReference === review.report?.sha256) {
+    if (delegated && !review.findings.every(({ path }) => delegated.request.mutablePaths.includes(path))) {
+      return state("stop", "CORRECTION_SCOPE_UNVERIFIED");
+    }
+    return correct();
+  }
   if (!exactReview || review.verdict !== "no_findings" || review.nativeVerdict !== "Verdict: No findings" || review.findings?.length !== 0) {
     return state("queue", "EXACT_REVIEW_PENDING");
   }
-  return state("accept-result", null, { group: group?.id ?? null, head: candidate.head, commits, eligibleForTaskUpdate: true });
+  if (phase === "correction") return state("stop", "CORRECTION_UNVERIFIED");
+  return state("accept-result", null, { group: group?.id ?? null, head: candidate.head, commits, eligibleForTaskUpdate: true,
+    ...(delegated ? { gateReference: gates.reference } : {}) });
 }
