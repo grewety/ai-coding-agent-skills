@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 1,
+  "change": "goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc",
+  "issueUrl": "https://github.com/grewety/ai-coding-agent-skills/issues/46",
+  "base": "147f34bc7a66d8b3489a590eb28314deb315c086",
+  "head": "b55c3e871c73fd4aab7d927123259bc25902bd80",
+  "plan": "62d33c6981302be6fa66ad0d0f3be1073183beaa",
+  "planDigest": "5765101d47e57a40ea0f6e2d05735b9836228d46e436610589bc6f29d0fb3207",
+  "integrated": "3d7f32c31c3128d01b18b1529050145d8f1c46b8",
+  "verified": "3d7f32c31c3128d01b18b1529050145d8f1c46b8",
+  "integrationReference": "https://github.com/grewety/ai-coding-agent-skills/pull/47",
+  "review": {
+    "schemaVersion": 1,
+    "change": "goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc",
+    "issueUrl": "https://github.com/grewety/ai-coding-agent-skills/issues/46",
+    "head": "b55c3e871c73fd4aab7d927123259bc25902bd80",
+    "planDigest": "5765101d47e57a40ea0f6e2d05735b9836228d46e436610589bc6f29d0fb3207",
+    "verdict": "pass",
+    "findings": [],
+    "reviewer": "Claude Code 2.1.330 / claude-sonnet-4-6 / 29957b5c-5926-47fc-8b8a-f4941c4e48fc",
+    "reference": "verification-records/i2-c3/output/status.json (SHA-256 4ef606f26b6af3c02118b71b1cb13262592eeee8c6100e9930e5c5141b10ed0c); verified by verification-records/i2-c3/verify.json (SHA-256 dff5369521914ee95fb6f7a8ea4dce513439566773131574ef2f21001c43e2cd)",
+    "gates": [
+      {
+        "command": "openspec validate goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc --strict",
+        "commit": "b55c3e871c73fd4aab7d927123259bc25902bd80",
+        "evidence": "verification-records/i2-c3/export/files/context/review-evidence/strict.txt (SHA-256 748f660dcb33f6dedc2a87d403ed2780e3ee06abc44a0eb64c61f04fd74e4478)",
+        "exitCode": 0
+      },
+      {
+        "command": "npm run validate:openspec",
+        "commit": "b55c3e871c73fd4aab7d927123259bc25902bd80",
+        "evidence": "verification-records/i2-c3/export/files/context/review-evidence/metadata.txt (SHA-256 90eab94c387cf38890ab1ee23079489f3b64f0b33294a9604d8fa082788f14ca)",
+        "exitCode": 0
+      },
+      {
+        "command": "npm test",
+        "commit": "b55c3e871c73fd4aab7d927123259bc25902bd80",
+        "evidence": "verification-records/i2-c3/export/files/context/review-evidence/tests.txt (SHA-256 a2200e4964823d8dde7b54e307481d7641b5463c8a871c456ac6c1643ace28b2)",
+        "exitCode": 0
+      },
+      {
+        "command": "npm run build",
+        "commit": "b55c3e871c73fd4aab7d927123259bc25902bd80",
+        "evidence": "verification-records/i2-c3/export/files/context/review-evidence/build.txt (SHA-256 213297d626820ecd0848c443d24dec765630a95544e989be9cbfbd068379a5da)",
+        "exitCode": 0
+      }
+    ]
+  },
+  "gates": [
+    {
+      "command": "npm ci --offline",
+      "commit": "3d7f32c31c3128d01b18b1529050145d8f1c46b8",
+      "exitCode": 0,
+      "evidence": "verification-records/i2-finish/integrated-gates/bootstrap.capture.json (SHA-256 ef9666fd5caca6261652a1e3f8c44f90380093201c725caf70cd9499d2a8ef89)"
+    },
+    {
+      "command": "openspec validate goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc --strict",
+      "commit": "3d7f32c31c3128d01b18b1529050145d8f1c46b8",
+      "exitCode": 0,
+      "evidence": "verification-records/i2-finish/integrated-gates/change-strict.capture.json (SHA-256 ffcdb9361d489bdef55267614f91f7e20a2dbcd0ea6da010792acbe44144481c)"
+    },
+    {
+      "command": "openspec validate --all --strict",
+      "commit": "3d7f32c31c3128d01b18b1529050145d8f1c46b8",
+      "exitCode": 0,
+      "evidence": "verification-records/i2-finish/integrated-gates/all-strict.capture.json (SHA-256 ecbd9774fa4cd9f3cdb1134ed68fc0084f296089ec5b05cde885748f748bf7bd)"
+    },
+    {
+      "command": "npm run validate:openspec",
+      "commit": "3d7f32c31c3128d01b18b1529050145d8f1c46b8",
+      "exitCode": 0,
+      "evidence": "verification-records/i2-finish/integrated-gates/metadata.capture.json (SHA-256 eca67243e24f6446c7caecb7de4b31458fa1c71751cc2bddb8653a439b96e5e5)"
+    },
+    {
+      "command": "npm test",
+      "commit": "3d7f32c31c3128d01b18b1529050145d8f1c46b8",
+      "exitCode": 0,
+      "evidence": "verification-records/i2-finish/integrated-gates/tests.capture.json (SHA-256 b7a3f8e62ba31c89989657262f7ec58fbd4941d5ec2ed66dd399d8efdf1af53d)"
+    },
+    {
+      "command": "npm run build",
+      "commit": "3d7f32c31c3128d01b18b1529050145d8f1c46b8",
+      "exitCode": 0,
+      "evidence": "verification-records/i2-finish/integrated-gates/build.capture.json (SHA-256 d38f214aa5ec5a9282b57d4e79d99b862125e7ebc0aa7a8d2a5241a139626717)"
+    }
+  ]
+}
