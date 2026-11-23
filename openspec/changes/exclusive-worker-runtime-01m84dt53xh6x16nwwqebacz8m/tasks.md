@@ -11,7 +11,7 @@ Each group uses the existing cumulative limit of eight correction/re-review cycl
 
 ## 1. Packaged worker runtime and reviewer reliability
 
-- [ ] 1.1 Deliver the packaged implementer runtime, host-wide ownership and crash recovery, and all three contained reviewer fixes. Verify the runtime and reviewer scenarios with offline synthetic, sandbox and real-runtime local socket controls, document the package interfaces, and obtain exact-candidate gates and independent review.
+- [x] 1.1 Deliver the packaged implementer runtime, host-wide ownership and crash recovery, and all three contained reviewer fixes. Verify the runtime and reviewer scenarios with offline synthetic, sandbox and real-runtime local socket controls, document the package interfaces, and obtain exact-candidate gates and independent review.
 
 Acceptance covers canonical claims across worktrees/clones, separate slots, pair/override admission, persistent dedicated worker auth isolation, sandbox denial and unchanged checkout status, foreground deadlines and parallel-batch admission, misleading terminal signals, authentic sealed handovers, native waits, turn-cap accounting, late reports and positive process-tree quiescence (`1151615162`). Review regressions cover socket paths, sealed candidate receipt mismatch and archive-move fidelity. Exercise races, unsafe pins and paths, and failure after leader exit. Cover the package's changed interfaces and owning contract. A launch for implementation of this group must use a separately authorized already-qualified role path, never self-qualification via the new candidate.
 
