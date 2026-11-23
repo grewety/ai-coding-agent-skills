@@ -38,8 +38,9 @@ host execution verification remain separate; package byte checks establish none
 of native client discovery, Desktop acceptance or scanner approval.
 
 The [contained Claude reviewer](claude-reviewer.md) is optional within the orchestration
-package. Its pinned Linux runtime and approved inference route are separate from OpenSpec
-prerequisites and skill installation. Packaged live qualification is pending task 3.1.
+package. Its limited packaged live qualification and separate grant for export and paid
+inference are documented in the guide. OpenSpec prerequisites and skill installation are
+separate from reviewer runtime and inference route setup.
 
 Keep delivery's `references/delivery-policy.md`, `references/task-authoring.md`
 and `scripts/delivery-policy.mjs`, plus orchestration's `references/portable-core.md`

@@ -8,13 +8,19 @@ checkout or the [Claude installation guide](claude-installation.md). Resolve
 from a terminal and requires neither account skill sync nor a plugin loaded
 in the reviewer process.
 
-Local synthetic verification covers the command contract. The packaged live
-trial is pending OpenSpec task 3.1 for
-`one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v`. An interim launcher
-probe does not qualify the packaged command. Continue using the existing
-approved reviewer procedure until the exact package and runtime pairing pass
-qualification. Obtain a separate explicit grant covering the approved export
-and paid inference, including any standalone probe, before running live.
+## Packaged live qualification
+
+The packaged live trial at source commit `4eddbade12fab2a032755a446f9176005b7b04a1`
+qualified the pinned Linux/WSL pairing of Bubblewrap 0.9.0, Claude Code
+2.1.330, `claude-sonnet-4-6`, and the `same-uid-key` relay. Candidate mode
+returned `No findings` with 13/13 whole-file coverage. Charter-v1 approach mode
+returned `freeze-ready` with 7/7 whole-file coverage. Both passed offline
+verification at their original request-bound output paths and returned
+`deliveryAccepted: false`.
+
+Qualification applies only to that tested pairing. Obtain a separate explicit
+grant covering the approved export and paid inference, including any standalone
+probe, before running live.
 
 ## Host setup and credential routes
 
@@ -39,7 +45,7 @@ and paid inference, including any standalone probe, before running live.
 
 | Route | Host configuration and qualification |
 | --- | --- |
-| `same-uid-key` | Intended pairing for the pending trial. Set `keyFile` and `keyFormat` explicitly. Use a host-owned single-link 0400 regular file with only the key for `raw`, or a host-owned single-link 0600 regular file with one literal `ANTHROPIC_API_KEY` assignment for `assignment`. The relay parses text without sourcing it and keeps the key host-side. Same-UID protection depends on isolation and trust in host processes running under that UID. |
+| `same-uid-key` | Relay used in the qualified pairing above. Set `keyFile` and `keyFormat` explicitly. Use a host-owned single-link 0400 regular file with only the key for `raw`, or a host-owned single-link 0600 regular file with one literal `ANTHROPIC_API_KEY` assignment for `assignment`. The relay parses text without sourcing it and keeps the key host-side. Same-UID protection depends on isolation and trust in host processes running under that UID. |
 | `dedicated-uid-broker` | Implemented interface pending independent qualification. Set `socket` to an absolute `inference.sock` and `ownerUid` to the distinct non-root broker UID. The socket must be mode 0660 and its parent must be owned by that UID and protected from group/other writes. The separately operated broker needs its own route and policy evidence. |
 | `scoped-oauth` | Unavailable under the pinned inference and startup constraints. The command rejects the route. Ambient login, cloud-provider sign-in and account sync are unqualified. |
 
@@ -65,6 +71,9 @@ reviewer session and a declared publisher evidence root.
 Replace uppercase operands with absolute paths, including `REVIEW_CLI` for
 the packaged script and `NODE` for Node 22+. These examples describe the
 command's effects. Run the live forms only with the separate grant.
+The mode lines are alternatives. For each run, `OUTPUT` is a fresh absolute
+path declared in that request's `worker.evidenceRoots`. Use the same request,
+sealed export and original `OUTPUT` path for `--verify`.
 
 ```text
 NODE REVIEW_CLI --prepare --request REQUEST --expect EXPECT --export EXPORT

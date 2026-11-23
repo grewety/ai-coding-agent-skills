@@ -25,15 +25,17 @@ inputs, writes a fresh export and returns its manifest SHA-256. Check validates
 the current inputs and every sealed manifest member offline. Probe makes a
 bounded inference call with a synthetic prompt and empty export. Either mode
 makes an automatic separate probe, then sends only the assigned packet data
-under the matching launch policy. Verify reads the complete sealed handover
-and replays the native stream and receipt checks offline. The two launch
-forms require explicit permission for data exposure and provider use.
+under the matching launch policy. The mode lines are alternatives. For offline
+verify, reuse the same request, sealed export and original absolute `OUTPUT`
+path bound to that run's request. Verify reads the complete sealed handover
+and replays the native stream and receipt checks offline. Obtain a separate
+explicit grant for the approved export and paid inference before either
+live mode or a standalone probe.
 
-Standalone probe and both launch modes can incur charges. The packaged live
-trial is pending task 3.1. An earlier interim launcher probe and synthetic
-fixtures provide no qualification of this package or alternative routes.
-Keep the existing approved review route until the selected package and credential
-route are qualified.
+Standalone probe and both launch modes can incur charges. See the
+[operator guide](https://github.com/grewety/ai-coding-agent-skills/blob/HEAD/docs/claude-reviewer.md#packaged-live-qualification)
+for the limited packaged live qualification. Select a route under the project's
+approved reviewer procedure.
 
 ## Retained inputs
 

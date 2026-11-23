@@ -192,9 +192,10 @@ and Pages artifact inclusion. They do not prove model obedience, cloud acceptanc
 or scanner approval.
 
 The optional orchestration package includes a standalone Linux Claude reviewer. See the
-[operator guide](claude-reviewer.md) for local setup and evidence checks. Marketplace
-installation, ZIP upload and account sync do not configure its inference route or authorize
-data export. Packaged live qualification is pending task 3.1.
+[operator guide](claude-reviewer.md) for the limited packaged live qualification, local setup
+and evidence checks. Marketplace installation, ZIP upload and account sync do not configure
+its inference route or authorize data export or paid inference, which require a separate
+explicit grant.
 
 Validate the marketplace and both plugin exports with a disposable HOME and
 CLAUDE_CONFIG_DIR, without account credentials. Check exact inventories: four

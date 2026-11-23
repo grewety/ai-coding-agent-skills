@@ -786,9 +786,9 @@ sync, host execution, native client discovery, Desktop acceptance or scanner app
 
 The [contained Claude reviewer](claude-reviewer.md) is an opt-in transport for exact candidate
 and charter-v1 approach review. A separate grant must cover export and paid inference. Replay
-the sealed output offline before applying the existing candidate or charter admission rules.
-Retain the current approved reviewer procedure until packaged live qualification under task
-3.1 succeeds.
+the original request-bound output offline before applying the existing candidate or charter
+admission rules. The guide records the limited packaged live qualification. Apply the
+project's approved reviewer procedure when selecting a route.
 
 Complete copies and generated packages preserve delivery's policy/task-authoring
 references and `scripts/delivery-policy.mjs`, plus orchestration's

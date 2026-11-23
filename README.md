@@ -745,8 +745,8 @@ acceptance or scanner approval. No upstream prerequisite or installation route i
 added by this representation facility.
 
 The packaged Claude reviewer is a separate opt-in for approved candidate or charter-v1
-exports. See the [operator guide](docs/claude-reviewer.md) for runtime pins, data exposure,
-credential limits and offline verification. Packaged live qualification is pending task 3.1.
+exports. The [operator guide](docs/claude-reviewer.md) records the limited packaged live
+qualification, required export and paid inference grant, credential limits and offline verification.
 
 Preserve orchestration's complete `references/portable-core.md`,
 `scripts/orchestration-core.mjs`, `references/worker-handoff.md`,
