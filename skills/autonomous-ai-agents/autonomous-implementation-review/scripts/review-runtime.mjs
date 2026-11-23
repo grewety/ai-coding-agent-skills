@@ -71,7 +71,7 @@ export function containmentArgs(config, exportDirectory, socket, runtime) {
       XDG_STATE_HOME: "/scratch/state", CLAUDE_CONFIG_DIR: "/scratch/config/claude",
       LANG: "C.UTF-8", CI: "1", DISABLE_AUTOUPDATER: "1", CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
       DISABLE_TELEMETRY: "1", DISABLE_ERROR_REPORTING: "1", DISABLE_BUG_COMMAND: "1",
-      CLAUDE_CODE_DISABLE_BUILTIN_PLUGINS: "1", MAX_THINKING_TOKENS: "0", ANTHROPIC_API_KEY: "relay-managed",
+      CLAUDE_CODE_DISABLE_BUILTIN_PLUGINS: "1", ANTHROPIC_API_KEY: "relay-managed",
     }).flatMap(([name, value]) => ["--setenv", name, value]),
     "--remount-ro", "/", "--chdir", "/review", "--", "/control/node", "/control/bridge.mjs",
     "--print", "--verbose", "--output-format", "stream-json", "--session-id", runtime.session,

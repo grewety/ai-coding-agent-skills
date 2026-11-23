@@ -142,6 +142,8 @@ test("containment retains the exact namespace, mount and Claude controls", () =>
     assert.ok(argv.includes(flag), flag);
   }
   assert.equal(value("--cap-drop"), "ALL");
+  assert.ok(!argv.some((flag, i) => flag === "--setenv" && argv[i + 1] === "MAX_THINKING_TOKENS"),
+    "containmentArgs must not set MAX_THINKING_TOKENS");
   assert.equal(value("--tmpfs"), "/scratch");
   assert.equal(value("--tools"), "Read");
   assert.equal(value("--allowedTools"), "Read");
