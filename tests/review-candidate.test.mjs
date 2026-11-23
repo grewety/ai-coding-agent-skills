@@ -485,13 +485,25 @@ emit({ type: "result", subtype: "success", is_error: false, num_turns: 1, total_
   const keyFile = path.join(root, "fixture-key");
   await writeFile(keyFile, "EXAMPLE=true\nANTHROPIC_API_KEY=sk-" + "ant-" + "synthetic".repeat(3) + "\n", { mode: 0o600 });
   const pin = async (file) => ({ path: file, sha256: hash(await readFile(file)) });
-  const config = { schemaVersion: 1, bwrap: await pin(launcher), node: await pin(node), claude: await pin(launcher),
+  const config = { schemaVersion: 1, bwrap: await pin(launcher), node: await pin(launcher), claude: await pin(launcher),
     libraries: [], model: "claude-fixture", relay: { route: "same-uid-key", keyFile, keyFormat: "assignment" },
     timeoutMs: 4000, maxTurns: 16, maxBudgetUsd: 1, requirePreExposureAttestation: false };
   const filename = path.join(root, "fixture-host-" + behavior + ".json");
   await writeFile(filename, jsonBytes(config));
   return { filename, config };
 }
+
+test("runtime rejects a group-writable Node pin", async (t) => {
+  const root = await scratch(t);
+  const { config } = await fakeHost(root);
+  const node = path.join(root, "fixture-group-writable-node");
+  await writeFile(node, "synthetic Node fixture\n");
+  await chmod(node, 0o775);
+  assert.equal((await stat(node)).mode & 0o777, 0o775);
+  config.node = { path: node, sha256: hash(await readFile(node)) };
+  await assert.rejects(withReviewRuntime(config, { parent: root, excluded: [], packetCount: 1 },
+    () => assert.fail("Group-writable Node pin reached the runtime callback")), /Unsafe runtime pin/);
+});
 
 const cliPath = fileURLToPath(new URL("../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-candidate.mjs", import.meta.url));
 
