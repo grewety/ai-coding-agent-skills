@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "change": "one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v",
+  "issueUrl": "https://github.com/grewety/ai-coding-agent-skills/issues/43",
+  "base": "89476c06ceb461952584f6409827ee175fb42ba5",
+  "head": "f5aa5bf2643b592eb7070c7d4f736bb57f1f14a9",
+  "plan": "9ee01e6fe85beb48bfeea7fabd7522bc9a0e843e",
+  "planDigest": "8a88d83d76f9f3ffc241dc0a171df3ebb2cc48e9b0f115a32fdd1586ac3a107a",
+  "integrated": "d5f4fb6deb3426676c90d5f06b6d6f20a6cbbba5",
+  "verified": "d5f4fb6deb3426676c90d5f06b6d6f20a6cbbba5",
+  "review": {
+    "schemaVersion": 1,
+    "change": "one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v",
+    "issueUrl": "https://github.com/grewety/ai-coding-agent-skills/issues/43",
+    "head": "f5aa5bf2643b592eb7070c7d4f736bb57f1f14a9",
+    "planDigest": "8a88d83d76f9f3ffc241dc0a171df3ebb2cc48e9b0f115a32fdd1586ac3a107a",
+    "verdict": "pass",
+    "findings": [],
+    "reviewer": "Claude Code 2.1.330 / claude-sonnet-4-6 / Bubblewrap / 4cd929c0-4c35-4919-9c16-e112605a341e",
+    "reference": "/home/raphael/verification-records/ai-coding-agent-skills/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/execution/ci-fixture-review.PsjWZL6H/report.txt sha256:ee1a7d341af8a6b6b5212b9a619003bed819fd688b04e3adb33798c8bfc7d7f3",
+    "gates": [
+      {
+        "command": "openspec validate one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v --strict",
+        "commit": "f5aa5bf2643b592eb7070c7d4f736bb57f1f14a9",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/execution/ci-fixture-candidate.RMW5kWiY/openspec.json sha256:bb59c629c34d0b9d06ec57f614cc67d23c05812c1f9bc611181a990c3e0508ff"
+      },
+      {
+        "command": "openspec validate --specs --strict",
+        "commit": "f5aa5bf2643b592eb7070c7d4f736bb57f1f14a9",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/execution/ci-fixture-candidate.RMW5kWiY/current-specs.json sha256:804b508c891fbb8f57611e7d4ac777ad65a427344a850e4d11302c43b435cd60"
+      },
+      {
+        "command": "npm run validate:openspec",
+        "commit": "f5aa5bf2643b592eb7070c7d4f736bb57f1f14a9",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/execution/ci-fixture-candidate.RMW5kWiY/metadata.json sha256:75c994e7020d6629eb59d0a183a919b6e97cb7f8e96444f852016e47e64beb54"
+      },
+      {
+        "command": "npm test",
+        "commit": "f5aa5bf2643b592eb7070c7d4f736bb57f1f14a9",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/execution/ci-fixture-candidate.RMW5kWiY/npm-test.json sha256:4f32d24b49984d2965c1263487e21e1e900e01c62c9de7abe05332c3f2e8bca1"
+      },
+      {
+        "command": "npm run build",
+        "commit": "f5aa5bf2643b592eb7070c7d4f736bb57f1f14a9",
+        "exitCode": 0,
+        "evidence": "/home/raphael/verification-records/ai-coding-agent-skills/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v/execution/ci-fixture-candidate.RMW5kWiY/build.json sha256:06561322603ac6aa122f71b5667b5779df0c5861f3633fdfbe0068dd9d6612f1"
+      }
+    ]
+  },
+  "integrationReference": "https://github.com/grewety/ai-coding-agent-skills/pull/44",
+  "gates": [
+    {
+      "command": "npm ci",
+      "commit": "d5f4fb6deb3426676c90d5f06b6d6f20a6cbbba5",
+      "exitCode": 0,
+      "evidence": "integrated-verification.json: integrated/captures/0"
+    },
+    {
+      "command": "openspec validate one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v --strict",
+      "commit": "d5f4fb6deb3426676c90d5f06b6d6f20a6cbbba5",
+      "exitCode": 0,
+      "evidence": "integrated-verification.json: integrated/captures/1"
+    },
+    {
+      "command": "openspec validate --specs --strict",
+      "commit": "d5f4fb6deb3426676c90d5f06b6d6f20a6cbbba5",
+      "exitCode": 0,
+      "evidence": "integrated-verification.json: integrated/captures/2"
+    },
+    {
+      "command": "openspec validate --all --strict",
+      "commit": "d5f4fb6deb3426676c90d5f06b6d6f20a6cbbba5",
+      "exitCode": 0,
+      "evidence": "integrated-verification.json: integrated/captures/3"
+    },
+    {
+      "command": "npm run validate:openspec",
+      "commit": "d5f4fb6deb3426676c90d5f06b6d6f20a6cbbba5",
+      "exitCode": 0,
+      "evidence": "integrated-verification.json: integrated/captures/4"
+    },
+    {
+      "command": "npm test",
+      "commit": "d5f4fb6deb3426676c90d5f06b6d6f20a6cbbba5",
+      "exitCode": 0,
+      "evidence": "integrated-verification.json: integrated/captures/5"
+    },
+    {
+      "command": "npm run build",
+      "commit": "d5f4fb6deb3426676c90d5f06b6d6f20a6cbbba5",
+      "exitCode": 0,
+      "evidence": "integrated-verification.json: integrated/captures/6"
+    }
+  ]
+}
