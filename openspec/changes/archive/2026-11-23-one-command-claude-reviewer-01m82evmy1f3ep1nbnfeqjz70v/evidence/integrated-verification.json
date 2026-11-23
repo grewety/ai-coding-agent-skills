@@ -1,0 +1,503 @@
+{
+  "schemaVersion": 1,
+  "change": "one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v",
+  "issueUrl": "https://github.com/grewety/ai-coding-agent-skills/issues/43",
+  "retention": {
+    "policy": "Original command captures and reviewer artifacts are retained in the operator’s verification-records tree; paths in retainedUnder are relative to this change’s execution directory. This public record is a factual index, not an original-byte artifact or proof of deployment."
+  },
+  "frozenPlan": "9ee01e6fe85beb48bfeea7fabd7522bc9a0e843e",
+  "planDigest": "8a88d83d76f9f3ffc241dc0a171df3ebb2cc48e9b0f115a32fdd1586ac3a107a",
+  "candidate": {
+    "phase": "candidate",
+    "revision": "f5aa5bf2643b592eb7070c7d4f736bb57f1f14a9",
+    "gateInventorySha256": "1f9a5c05741119340ae4908a3f6477c3e08009816043570e49b3cb3bf6e140b1",
+    "runtime": {
+      "node": "v24.21.0",
+      "npm": "11.19.0",
+      "git": "git version 2.43.0",
+      "openspec": "2.1.1",
+      "platform": "linux"
+    },
+    "environmentPolicy": {
+      "OPENSPEC_TELEMETRY": "0",
+      "CI": "true",
+      "LC_ALL": "C.UTF-8"
+    },
+    "captures": [
+      {
+        "name": "openspec",
+        "argv": [
+          "openspec",
+          "validate",
+          "one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v",
+          "--strict"
+        ],
+        "startedAt": "2026-11-23T06:27:45Z",
+        "observedAt": "2026-11-23T06:27:45Z",
+        "exitCode": 0,
+        "commit": "f5aa5bf2643b592eb7070c7d4f736bb57f1f14a9",
+        "captures": {
+          "openspec.log": "c671ffa3a788412cc8b89f5a008ab24537e1d5e6a57d541a937801384cf615cf",
+          "openspec.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "commandRecordSha256": "bb59c629c34d0b9d06ec57f614cc67d23c05812c1f9bc611181a990c3e0508ff",
+        "retainedUnder": "ci-fixture-candidate.RMW5kWiY"
+      },
+      {
+        "name": "current-specs",
+        "argv": [
+          "openspec",
+          "validate",
+          "--specs",
+          "--strict"
+        ],
+        "startedAt": "2026-11-23T06:27:45Z",
+        "observedAt": "2026-11-23T06:27:45Z",
+        "exitCode": 0,
+        "commit": "f5aa5bf2643b592eb7070c7d4f736bb57f1f14a9",
+        "captures": {
+          "current-specs.log": "71dc0fa0be8fb40610a3d6e0729bb43cea4f170ae81a041fdc5f1b5561d12a58",
+          "current-specs.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "commandRecordSha256": "804b508c891fbb8f57611e7d4ac777ad65a427344a850e4d11302c43b435cd60",
+        "retainedUnder": "ci-fixture-candidate.RMW5kWiY"
+      },
+      {
+        "name": "metadata",
+        "argv": [
+          "npm",
+          "run",
+          "validate:openspec"
+        ],
+        "startedAt": "2026-11-23T06:27:45Z",
+        "observedAt": "2026-11-23T06:27:45Z",
+        "exitCode": 0,
+        "commit": "f5aa5bf2643b592eb7070c7d4f736bb57f1f14a9",
+        "captures": {
+          "metadata.log": "6cc84089363eac2cc7b9b79ff23cf90e0fb115cbbecb9141b35c1410689bd2ed",
+          "metadata.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "commandRecordSha256": "75c994e7020d6629eb59d0a183a919b6e97cb7f8e96444f852016e47e64beb54",
+        "retainedUnder": "ci-fixture-candidate.RMW5kWiY"
+      },
+      {
+        "name": "npm-test",
+        "argv": [
+          "npm",
+          "test"
+        ],
+        "startedAt": "2026-11-23T06:27:45Z",
+        "observedAt": "2026-11-23T06:28:01Z",
+        "exitCode": 0,
+        "commit": "f5aa5bf2643b592eb7070c7d4f736bb57f1f14a9",
+        "captures": {
+          "npm-test.log": "46ac646ebe3284bf6fa0377b7203100177d04962cc22639cdea1d32bbc322e3b",
+          "npm-test.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "commandRecordSha256": "4f32d24b49984d2965c1263487e21e1e900e01c62c9de7abe05332c3f2e8bca1",
+        "retainedUnder": "ci-fixture-candidate.RMW5kWiY"
+      },
+      {
+        "name": "build",
+        "argv": [
+          "npm",
+          "run",
+          "build"
+        ],
+        "startedAt": "2026-11-23T06:28:01Z",
+        "observedAt": "2026-11-23T06:28:01Z",
+        "exitCode": 0,
+        "commit": "f5aa5bf2643b592eb7070c7d4f736bb57f1f14a9",
+        "captures": {
+          "build.log": "5fb79ab17f6658b0ee24a50ba612793e75b469c3d3718a0af610a3a1f45c6114",
+          "build.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "commandRecordSha256": "06561322603ac6aa122f71b5667b5779df0c5861f3633fdfbe0068dd9d6612f1",
+        "retainedUnder": "ci-fixture-candidate.RMW5kWiY"
+      }
+    ],
+    "testSummary": [
+      "ℹ tests 404",
+      "ℹ pass 404",
+      "ℹ fail 0"
+    ]
+  },
+  "independentReview": {
+    "session": "4cd929c0-4c35-4919-9c16-e112605a341e",
+    "verdict": "Verdict: No findings",
+    "findings": [],
+    "coverageLimitations": [],
+    "retainedUnder": "ci-fixture-review.PsjWZL6H",
+    "reportSha256": "ee1a7d341af8a6b6b5212b9a619003bed819fd688b04e3adb33798c8bfc7d7f3",
+    "admissionSha256": "b3a7a85682617d24e37973ac59bcaaf5fc3601702572e5b1141427ac49e2b8aa",
+    "nativeVerdictExtractSha256": "ee1a7d341af8a6b6b5212b9a619003bed819fd688b04e3adb33798c8bfc7d7f3"
+  },
+  "implementation": {
+    "merge": {
+      "baseRefName": "main",
+      "headRefOid": "f5aa5bf2643b592eb7070c7d4f736bb57f1f14a9",
+      "mergeCommit": {
+        "oid": "d5f4fb6deb3426676c90d5f06b6d6f20a6cbbba5"
+      },
+      "mergedAt": "2026-11-23T06:46:45Z",
+      "state": "MERGED",
+      "url": "https://github.com/grewety/ai-coding-agent-skills/pull/44"
+    },
+    "preMergeChecks": {
+      "head": "f5aa5bf2643b592eb7070c7d4f736bb57f1f14a9",
+      "base": "89476c06ceb461952584f6409827ee175fb42ba5",
+      "number": 44,
+      "observedAt": "2026-11-23T06:46:36.140Z",
+      "reviewThreadsObservedAt": "2026-11-23T06:46:37.067Z",
+      "reviewThreads": 0,
+      "unresolvedReviewThreads": 0,
+      "checks": [
+        {
+          "id": "137531379580",
+          "name": "verify",
+          "app": 15368,
+          "head": "f5aa5bf2643b592eb7070c7d4f736bb57f1f14a9",
+          "conclusion": "success",
+          "completedAt": "2026-11-23T06:46:33Z",
+          "url": "https://github.com/grewety/ai-coding-agent-skills/actions/runs/45126331130/job/137531379580"
+        },
+        {
+          "id": "137531359766",
+          "name": "verify",
+          "app": 15368,
+          "head": "f5aa5bf2643b592eb7070c7d4f736bb57f1f14a9",
+          "conclusion": "success",
+          "completedAt": "2026-11-23T06:46:28Z",
+          "url": "https://github.com/grewety/ai-coding-agent-skills/actions/runs/45126324740/job/137531359766"
+        }
+      ],
+      "workflowEvents": [
+        {
+          "id": 45126331130,
+          "event": "pull_request",
+          "head": "f5aa5bf2643b592eb7070c7d4f736bb57f1f14a9"
+        },
+        {
+          "id": 45126324740,
+          "event": "push",
+          "head": "f5aa5bf2643b592eb7070c7d4f736bb57f1f14a9"
+        }
+      ]
+    },
+    "readbacks": [
+      {
+        "argv": [
+          "gh",
+          "pr",
+          "checks",
+          "44",
+          "-R",
+          "grewety/ai-coding-agent-skills",
+          "--required"
+        ],
+        "startedAt": "2026-11-23T06:46:34.842Z",
+        "observedAt": "2026-11-23T06:46:35.686Z",
+        "exitCode": 0,
+        "captures": {
+          "required-final.stdout": "699363a17903e0fd89cdd395e0a9c72489a1181c8e5efb153dced07325550808",
+          "required-final.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "commandRecordSha256": "d3e6206a1eaa90ef70f96a694f0b478779eb778eebdc4602ceb3507cc9a3534b",
+        "retainedUnder": "finish-fixture.6Kbw9gHm"
+      },
+      {
+        "argv": [
+          "gh",
+          "api",
+          "--paginate",
+          "repos/grewety/ai-coding-agent-skills/commits/f5aa5bf2643b592eb7070c7d4f736bb57f1f14a9/check-runs?per_page=100"
+        ],
+        "startedAt": "2026-11-23T06:46:35.686Z",
+        "observedAt": "2026-11-23T06:46:36.140Z",
+        "exitCode": 0,
+        "captures": {
+          "exact-head-check-runs.stdout": "69ebecab5b464d1fbf57a9c761ea3a90fdbafeac216d5766468e7a35fc457b5b",
+          "exact-head-check-runs.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "commandRecordSha256": "c5bef3504e58fca2109e6ddc597bae7d822773ac7edd765916abb59cfea9a588",
+        "retainedUnder": "finish-fixture.6Kbw9gHm"
+      },
+      {
+        "argv": [
+          "gh",
+          "api",
+          "--paginate",
+          "repos/grewety/ai-coding-agent-skills/actions/runs?head_sha=f5aa5bf2643b592eb7070c7d4f736bb57f1f14a9&per_page=100"
+        ],
+        "startedAt": "2026-11-23T06:46:36.141Z",
+        "observedAt": "2026-11-23T06:46:36.663Z",
+        "exitCode": 0,
+        "captures": {
+          "exact-head-workflows.stdout": "5385414990776112949c806ab46f54be18744639c8def61c3e3e37f6b724cc50",
+          "exact-head-workflows.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "commandRecordSha256": "d4306cf27983d96d018cd856baecf3692ac98bad0789d27211fa94a53c501242",
+        "retainedUnder": "finish-fixture.6Kbw9gHm"
+      },
+      {
+        "argv": [
+          "gh",
+          "api",
+          "graphql",
+          "--paginate",
+          "-f",
+          "query=query($endCursor:String){repository(owner:\"grewety\",name:\"ai-coding-agent-skills\"){pullRequest(number:44){headRefOid reviewThreads(first:100,after:$endCursor){totalCount nodes{id isResolved} pageInfo{hasNextPage endCursor}}}}}"
+        ],
+        "startedAt": "2026-11-23T06:46:36.663Z",
+        "observedAt": "2026-11-23T06:46:37.067Z",
+        "exitCode": 0,
+        "captures": {
+          "review-threads.stdout": "cfc91d9866bc70d7c80e966b43fd3463d6b4c2862b8aacefa6fd7e04b7b7a00c",
+          "review-threads.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "commandRecordSha256": "885d77b9a3eec5e2cdf06337a4b3d00cce3aed2c83a42d41e7980c73b9fe20a0",
+        "retainedUnder": "finish-fixture.6Kbw9gHm"
+      },
+      {
+        "argv": [
+          "gh",
+          "pr",
+          "view",
+          "44",
+          "-R",
+          "grewety/ai-coding-agent-skills",
+          "--json",
+          "url,state,isDraft,baseRefName,headRefName,headRefOid,mergeable,mergeStateStatus,reviewDecision,statusCheckRollup"
+        ],
+        "startedAt": "2026-11-23T06:46:37.067Z",
+        "observedAt": "2026-11-23T06:46:37.667Z",
+        "exitCode": 0,
+        "captures": {
+          "pr-before-merge.stdout": "c0ca9a344c8edc64e189b8d9cd0587bbe1ceaab6480aa2262cfe6e69290712a0",
+          "pr-before-merge.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "commandRecordSha256": "05cd08648000f62f256db8e93ab71f17b58a1d976c20bf298759541bd0481eb4",
+        "retainedUnder": "finish-fixture.6Kbw9gHm"
+      },
+      {
+        "argv": [
+          "git",
+          "ls-remote",
+          "--heads",
+          "origin",
+          "refs/heads/main"
+        ],
+        "startedAt": "2026-11-23T06:46:37.667Z",
+        "observedAt": "2026-11-23T06:46:38.948Z",
+        "exitCode": 0,
+        "captures": {
+          "target-before-merge.stdout": "f6534d6366738bda7500c853fd4604f8d1930be7de2f25873a4467ff7c669164",
+          "target-before-merge.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "commandRecordSha256": "485a68770bf7f5ec269e910f64869f60ae055ccfae1346c682f8700071714f09",
+        "retainedUnder": "finish-fixture.6Kbw9gHm"
+      },
+      {
+        "argv": [
+          "gh",
+          "pr",
+          "view",
+          "44",
+          "-R",
+          "grewety/ai-coding-agent-skills",
+          "--json",
+          "state,mergedAt,mergeCommit,headRefOid,baseRefName,url"
+        ],
+        "cwd": "/home/raphael/src/ai-coding-agent-skills",
+        "startedAt": "2026-11-23T06:47:33.355Z",
+        "observedAt": "2026-11-23T06:47:33.886Z",
+        "exitCode": 0,
+        "captures": {
+          "implementation-merge.stdout": "aa5a77df9e0de14ebe43ebcdab1b40e9c8e1601c47b42d85074ed427c1621d4c",
+          "implementation-merge.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "commandRecordSha256": "b33a104504262818ec289acdcd0165dc7bfcae253f2c48aeb7a940b96a4bdb43",
+        "retainedUnder": "finish-fixture.6Kbw9gHm"
+      },
+      {
+        "argv": [
+          "git",
+          "ls-remote",
+          "--heads",
+          "origin",
+          "refs/heads/main",
+          "refs/heads/change/one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v"
+        ],
+        "cwd": "/home/raphael/src/ai-coding-agent-skills",
+        "startedAt": "2026-11-23T06:47:33.916Z",
+        "observedAt": "2026-11-23T06:47:35.263Z",
+        "exitCode": 0,
+        "captures": {
+          "implementation-target.stdout": "440a58a01fe35db0ebbf4105c448be0dbd58b247ae380a82aadaf5027f694017",
+          "implementation-target.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "commandRecordSha256": "fab25b6e3c9937eec7cf0c87c5563639bd1b195dd97a3824110cf7ad875bdbd6",
+        "retainedUnder": "finish-fixture.6Kbw9gHm"
+      }
+    ],
+    "previousFailedCandidate": {
+      "head": "8bdeb452f70da618f17eb30c459098364cb7f711",
+      "conclusion": "failure",
+      "url": "https://github.com/grewety/ai-coding-agent-skills/actions/runs/45123433169",
+      "retainedUnder": "finish-implementation.0xahzEvg",
+      "logSha256": "bcc29da6df4a546742e8fbd825e96a62efab03a9e3d796cfbfaacbf808afddf1",
+      "note": "Earlier CI failed five tests at the runtime-pin prerequisite; not the accepted head."
+    }
+  },
+  "integrated": {
+    "phase": "integrated",
+    "revision": "d5f4fb6deb3426676c90d5f06b6d6f20a6cbbba5",
+    "gateInventorySha256": "12d46ab1bdc5f8916c45d89b96715b2b13782a6de40d29c1fdd6263178ad76fc",
+    "runtime": {
+      "node": "v24.21.0",
+      "npm": "11.19.0",
+      "git": "git version 2.43.0",
+      "openspec": "2.1.1",
+      "platform": "linux"
+    },
+    "environmentPolicy": {
+      "OPENSPEC_TELEMETRY": "0",
+      "CI": "true",
+      "LC_ALL": "C.UTF-8"
+    },
+    "captures": [
+      {
+        "name": "bootstrap",
+        "argv": [
+          "npm",
+          "ci"
+        ],
+        "startedAt": "2026-11-23T06:48:02Z",
+        "observedAt": "2026-11-23T06:48:02Z",
+        "exitCode": 0,
+        "commit": "d5f4fb6deb3426676c90d5f06b6d6f20a6cbbba5",
+        "captures": {
+          "bootstrap.log": "4634d2cb299a5293dd00c9fb0c22d700df11907aa34cf98bedd283f604c71738",
+          "bootstrap.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "commandRecordSha256": "313db46d6652bd23a8196c1c59ac6cdc12187027b7a80b671c196c3bbbec321d",
+        "retainedUnder": "finish-fixture.6Kbw9gHm/integrated-gates"
+      },
+      {
+        "name": "openspec",
+        "argv": [
+          "openspec",
+          "validate",
+          "one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v",
+          "--strict"
+        ],
+        "startedAt": "2026-11-23T06:48:02Z",
+        "observedAt": "2026-11-23T06:48:03Z",
+        "exitCode": 0,
+        "commit": "d5f4fb6deb3426676c90d5f06b6d6f20a6cbbba5",
+        "captures": {
+          "openspec.log": "c671ffa3a788412cc8b89f5a008ab24537e1d5e6a57d541a937801384cf615cf",
+          "openspec.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "commandRecordSha256": "b10b9306d83c917127b9fb4a62a8fd8816cdca81e0bb1cc2d0c6cf9c7569e0bf",
+        "retainedUnder": "finish-fixture.6Kbw9gHm/integrated-gates"
+      },
+      {
+        "name": "current-specs",
+        "argv": [
+          "openspec",
+          "validate",
+          "--specs",
+          "--strict"
+        ],
+        "startedAt": "2026-11-23T06:48:03Z",
+        "observedAt": "2026-11-23T06:48:03Z",
+        "exitCode": 0,
+        "commit": "d5f4fb6deb3426676c90d5f06b6d6f20a6cbbba5",
+        "captures": {
+          "current-specs.log": "71dc0fa0be8fb40610a3d6e0729bb43cea4f170ae81a041fdc5f1b5561d12a58",
+          "current-specs.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "commandRecordSha256": "3270e99ba519916f771a44e1910da585a7c44e9957ee5e444986cde3e45b39f8",
+        "retainedUnder": "finish-fixture.6Kbw9gHm/integrated-gates"
+      },
+      {
+        "name": "all-openspec",
+        "argv": [
+          "openspec",
+          "validate",
+          "--all",
+          "--strict"
+        ],
+        "startedAt": "2026-11-23T06:48:03Z",
+        "observedAt": "2026-11-23T06:48:03Z",
+        "exitCode": 0,
+        "commit": "d5f4fb6deb3426676c90d5f06b6d6f20a6cbbba5",
+        "captures": {
+          "all-openspec.log": "9cf73dfb48f51882d1c92e57d18b3a9f06d1b618bb72e7c96cce7ce0f9012d95",
+          "all-openspec.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "commandRecordSha256": "f4912ab382fa7a7d3e3fa8fe31b0dd2e4c86e4c33173b4df86fd4385df2eae44",
+        "retainedUnder": "finish-fixture.6Kbw9gHm/integrated-gates"
+      },
+      {
+        "name": "metadata",
+        "argv": [
+          "npm",
+          "run",
+          "validate:openspec"
+        ],
+        "startedAt": "2026-11-23T06:48:03Z",
+        "observedAt": "2026-11-23T06:48:03Z",
+        "exitCode": 0,
+        "commit": "d5f4fb6deb3426676c90d5f06b6d6f20a6cbbba5",
+        "captures": {
+          "metadata.log": "6cc84089363eac2cc7b9b79ff23cf90e0fb115cbbecb9141b35c1410689bd2ed",
+          "metadata.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "commandRecordSha256": "ef6849de56c6badc5268f7cb6b96c74f56d9304e1979bf5386346b3655562d4d",
+        "retainedUnder": "finish-fixture.6Kbw9gHm/integrated-gates"
+      },
+      {
+        "name": "npm-test",
+        "argv": [
+          "npm",
+          "test"
+        ],
+        "startedAt": "2026-11-23T06:48:03Z",
+        "observedAt": "2026-11-23T06:48:19Z",
+        "exitCode": 0,
+        "commit": "d5f4fb6deb3426676c90d5f06b6d6f20a6cbbba5",
+        "captures": {
+          "npm-test.log": "8b2e3c509d4fffb54713afea41fc8947f7e3a45376324d02613de4c5c177002a",
+          "npm-test.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "commandRecordSha256": "cd299b9b6e55f9b6d96797fc48e23878c480eeec5149a273193bc878f75408dc",
+        "retainedUnder": "finish-fixture.6Kbw9gHm/integrated-gates"
+      },
+      {
+        "name": "build",
+        "argv": [
+          "npm",
+          "run",
+          "build"
+        ],
+        "startedAt": "2026-11-23T06:48:19Z",
+        "observedAt": "2026-11-23T06:48:20Z",
+        "exitCode": 0,
+        "commit": "d5f4fb6deb3426676c90d5f06b6d6f20a6cbbba5",
+        "captures": {
+          "build.log": "30354bf2005244bd90aea696be207bd968a306ba9e2ad97292627b6ee915123f",
+          "build.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        "commandRecordSha256": "ac226bf9add3ad0b7eddc8663f8faee45d2af9139d51870b2c6fb8bfe1e2e33d",
+        "retainedUnder": "finish-fixture.6Kbw9gHm/integrated-gates"
+      }
+    ],
+    "testSummary": [
+      "ℹ tests 404",
+      "ℹ pass 404",
+      "ℹ fail 0"
+    ]
+  }
+}
