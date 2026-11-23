@@ -17,7 +17,7 @@ const expectedBundles = {
     skills: ["openspec-delivery", "openspec-next", "git-commit-message", "capability-wireframes"],
   },
   "autonomous-orchestration": {
-    version: "1.8.0",
+    version: "1.9.0",
     skills: ["autonomous-implementation-review"],
   },
 };
@@ -120,6 +120,43 @@ test("distribution builds complete skill and plugin ZIPs from canonical bytes", 
   };
   assert.deepEqual(await pluginPackages(catalog.plugins[0]), expectedBundles["openspec-development"].skills.slice().sort());
   assert.deepEqual(await pluginPackages(catalog.plugins[1]), ["autonomous-implementation-review"]);
+  const reviewPackage = packages.find(({ name }) => name === "autonomous-implementation-review");
+  const reviewEntry = catalog.skills.find(({ name }) => name === reviewPackage.name);
+  assert.ok(reviewEntry, "individual reviewer ZIP must be advertised");
+  const reviewArchive = unzipSync(await readFile(path.join(output, "downloads", reviewEntry.file)));
+  assert.match(Buffer.from(reviewArchive[`${reviewPackage.name}/SKILL.md`]).toString(), /^version: 0\.19\.0$/m);
+  const orchestrationArchive = unzipSync(await readFile(path.join(output, "downloads", catalog.plugins[1].file)));
+  const reviewFiles = [
+    "references/review-candidate.md",
+    "scripts/review-candidate.mjs",
+    "scripts/review-admission.mjs",
+    "scripts/review-inputs.mjs",
+    "scripts/review-relay.mjs",
+    "scripts/review-runtime.mjs",
+    "scripts/review-sandbox-bridge.mjs",
+    "scripts/review-stream.mjs",
+    "scripts/bounded-worker.mjs",
+    "scripts/bounded-worker.py",
+  ];
+  for (const file of reviewFiles) {
+    const canonical = await readFile(path.join(reviewPackage.directory, file));
+    const key = `${reviewPackage.name}/${file}`;
+    assert.deepEqual(Buffer.from(reviewArchive[key]), canonical, key);
+    assert.deepEqual(Buffer.from(orchestrationArchive[`skills/${key}`]), canonical, key);
+  }
+  for (const file of ["README.md", "docs/claude-installation.md", "docs/openspec-installation.md", "docs/openspec-workflow.md"]) {
+    const guide = await readFile(path.join(root, file), "utf8");
+    const reviewerLink = file === "README.md" ? "(docs/claude-reviewer.md)" : "(claude-reviewer.md)";
+    assert.ok(guide.includes(reviewerLink), `${file} links to reviewer setup`);
+    assert.ok(guide.includes("0.19.0") && guide.includes("1.9.0"), `${file} lists paired versions`);
+  }
+  const reviewerGuide = await readFile(path.join(root, "docs/claude-reviewer.md"), "utf8");
+  const reviewerReference = await readFile(path.join(reviewPackage.directory, "references/review-candidate.md"), "utf8");
+  const commandForms = (guide) => guide.split("\n")
+    .filter((line) => /^(NODE REVIEW_CLI|node review-candidate\.mjs) --/.test(line))
+    .map((line) => line.split(" ").slice(2).join(" "));
+  assert.equal(commandForms(reviewerReference).length, 6);
+  assert.deepEqual(commandForms(reviewerGuide), commandForms(reviewerReference));
   const integrationArchive = unzipSync(await readFile(path.join(output, "downloads", catalog.plugins[0].file)));
   const deliveryEntry = catalog.skills.find(({ name }) => name === "openspec-delivery");
   assert.ok(deliveryEntry, "individual delivery ZIP must be advertised");

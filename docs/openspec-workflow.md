@@ -779,10 +779,16 @@ model configuration, and a supported host. Package installation does not create
 those roles.
 
 Current source: delivery 1.3.1 in `openspec-development` 1.3.1;
-`openspec-next` 0.4.0 and core skill 0.18.0 in `autonomous-orchestration` 1.8.0.
+`openspec-next` 0.4.0 and core skill 0.19.0 in `autonomous-orchestration` 1.9.0.
 Representation support adds no upstream workflow, runtime dependency or
 installation route. Package availability/byte checks do not establish account
 sync, host execution, native client discovery, Desktop acceptance or scanner approval.
+
+The [contained Claude reviewer](claude-reviewer.md) is an opt-in transport for exact candidate
+and charter-v1 approach review. A separate grant must cover export and paid inference. Replay
+the original request-bound output offline before applying the existing candidate or charter
+admission rules. The guide records the limited packaged live qualification. Apply the
+project's approved reviewer procedure when selecting a route.
 
 Complete copies and generated packages preserve delivery's policy/task-authoring
 references and `scripts/delivery-policy.mjs`, plus orchestration's

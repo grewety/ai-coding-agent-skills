@@ -49,8 +49,20 @@ test("well-known build publishes every skill and all advertised files", async ()
     const generatedList = contract.split("Confirm the generated package advertises")[1]?.split("Parent contract:")[0];
     assert.ok(generatedList, "category contract owns the complete generated-package list");
     const declaredFiles = [...generatedList.matchAll(/`((?:references|scripts|templates)\/[^`]+|SKILL\.md)`/g)].map((m) => m[1]);
-    assert.deepEqual(declaredFiles.sort(), [...autonomous.files].sort(), "generated-package contract must include every packaged support file");
-    assert.deepEqual(autonomous?.files, ["references/claude-code-host.md", "references/claude-code-roles.md", "references/environment-passthrough.md", "references/herdr.md", "references/lifecycle-watch.md", "references/openspec.md", "references/portable-core.md", "references/profile-preparation.md", "references/terminal-adapters.md", "references/worker-handoff.md", "scripts/herdr_lifecycle_watch.mjs", "scripts/herdr_panes.py", "scripts/herdr-pane-state.mjs", "scripts/orchestration-core.mjs", "scripts/terminal-adapters.mjs", "scripts/worker-handoff.mjs", "SKILL.md", "templates/phase-implementer.md", "templates/phase-reviewer.md"]);
+    const reviewerFiles = [
+      "references/review-candidate.md",
+      "scripts/bounded-worker.mjs",
+      "scripts/bounded-worker.py",
+      "scripts/review-admission.mjs",
+      "scripts/review-candidate.mjs",
+      "scripts/review-inputs.mjs",
+      "scripts/review-relay.mjs",
+      "scripts/review-runtime.mjs",
+      "scripts/review-sandbox-bridge.mjs",
+      "scripts/review-stream.mjs",
+    ];
+    assert.deepEqual([...declaredFiles, ...reviewerFiles].sort(), [...autonomous.files].sort(), "generated package must include exactly the declared and new reviewer support files");
+    assert.deepEqual(autonomous?.files, [...reviewerFiles, "references/claude-code-host.md", "references/claude-code-roles.md", "references/environment-passthrough.md", "references/herdr.md", "references/lifecycle-watch.md", "references/openspec.md", "references/portable-core.md", "references/profile-preparation.md", "references/terminal-adapters.md", "references/worker-handoff.md", "scripts/herdr_lifecycle_watch.mjs", "scripts/herdr_panes.py", "scripts/herdr-pane-state.mjs", "scripts/orchestration-core.mjs", "scripts/terminal-adapters.mjs", "scripts/worker-handoff.mjs", "SKILL.md", "templates/phase-implementer.md", "templates/phase-reviewer.md"].sort((left, right) => left.localeCompare(right)));
     const integration = index.skills.find((skill) => skill.name === "openspec-delivery");
     assert.deepEqual(integration?.files, ["references/continuation.md", "references/delivery-policy.md", "references/evidence-retention.md", "references/git-environment.md", "references/guard.md", "references/integration.md", "references/naming.md", "references/recovery.md", "references/task-authoring.md", "references/ticket.md", "references/workspace.md", "scripts/change-guard.mjs", "scripts/change-name.mjs", "scripts/change-workspace.mjs", "scripts/delivery-policy.mjs", "scripts/evidence-retention.mjs", "scripts/git-environment.mjs", "SKILL.md"]);
     // Independent of dynamic package discovery: both representation files are required.

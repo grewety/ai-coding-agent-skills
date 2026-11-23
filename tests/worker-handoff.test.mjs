@@ -320,3 +320,14 @@ test("capped attempts retain diagnostics and limitations without manufacturing a
   assert.equal(result.executionCompleted, false);
   assert.equal(result.deliveryAccepted, false);
 });
+
+test("publisher rejects non-byte and over-limit captures before creating sinks", async (t) => {
+  const f = await fixture(t);
+  const expected = await prepare(f);
+  for (const capture of ["not bytes", new Uint16Array(2), new Uint8Array(9 * 1024 * 1024)]) {
+    await assert.rejects(core.publishResult({
+      expected, runtime: f.runtime, result: f.result, files: { ...f.files, "report.md": capture },
+    }), /capture (?:bytes|limit)/i);
+    assert.deepEqual(await readdir(f.directory), ["request.md"]);
+  }
+});

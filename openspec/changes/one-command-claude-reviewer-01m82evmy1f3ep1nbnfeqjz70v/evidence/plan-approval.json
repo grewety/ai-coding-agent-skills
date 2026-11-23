@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "change": "one-command-claude-reviewer-01m82evmy1f3ep1nbnfeqjz70v",
+  "plan": "9ee01e6fe85beb48bfeea7fabd7522bc9a0e843e",
+  "parent": "89476c06ceb461952584f6409827ee175fb42ba5",
+  "planDigest": "8a88d83d76f9f3ffc241dc0a171df3ebb2cc48e9b0f115a32fdd1586ac3a107a",
+  "decision": "approve-exact-plan",
+  "authority": "Repository operator, Item 1 approve and run all, Grant 1",
+  "operatorBriefSha256": "989837a35dd2426801737c7367bf9c00b9f1f00b20368baa337739823ff0940b",
+  "approvedScope": "Frozen Item 1 OpenSpec plan, native tasks 1.1, 2.1 and 3.1 as written",
+  "executionGrantedByThisRecord": false,
+  "publicationGrantedByThisRecord": false
+}

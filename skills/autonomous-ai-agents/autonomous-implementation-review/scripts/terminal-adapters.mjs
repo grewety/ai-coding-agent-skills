@@ -1,11 +1,11 @@
 // Qualified terminal worker adapter checks, role/model bindings, non-argv prompt
 // transport, process supervision, same-session human interaction, bootstrap
 // exception admission/expiry, and legacy-route migration.
-import { spawnSync } from "node:child_process";
+import { runBoundedWorker, captureLimit } from "./bounded-worker.mjs";
 import { createHash } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { lstat, mkdtemp } from "node:fs/promises";
 import path from "node:path";
-import { createAttempt, publishResult, readHandoff } from "./worker-handoff.mjs";
+import { createAttempt, publishResult, readHandoff, safePath, writeClosed } from "./worker-handoff.mjs";
 
 const need = (ok, message) => { if (!ok) throw new Error(message); };
 const text = (v) => typeof v === "string" && v.trim().length > 0;
@@ -749,9 +749,9 @@ export async function executeTerminalAdapterAttempt({
   command = process.execPath, runnerPrefixArgs = [], args = null, promptText, transportRoute = null,
   completionKind = "exit", turnId = "turn-1", humanWait = null, records = CANDIDATE_RECORDS,
 }) {
-  const expected = await createAttempt({ directory, request, excludedRoots: [...excludedRoots, scratchRoot] });
-  const captureDir = path.join(scratchRoot, "transport");
-  await mkdir(captureDir, { recursive: true });
+  await safePath(scratchRoot);
+  need((await lstat(scratchRoot)).isDirectory(), "Unsafe worker scratch root");
+  const captureDir = await mkdtemp(path.join(scratchRoot, "transport-"));
   const effectivePrompt = promptText ?? `# Assignment ${request.identity.attempt}\n${request.outcome}\n`;
   const transport = preparePromptTransport({
     client: runtime.client, version: runtime.version, role: request.identity.role,
@@ -764,13 +764,13 @@ export async function executeTerminalAdapterAttempt({
   if (runtime.client === "hermes") {
     need(transport.argv[0] === "--profile" && transport.argv[1] === runtime.profile, "Hermes launch must bind --profile <verified-profile> in argv");
   }
-  if (transport.promptFilePath) {
-    await writeFile(transport.promptFilePath, Buffer.from(effectivePrompt, "utf8"), { mode: 0o600 });
-  }
   const spawnedArgs = args === null ? [...runnerPrefixArgs, ...transport.argv] : args;
   need(Array.isArray(spawnedArgs) && !spawnedArgs.includes(effectivePrompt), "Spawned argv must never contain the prompt payload");
   const tail = spawnedArgs.slice(spawnedArgs.length - transport.argv.length);
   need(tail.length === transport.argv.length && tail.every((v, idx) => v === transport.argv[idx]), "Spawned argv must preserve transport.argv");
+  need(Buffer.byteLength(effectivePrompt, "utf8") <= captureLimit, "Prompt capture limit exceeded");
+  const expected = await createAttempt({ directory, request, excludedRoots: [...excludedRoots, scratchRoot] });
+  if (transport.promptFilePath) await writeClosed(transport.promptFilePath, Buffer.from(effectivePrompt), true);
   const env = {
     PATH: process.env.PATH,
     HOME: scratchRoot,
@@ -778,23 +778,18 @@ export async function executeTerminalAdapterAttempt({
     WORKER_ATTEMPT_DIR: directory,
     WORKER_PROMPT_FILE: transport.promptFilePath ?? "",
   };
-  const proc = spawnSync(command, spawnedArgs, {
-    cwd: request.identity.workspace,
-    env,
-    input: transport.stdinBytes ?? undefined,
-    encoding: null,
-    timeout: 30000,
+  const proc = await runBoundedWorker(command, spawnedArgs, {
+    cwd: request.identity.workspace, env, input: transport.stdinBytes ?? undefined,
   });
-  const stdoutBytes = Buffer.from(proc.stdout ?? []);
-  const stderrBytes = Buffer.from(proc.stderr ?? []);
-  const exitCode = proc.status ?? 1;
-  const signal = proc.signal ?? null;
-  const exitBytes = Buffer.from(`${signal ?? exitCode}\n`, "utf8");
+  const { stdout: stdoutBytes, stderr: stderrBytes, code: exitCode, signal } = proc;
+  const exitBytes = Buffer.from(`${signal ?? exitCode ?? "unknown"}\n`, "utf8");
   await Promise.all([
-    writeFile(transport.captures.stdoutPath, stdoutBytes, { mode: 0o600 }),
-    writeFile(transport.captures.stderrPath, stderrBytes, { mode: 0o600 }),
-    writeFile(transport.captures.exitPath, exitBytes, { mode: 0o600 }),
+    writeClosed(transport.captures.stdoutPath, stdoutBytes, true),
+    writeClosed(transport.captures.stderrPath, stderrBytes, true),
+    writeClosed(transport.captures.exitPath, exitBytes, true),
   ]);
+  need(proc.quiescent, "Worker process tree has no verified quiescence");
+  const normalExit = proc.outcome === "exit" && exitCode === 0 && signal === null;
 
   const hasNativeOutput = stdoutBytes.length > 0;
   const lines = hasNativeOutput ? stdoutBytes.toString("utf8").split(/\r?\n/) : [];
@@ -806,7 +801,7 @@ export async function executeTerminalAdapterAttempt({
   let verdict = "unavailable";
   let nativeVerdict = null;
   let findings = [];
-  if (hasNativeOutput && exitCode === 0 && signal === null && (!humanWait || humanWait.decision === "approved")) {
+  if (hasNativeOutput && normalExit && (!humanWait || humanWait.decision === "approved")) {
     if (request.identity.role === "implementer") {
       verdict = "not_applicable";
     } else if (hasNoFindingsLine && extractedFindings.length === 0) {
@@ -823,7 +818,7 @@ export async function executeTerminalAdapterAttempt({
     reviewOutputValid = false;
   }
 
-  const isCompleted = hasNativeOutput && reviewOutputValid && exitCode === 0 && signal === null && (!humanWait || humanWait.decision === "approved");
+  const isCompleted = hasNativeOutput && reviewOutputValid && normalExit && (!humanWait || humanWait.decision === "approved");
   const status = !isCompleted ? (humanWait?.decision === "denied" ? "blocked" : "failed") : "completed";
   const reportKind = isCompleted ? "native" : "adapter-diagnostic";
   const nativeBytes = hasNativeOutput ? stdoutBytes : Buffer.from("Adapter diagnostic: worker produced no native output.\n", "utf8");
@@ -847,7 +842,7 @@ export async function executeTerminalAdapterAttempt({
     files["turn.json"] = turnBytes;
     completion = { kind: "turn-end", turn: turnId, evidence: path.join(directory, "turn.json") };
   } else {
-    completion = { kind: "exit", code: signal ? null : (isCompleted ? 0 : (exitCode === 0 ? 1 : exitCode)), signal };
+    completion = { kind: "exit", code: signal ? null : exitCode, signal };
   }
   const lifecycleEvents = [
     { schemaVersion: 1, attempt: request.identity.attempt, session: runtime.session, event: "launch" },
@@ -865,7 +860,7 @@ export async function executeTerminalAdapterAttempt({
   }
   lifecycleEvents.push({
     schemaVersion: 1, attempt: request.identity.attempt, session: runtime.session,
-    event: "terminal", status, completion,
+    event: "terminal", status, completion, supervisor: { outcome: proc.outcome, quiescent: proc.quiescent },
   });
   files["lifecycle.jsonl"] = Buffer.from(lifecycleEvents.map((e) => JSON.stringify(e)).join("\n") + "\n", "utf8");
   const desc = (name) => ({ path: path.join(directory, name), sha256: hash(files[name]), bytes: files[name].length });

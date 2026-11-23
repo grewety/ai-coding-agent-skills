@@ -171,7 +171,7 @@ The source catalog's `openspec-development` 1.3.1 includes `openspec-delivery`
 copies and skill/plugin ZIP exports: this separate local representation support
 preserves captured bytes/hashes and checks claim support, not gate execution,
 reviewer authentication, approval or publication authority. The optional
-`autonomous-orchestration` is 1.8.0 (core skill 0.18.0) and `openspec-next` is 0.4.0. These
+`autonomous-orchestration` is 1.9.0 (core skill 0.19.0) and `openspec-next` is 0.4.0. These
 source versions do not assert that the public marketplace/downloads are updated.
 Preserve delivery's policy/task-authoring references and `delivery-policy.mjs`,
 and orchestration's `references/portable-core.md`, `scripts/orchestration-core.mjs`,
@@ -190,6 +190,12 @@ inclusion, unshared packages in multiple bundles, added active plugin components
 unsafe paths, and symlinks, and verify archive bytes, repeatability, checksums,
 and Pages artifact inclusion. They do not prove model obedience, cloud acceptance,
 or scanner approval.
+
+The optional orchestration package includes a standalone Linux Claude reviewer. See the
+[operator guide](claude-reviewer.md) for the limited packaged live qualification, local setup
+and evidence checks. Marketplace installation, ZIP upload and account sync do not configure
+its inference route or authorize data export or paid inference, which require a separate
+explicit grant.
 
 Validate the marketplace and both plugin exports with a disposable HOME and
 CLAUDE_CONFIG_DIR, without account credentials. Check exact inventories: four

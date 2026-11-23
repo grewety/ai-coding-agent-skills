@@ -737,12 +737,16 @@ its bundled content changes. See the [Claude release checks](docs/claude-install
 
 Current source versions are delivery 1.3.1 and its affected
 `openspec-development` plugin 1.3.1; `openspec-next` is 0.4.0 and
-`autonomous-orchestration` is 1.8.0 (core skill 0.18.0). Complete well-known output, the delivery
+`autonomous-orchestration` is 1.9.0 (core skill 0.19.0). Complete well-known output, the delivery
 skill ZIP, workflow plugin ZIP and isolated native copies must retain the lossless
 reference/helper pair byte-for-byte. Source assertions are not executed packaging
 proof or a claim of updated public downloads, native client discovery, Desktop
 acceptance or scanner approval. No upstream prerequisite or installation route is
 added by this representation facility.
+
+The packaged Claude reviewer is a separate opt-in for approved candidate or charter-v1
+exports. The [operator guide](docs/claude-reviewer.md) records the limited packaged live
+qualification, required export and paid inference grant, credential limits and offline verification.
 
 Preserve orchestration's complete `references/portable-core.md`,
 `scripts/orchestration-core.mjs`, `references/worker-handoff.md`,

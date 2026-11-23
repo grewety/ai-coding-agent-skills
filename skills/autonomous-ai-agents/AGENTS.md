@@ -14,6 +14,8 @@ Herdr pane-selection helper.
 | `autonomous-implementation-review/scripts/orchestration-core.mjs` | Pure packet and retained-observation checks; no launch, progress writes or authority authentication. |
 | `autonomous-implementation-review/scripts/worker-handoff.mjs` and `references/worker-handoff.md` | Portable strict request/result schemas, adapter-only local publication and complete retained-artifact admission; no launch, cleanup or delivery acceptance. |
 | `autonomous-implementation-review/scripts/terminal-adapters.mjs`, `references/terminal-adapters.md` and `references/profile-preparation.md` | Candidate qualification records, terminal worker adapters (`hermes`, `claude-code`, `codex`, `grok-build`), role/model bindings, non-argv transport, process supervision, same-session interaction exposure, bootstrap-exception expiry, Hermes profile preparation and legacy-route retirement. |
+| `autonomous-implementation-review/scripts/review-candidate.mjs`, `scripts/review-*.mjs` in that package, and `references/review-candidate.md` | Opt-in contained Claude reviewer, candidate and charter-v1 export and receipt verification, pinned inference and sealed captures. |
+| `autonomous-implementation-review/scripts/bounded-worker.mjs` and `scripts/bounded-worker.py` in that package | Shared bounded process-tree supervision and stream capture. |
 | `autonomous-implementation-review/scripts/herdr_panes.py` | Read-only overview and fail-closed validation of supplied operator selection against fresh pane JSON. |
 | `autonomous-implementation-review/scripts/herdr_lifecycle_watch.mjs` | Passive output-based Herdr lifecycle watcher, read-only inspection and arming gate; never sends pane input. |
 | `autonomous-implementation-review/scripts/herdr-pane-state.mjs` | Live-composer/footer parser and identity-bound executor observation. |
@@ -54,5 +56,11 @@ Run `npm test` and `npm run build`. Confirm the generated package advertises
 `references/lifecycle-watch.md`, `references/openspec.md`, `references/claude-code-host.md`, `scripts/herdr_panes.py`,
 `scripts/herdr_lifecycle_watch.mjs`, `scripts/herdr-pane-state.mjs`,
 `templates/phase-implementer.md`, and `templates/phase-reviewer.md`.
+
+Verify the contained reviewer CLI, reference and runtime helpers are
+byte-identical in the individual skill and optional orchestration bundle,
+with five skills and two bundles still advertised. Synthetic tests cover
+offline admission and containment checks. Packaged live qualification
+requires a separate grant for the exact runtime, relay and export inputs.
 
 Parent contract: `../AGENTS.md`.

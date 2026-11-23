@@ -4,6 +4,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, link, unlink } from "node:fs/promises";
 import path from "node:path";
+import { captureLimit, captureAggregateLimit } from "./bounded-worker.mjs";
 
 const need = (ok, message) => { if (!ok) throw new Error(message); };
 const text = (v) => typeof v === "string" && v.trim().length > 0;
@@ -35,7 +36,7 @@ function absolute(p) {
   return p;
 }
 const within = (root, target) => target === root || (!path.relative(root, target).startsWith(`..${path.sep}`) && path.relative(root, target) !== ".." && !path.isAbsolute(path.relative(root, target)));
-async function safePath(p, leafMayBeAbsent = false) {
+export async function safePath(p, leafMayBeAbsent = false) {
   absolute(p);
   const parts = p.slice(path.parse(p).root.length).split(path.sep).filter(Boolean);
   let current = path.parse(p).root;
@@ -53,7 +54,7 @@ async function safePath(p, leafMayBeAbsent = false) {
 function inventory(inputs) {
   need(plain(inputs) && Object.keys(inputs).length > 0 && Object.entries(inputs).every(([p, h]) => relative(p) && digest(h)), "Invalid input/output hash inventory");
 }
-function validateRequest(r) {
+export function validateRequest(r) {
   keys(r, ["schemaVersion", "identity", "outcome", "acceptance", "scope", "nonGoals", "authority", "restrictions", "budget", "stop", "evidenceRoots", "requiredEvidence", "mutablePaths"], "request");
   need(r.schemaVersion === 1, "Unsupported request schema");
   const id = r.identity;
@@ -85,25 +86,35 @@ function validateRequest(r) {
     !p.startsWith("openspec/changes/") && p !== "openspec/config.yaml"), "Unsafe mutable output path");
   if (id.role !== "implementer") need(r.mutablePaths.length === 0 && r.restrictions.includes("read-only"), "Reviewer must remain read-only");
 }
-const requestBytes = (request) => Buffer.from(`# Worker request\n\n\`\`\`json\n${canonical(request)}\n\`\`\`\n`);
+export const requestBytes = (request) => Buffer.from(`# Worker request\n\n\`\`\`json\n${canonical(request)}\n\`\`\`\n`);
 const jsonBytes = (value) => Buffer.from(canonical(value) + "\n");
-async function readClosed(p, maxBytes = 64 * 1024 * 1024, sealed = false) {
+export async function readClosed(p, maxBytes = 64 * 1024 * 1024, sealed = false) {
   await safePath(p);
-  const handle = await open(p, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  const handle = await open(p, constants.O_RDONLY | constants.O_NONBLOCK | (constants.O_NOFOLLOW ?? 0));
   try {
     const before = await handle.stat();
     need(before.isFile() && before.size <= maxBytes, "Unsafe or oversized artifact");
     if (sealed) need((before.mode & 0o222) === 0 && before.nlink === 1, "Result is not sealed or still has a publication alias");
-    const bytes = await handle.readFile();
+    const bounded = Buffer.alloc(before.size + 1);
+    let length = 0;
+    while (length < bounded.length) {
+      const { bytesRead } = await handle.read(bounded, length, bounded.length - length);
+      if (bytesRead === 0) break;
+      length += bytesRead;
+    }
+    const bytes = bounded.subarray(0, length);
     const after = await handle.stat();
     need(bytes.length === before.size && after.size === before.size && after.mtimeMs === before.mtimeMs && after.ctimeMs === before.ctimeMs, "Artifact changed during read");
     return bytes;
   } finally { await handle.close(); }
 }
-async function writeClosed(p, bytes, sealed = false) {
+export async function writeClosed(p, bytes, sealed = false) {
   await safePath(p, true);
-  const handle = await open(p, "wx", 0o600);
+  need(Number.isInteger(constants.O_NOFOLLOW), "Exclusive no-follow creation unavailable");
+  const handle = await open(p, constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW | constants.O_WRONLY, 0o600);
   try {
+    const stat = await handle.stat();
+    need(stat.isFile() && stat.nlink === 1, "Unsafe capture sink");
     await handle.writeFile(bytes);
     if (sealed) await handle.chmod(0o400);
     await handle.sync();
@@ -212,6 +223,12 @@ export async function publishResult({ expected, runtime, result, files }) {
   // Snapshot all caller-owned values before the first asynchronous operation.
   expected = structuredClone(expected); runtime = structuredClone(runtime); result = structuredClone(result);
   need(plain(files), "Missing finalized captures");
+  let total = 0;
+  for (const bytes of Object.values(files)) {
+    need(bytes instanceof Uint8Array, "Invalid publisher capture bytes");
+    total += bytes.byteLength;
+    need(bytes.byteLength <= captureLimit && total <= captureAggregateLimit, "Publisher capture limit exceeded");
+  }
   files = Object.fromEntries(Object.entries(files).map(([p, bytes]) => [p, Buffer.from(bytes)]));
   validateResult(result, expected, runtime);
   await checkExpected(expected);
@@ -221,6 +238,16 @@ export async function publishResult({ expected, runtime, result, files }) {
     const p = path.join(expected.directory, name);
     const d = descriptors.find((entry) => entry.path === p);
     need(d && hash(bytes) === d.sha256 && bytes.length === d.bytes, "Unexpected or truncated capture");
+  }
+  for (const name of ["result.json", ...Object.keys(files)]) {
+    const destination = path.join(expected.directory, name);
+    await safePath(destination, true);
+    try {
+      await lstat(destination);
+      throw Object.assign(new Error("EEXIST: publisher capture already exists"), { code: "EEXIST" });
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
   }
   for (const [name, bytes] of Object.entries(files)) await writeClosed(path.join(expected.directory, name), bytes, true);
   await verifyFiles(result, expected);
