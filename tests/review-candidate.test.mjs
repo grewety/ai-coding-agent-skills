@@ -4,6 +4,45 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { packetize, parseStrictJson } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-inputs.mjs";
 import { auditClaudeStream } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-stream.mjs";
+import { reviewPrompt } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-admission.mjs";
+
+const finalPromptRule = "Your FINAL assistant message MUST contain ONLY these exact three lines and NOTHING else — no preamble, no prose before or after, no markdown code fences, no blank lines:";
+
+test("candidate prompt ends with the exact clean packet template", () => {
+  const target = "0123456789abcdef0123456789abcdef01234567";
+  const context = { target };
+  const prompt = reviewPrompt({ mode: "candidate" }, context, { paths: ["base/a", "target/b"] }, 1, 3, "candidate-ref");
+  const suffix = [finalPromptRule, "Verdict: No findings", `Target: ${target}`,
+    `{"target":"${target}","packet":2,"findings":[],"coverageLimitations":[]}`].join("\n");
+  assert.equal(prompt.slice(-suffix.length), suffix);
+  const instructions = prompt.slice(0, -suffix.length);
+  assert.match(instructions, /Batch multiple whole-file Read calls in parallel per turn/);
+  assert.match(instructions, /file_path as the sole argument.*Read exactly all assigned \/review paths/);
+  assert.deepEqual(instructions.split("\n").filter((line) => line.startsWith("/review/")), ["/review/base/a", "/review/target/b"]);
+  assert.match(instructions, /Inherent read-only, no-shell, no-network constraints and future groups are not coverageLimitations/);
+  assert.match(instructions, /Use \[\] for coverageLimitations when all assigned files were read/);
+  assert.match(instructions, /Verdict: Findings.*findings/);
+  assert.ok(instructions.includes(`Packet: 2 of 3\nNative reference: candidate-ref\n${JSON.stringify(context)}\n`));
+});
+
+test("approach prompt ends with the exact clean charter template", () => {
+  const identity = { change: "fixture-change", ledger: [{ id: "F1", status: "open" }] };
+  const context = { identity };
+  const reference = 'approach "ref"';
+  const prompt = reviewPrompt({ mode: "approach" }, context, { paths: ["plan/a", "plan/b"] }, 0, 1, reference);
+  const suffix = [finalPromptRule, "Verdict: No findings", "Policy: charter-v1",
+    `{"identity":${JSON.stringify(identity)},"readOnly":true,"reference":${JSON.stringify(reference)},"verdict":"Verdict: No findings","findings":[],"observations":[],"coverageLimitations":[],"ledgerChecks":[]}`].join("\n");
+  assert.equal(prompt.slice(-suffix.length), suffix);
+  const instructions = prompt.slice(0, -suffix.length);
+  assert.match(instructions, /Batch multiple whole-file Read calls in parallel per turn/);
+  assert.match(instructions, /file_path as the sole argument.*Read exactly all assigned \/review paths/);
+  assert.deepEqual(instructions.split("\n").filter((line) => line.startsWith("/review/")), ["/review/plan/a", "/review/plan/b"]);
+  assert.match(instructions, /one ledgerChecks entry for each open ledger item/);
+  assert.match(instructions, /reReviewReference must equal the supplied native reference/);
+  assert.match(instructions, /copy the verdict line/);
+  assert.match(instructions, /Populate observations and coverageLimitations/);
+  assert.ok(instructions.includes(`Packet: 1 of 1\nNative reference: ${reference}\n${JSON.stringify(context)}\n`));
+});
 
 test("strict JSON rejects decoded duplicate keys and trailing data", () => {
   assert.throws(() => parseStrictJson(Buffer.from('{"mode":1,"m\\u006fde":2}')), /JSON/);
