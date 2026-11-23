@@ -101,6 +101,14 @@ then run both checks. New capability deltas should include a meaningful
 `## Purpose` section to supply the purpose for the new current spec.
 Do not patch installed OpenSpec adapters.
 
+Before protected finish, the delivery runtime checks semantic delta promotion
+and identity at the exact accepted candidate SHA. A missing or mismatched
+current spec produces `CURRENT_SPEC_PROMOTION_UNVERIFIED` with the capability,
+path and reason. Resolve it in the implementation candidate, then repeat
+strict and metadata checks, exact candidate gates and independent review.
+Preserve existing unrelated requirements. Record-only closure carries the
+archive and evidence after verified integration.
+
 ## Vault integration
 
 Prefer one set of files: open the repository (or its `openspec/` directory) as an

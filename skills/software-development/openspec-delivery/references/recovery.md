@@ -12,6 +12,9 @@ without rewriting the original record.
 | --- | --- |
 | Dirty/unowned checkout, conflicting run or ambiguous operator | Stop and retain paths/refs; operator chooses ownership and safe next action. No reset, discard, silent unassignment or competing executor. |
 | Proposed plan changed after approval | Reapprove named changed scope/gates and digest before continuing. Preserve previous approval and evidence. |
+| `DIRECTION_DRIFT_CHOICE` | Report the exact conflicting clause and preserve both authority and prior evidence. A declared in-scope assumption adaptation with evidence can proceed under the held Goal Contract. |
+| P1–P8 incomplete or handover unverified | Reconcile the exact target, companion inventory, workspace and sealed evidence through the runtime. A fresh paid probe or retry needs separate authority. |
+| Declared UI or external gate pending | Retain local exact-candidate results. Wait for the specific loopback evidence, separate preview/external authority or preview review. A failed run requires verified cleanup before any separately approved retry. |
 | Candidate changed after review | Run gates and independent review on the new exact candidate; do not relabel old review. Use the canonical correction loop and retained cumulative count: eight automatic cycles or a narrower inherited group/authority limit (including legacy two-cycle limits). |
 | Push/comment/PR write timed out | Read the exact target and intended content back. Resume only from known state; do not replay a possibly successful write blindly. |
 | Open PR waiting on review or checks | Not a failure and not a second pull request. Resume under finish from the actual head and review state. |
@@ -19,6 +22,7 @@ without rewriting the original record.
 | Integrated gate failed | Keep completion blocked, preserve failure output and obtain explicit repair/revert authority. Checked tasks do not mean accepted integration. |
 | Receipt/archive PR already exists | Read its exact head/content/merge state and continue that closure path. Do not create competing receipts or rewrite previous failed evidence. |
 | Current capability spec differs from an older delta | Reconcile against current target explicitly; never reapply an old MODIFIED block over newer accepted behavior. |
+| `CURRENT_SPEC_PROMOTION_UNVERIFIED` | Report the exact capability, path and deficiency. Correct the implementation candidate, validate metadata and delta parity, and repeat exact-SHA gates and review before requesting protected finish. |
 | Target advanced after verification | Re-verify a named revision unless the guard accepts exact record-only movement/new evidence; changed product/config/current-spec content is never excused by a declared prefix. |
 | Closure merged, cleanup interrupted | Verify closure/acceptance and request only bounded cleanup. Do not create another PR attesting the closure or report cleanup before readback. |
 

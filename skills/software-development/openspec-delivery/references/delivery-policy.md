@@ -90,9 +90,8 @@ Selection contains that exact parent `revision`, retained contract-readback
 These are derived observations of contributor policy, not a new configuration
 file or permission flags. Never infer them from the working-tree contract.
 
-- Without explicit parent selection: single-group continuation and existing plan
-  approval behavior; no retroactive approach review. Policy selected after freeze
-  cannot widen that change or invalidate its existing approval.
+- Without explicit parent selection, use Task-Guided, single-group continuation
+  and existing plan approval behavior. Later policy applies only to later plans.
 - With pre-execution review and no explicit convergence selection, retain the strict literal no-findings, empty-findings and empty-limitations gate. A working-tree edit is inert for its own change.
 - With explicit `approachConvergence: true` in the verified integrated parent and pre-execution review selected, use the charter-v1 bounded procedure in orchestration’s `references/portable-core.md`; supply its matching acceptance with `policy: "charter-v1"`. Selection never grants a launch or writes.
 - With pre-execution review: invoke the orchestration core's approach protocol,
@@ -101,8 +100,9 @@ file or permission flags. Never infer them from the working-tree contract.
   and `orchestrationAvailable: true`. A draft/partial/recommended review cannot
   satisfy the gate or approve execution. Freeze still needs separate commit
   authority and subsequent operator approval bound to its actual SHA/digest.
-- With continuous-goal: an execution invocation advances consecutive eligible
-  groups of that same approved change within restrictions, budgets and stops.
+- With continuous-goal in Task-Guided, an execution invocation advances
+  consecutive eligible groups of that same approved change within restrictions,
+  budgets and stops.
   Delivery owns that decision; the core is not a scheduler or a second task list.
 - Verified legacy evidence that a frozen plan predates adoption of the integrated-
   parent integrity guard defers that guard until the next
@@ -146,8 +146,8 @@ review acceptance. Expired, missing or mismatched recovery evidence stops.
 
 ## Continuation and stop boundaries
 
-After each accepted group, resolve actual native tasks in document/dependency
-order. Resume interrupted work and incomplete candidate verification first. Keep
+In Task-Guided, resolve actual native tasks in document/dependency order after
+each accepted group. Resume interrupted work and incomplete candidate verification first. Keep
 one Git/task writer and the original invocation's restrictions; a bare `next`
 does not lift them. Default single-group delivery stops after one task group.
 Continuous-goal proceeds only if selected at the integrated plan parent, with no
@@ -201,8 +201,9 @@ Use orchestration's canonical `correctionDecision` and review-record continuity
 for routine in-scope failures/findings. Dispatch source/test/documentation repairs
 to the qualified implementer; planning amendments belong to the authorized
 orchestrator. Do not prompt merely to approve an already-granted repair, waive a
-failed gate or advance a later group. Changed planning bytes pause execution until
-fresh identity, whole-package review and explicit exact-plan approval. Missing
+failed gate or advance a later group. Changed Task-Guided planning identity or
+changed Goal Contract inputs pause execution for fresh identity, any selected
+planning review and renewed approval in the applicable mode. Missing
 authority, native waits, material conflicts or exhausted budgets remain stops.
 
 `workerContinuationDecision` is separate from group advancement. Every iteration-cap
@@ -248,3 +249,59 @@ A new artifact directory links its predecessor but does not reset this count.
 Budget exhaustion is a stop, not an iteration cap. Existing integrated handoff
 gates still constrain already-frozen changes; this source revision grants no new
 handoff authority to the change implementing it.
+
+## Mode selection and local result
+
+The optional integrated root contributor marker is
+`<!-- openspec-delivery-mode: goal-first -->` on its own line. The guard reads
+it from the frozen plan's verified integrated parent, using root `AGENTS.md`
+or root `CLAUDE.md` when `AGENTS.md` is absent. A change's own marker edit
+is inert for that change. A missing, ambiguous or inactive marker, a legacy
+plan, a prescribed method, ordered dependencies, staged authority, or an
+unproved reversible local boundary selects Task-Guided. Supply the observed
+`reversibleLocal`, `prescribedMethod`, `orderedDependencies` and `stagedAuthority`
+booleans as the `deliveryBoundary`. Keep the frozen interpretation on resume.
+
+Goal-First uses one fenced `openspec-goal-contract` JSON block in the native
+proposal and at least one native spec delta. Its v1 fields are
+
+| Field | Meaning |
+| --- | --- |
+| `outcome` | The local result being approved. |
+| `scope` | Allowed repository-relative paths or directory prefixes. |
+| `invariants`, `nonGoals` | Explicit hard requirements and excluded outcomes. |
+| `adaptableAssumptions` | Named legacy assumptions that can be revised within the same contract. Use an empty list if none apply. |
+| `acceptance`, `gates` | Verifiable criteria and the exact ordered command argument arrays. |
+| `localAuthority` | An explicit `commits` boolean and a declared `stop`. |
+| `budgets` | Maximum active `minutes` and cumulative `corrections`. |
+
+Use one native local outcome checkbox and place external closeout predicates
+outside that checkbox. The Goal Contract digest binds the contract, integrated
+policy revision, OpenSpec config, change metadata and spec inputs. Native
+checkbox progress and implementation decisions preserve the digest. The guard
+checks frozen task wording, changed paths and approved acceptance commands.
+Approach review, where selected, still covers all raw draft planning inputs.
+
+Normalize independently retained authority into two v1 records. The first has
+`kind: "exact-goal-approval"` or `"exact-plan-approval"`, `approved: true`,
+`verified: true` and a stable `reference`. The second has
+`kind: "local-execution-grant"`, `verified: true`, its own `reference`,
+a matching `approvalReference`, `localOnly: true`, finite `budgets`,
+`commits` and `stop`. Both bind `change`, `workspace`, `plan`,
+`planDigest`, `mode` and `policyRevision`. Task-Guided also carries
+`eligibleGroups` and the inherited continuation `budget`. The grant and
+selected group can narrow time, corrections and commits independently.
+One operator reply can express both decisions if each record identifies
+its own authority.
+
+At each phase and after each correction, retain alignment of Goal-First
+`scope`, `invariants`, `nonGoals`, `acceptance` and `localAuthority`,
+or Task-Guided `frozen-plan`, `order` and `localAuthority`. Each
+is `aligned` or `conflict`. Record in-scope assumption adaptations as
+`{assumption, evidence}`. Conflict returns `DIRECTION_DRIFT_CHOICE` with
+the affected clause. Missing ownership, unrecoverable host failures, declared
+stops, exhausted time or correction budgets and separate authority needs
+also stop or queue the run. An actionable in-scope failure consumes the
+held correction budget. Retain its rejected evidence and successor; repin
+gates and independent result review every time the candidate SHA changes.
+See [delivery-runtime.md](delivery-runtime.md) for the runnable interfaces.

@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFile, stat } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { sha256 } from "../skills/software-development/openspec-delivery/scripts/evidence-cli.mjs";
 
 const read = (file) => readFile(new URL(`../${file}`, import.meta.url), "utf8");
 test("proposal issue wording requires adoption and bounded operator authority without expanding planning", async () => {
@@ -114,4 +119,88 @@ test("policy/textual plan self-comparison never manufactures approval, commit au
   assert.match(guard, /setting `--plan` equal to `--head` computes identity only/);
   assert.match(guard, /neither approval nor commit authority and resets neither operator restrictions\s+nor the inherited correction\/re-review budget/);
   for (const pattern of [/evidence-only additions from actual checkbox-only progress and\s+covered planning-text changes/, /evidence additions do not approve a plan/, /drift refuses continuation pending separately approved recovery of the exact new\s+plan identity/, /Missing actual approval or unresolved operator restrictions still stop execution/]) assert.match(continuation, pattern);
+});
+
+test("Aikido 1151615165 rejects ignored inputs and binds gates to a fresh disposable exact-SHA checkout", async (t) => {
+  const root = await realpath(await mkdtemp(path.join(os.tmpdir(), "ignored-candidate-")));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const repo = path.join(root, "implementation");
+  const checkout = path.join(root, "disposable");
+  const output = path.join(root, "good-gates.json");
+  await mkdir(repo);
+  const change = "ignored-candidate";
+  const planPath = `openspec/changes/${change}`;
+  await mkdir(path.join(repo, planPath), { recursive: true });
+  const env = { PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: process.platform === "win32" ? "NUL" : os.devNull };
+  function run(executable, args) {
+    const result = spawnSync(executable, args, { stdio: ["ignore", "pipe", "pipe"], env, encoding: "utf8" });
+    assert.equal(result.error, undefined);
+    return result;
+  }
+  function git(cwd, ...args) {
+    const result = run("git", ["--no-optional-locks", "-C", cwd, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", ...args]);
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout.trimEnd();
+  }
+  const guard = fileURLToPath(new URL("../skills/software-development/openspec-delivery/scripts/change-guard.mjs", import.meta.url));
+  const evidence = fileURLToPath(new URL("../skills/software-development/openspec-delivery/scripts/evidence-cli.mjs", import.meta.url));
+  git(repo, "init", "-b", "main");
+  await writeFile(path.join(repo, ".gitignore"), "/dist/\n/ambient\n");
+  await writeFile(path.join(repo, "openspec/config.yaml"), "schema: spec-driven\n");
+  await writeFile(path.join(repo, planPath, ".openspec.yaml"), "schema: spec-driven\n");
+  await writeFile(path.join(repo, planPath, "proposal.md"), "# Fixture\n");
+  await writeFile(path.join(repo, planPath, "tasks.md"), "# Work\n- [ ] 1.1 Prove isolation\n");
+  git(repo, "add", ".");
+  git(repo, "commit", "-m", "Fixture plan");
+  const plan = git(repo, "rev-parse", "HEAD");
+  await writeFile(path.join(repo, "app.txt"), "candidate");
+  git(repo, "add", ".");
+  git(repo, "commit", "-m", "Fixture candidate");
+  const head = git(repo, "rev-parse", "HEAD");
+  const args = ["--repo", repo, "--change", change, "--head", head, "--base", plan, "--plan", plan];
+  const inspect = (...options) => {
+    const result = run(process.execPath, [guard, "candidate", ...args, ...options]);
+    return { status: result.status, ...JSON.parse(result.stdout) };
+  };
+  assert.equal(inspect().ok, true);
+  await writeFile(path.join(repo, "ambient"), "ignored but unapproved");
+  assert.equal(git(repo, "status", "--porcelain"), "");
+  assert.match(inspect().error, /unclassified ignored input: ambient/);
+  await rm(path.join(repo, "ambient"));
+  git(repo, "update-index", "--assume-unchanged", "app.txt");
+  await writeFile(path.join(repo, "app.txt"), "Unseen modification");
+  assert.match(inspect().error, /unsupported Git index entries or flags/);
+  git(repo, "update-index", "--no-assume-unchanged", "app.txt");
+  await writeFile(path.join(repo, "app.txt"), "candidate");
+  const planDigest = inspect().planDigest;
+  git(repo, "worktree", "add", "--detach", checkout, plan);
+  let index = 0;
+  const capture = async (options) => {
+    const file = path.join(root, `request-${++index}.json`);
+    await writeFile(file, JSON.stringify({ output, checkout, implementation: repo, head, base: plan, plan, change, planDigest,
+      generated: ["dist"], gates: [{ argv: [process.execPath, "-e", "const fs=require('node:fs');if(fs.readFileSync('app.txt','utf8')!=='candidate')process.exit(5);fs.writeSync(1,'exact')"], timeoutMs: 5_000 }],
+      bootstrap: [{ argv: [process.execPath, "-e", "const fs=require('node:fs');fs.mkdirSync('dist');fs.writeFileSync('dist/generated.txt','built here')"], timeoutMs: 5_000 }], ...options }));
+    const result = run(process.execPath, [evidence, "gate-capture", "--input", file]);
+    return { status: result.status, ...JSON.parse(result.stdout) };
+  };
+  assert.match((await capture()).error, /HEAD changed/);
+  git(checkout, "switch", "--detach", head);
+  await mkdir(path.join(checkout, "dist"));
+  await writeFile(path.join(checkout, "dist/contaminated"), "ambient ignored material");
+  assert.match((await capture()).error, /unclassified ignored input: dist/);
+  await rm(path.join(checkout, "dist"), { recursive: true });
+  assert.match((await capture({ checkout: repo })).error, /isolated/);
+  const verified = await capture();
+  assert.equal(verified.ok, true, JSON.stringify(verified));
+  const record = JSON.parse(await readFile(output, "utf8"));
+  assert.deepEqual(record.initial.ignoredGenerated, []);
+  assert.deepEqual(record.final.ignoredGenerated, ["dist"]);
+  assert.equal(record.commands.at(-1).cwd, checkout);
+  assert.equal(record.commands.at(-1).revision, head);
+  assert.equal(inspect("--gate-run", output, "--gate-run-sha256", verified.fileSha256).ok, true);
+  record.commands.at(-1).revision = plan;
+  const moved = path.join(root, "altered-gates");
+  const changed = JSON.stringify(record);
+  await writeFile(moved, changed);
+  assert.match(inspect("--gate-run", moved, "--gate-run-sha256", sha256(changed)).error, /seal mismatch/);
 });

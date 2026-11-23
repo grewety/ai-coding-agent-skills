@@ -18,6 +18,10 @@ output, factual readback provenance, and limits on historical claims.
    Only the orchestrator stages/commits under separately explicit authority.
    Preserve a clean committed candidate, actual passing gate output and independent
    review bound to it. No broad staging or unreviewed incidental files.
+   Use [finish readiness](delivery-runtime.md#handover-and-finish-readiness)
+   to verify native outcome completion, requirement promotion and current-spec
+   metadata at that SHA. A deficiency belongs in the implementation candidate
+   and requires fresh gates and review before first publication.
 3. Inspect the actual remote target and current capability specifications. Include
    updated implemented specs and stable visuals in the implementation PR; proposed
    visuals remain change-owned. Reconcile semantic overlaps even if Git merges cleanly.
@@ -26,7 +30,10 @@ output, factual readback provenance, and limits on historical claims.
    checks, or a configured merge queue whose CI runs on `merge_group`. Verify direct
    push/bypass restrictions match project policy. If missing, stop for the owner;
    do not silently administer repository settings. Record configuration readbacks.
-5. Publish only the explicitly authorized branch or pull request and verify its
+5. Before an authorized push, check verified external trigger inventory and
+   require any distinct single-run reservations under
+   [external verification](external-verification.md). Publish only the
+   explicitly authorized branch or pull request and verify its
    exact remote head and body after the write. Unknown API outcome requires
    readback, not a blind retry. The pull request is the review record of the
    candidate. Use a plain issue reference when a documentation issue exists; do
@@ -37,6 +44,8 @@ output, factual readback provenance, and limits on historical claims.
 Integrate only the approved PR by the configured protected route with explicit
 permission, and only after an independent reviewer that did not implement the
 candidate has reviewed that exact SHA and every finding has a disposition.
+For a declared deploy preview, the protected route pauses before merge until
+the exact-candidate artifact-only preview and separate operator review pass.
 Read the exact PR merge state and actual resulting commit/target from
 the authoritative remote. Confirm candidate reachability; this helper does not
 support squash/rebase mapping. Keep the candidate's evidence immutable.

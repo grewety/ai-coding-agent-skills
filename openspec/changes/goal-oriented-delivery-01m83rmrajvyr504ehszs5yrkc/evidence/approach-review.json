@@ -1,0 +1,199 @@
+{
+  "binding": {
+    "client": "claude-code",
+    "independent": true,
+    "model": "claude-sonnet-4-6",
+    "permissions": [
+      "read"
+    ],
+    "qualified": true,
+    "readOnly": true,
+    "route": "terminal-adapter"
+  },
+  "budget": 3,
+  "change": "goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc",
+  "charter": {
+    "boundaries": [
+      "Review only the declared exported files through read-only Claude containment. No implementation, Git, profile or task writes.",
+      "Runtime tests, packaged behavior and implementation mechanics belong to the named execution groups. Style is outside the planning charter.",
+      "Only the approved Anthropic relay receives the assigned packet. No other network, unrelated files, credentials or live services are in the packet."
+    ],
+    "clauses": [
+      "delivery-modes-and-immutable-approval-boundaries",
+      "hard-invariants-adaptable-assumptions-and-goal-drift",
+      "deterministic-status-handover-and-lossless-evidence",
+      "external-paid-tunnel-and-Aikido-guardrails",
+      "fail-closed-integrated-parent-opt-in-and-legacy-authority",
+      "outcome-groups-delta-capabilities-and-package-version-inventory"
+    ],
+    "gates": [
+      "openspec validate goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc --strict",
+      "npm run validate:openspec",
+      "npm test",
+      "npm run build",
+      "exact-SHA independent candidate review"
+    ],
+    "tasks": [
+      "1.1",
+      "2.1"
+    ]
+  },
+  "cumulativeCycles": 0,
+  "entries": [
+    {
+      "inputs": {
+        "openspec/changes/goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc/.openspec.yaml": "01c3365f21ad2129d7e1db5577bc59c382883cdcbfece60900a8ac86293e3398",
+        "openspec/changes/goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc/design.md": "c0c26e00fba55c2f1985fdb0a37b5c3803c7937297cc4910b6836e786d3d7017",
+        "openspec/changes/goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc/proposal.md": "c3c1806826bfa4d9f31c365fb8bca1add053f57bf516381eadbc9481bc77b6d4",
+        "openspec/changes/goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc/specs/lossless-closeout-evidence/spec.md": "927753ce9b29d61ad1da618e10b132d110a91694f34393e99dfcf70a3d1d203d",
+        "openspec/changes/goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc/specs/openspec-integration/spec.md": "9b876090c2c84c64d472a8efc447c640c81080a85c45cd5588bc7e1baab2705f",
+        "openspec/changes/goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc/tasks.md": "2d0362e9f1c430f5b91c774d5a570859316de95e0c103607b8574dfe21298b6d",
+        "openspec/config.yaml": "e00255bbcd0689f475861788f7e3cacbfab12c16ae6f49a0b730abbba6d2437a"
+      },
+      "authorSession": "codex-planning-author-goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc",
+      "reviewerSession": "02bfa76b-6dfc-4346-abb6-2a5167c8b949",
+      "reference": "/home/raphael/verification-records/i2-a1/output/report.md",
+      "coverageLimitations": [
+        {
+          "class": "declared-deferral",
+          "gate": "openspec validate goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc --strict"
+        },
+        {
+          "class": "declared-deferral",
+          "gate": "npm run validate:openspec"
+        },
+        {
+          "class": "declared-deferral",
+          "gate": "npm test"
+        },
+        {
+          "class": "declared-deferral",
+          "gate": "npm run build"
+        },
+        {
+          "class": "declared-deferral",
+          "gate": "exact-SHA independent candidate review"
+        },
+        {
+          "class": "containment-boundary",
+          "boundary": "Review only the declared exported files through read-only Claude containment. No implementation, Git, profile or task writes."
+        },
+        {
+          "class": "containment-boundary",
+          "boundary": "Runtime tests, packaged behavior and implementation mechanics belong to the named execution groups. Style is outside the planning charter."
+        },
+        {
+          "class": "containment-boundary",
+          "boundary": "Only the approved Anthropic relay receives the assigned packet. No other network, unrelated files, credentials or live services are in the packet."
+        }
+      ],
+      "receipt": {
+        "identity": {
+          "change": "goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc",
+          "goal": "Make result-verified Goal-First the default for eligible reversible local work after explicit integrated-parent opt-in. Preserve Task-Guided order and authority, hard operator invariants, exact candidate review, and policy for this introducing change. Cover disposable-scratch discovery, deterministic status and file handover, runnable evidence and defensive change guards for the open Aikido findings, explicit external/paid/tunnel authority, future-only opt-in, and synchronized operator docs and versions.",
+          "charter": {
+            "boundaries": [
+              "Review only the declared exported files through read-only Claude containment. No implementation, Git, profile or task writes.",
+              "Runtime tests, packaged behavior and implementation mechanics belong to the named execution groups. Style is outside the planning charter.",
+              "Only the approved Anthropic relay receives the assigned packet. No other network, unrelated files, credentials or live services are in the packet."
+            ],
+            "clauses": [
+              "delivery-modes-and-immutable-approval-boundaries",
+              "hard-invariants-adaptable-assumptions-and-goal-drift",
+              "deterministic-status-handover-and-lossless-evidence",
+              "external-paid-tunnel-and-Aikido-guardrails",
+              "fail-closed-integrated-parent-opt-in-and-legacy-authority",
+              "outcome-groups-delta-capabilities-and-package-version-inventory"
+            ],
+            "gates": [
+              "openspec validate goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc --strict",
+              "npm run validate:openspec",
+              "npm test",
+              "npm run build",
+              "exact-SHA independent candidate review"
+            ],
+            "tasks": [
+              "1.1",
+              "2.1"
+            ]
+          },
+          "binding": {
+            "client": "claude-code",
+            "independent": true,
+            "model": "claude-sonnet-4-6",
+            "permissions": [
+              "read"
+            ],
+            "qualified": true,
+            "readOnly": true,
+            "route": "terminal-adapter"
+          },
+          "passRule": "charter-v1",
+          "budget": 3,
+          "cumulativeCycles": 0,
+          "inputs": {
+            "openspec/changes/goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc/.openspec.yaml": "01c3365f21ad2129d7e1db5577bc59c382883cdcbfece60900a8ac86293e3398",
+            "openspec/changes/goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc/design.md": "c0c26e00fba55c2f1985fdb0a37b5c3803c7937297cc4910b6836e786d3d7017",
+            "openspec/changes/goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc/proposal.md": "c3c1806826bfa4d9f31c365fb8bca1add053f57bf516381eadbc9481bc77b6d4",
+            "openspec/changes/goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc/specs/lossless-closeout-evidence/spec.md": "927753ce9b29d61ad1da618e10b132d110a91694f34393e99dfcf70a3d1d203d",
+            "openspec/changes/goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc/specs/openspec-integration/spec.md": "9b876090c2c84c64d472a8efc447c640c81080a85c45cd5588bc7e1baab2705f",
+            "openspec/changes/goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc/tasks.md": "2d0362e9f1c430f5b91c774d5a570859316de95e0c103607b8574dfe21298b6d",
+            "openspec/config.yaml": "e00255bbcd0689f475861788f7e3cacbfab12c16ae6f49a0b730abbba6d2437a"
+          },
+          "packetHashes": {
+            "packet-1": "2d995b70fddd3ef50a0055375746bc0b6851b9277986a6b19df4075e8ebb7b4c"
+          },
+          "authorSession": "codex-planning-author-goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc",
+          "reviewerSession": "02bfa76b-6dfc-4346-abb6-2a5167c8b949",
+          "model": "claude-sonnet-4-6",
+          "ledger": [],
+          "correction": null
+        },
+        "readOnly": true,
+        "reference": "/home/raphael/verification-records/i2-a1/output/report.md",
+        "verdict": "Verdict: No findings",
+        "findings": [],
+        "observations": [],
+        "coverageLimitations": [
+          {
+            "class": "declared-deferral",
+            "gate": "openspec validate goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc --strict"
+          },
+          {
+            "class": "declared-deferral",
+            "gate": "npm run validate:openspec"
+          },
+          {
+            "class": "declared-deferral",
+            "gate": "npm test"
+          },
+          {
+            "class": "declared-deferral",
+            "gate": "npm run build"
+          },
+          {
+            "class": "declared-deferral",
+            "gate": "exact-SHA independent candidate review"
+          },
+          {
+            "class": "containment-boundary",
+            "boundary": "Review only the declared exported files through read-only Claude containment. No implementation, Git, profile or task writes."
+          },
+          {
+            "class": "containment-boundary",
+            "boundary": "Runtime tests, packaged behavior and implementation mechanics belong to the named execution groups. Style is outside the planning charter."
+          },
+          {
+            "class": "containment-boundary",
+            "boundary": "Only the approved Anthropic relay receives the assigned packet. No other network, unrelated files, credentials or live services are in the packet."
+          }
+        ],
+        "ledgerChecks": []
+      }
+    }
+  ],
+  "goal": "Make result-verified Goal-First the default for eligible reversible local work after explicit integrated-parent opt-in. Preserve Task-Guided order and authority, hard operator invariants, exact candidate review, and policy for this introducing change. Cover disposable-scratch discovery, deterministic status and file handover, runnable evidence and defensive change guards for the open Aikido findings, explicit external/paid/tunnel authority, future-only opt-in, and synchronized operator docs and versions.",
+  "ledger": [],
+  "passRule": "charter-v1",
+  "schemaVersion": 1
+}

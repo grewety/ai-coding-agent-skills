@@ -13,7 +13,7 @@ const marketplacePath = path.join(root, ".claude-plugin/marketplace.json");
 
 const expectedBundles = {
   "openspec-development": {
-    version: "1.3.1",
+    version: "1.4.0",
     skills: ["openspec-delivery", "openspec-next", "git-commit-message", "capability-wireframes"],
   },
   "autonomous-orchestration": {
@@ -33,7 +33,11 @@ test("Claude marketplace selects exact canonical packages for two isolated bundl
   const packages = await discoverSkillPackages({ root });
   const delivery = packages.find(({ name }) => name === "openspec-delivery");
   assert.ok(delivery);
-  assert.match(await readFile(path.join(delivery.directory, "SKILL.md"), "utf8"), /^version: 1\.3\.1$/m);
+  assert.match(await readFile(path.join(delivery.directory, "SKILL.md"), "utf8"), /^version: 1\.4\.0$/m);
+  const next = packages.find(({ name }) => name === "openspec-next");
+  assert.ok(next);
+  assert.match(await readFile(path.join(next.directory, "SKILL.md"), "utf8"), /^version: 0\.5\.0$/m);
+  assert.deepEqual([...next.files].sort(), ["SKILL.md", "references/routing.md", "scripts/next.mjs"]);
   const selected = new Map();
   for (const plugin of marketplace.plugins) {
     assert.equal(plugin.source, "./");

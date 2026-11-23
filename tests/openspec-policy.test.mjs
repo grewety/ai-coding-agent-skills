@@ -143,3 +143,53 @@ test('convergence is an integrated-parent opt-in with strict fallback', async ()
   assert.throws(() => api.resolveDeliveryPolicy({ ...selected, reviewAcceptance: base.reviewAcceptance }), /review/);
   assert.throws(() => api.resolveDeliveryPolicy({ ...base, selection: { ...base.selection, approachConvergence: true, preExecutionReview: false } }), /review/);
 });
+
+test("Goal-First requires the integrated opt-in and reuses Task-Guided for ordered, staged, or legacy plans", async () => {
+  const { resolveDeliveryPolicy } = await policy();
+  const { selectTaskGroup } = await import("../skills/software-development/openspec-delivery/scripts/delivery-control.mjs");
+  const request = {
+    phase: "execute", context: { ...context(), goalFirstOptIn: true }, selection: { ...selection(), goalFirst: true },
+    contractPaths: [], deliveryBoundary: { reversibleLocal: true, prescribedMethod: false, orderedDependencies: false, stagedAuthority: false },
+  };
+  assert.equal(resolveDeliveryPolicy(request).mode, "goal-first");
+  for (const key of Object.keys(request.deliveryBoundary)) {
+    assert.equal(resolveDeliveryPolicy({ ...request, deliveryBoundary: { ...request.deliveryBoundary, [key]: !request.deliveryBoundary[key] } }).mode,
+      "task-guided", key);
+  }
+  assert.equal(resolveDeliveryPolicy({ ...request, context: { ...request.context, goalFirstOptIn: false } }).mode, "task-guided");
+  assert.equal(resolveDeliveryPolicy({ ...request, legacy: { plan, planDigest, reference: "retained:legacy",
+    verified: true, predatesIntegrityGuards: true } }).mode, "task-guided");
+
+  const groups = [
+    { id: "1", completed: false, requires: [], authority: "local" },
+    { id: "2", completed: false, requires: ["1"], authority: "local" },
+    { id: "3", completed: false, requires: ["2"], authority: "external" },
+  ];
+  const next = (requested = null, eligibleGroups = ["1", "2", "3"]) => selectTaskGroup({ groups, eligibleGroups, requested });
+  assert.equal(next().group.id, "1");
+  assert.deepEqual(next("2"), { reason: "GROUP_AUTHORITY_PENDING" });
+  groups[0].completed = true;
+  assert.equal(next(null, ["1"]).reason, "GROUP_AUTHORITY_PENDING");
+  assert.equal(next().group.id, "2");
+  groups[1].completed = true;
+  assert.equal(next().reason, "EXTERNAL_AUTHORITY_PENDING");
+  groups[0].completed = false;
+  assert.equal(next().reason, "NATIVE_GROUPS_UNVERIFIED");
+});
+
+test("contributor approval and policy share the structural inventory limits", async () => {
+  const { resolveDeliveryPolicy, bindContractGrant } = await policy();
+  const { planningLimits } = await import("../skills/software-development/openspec-delivery/scripts/planning-inventory.mjs");
+  for (const [expanded, reason] of [
+    [{ ...inputs, ...Object.fromEntries(Array.from({ length: planningLimits.files }, (_, i) => [`openspec/changes/fixture-change/specs/bulk/item-${i}`, "a".repeat(64)])) }, /file limit/],
+    [{ ...inputs, [`openspec/changes/fixture-change/specs/${"a/".repeat(planningLimits.depth)}spec.md`]: "a".repeat(64) }, /depth/],
+  ]) {
+    const grant = { stage: "pre-freeze", change: "fixture-change", inputs: expanded, paths: [], reference: "fixture" };
+    assert.throws(() => bindContractGrant({ change: "fixture-change", inputs: expanded, paths: [], grant, plan, planDigest }), reason);
+    assert.throws(() => resolveDeliveryPolicy({ phase: "execute", context: { ...context(), inputs: expanded },
+      selection: selection(), contractPaths: [] }), reason);
+  }
+  assert.throws(() => resolveDeliveryPolicy({ phase: "execute", context: { ...context(),
+    inventory: { files: Object.keys(inputs).length, entries: 10, outputBytes: 2_000, bytes: planningLimits.bytes + 1 } },
+    selection: selection(), contractPaths: [] }), /inventory totals/);
+});

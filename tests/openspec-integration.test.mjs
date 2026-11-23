@@ -26,7 +26,7 @@ test("OpenSpec package documents explicit authority, writer separation and read-
   for (const pattern of [/candidate --repo/, /review --repo/, /receipt --repo/, /schemaVersion/, /planDigest/, /exitCode/, /does not authenticate/, /fences/, /append-only/]) assert.match(reference, pattern);
   for (const pattern of [/valid UTF-8/, /refs\/replace/, /grafts/, /fsmonitor/, /Every commit in `verified\.\.target`/, /--receipt-path/, /duplicate/i, /raw blob bytes/]) assert.match(reference, pattern);
   assert.doesNotMatch(skill, /adoption history|reviewer found|previously reported/i);
-  assert.match(skill, /^version: 1\.3\.1$/m);
+  assert.match(skill, /^version: 1\.4\.0$/m);
   assert.doesNotMatch(skill, /\/home\/|~\/.hermes/);
 });
 
@@ -75,7 +75,8 @@ test("planning inventory exposes exact raw hashes separately from the normalized
   const current = inventory(f.head);
   assert.deepEqual(Object.keys(plan.inputs).sort(), ["openspec/config.yaml", `${changeRoot}/.openspec.yaml`, `${changeRoot}/proposal.md`, `${changeRoot}/tasks.md`, `${changeRoot}/specs/example/spec.md`].sort());
   for (const [file, hash] of Object.entries(plan.inputs)) {
-    assert.equal(hash, createHash("sha256").update(execFileSync("git", ["-C", f.repo, "show", `${f.base}:${file}`], { env })).digest("hex"));
+    const bytes = execFileSync("git", ["-C", f.repo, "show", `${f.base}:${file}`], { env, stdio: ["ignore", "pipe", "pipe"] });
+    assert.equal(hash, createHash("sha256").update(bytes).digest("hex"));
   }
   assert.equal(plan.planDigest, current.planDigest);
   assert.notEqual(plan.inputs[`${changeRoot}/tasks.md`], current.inputs[`${changeRoot}/tasks.md`]);

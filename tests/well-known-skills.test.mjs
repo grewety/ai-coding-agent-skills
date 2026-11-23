@@ -42,7 +42,14 @@ test("well-known build publishes every skill and all advertised files", async ()
       const source = await readFile(path.join(endpoint, skill.name, "SKILL.md"), "utf8");
       assert.equal(frontmatterField(source, "name"), skill.name);
       assert.equal(frontmatterField(source, "description"), skill.description);
+      const category = skill.name === "autonomous-implementation-review" ? "autonomous-ai-agents" : "software-development";
+      for (const file of skill.files) {
+        assert.deepEqual(await readFile(path.join(endpoint, skill.name, file)), await readFile(path.join(root, "skills", category, skill.name, file)));
+      }
     }
+
+    const next = index.skills.find(({ name }) => name === "openspec-next");
+    assert.deepEqual([...next.files].sort(), ["SKILL.md", "references/routing.md", "scripts/next.mjs"]);
 
     const autonomous = index.skills.find((skill) => skill.name === "autonomous-implementation-review");
     const contract = await readFile(path.join(root, "skills/autonomous-ai-agents/AGENTS.md"), "utf8");
@@ -64,7 +71,35 @@ test("well-known build publishes every skill and all advertised files", async ()
     assert.deepEqual([...declaredFiles, ...reviewerFiles].sort(), [...autonomous.files].sort(), "generated package must include exactly the declared and new reviewer support files");
     assert.deepEqual(autonomous?.files, [...reviewerFiles, "references/claude-code-host.md", "references/claude-code-roles.md", "references/environment-passthrough.md", "references/herdr.md", "references/lifecycle-watch.md", "references/openspec.md", "references/portable-core.md", "references/profile-preparation.md", "references/terminal-adapters.md", "references/worker-handoff.md", "scripts/herdr_lifecycle_watch.mjs", "scripts/herdr_panes.py", "scripts/herdr-pane-state.mjs", "scripts/orchestration-core.mjs", "scripts/terminal-adapters.mjs", "scripts/worker-handoff.mjs", "SKILL.md", "templates/phase-implementer.md", "templates/phase-reviewer.md"].sort((left, right) => left.localeCompare(right)));
     const integration = index.skills.find((skill) => skill.name === "openspec-delivery");
-    assert.deepEqual(integration?.files, ["references/continuation.md", "references/delivery-policy.md", "references/evidence-retention.md", "references/git-environment.md", "references/guard.md", "references/integration.md", "references/naming.md", "references/recovery.md", "references/task-authoring.md", "references/ticket.md", "references/workspace.md", "scripts/change-guard.mjs", "scripts/change-name.mjs", "scripts/change-workspace.mjs", "scripts/delivery-policy.mjs", "scripts/evidence-retention.mjs", "scripts/git-environment.mjs", "SKILL.md"]);
+    assert.deepEqual(integration?.files, [
+      "references/continuation.md",
+      "references/delivery-policy.md",
+      "references/delivery-runtime.md",
+      "references/evidence-retention.md",
+      "references/external-verification.md",
+      "references/git-environment.md",
+      "references/guard.md",
+      "references/integration.md",
+      "references/naming.md",
+      "references/recovery.md",
+      "references/task-authoring.md",
+      "references/ticket.md",
+      "references/workspace.md",
+      "scripts/change-guard.mjs",
+      "scripts/change-name.mjs",
+      "scripts/change-workspace.mjs",
+      "scripts/delivery-cli.mjs",
+      "scripts/delivery-control.mjs",
+      "scripts/delivery-policy.mjs",
+      "scripts/delivery-status.mjs",
+      "scripts/evidence-cli.mjs",
+      "scripts/evidence-retention.mjs",
+      "scripts/external-verification.mjs",
+      "scripts/finish-readiness.mjs",
+      "scripts/git-environment.mjs",
+      "scripts/planning-inventory.mjs",
+      "SKILL.md",
+    ]);
     // Independent of dynamic package discovery: both representation files are required.
     for (const file of ["references/evidence-retention.md", "scripts/evidence-retention.mjs", "references/delivery-policy.md", "references/task-authoring.md", "scripts/delivery-policy.mjs"]) {
       assert.ok(integration.files.includes(file), `delivery inventory omits ${file}`);

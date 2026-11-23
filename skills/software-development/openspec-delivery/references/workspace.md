@@ -145,3 +145,26 @@ helper's target ancestry check cannot establish any of these external facts.
 4. If already absent, inspect registration and recoverable refs/evidence; report
    cleanup already complete. Do not create a replacement to make `locate` pass.
    A failed cleanup leaves accepted source evidence valid but cleanup pending.
+
+## Read-only reconciliation and disposable gates
+
+```sh
+node <workspace-helper> reconcile --repo <primary> --change <name> --base <base-sha>
+```
+
+Reconciliation reports the registered implementation branch, any separate
+closure worktree, and detached checkout inventory. An optional
+`--verification-workspace <path> --verification-sha <sha>` binds an exact
+registered detached checkout. The equivalent JSON interface and its optional
+role selectors are in [delivery-runtime.md](delivery-runtime.md). Reuse only
+the verified dedicated implementation checkout. Resolve stale ownership
+before dispatch.
+
+Provision a separate disposable checkout for exact-revision acceptance gates
+only within the authorized workspace/Git scope. Keep the candidate's
+implementation checkout clean. In the disposable checkout, establish
+ignored-file-aware cleanliness before any bootstrap, then permit only the
+approved generated outputs. Retain the gate record outside both workspaces
+and preserve failed attempts. See [guard.md](guard.md) and
+[evidence-retention.md](evidence-retention.md) for the capture and verification
+commands. The orchestrator owns worktree provisioning and cleanup.

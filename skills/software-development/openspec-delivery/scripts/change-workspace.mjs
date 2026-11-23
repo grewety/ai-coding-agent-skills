@@ -1,15 +1,14 @@
 #!/usr/bin/env node
 /** Read-only worktree previews. The authorized orchestrator executes returned argv. */
 import { execFileSync } from "node:child_process";
-import { existsSync, lstatSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { gitEnvironment } from "./git-environment.mjs";
 
 const requireThat = (condition, message) => { if (!condition) throw new Error(message); };
-let env;
 function git(repo, ...args) {
-  return execFileSync("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "-C", repo, ...args], { env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 16 * 1024 * 1024 }).trimEnd();
+  return execFileSync("git", ["--no-optional-locks", "-c", "core.fsmonitor=false", "-C", repo, ...args], { env: gitEnvironment(process.env), encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], maxBuffer: 16 * 1024 * 1024 }).trimEnd();
 }
 export function hasControlCharacter(value) {
   for (let index = 0; index < value.length; index += 1) {
@@ -79,19 +78,78 @@ function locate(o, entries, branch) {
   ancestor(o.repo, o.base, head);
   return { workspace, branch, base: o.base, head, dirty: dirty(workspace) };
 }
+function inspectSource(repo) {
+  canonical(repo);
+  requireThat(realpathSync(git(repo, "rev-parse", "--show-toplevel")) === repo, "Expected the canonical repository root");
+  topology(repo);
+}
+export function sourceObservation({ repo, targetBranch, remote }) {
+  inspectSource(repo);
+  requireThat(typeof targetBranch === "string" && !targetBranch.startsWith("-") &&
+    git(repo, "check-ref-format", "--branch", targetBranch) === targetBranch, "Invalid target branch");
+  requireThat(typeof remote === "string" && /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/.test(remote), "Invalid tracking remote");
+  const tracking = git(repo, "for-each-ref", "--format=%(objectname)", `refs/remotes/${remote}/${targetBranch}`);
+  return { branch: git(repo, "rev-parse", "--symbolic-full-name", "HEAD"), head: git(repo, "rev-parse", "HEAD"),
+    targetHead: git(repo, "rev-parse", "--verify", `refs/heads/${targetBranch}^{commit}`),
+    trackingHead: tracking || null, dirty: dirty(repo), registeredWorktrees: inventory(repo).length };
+}
+export function reconcileWorkspace(o) {
+  inspectSource(o.repo);
+  requireThat(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(o.change) && o.change.length <= 200 && o.change !== "archive", "Malformed full change name");
+  commit(o.repo, o.base);
+  const branch = o.branch ?? `change/${o.change}`;
+  const closureBranch = o.closureBranch ?? `closure/${o.change}`;
+  for (const value of [branch, closureBranch]) {
+    requireThat(!value.startsWith("-") && git(o.repo, "check-ref-format", "--branch", value) === value, "Invalid branch");
+  }
+  requireThat(branch !== closureBranch, "Implementation and closure branches must be distinct");
+  const entries = inventory(o.repo);
+  const registered = (name) => {
+    if (entries.some((entry) => entry.branch === `refs/heads/${name}`)) return locate(o, entries, name);
+    requireThat(!git(o.repo, "for-each-ref", "--format=%(refname)", `refs/heads/${name}`), "Branch exists without a registered worktree; preserve and resolve ownership");
+    return null;
+  };
+  const implementation = registered(branch);
+  requireThat(!o.workspace || implementation, "Selected dedicated implementation workspace is missing");
+  const closure = entries.some((entry) => entry.branch === `refs/heads/${closureBranch}`)
+    ? locate({ ...o, workspace: undefined }, entries, closureBranch) : null;
+  const detached = [];
+  for (const entry of entries.filter((value) => value.detached)) {
+    requireThat(!entry.locked && !entry.prunable && !entry.bare, "Detached worktree ownership is unresolved");
+    const workspace = canonical(entry.worktree);
+    requireThat(realpathSync(git(workspace, "rev-parse", "--show-toplevel")) === workspace &&
+      common(workspace) === common(o.repo) && git(workspace, "rev-parse", "--symbolic-full-name", "HEAD") === "HEAD",
+    "Detached worktree ownership changed");
+    const head = commit(o.repo, entry.HEAD);
+    requireThat(git(workspace, "rev-parse", "HEAD") === head, "Detached worktree HEAD changed");
+    topology(workspace);
+    detached.push({ workspace, head, dirty: dirty(workspace) });
+  }
+  detached.sort((a, b) => a.workspace < b.workspace ? -1 : a.workspace > b.workspace ? 1 : 0);
+  let verification = null;
+  if (o.verificationWorkspace) {
+    const workspace = canonical(o.verificationWorkspace);
+    verification = detached.find((entry) => entry.workspace === workspace) ?? null;
+    requireThat(verification?.head === commit(o.repo, o.verificationSha), "Verification checkout is missing or repinned");
+  }
+  return { schemaVersion: 1, change: o.change, implementation, closure, verification, detached,
+    action: implementation ? "reuse" : "workspace-pending" };
+}
 function main() {
-  env = gitEnvironment(process.env);
   const command = process.argv[2];
-  requireThat(["prepare", "locate", "retire"].includes(command), "Expected prepare, locate or retire");
+  requireThat(["prepare", "locate", "retire", "reconcile"].includes(command), "Expected prepare, locate, retire or reconcile");
   const args = process.argv.slice(3);
   const seen = new Set();
   for (const arg of args) {
     const key = /^--([^=]+)/.exec(arg)?.[1];
     if (key) { requireThat(!seen.has(key), `Duplicate option --${key}`); seen.add(key); }
   }
-  const names = ["repo", "change", "base", "workspace", "branch", ...(command === "retire" ? ["head", "target"] : [])];
+  const names = ["repo", "change", "base", "workspace", "branch", ...(command === "retire" ? ["head", "target"] : command === "reconcile" ?
+    ["closure-branch", "verification-workspace", "verification-sha"] : [])];
   const { values: o } = parseArgs({ args, options: Object.fromEntries(names.map((key) => [key, { type: "string" }])), strict: true, allowPositionals: false });
   for (const key of ["repo", "change", "base", ...(command === "retire" ? ["head", "target"] : [])]) requireThat(o[key], `Missing --${key}`);
+  if (command === "reconcile") return reconcileWorkspace({ ...o, closureBranch: o["closure-branch"],
+    verificationWorkspace: o["verification-workspace"], verificationSha: o["verification-sha"] });
   requireThat(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(o.change) && o.change.length <= 200 && o.change !== "archive", "Malformed full change name");
   canonical(o.repo);
   requireThat(realpathSync(git(o.repo, "rev-parse", "--show-toplevel")) === o.repo, "Expected the canonical repository root");
@@ -124,6 +182,6 @@ const isMain = () => {
   catch { return false; }
 };
 if (isMain()) {
-  try { console.log(JSON.stringify({ ok: true, ...main() })); }
-  catch (error) { console.log(JSON.stringify({ ok: false, error: error.message })); process.exitCode = 1; }
+  try { writeFileSync(1, `${JSON.stringify({ ok: true, ...main() })}\n`); }
+  catch (error) { writeFileSync(1, `${JSON.stringify({ ok: false, error: error.message })}\n`); process.exitCode = 1; }
 }

@@ -1,3 +1,4 @@
+import { validatePlanningInputs } from "./planning-inventory.mjs";
 // Read-only policy decisions from retained observations. No scheduler or authority service.
 const requireThat = (condition, message) => { if (!condition) throw new Error(message); };
 const text = (value) => typeof value === "string" && value.trim().length > 0;
@@ -10,16 +11,6 @@ const canonicalPaths = (paths) => {
   return [...paths].sort();
 };
 const nativeContract = (name) => ["AGENTS.md", "CLAUDE.md"].includes(name.split("/").at(-1));
-
-function planningInputs(change, inputs) {
-  requireThat(typeof change === "string" && /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(change), "Invalid planning inventory identity");
-  requireThat(inputs && typeof inputs === "object" && !Array.isArray(inputs), "Missing planning inputs");
-  const prefix = `openspec/changes/${change}/`;
-  const required = ["openspec/config.yaml", ...[".openspec.yaml", "proposal.md", "tasks.md"].map((file) => prefix + file)];
-  requireThat(required.every((file) => Object.hasOwn(inputs, file)), "Incomplete planning inventory inputs");
-  requireThat(Object.entries(inputs).every(([file, hash]) => safePath(file) && digest(hash) &&
-    (required.includes(file) || file === `${prefix}design.md` || file.startsWith(`${prefix}specs/`))), "Invalid planning inventory inputs");
-}
 
 export function contractChangePaths({ declared, changed, designations }) {
   const candidates = new Set([...canonicalPaths(declared), ...canonicalPaths(changed)]);
@@ -35,7 +26,7 @@ export function contractChangePaths({ declared, changed, designations }) {
 
 function checkGrant({ change, inputs, paths, grant }) {
   const declared = canonicalPaths(paths);
-  planningInputs(change, inputs);
+  validatePlanningInputs(change, inputs);
   requireThat(grant?.stage === "pre-freeze" && grant.change === change && text(grant.reference), "Missing separate pre-freeze contributor grant");
   requireThat(sameInputs(inputs, grant.inputs) && JSON.stringify(declared) === JSON.stringify(canonicalPaths(grant.paths)), "Contributor grant input/path mismatch");
   return declared;
@@ -56,10 +47,10 @@ export function verifyContractGrant(request) {
   return true;
 }
 
-export function resolveDeliveryPolicy({ phase, context, selection, contractPaths, declaredContractPaths, legacy, recovery, orchestrationAvailable, reviewAcceptance }) {
+export function resolveDeliveryPolicy({ phase, context, selection, contractPaths, declaredContractPaths, legacy, recovery, orchestrationAvailable, reviewAcceptance, deliveryBoundary }) {
   requireThat(["freeze", "execute"].includes(phase), "Unknown delivery policy phase");
   requireThat(context && sha(context.parent) && sha(context.target), "Missing integrated parent identity");
-  planningInputs(context.change, context.inputs);
+  validatePlanningInputs(context.change, context.inputs, context.inventory);
   if (phase === "execute") requireThat(sha(context.plan) && digest(context.planDigest), "Missing frozen plan identity");
   const exempt = phase === "execute" && legacy?.verified === true && legacy.predatesIntegrityGuards === true &&
     legacy.plan === context.plan && legacy.planDigest === context.planDigest && text(legacy.reference);
@@ -95,7 +86,15 @@ export function resolveDeliveryPolicy({ phase, context, selection, contractPaths
   if (selection.preExecutionReview) requireThat(reviewAcceptance?.action === "freeze-ready" && text(reviewAcceptance.reference) &&
     sameInputs(reviewAcceptance.inputs, context.inputs) &&
     (selection.approachConvergence === true ? reviewAcceptance.policy === "charter-v1" : reviewAcceptance.policy === undefined || reviewAcceptance.policy === "strict"), "Missing matching complete approach-review acceptance");
-  return { continuation: selection.continuousGoal ? "continuous-goal" : "single-group", requireApproachReview: selection.preExecutionReview,
+  requireThat(selection.goalFirst === undefined || typeof selection.goalFirst === "boolean", "Invalid Goal-First selection");
+  const boundary = deliveryBoundary;
+  const eligible = boundary?.reversibleLocal === true && boundary.prescribedMethod === false &&
+    boundary.orderedDependencies === false && boundary.stagedAuthority === false;
+  // Committed contexts carry the marker read from the integrated root contract.
+  // Older contexts and named legacy recoveries always retain Task-Guided policy.
+  const mode = !exempt && recovery === undefined && context.goalFirstOptIn === true &&
+    selection.goalFirst === true && eligible ? "goal-first" : "task-guided";
+  return { mode, continuation: selection.continuousGoal ? "continuous-goal" : "single-group", requireApproachReview: selection.preExecutionReview,
     approachPolicy: selection.approachConvergence === true ? "charter-v1" : "strict", integrityGuards: !exempt, policyRevision, planApproved: false, executionAuthorized: false };
 }
 
