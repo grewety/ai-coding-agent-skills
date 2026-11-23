@@ -33,9 +33,13 @@ in complete companion copies and ZIPs. This is local lossless representation and
 claim-support checking, not a Git helper, gate runner, reviewer authenticator or
 approval/publication authority. It adds no upstream workflow, runtime dependency
 or installation route. `openspec-next` is 0.4.0 and the separate optional
-`autonomous-orchestration` plugin is 1.8.0 (core skill 0.18.0). Installation, account sync and
+`autonomous-orchestration` plugin is 1.9.0 (core skill 0.19.0). Installation, account sync and
 host execution verification remain separate; package byte checks establish none
 of native client discovery, Desktop acceptance or scanner approval.
+
+The [contained Claude reviewer](claude-reviewer.md) is optional within the orchestration
+package. Its pinned Linux runtime and approved inference route are separate from OpenSpec
+prerequisites and skill installation. Packaged live qualification is pending task 3.1.
 
 Keep delivery's `references/delivery-policy.md`, `references/task-authoring.md`
 and `scripts/delivery-policy.mjs`, plus orchestration's `references/portable-core.md`

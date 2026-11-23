@@ -15,7 +15,7 @@ Acceptance boundary: an independently reviewed, fixture-proven command and no we
 
 ## 2. Complete distributable package and operator guidance
 
-- [ ] 2.1 Deliver opt-in reviewer setup, credential route/qualification limits, and command/evidence/troubleshooting guidance in `docs/claude-reviewer.md`, the skill and its references, and synchronize affected README, installation and OpenSpec SDLC guides. Bump the core skill to 0.19.0 and its optional marketplace bundle to 1.9.0; prove documentation and full package contents with `npm test` and `npm run build`, including unchanged five-skill/two-bundle inventory and byte-preserving archive contents.
+- [x] 2.1 Deliver opt-in reviewer setup, credential route/qualification limits, and command/evidence/troubleshooting guidance in `docs/claude-reviewer.md`, the skill and its references, and synchronize affected README, installation and OpenSpec SDLC guides. Bump the core skill to 0.19.0 and its optional marketplace bundle to 1.9.0; prove documentation and full package contents with `npm test` and `npm run build`, including unchanged five-skill/two-bundle inventory and byte-preserving archive contents.
 
 Acceptance boundary: independently reviewed distribution and current docs for the verified local contract; no claim of packaged live qualification. Update the owning `skills/autonomous-ai-agents/AGENTS.md` contract for the new packaged responsibility; no other contributor-contract edit is declared. Budget: up to one routine correction/review cycle inside the shared grant. Stop after this group unless task 3.1 has separately granted authority; the release-ready archive shape does not qualify live use or authorize publication.
 

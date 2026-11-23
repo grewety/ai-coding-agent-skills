@@ -1,7 +1,11 @@
 # Contained Claude review command
 
-Use this opt-in transport for independently approved exports. Run it by absolute
-path with Node 22 or later. Keep the export, publisher output and trusted host
+Use this opt-in transport for candidate or charter-v1 approach exports under
+separate authority for the exact export and paid inference. Use an independently
+retained request, runtime and export binding, then replay the sealed handover
+offline. Apply the existing candidate or charter admission rules before any
+delivery decision. Run the standalone Linux command by absolute path with
+Node 22 or later. Keep the export, publisher output and trusted host
 configuration outside the reviewed checkout and separate from each other. Use a
 private, existing parent for new directories. The command reports execution
 and receipt admission. The orchestrator retains authority for plan approval,
@@ -25,6 +29,12 @@ under the matching launch policy. Verify reads the complete sealed handover
 and replays the native stream and receipt checks offline. The two launch
 forms require explicit permission for data exposure and provider use.
 
+Standalone probe and both launch modes can incur charges. The packaged live
+trial is pending task 3.1. An earlier interim launcher probe and synthetic
+fixtures provide no qualification of this package or alternative routes.
+Keep the existing approved review route until the selected package and credential
+route are qualified.
+
 ## Retained inputs
 
 The request is strict JSON. The outer fields are `schemaVersion` (1), `mode`,
@@ -32,7 +42,7 @@ The request is strict JSON. The outer fields are `schemaVersion` (1), `mode`,
 `snapshot`, `attachments` (workspace-relative path to SHA-256 map), and
 `limits` (an object with integer `diffBytes` from 256 through 65536). Use the
 portable worker identity, authority and required restrictions. The output
-directory must be a declared `worker.evidenceRoots` entry. Candidate handoffs
+directory must be a declared `worker.evidenceRoots` entry. Completed candidate handoffs
 provide the required `native.txt` and `lifecycle.jsonl` captures.
 
 - Candidate snapshot fields are `base`, `target`, `plan` (full Git commit
@@ -90,11 +100,14 @@ audit. Every assigned file must have a successful whole-file `Read`.
 
 ## Readback and decisions
 
-Raw stdout, stderr and supervisor metadata live under `raw/` in the
-publisher output. The extracted report, result, worker request and status are
-separate, sealed artifacts. Keep all files and the independent status hash.
-A failed probe retains only the probe capture. Runtime and receipt failures
-retain the available bytes with a nonzero CLI exit. An interrupted or partial
+Mode runs retain indexed stdout, stderr and supervisor metadata under
+`raw/` in the publisher output. Index 0 is the automatic probe. A standalone
+probe writes its captures and `status.json` directly under its output root.
+Mode runs seal `request.md`, `result.json`, `status.json`, and the extracted
+`native.txt` plus `lifecycle.jsonl` for a completed candidate, or `report.md`
+for approach or failure outcomes. Keep all files and the independent status hash.
+A failed automatic probe retains its raw captures and prevents packet launches.
+Runtime and receipt failures retain available bytes with a nonzero CLI exit. An interrupted or partial
 output without the complete verified status is inadmissible. Use fresh
 directories for any authorized successor.
 

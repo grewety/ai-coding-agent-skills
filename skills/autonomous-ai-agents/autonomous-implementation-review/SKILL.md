@@ -1,7 +1,7 @@
 ---
 name: autonomous-implementation-review
 description: Implement changes with an independent review loop.
-version: 0.18.0
+version: 0.19.0
 author: Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -27,15 +27,18 @@ One authorized OpenSpec change, one named task group per worker; no GitHub write
 
 Follow `references/portable-core.md`, `references/terminal-adapters.md`,
 `references/profile-preparation.md`, `references/openspec.md`, and
-`references/worker-handoff.md` without Hermes or Herdr. Dispatch uses a qualified
-adapter; replacement readiness precedes retirement; no fallback. For integrated-parent
-charter-v1 review, the portable core bounds readiness; it grants no freeze, approval,
+`references/worker-handoff.md` without Hermes or Herdr. For integrated-parent
+charter-v1 review, the core bounds readiness and grants no freeze, approval,
 execution or remote writes.
+
+## Optional contained Claude reviewer
+
+[Contained Claude review](references/review-candidate.md) requires separate launch authority.
 
 ## Legacy host execution
 
 `replacementReadiness` is satisfied. `resolveLegacyRouteRequest` stops
-`code-tab-phase-roles` and `herdr-pane-dispatch` with `status: "retired-route"`,
+[`code-tab-phase-roles`](references/claude-code-roles.md) and `herdr-pane-dispatch` with `status: "retired-route"`,
 without fallback or `.claude/agents` edits. `HERDR_ENV` selects no role transport;
 [references/herdr.md](references/herdr.md) and `references/lifecycle-watch.md`
 govern only the Herdr interaction fallback.
@@ -54,8 +57,7 @@ govern only the Herdr interaction fallback.
   (`hermes`, `claude-code`, `codex`, `grok-build`) in `references/terminal-adapters.md`.
   One client may run all roles sequentially in fresh sessions without distinct
   models unless `requireDistinctModels: true`. No implicit consent, `delegate_task`,
-  subagent, or multiplexer fallback. `code-tab-phase-roles` (`references/claude-code-roles.md`)
-  and Herdr pane dispatch stop at `resolveLegacyRouteRequest` (`retired-route`).
+  subagent, or multiplexer fallback.
 - Model keys are session selectors, not executables; never shell-execute them or edit global config.
 - Isolate writers/services; use finite budgets; no secrets or destructive tasks.
 - Compare installed skill version to source once; source edits do not update profiles.
