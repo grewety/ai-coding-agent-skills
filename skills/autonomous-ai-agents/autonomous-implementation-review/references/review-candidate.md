@@ -32,10 +32,12 @@ and replays the native stream and receipt checks offline. Obtain a separate
 explicit grant for the approved export and paid inference before either
 live mode or a standalone probe.
 
-Standalone probe and both launch modes can incur charges. See the
-[operator guide](https://github.com/grewety/ai-coding-agent-skills/blob/HEAD/docs/claude-reviewer.md#packaged-live-qualification)
-for the limited packaged live qualification. Select a route under the project's
-approved reviewer procedure.
+Standalone probe and both launch modes can incur charges. The packaged
+candidate and charter-v1 approach modes passed live qualification only on the
+tested Linux/WSL pairing of Bubblewrap 0.9.0 and Claude Code 2.1.330, using
+`claude-sonnet-4-6` with the `same-uid-key` relay. Operator setup details are
+in the source repository’s `docs/claude-reviewer.md`. Select a route under the
+project's approved reviewer procedure.
 
 ## Retained inputs
 
