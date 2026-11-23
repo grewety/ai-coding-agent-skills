@@ -9,7 +9,7 @@ Exact frozen-plan approval and a separate execution grant precede any implementa
 
 ## 1. Independently verifiable reviewer and bounded worker captures
 
-- [ ] 1.1 Deliver the packaged Read-only Claude reviewer in candidate and charter-v1 approach modes plus shared process-tree, quota and transport/capture hardening. Verify the complete capability delta with synthetic positive and negative fixtures under `npm test` (all modes, exact identity, isolation and receipt failures, zero-cycle retry/packet handling, tree quiescence, separate quotas, unsafe paths, invalid publisher buffers and immutable readback); ship the CLI's usage and contract reference with the implementation.
+- [x] 1.1 Deliver the packaged Read-only Claude reviewer in candidate and charter-v1 approach modes plus shared process-tree, quota and transport/capture hardening. Verify the complete capability delta with synthetic positive and negative fixtures under `npm test` (all modes, exact identity, isolation and receipt failures, zero-cycle retry/packet handling, tree quiescence, separate quotas, unsafe paths, invalid publisher buffers and immutable readback); ship the CLI's usage and contract reference with the implementation.
 
 Acceptance boundary: an independently reviewed, fixture-proven command and no weakened existing adapter contract. No packaged provider trial. Budget: up to two routine correction/review cycles inside the shared grant. Stop at verified local outcome or the declared blockers. Group 2 depends on this stable command and evidence contract, not a draft interface.
 
