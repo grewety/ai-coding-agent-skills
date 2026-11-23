@@ -7,7 +7,7 @@ profile, and a fresh Claude Code 2.1.330 reviewer using the contained
 Bubblewrap 0.9.0 route in [review-candidate.md](review-candidate.md).
 A terminal adapter’s existing qualification does not qualify this
 combined runtime. Both exact role records are required before dispatch.
-Live qualification, paid attempts, profile provisioning and publication
+Live qualification of the pair remains pending. Paid attempts, profile provisioning and publication
 depend on separate authority.
 
 ## Pair and sandbox
@@ -105,6 +105,10 @@ needs `verifiedProgress: true` and the matching `progressSha256` of the
 retained native progress capture. A `review-correction` names the exact
 `rejectedCandidate`, `reviewSha256` and `inScopeFinding: true`.
 An `ordered-successor` names the `acceptedCandidate` for its predecessor.
+Delivery replays the ordered predecessor's exact gate and review observations
+or the correction's exact failure before advising dispatch. Native cap
+continuation also requires delivery's once-only policy check. Keep the
+new role attempt bounded and verify its distinct returned session.
 One native cap continuation is available per native task. Wall-clock or
 supervisor-limit stops cannot supply a native-cap continuation.
 

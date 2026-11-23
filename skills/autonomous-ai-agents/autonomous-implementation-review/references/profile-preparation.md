@@ -49,3 +49,36 @@ readbacks match. Under this profile-prepared terminal adapter route, do not
 send `/busy queue`, `/model`, or `/status` into a live pane during setup. A
 later config mismatch or package-hash drift is a profile-integrity stop, not a
 repair warrant.
+
+## Hermes skill maintenance
+
+Under separate operator profile authority, verify the installed complete
+upstream OpenSpec and companion inventories. On Hermes versions with user
+skill locks, use `hermes --profile <name> curator lock <skill>` or the Desktop
+lock switch for each upstream package. Confirm the selected profile's locks
+with `hermes --profile <name> curator status`. A lock blocks Hermes agent
+mutation paths. Preserve filesystem isolation for arbitrary local processes.
+[Hermes lock implementation](https://github.com/NousResearch/hermes-agent/blob/a3e4e721e60f87319d272a50554cde8c11f22628/tools/skill_lock.py).
+
+For companion packages independently verify
+`skills.write_approval = true`, `skills.creation_nudge_interval = 0`,
+`curator.enabled = false` and
+`auxiliary.background_review.enabled = false` in the selected profile.
+Read back the exact effective and raw values in fresh processes. An operator
+update needs separate authority, collision checks and a complete backup
+outside discovery. Start a fresh session and compare active package bytes
+with the reviewed inventory after any approved update.
+
+## Dedicated Codex and contained Claude
+
+For the pending exclusive route, use the separate
+[worker bindings](worker-runtime.md). An operator prepares the persistent,
+pre-authenticated dedicated Codex home and isolated HOME/XDG directories
+under separate setup authority. Package pins point to reviewed complete
+bytes outside the mutable workspace. Preserve any replaced Codex package in
+a private backup outside skill discovery. Compare the complete inventory
+against fresh-session discovery before relying on a verified package pin.
+The dedicated runner disables host skill discovery and ambient config.
+Claude uses its own read-only reviewer configuration and fresh exact session.
+Role binding and worker recovery read the pins. Profile installation, login,
+update and removal require their own operator action.

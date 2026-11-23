@@ -122,9 +122,9 @@ Inspection uses the same evidence checks. The v1 status object always has
 States are `unresolved`, `draft`, `approval-pending`, `local-ready`,
 `active`, `result-review-pending`, `local-verified`, `finish-ready`,
 `closed` and `blocked`. A matched retained `phaseBoundary` can supply
-`same-session` or `fresh-session` for the verified active attempt. Status
-uses no wall clock. Its recommendation includes a stable `code` and the
-selected `subject`. It performs no action.
+`same-session` or `fresh-session` for the verified active attempt. A proposed
+exclusive-runtime dispatch also checks the grant deadline. Status recommends
+a stable `code` and the selected `subject`. It performs no action.
 
 For an already selected change, `openspec-next` routes inspect to `status` and
 local continuation assessment to `decision`. Preserve the retained request's
@@ -132,6 +132,89 @@ mode, authority, phase, restrictions and evidence when invoking either entry.
 A pending or blocked predicate identifies the next evidence to reconcile.
 
 ## Handover and finish readiness
+
+### Configured exclusive worker runtime
+
+An integrated root contributor contract can select
+`<!-- openspec-worker-runtime: exclusive -->`. An explicit retained selection
+or local grant can also require it with `delegatedRuntime: true`. Include a
+`delegation` object in the retained delivery request for every phase:
+
+- `verifier` is the absolute installed path to `scripts/run-implementer.mjs`,
+  with `verifierSha256` and the qualified full `runtimeSha256`. Choose this
+  complete trusted installation outside both checkouts, the registry and
+  publisher output. Resolve the inventory hash through `--runtime-identity`.
+- `assignment: {path, sha256}` locates an independently retained sealed
+  single-assignment input to the packaged runtime. Its approval and grant
+  paths must match the normalized delivery references. Delivery checks the
+  role pair, qualification, effective settings, scope, plan, authority and
+  restrictions against that original input. Encode a no-commit restriction
+  as `no commits`, or a fixed group as `group:<id>`, in the portable
+  restrictions as applicable, and preserve the outer restrictions.
+- For successor dispatch, add `predecessor: {path, sha256}` pointing to the
+  sealed inputs of the preceding delivery decision. An ordered successor
+  replays the predecessor's exact result phase, including executable gates
+  and fresh contained review, and matches the accepted group to its
+  reviewed SHA, gate wrapper hash and review report hash. A correction
+  replays the exact, scoped failed gate or review finding. Its runtime
+  continuation record uses `review-correction` and pins the offending
+  evidence hash. For a native turn cap, read back the prior `boundary`
+  phase and preserve its verified native progress hash with the on-track
+  check. The same-action attempt reserves the available cap allowance.
+  Its actual distinct native session is checked on settlement.
+
+`dispatch` for this route is advisory and returns
+`requiresExclusiveAdmission: true`. Run the pinned implementer under its
+separate bounded authority. The runtime must win the atomic claim and slot,
+then pass its native sandbox probe before providing input. A subsequent
+`boundary` reads the same registry attempt. Delivery verifies process-tree
+quiescence, sealed publication and matching workspace outputs. The
+orchestrator may then prepare the exact candidate within held authority.
+A missing publication after settlement is a recovery predicate. Use the
+separately authorized original-attempt recovery before rechecking delivery.
+
+`result` checks the output bytes in the exact candidate and uses the
+normal gate and review requirements. The `handover` must be the pinned
+companion's `review-candidate` handover. Set its `predecessor` to the
+implementer attempt, its `implementerSession` to the verified native
+session, and its native group/task to the same action. Use the fresh
+reviewer session and configuration pinned by the pair. Retain the same
+outcome, acceptance criteria, scope and exclusions in the review request.
+Pin the independent expectation file as `expectFileSha256`. For either delivery
+mode, the contained reviewer uses the normalized Git plan digest and
+frozen planning inputs to reconstruct the full diff from the frozen plan.
+For Goal-First include `goal-contract:<approvedGoalContractDigest>` in
+the review acceptance list. The gate record uses the selected delivery
+mode's digest and the review request also carries its `gate-run:<wrapperSha256>`
+tag. Delivery joins both identities on the exact candidate.
+
+Inspection uses original-attempt and evidence readback. Running, native
+input wait, unknown or unsettled ownership, a native turn cap, failed
+handover or scope mismatch blocks advancement. Missing qualification
+blocks the selected route. Policies that did not select the runtime
+continue to use their applicable evidence paths.
+
+At dispatch, delivery matches the retained target repository and reviewer
+probe configuration to the assignment. Use the hash of the paired
+reviewer's canonical inventory in P4 and P8. A changed source inventory
+needs fresh applicable verification.
+
+For a fresh review of a changed candidate after recording native progress,
+keep the same settled implementer and qualified reviewer configuration.
+Retain the authorized new attempt as `handover.reviewSessionBinding`
+with a protected `{path, sha256}` locator. The v1
+`exclusive-review-session` record binds `claimId`, `change`, `plan`,
+`planDigest`, implementer `attempt`, exact `candidate`, `orchestrator`,
+`originalSession`, new reviewer `session`, `configurationSha256`,
+`inventorySha256`, `requestFileSha256`, `reviewAuthority` and
+`maxRuns: 1`. The new session must be distinct. This readback requires
+the same complete gate and review checks. Obtain the separate paid-run
+grant before launching the reviewer.
+Keep the native task pending while a scoped product correction may still
+be needed. A verified finding or failed gate requires a fresh bounded worker
+attempt under the same action and accepted scope.
+
+### Portable handovers
 
 A `portable-role` handover takes an absolute path to the trusted companion
 `worker-handoff.mjs` in `verifier`, its independently pinned
@@ -153,9 +236,9 @@ canonical review checkout isolated from both the primary and implementation
 checkouts. Bind the held approval and grant references and the selected native
 group and task. Report exclusive ownership and the group's implementer session
 in `observed`. The exact disposable gate run and its matching acceptance tag
-remain required. Goal-First results use a qualified portable-role reviewer with
-the distinct Goal Contract digest. The contained renderer supports the
-Task-Guided normalized plan format.
+remain required. For inherited non-delegated Goal-First policy, use a qualified
+portable-role reviewer with the distinct Goal Contract digest. The contained
+renderer uses the normalized Git plan format described above.
 
 Before a terminal handover exists, the `active-attempt` variant reads the
 companion's sealed request and a separately pinned `active.json` in that same

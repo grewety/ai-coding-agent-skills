@@ -3,6 +3,14 @@
 Load this when the operator has authorized execution of one OpenSpec change.
 Selecting or approving a change grants nothing by itself.
 
+For projects selecting exclusive delegation, use the
+[packaged runtime](run-implementer.md) and its [role binding](worker-runtime.md).
+The distributed pair is pending live qualification. Delivery owns readback
+of the original claim and session, scoped settled outputs, exact gates and
+paired independent review. A dependent Task-Guided group waits for exact
+predecessor acceptance. Goal-First retains its approved contract and single
+outcome. This route blocks on missing qualification or uncertain ownership.
+
 For agent-neutral packets and review, use [portable-core.md](portable-core.md),
 [terminal-adapters.md](terminal-adapters.md), and
 [profile-preparation.md](profile-preparation.md).

@@ -115,6 +115,12 @@ without copying `.claude/agents` templates). Installing a plugin neither
 configures an adapter nor authorizes commits, checkout creation, publication, or
 unattended execution.
 
+Projects selecting the [exclusive worker runtime](worker-runtime.md) need the
+complete separate orchestration package on a Linux execution host and an
+independently qualified, pinned Codex implementer and contained Claude reviewer.
+The combined route is pending live qualification. An account upload, plugin
+activation or previously qualified terminal adapter cannot satisfy that check.
+
 Anthropic documents account skills and plugins syncing into Claude Code v2.1.273+
 when signed in with the same Claude account. API-key and cloud-provider sign-ins
 do not use that sync. Account installation is not the same as a local CLI plugin
@@ -165,23 +171,25 @@ files plus their generated plugin metadata, README, and license.
 
 Bump the affected plugin version in the catalog whenever its selected skills or
 support files change; skill versions alone do not update the enclosing plugin.
-The source catalog's `openspec-development` 1.4.0 includes `openspec-delivery`
-1.4.0 with its shared `scripts/git-environment.mjs` and
+The source catalog's `openspec-development` 1.5.0 includes `openspec-delivery`
+1.5.0 with its shared `scripts/git-environment.mjs` and
 `references/git-environment.md` for the Git guard/workspace helpers. Also preserve
 `references/evidence-retention.md`, `scripts/evidence-retention.mjs`,
-`scripts/evidence-cli.mjs` and `scripts/delivery-cli.mjs` in complete copies and
+`scripts/evidence-cli.mjs`, `scripts/delivery-cli.mjs` and
+`scripts/delegated-delivery.mjs` in complete copies and
 skill/plugin ZIP exports. The evidence command supports authorized exact-SHA gate
 capture and offline readback. Keep next's `references/routing.md` and
 `scripts/next.mjs` with that skill. If direct packages load from different scopes,
 use the router's explicit trusted runtime path. The optional
-`autonomous-orchestration` is 1.9.0 (core skill 0.19.0) and `openspec-next` is 0.5.0. These
+`autonomous-orchestration` is 1.10.0 (core skill 0.20.0) and `openspec-next` is 0.6.0. These
 source versions do not assert that the public marketplace/downloads are updated.
 Preserve delivery's policy/task-authoring references and `delivery-policy.mjs`,
 and orchestration's `references/portable-core.md`, `scripts/orchestration-core.mjs`,
 `references/worker-handoff.md`, `scripts/worker-handoff.mjs`,
 `references/terminal-adapters.md`, `scripts/terminal-adapters.mjs` and
 `references/profile-preparation.md`, in full copies and
-generated skill/plugin packages. The handoff pair is required portable support,
+generated skill/plugin packages. Keep `scripts/run-implementer.mjs` and all
+its runtime helpers in the separate orchestration package. The handoff pair is required portable support,
 not disposable worker scratch or evidence of adapter qualification.
 The [policy protocol](../skills/software-development/openspec-delivery/references/delivery-policy.md)
 adds no automatic plugin dependency: selected approach-review/continuous-goal

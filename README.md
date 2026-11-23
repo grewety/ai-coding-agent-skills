@@ -59,6 +59,13 @@ selection becomes effective only for later plans after integration. The
 introducing change `goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc` retains
 its inherited Task-Guided policy and approval.
 
+The optional [exclusive worker runtime](docs/worker-runtime.md) connects a
+host-wide claim and sealed, settled worker attempt to both delivery modes.
+`openspec-next inspect` reads that evidence. Execution preserves the
+selected role pair, restrictions, exact candidate gates and independent
+review across ordered groups and corrections. The intended Linux Codex and
+contained Claude pairing is pending separate live qualification.
+
 The delivery Git helpers share an explicit [child environment contract](skills/software-development/openspec-delivery/references/git-environment.md):
 only allowlisted runtime/configuration values reach Git, with global/system selectors
 preserved and topology overrides refused. Configuration remains trusted, not sandboxed.
@@ -417,6 +424,11 @@ the orchestrator session. A displayed goal grants no execution authority.
 
 #### Configure and verify qualified terminal adapters
 
+For a project that selects the exclusive runtime, use its separate
+[role, sandbox and recovery procedure](docs/worker-runtime.md). Adapter
+qualification applies to the exact tested route. An unavailable exclusive
+pair blocks the assignment.
+
 See [`references/terminal-adapters.md`](skills/autonomous-ai-agents/autonomous-implementation-review/references/terminal-adapters.md)
 for the complete adapter inventory and executable JSON examples:
 
@@ -748,12 +760,14 @@ no generated skill copies are committed. Its explicit skill lists separate the
 OpenSpec companion workflow from opt-in orchestration. Bump every affected plugin's version when
 its bundled content changes. See the [Claude release checks](docs/claude-installation.md#maintainer-verification).
 
-Current source versions are delivery 1.4.0 and its affected
-`openspec-development` plugin 1.4.0; `openspec-next` is 0.5.0 and
-`autonomous-orchestration` is 1.9.0 (core skill 0.19.0). Complete well-known output,
+Current source versions are delivery 1.5.0 and its affected
+`openspec-development` plugin 1.5.0; `openspec-next` is 0.6.0 and
+`autonomous-orchestration` is 1.10.0 (core skill 0.20.0). Complete well-known output,
 skill ZIPs, workflow plugin ZIP and isolated native copies must retain all support
 files byte-for-byte, including delivery's runtime and evidence commands and next's
-read-only routing script and reference. Source assertions are not executed packaging
+read-only routing script and reference. Include `scripts/delegated-delivery.mjs`
+with delivery and `scripts/run-implementer.mjs` and its helpers with optional
+orchestration. Source assertions are not executed packaging
 proof or a claim of updated public downloads, native client discovery, Desktop
 acceptance or scanner approval. No upstream prerequisite or installation route is
 added by this representation facility.

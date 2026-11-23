@@ -156,4 +156,10 @@ native `report.md` with sealed `native.txt`, `stdout.jsonl`, `stderr.log`,
 `launch.json` and `lifecycle.jsonl`. Its adapter publishes `result.json`
 from the original positively settled process and native session. Replay
 checks the original settlement, exact request and publisher bytes.
-Candidate delivery acceptance belongs to the orchestrator.
+Delivery uses the installed runtime's read-only original-attempt check and
+binds the publisher seal to the same settlement and native session. Reconcile
+workspace outputs before producing the candidate. The separate contained
+review request names the implementer attempt as its predecessor and pins its
+native session. Verify both the gate and review at the exact candidate before
+acceptance, correction or ordered advancement. Candidate delivery acceptance
+belongs to the orchestrator.
