@@ -1,13 +1,57 @@
 import { createHash } from "node:crypto";
+import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, realpathSync } from "node:fs";
+import path from "node:path";
+import { safePlanningPath } from "./planning-inventory.mjs";
 
-const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+export const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
 export const storedArtifactSha256 = (content) => sha256(Buffer.from(requireString(content, "content"), "utf8"));
 const canonicalize = (value) => {
   if (Array.isArray(value)) return value.map(canonicalize);
   if (value && typeof value === "object") return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalize(value[key])]));
   return value;
 };
-const canonicalBytes = (value) => Buffer.from(JSON.stringify(canonicalize(value)), "utf8");
+export const stableJson = (value) => JSON.stringify(canonicalize(value));
+const canonicalBytes = (value) => Buffer.from(stableJson(value), "utf8");
+export const maxInput = 64 * 1024 * 1024;
+export const maxCommands = 12;
+export const maxStream = 1024 * 1024;
+const utf8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+const requireThat = (condition, message) => { if (!condition) throw new Error(message); };
+const sha = (value) => typeof value === "string" && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(value);
+const digest = (value) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+const text = (value) => typeof value === "string" && value.trim().length > 0;
+export const separate = (a, b) => ![path.relative(a, b), path.relative(b, a)].some((relative) =>
+  relative === "" || (!path.isAbsolute(relative) && relative !== ".." && !relative.startsWith(`..${path.sep}`)));
+
+export function scopedPath(file, absent = false) {
+  requireThat(typeof file === "string" && path.isAbsolute(file) && path.normalize(file) === file && !/[\x00-\x1f\x7f]/.test(file), "Expected an absolute normalized path");
+  if (absent) requireThat(realpathSync(path.dirname(file)) === path.dirname(file), "Output parent is not canonical");
+  else requireThat(realpathSync(file) === file, "Input is not canonical");
+  return file;
+}
+
+export function readBounded(file, limit = maxInput) {
+  scopedPath(file);
+  const before = lstatSync(file);
+  requireThat(before.isFile() && before.size <= limit, "Expected a bounded regular input file");
+  const fd = openSync(file, constants.O_RDONLY | (constants.O_NOFOLLOW || 0) | (constants.O_NONBLOCK || 0));
+  try {
+    const info = fstatSync(fd);
+    requireThat(info.isFile() && info.ino === before.ino && info.dev === before.dev && info.size === before.size, "Input changed during open");
+    const bytes = Buffer.alloc(info.size + 1);
+    let total = 0;
+    while (total < bytes.length) {
+      const size = readSync(fd, bytes, total, bytes.length - total, null);
+      if (!size) break;
+      total += size;
+    }
+    const after = fstatSync(fd);
+    requireThat(total === info.size && after.mtimeMs === info.mtimeMs && after.ctimeMs === info.ctimeMs, "Input changed during read");
+    return bytes.subarray(0, total);
+  } finally { closeSync(fd); }
+}
+export const readJson = (file, limit) => JSON.parse(utf8.decode(readBounded(file, limit)));
+
 
 function requireString(value, field) {
   if (typeof value !== "string") throw new Error(`${field} must be a string`);
@@ -62,7 +106,7 @@ function validateProvenance(provenance) {
   } else if (Object.hasOwn(provenance, "extractedAt")) {
     throw new Error("provenance.extractedAt is only valid for historical-extract evidence");
   }
-  if (!Array.isArray(provenance.command) || provenance.command.length === 0 || provenance.command.some((part) => typeof part !== "string" || part.length === 0)) {
+  if (!Array.isArray(provenance.command) || provenance.command.length === 0 || !provenance.command[0] || provenance.command.some((part) => typeof part !== "string" || part.includes("\0"))) {
     throw new Error("provenance.command must be a non-empty string array");
   }
   if (!Number.isInteger(provenance.exitStatus)) throw new Error("provenance.exitStatus must be an integer");
@@ -136,7 +180,9 @@ function decodedBytes(representation) {
     if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(representation.content)) {
       throw new Error("base64 content is invalid");
     }
-    return Buffer.from(representation.content, "base64");
+    const bytes = Buffer.from(representation.content, "base64");
+    if (bytes.toString("base64") !== representation.content) throw new Error("base64 content is noncanonical");
+    return bytes;
   }
   throw new Error(`unsupported encoding: ${representation.encoding}`);
 }
@@ -245,4 +291,150 @@ export function assessClaimSupport({ representation, mergedAt, expectedHead, app
   }
   if (Number.isNaN(observedTime) || observedTime >= mergeTime) return "blocked";
   return "supported";
+}
+
+// These are retained readback schemas, with explicit provenance for each source.
+// They assert observed facts and reuse historical claim eligibility when a merge is claimed.
+export function assertCloseoutReadbacks({ pullRequest, expectedHead, applicableCheckIds, mergedAt, observedNotBefore,
+  closureExpected, readbacks }) {
+  const assertions = [];
+  const fail = (predicate) => ({ ok: false, schemaVersion: 1, assertions, predicate });
+  const strictSha = (value) => typeof value === "string" && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(value);
+  const canonicalPr = /^https:\/\/github\.com\/[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?\/([a-zA-Z0-9_.-]+)\/pull\/[1-9][0-9]*$/;
+  if (typeof pullRequest !== "string" || !canonicalPr.test(pullRequest) || [".", ".."].includes(pullRequest.split("/")[4]) ||
+      !strictSha(expectedHead) || !Array.isArray(applicableCheckIds) || applicableCheckIds.length === 0 ||
+      !applicableCheckIds.every((id) => typeof id === "string" && id.trim()) ||
+      new Set(applicableCheckIds).size !== applicableCheckIds.length ||
+      Number.isNaN(parseUtcInstant(observedNotBefore))) return fail("READBACK_EXPECTATION_INVALID");
+
+  const observed = new Map();
+  function source(key, name) {
+    const representation = readbacks?.[key];
+    let value;
+    try {
+      value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(verifyRepresentation(representation)));
+    } catch {
+      return null;
+    }
+    const p = representation.provenance;
+    if (p.source !== name || p.revision !== expectedHead || p.scope !== pullRequest || p.exitStatus !== 0 ||
+        p.pagination !== "complete" || representation.labels.confidentiality !== "publishable" ||
+        !["original-response", "fresh-corroboration", "merge-snapshot", "historical-extract"].includes(p.readbackType) ||
+        !(parseUtcInstant(p.observedAt) >= parseUtcInstant(observedNotBefore)) ||
+        value?.pullRequest !== pullRequest || value.head !== expectedHead) return null;
+    observed.set(key, { representation, time: parseUtcInstant(p.observedAt) });
+    return value;
+  }
+  const record = (predicate, ...keys) => assertions.push({ predicate,
+    sources: keys.map((key) => ({ readback: key, wrapperSha256: observed.get(key).representation.wrapperSha256 })) });
+  const pr = source("pr", "github-pull-request");
+  if (!pr || !["OPEN", "MERGED"].includes(pr.state) ||
+      (pr.state === "OPEN" ? pr.mergedAt !== null || mergedAt !== undefined : Number.isNaN(parseUtcInstant(mergedAt)) ||
+        pr.mergedAt !== mergedAt || !strictSha(pr.mergeCommit) || parseUtcInstant(mergedAt) > observed.get("pr").time)) return fail("PR_IDENTITY_OR_STATE");
+  record("EXACT_PR_HEAD", "pr");
+
+  function passing(key, readback, entries) {
+    if (!readback || !Array.isArray(entries) || entries.some((entry) => !entry || typeof entry.id !== "string" || !entry.id.trim())) return false;
+    const index = new Map(entries.map((entry) => [entry.id, entry]));
+    return index.size === entries.length && applicableCheckIds.every((id) => {
+      const check = index.get(id);
+      return check?.conclusion === "success" && parseUtcInstant(check.completedAt) <= observed.get(key).time;
+    });
+  }
+  const checks = source("checks", "github-applicable-checks");
+  if (!passing("checks", checks, checks?.checks) || (pr.state === "OPEN" && observed.get("checks").representation.provenance.readbackType === "historical-extract")) {
+    return fail("APPLICABLE_CHECKS_INCOMPLETE_OR_FAILED");
+  }
+  const runs = source("checkRuns", "github-check-runs");
+  if (!passing("checkRuns", runs, runs?.checks) || runs.checks.some((run) => run.head !== expectedHead) ||
+      (pr.state === "OPEN" && observed.get("checkRuns").representation.provenance.readbackType === "historical-extract")) return fail("CHECK_RUNS_INCOMPLETE_OR_STALE");
+  if (pr.state === "MERGED" && ["checks", "checkRuns"].some((key) => assessClaimSupport({
+    representation: observed.get(key).representation, mergedAt, expectedHead, applicableCheckIds,
+  }) !== "supported")) return fail("HISTORICAL_CHECK_CLAIM_UNSUPPORTED");
+  record("APPLICABLE_CHECKS_PASSED", "checks", "checkRuns");
+
+  const threads = source("threads", "github-review-threads");
+  if (!threads || !Array.isArray(threads.threads) || threads.threads.some((thread) => !thread?.id ||
+    typeof thread.id !== "string" || thread.resolved !== true) ||
+    new Set(threads.threads.map((thread) => thread.id)).size !== threads.threads.length ||
+    (pr.state === "MERGED" ? observed.get("threads").time >= parseUtcInstant(mergedAt) :
+      observed.get("threads").representation.provenance.readbackType === "historical-extract") ||
+    ["fresh-corroboration", "merge-snapshot"].includes(observed.get("threads").representation.provenance.readbackType) &&
+      pr.state === "MERGED") return fail("REVIEW_THREADS_INCOMPLETE_OR_UNRESOLVED");
+  record("REVIEW_THREADS_RESOLVED", "threads");
+
+  const pending = [];
+  if (pr.state === "OPEN") pending.push("PROTECTED_MERGE_PENDING");
+  if (!closureExpected) pending.push("CLOSURE_PREDICATES_PENDING");
+  else {
+    const closure = source("closure", "github-closure-readback");
+    const issuePrefix = pullRequest.replace(/\/pull\/[0-9]+$/, "/issues/");
+    if (pr.state !== "MERGED" || !closure || !strictSha(closureExpected.verifiedRevision) ||
+        typeof closureExpected.issue !== "string" || !closureExpected.issue.startsWith(issuePrefix) ||
+        !/^[1-9][0-9]*$/.test(closureExpected.issue.slice(issuePrefix.length)) ||
+        !/^openspec\/changes\/archive\/\d{4}-\d{2}-\d{2}-[a-z][a-z0-9-]+$/.test(closureExpected.archive ?? "") ||
+        !/^[a-f0-9]{64}$/.test(closureExpected.receiptSha256 ?? "") ||
+        closure.integrated !== pr.mergeCommit || closure.verifiedRevision !== closureExpected.verifiedRevision ||
+        closure.issue !== closureExpected.issue || closure.issueState !== "CLOSED" || closure.archive !== closureExpected.archive ||
+        closure.receiptSha256 !== closureExpected.receiptSha256 || closure.recordOnly !== true ||
+        observed.get("closure").time < parseUtcInstant(mergedAt) ||
+        observed.get("closure").representation.provenance.readbackType === "historical-extract") return fail("CLOSURE_PREDICATES_UNVERIFIED");
+    record("CLOSURE_PREDICATES_MET", "pr", "closure");
+  }
+  return { ok: true, schemaVersion: 1, assertions, pending };
+}
+
+export function verifyCapture(record) {
+  requireThat(record?.schemaVersion === 1 && record.kind === "command-capture" &&
+    typeof record.cwd === "string" && path.isAbsolute(record.cwd) &&
+    (record.revision === null || sha(record.revision)) && Number.isInteger(record.exitStatus) &&
+    typeof record.complete === "boolean" && (record.complete ? record.exitStatus >= 0 && record.interruption === null :
+      record.exitStatus === -1 && text(record.interruption)), "Invalid command capture");
+  requireThat(Array.isArray(record.argv) && record.argv.length > 0 && record.argv.length <= 64 &&
+    text(record.argv[0]) && record.argv.every((arg) => typeof arg === "string" && !arg.includes("\0") &&
+      Buffer.byteLength(arg) <= 4096), "Invalid capture argument vector");
+  for (const name of ["stdout", "stderr"]) {
+    const bytes = verifyRepresentation(record[name]);
+    const p = record[name].provenance;
+    requireThat(bytes.length <= maxStream && p.source === `command-${name}` &&
+      stableJson(p.command) === stableJson(record.argv) && p.revision === (record.revision ?? "not-applicable") &&
+      p.observedAt === record.observedAt && p.exitStatus === record.exitStatus &&
+      p.pagination === (record.complete ? "complete" : "partial") &&
+      p.readbackType === "lossless-representation" && record[name].labels.confidentiality === "restricted",
+    "Command capture stream provenance mismatch or overflow");
+  }
+  requireThat(record.stdout.provenance.scope === record.stderr.provenance.scope &&
+    record.stdout.provenance.environmentScope === record.stderr.provenance.environmentScope, "Command capture scope mismatch");
+  return record.complete && record.exitStatus === 0;
+}
+
+function gatePayload({ wrapperSha256, ...value }) { return value; }
+export function verifyGateRun(run, expected) {
+  requireThat(run?.kind === "disposable-gate-run" && run.schemaVersion === 1 && digest(run.wrapperSha256) &&
+    sha256(stableJson(gatePayload(run))) === run.wrapperSha256, "Gate evidence seal mismatch");
+  requireThat(expected && sha(run.plan) && digest(run.planDigest) &&
+    ["goal-first", "task-guided"].includes(run.mode) && typeof run.change === "string" &&
+    ["plan", "planDigest", "mode", "change"].every((key) => expected[key] === undefined || expected[key] === run[key]) &&
+    run.head === expected.head && run.tree === expected.tree && run.implementation === expected.implementation &&
+    typeof run.checkout === "string" && path.isAbsolute(run.checkout) && separate(run.checkout, run.implementation),
+  "Gate evidence is misplaced or names a different revision/tree");
+  requireThat(Array.isArray(run.generated) && run.generated.every(safePlanningPath) &&
+    run.initial?.head === run.head && run.initial.tree === run.tree &&
+    Array.isArray(run.initial.ignoredGenerated) && run.initial.ignoredGenerated.length === 0,
+  "Missing clean disposable checkout observation");
+  requireThat(Array.isArray(run.commands) && run.commands.length > 0 && run.commands.length <= maxCommands &&
+    Number.isSafeInteger(run.bootstrapCount) && run.bootstrapCount >= 0 && run.bootstrapCount < run.commands.length,
+  "Missing disposable gate commands");
+  requireThat(run.final?.head === run.head && run.final.tree === run.tree && Array.isArray(run.final.ignoredGenerated) &&
+    run.final.ignoredGenerated.every((file) => safePlanningPath(file) && run.generated.some((root) => file === root || file.startsWith(`${root}/`))),
+  "Invalid final disposable checkout observation");
+  const outcomes = run.commands.map((record, index) => {
+    requireThat(record.cwd === run.checkout && record.revision === run.head &&
+      record.stdout?.provenance.scope === (index < run.bootstrapCount ? "bootstrap" : "gate") &&
+      record.stdout?.provenance.environmentScope === "disposable-checkout", "Gate command provenance mismatch");
+    return verifyCapture(record);
+  });
+  const gateCommands = run.commands.slice(run.bootstrapCount).map((record) => record.argv);
+  if (expected.gates) requireThat(stableJson(gateCommands) === stableJson(expected.gates), "Gate commands differ from approved acceptance");
+  return { passed: outcomes.every(Boolean), reference: run.wrapperSha256, gateCommands };
 }

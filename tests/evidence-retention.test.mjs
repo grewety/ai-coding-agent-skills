@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { assessClaimSupport, createRepresentation, sealRepresentation, storedArtifactSha256, verifyRepresentation } from "../skills/software-development/openspec-delivery/scripts/evidence-retention.mjs";
+import { spawnSync } from "node:child_process";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { sha256 } from "../skills/software-development/openspec-delivery/scripts/evidence-cli.mjs";
 
 const provenance = {
   source: "node --test fixture",
@@ -308,4 +314,133 @@ test("reaches direct hash and decoding failure paths after resealing", () => {
 test("derives claim limits from a verified representation and refuses free inputs", () => {
   assert.equal(assessClaimSupport({ representation: claim("fresh-corroboration", "complete"), ...expectedClaim }), "blocked");
   assert.throws(() => assessClaimSupport({ kind: "fresh-corroboration", pagination: "complete" }), /representation/i);
+});
+
+const cli = fileURLToPath(new URL("../skills/software-development/openspec-delivery/scripts/evidence-cli.mjs", import.meta.url));
+async function evidenceFixture(t) {
+  const root = await realpath(await mkdtemp(path.join(os.tmpdir(), "lossless-cli-")));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  let index = 0;
+  const save = async (name, value) => {
+    const file = path.join(root, name);
+    const bytes = Buffer.isBuffer(value) ? value : Buffer.from(JSON.stringify(value));
+    await writeFile(file, bytes);
+    return { file, sha256: sha256(bytes) };
+  };
+  const run = async (command, value) => {
+    const request = await save(`request-${++index}.json`, value);
+    const result = spawnSync(process.execPath, [cli, command, "--input", request.file], {
+      encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
+    });
+    assert.equal(result.error, undefined);
+    return { status: result.status, value: JSON.parse(result.stdout) };
+  };
+  return { root, save, run };
+}
+
+test("evidence CLI captures both byte streams, the literal argv and a failed exit", async (t) => {
+  const { root, save, run } = await evidenceFixture(t);
+  const cwd = path.join(root, "checkout");
+  await mkdir(cwd);
+  const output = path.join(root, "capture.json");
+  const bytes = Buffer.from([0xff, 0x00, 0x0d, 0x0a]);
+  const argv = [process.execPath, "-e", "const fs=require('node:fs');fs.writeSync(1,Buffer.from([255,0,13,10]));fs.writeSync(2,'error\\r\\n');process.exitCode=7", ""];
+  const captured = await run("capture", { cwd, output, argv, timeoutMs: 5_000, scope: "synthetic gate", environmentScope: "fixture-clean" });
+  assert.equal(captured.status, 1);
+  assert.equal(captured.value.exitStatus, 7);
+  const record = JSON.parse(await readFile(output, "utf8"));
+  assert.deepEqual(record.argv, argv);
+  assert.deepEqual(verifyRepresentation(record.stdout), bytes);
+  assert.deepEqual(verifyRepresentation(record.stderr), Buffer.from("error\r\n"));
+  assert.equal(record.stdout.decodedOriginalSha256, sha256(bytes));
+  assert.equal(new Date(record.observedAt).toISOString(), record.observedAt);
+  const pin = { file: output, sha256: captured.value.fileSha256 };
+  assert.deepEqual((await run("verify", pin)).value, { ok: true, passed: false, revision: null, fileSha256: pin.sha256 });
+  const altered = await save("altered", { ...record, exitStatus: 0 });
+  assert.match((await run("verify", altered)).value.error, /provenance/);
+  await writeFile(output, (await readFile(output)).subarray(0, -3));
+  assert.match((await run("verify", pin)).value.error, /identity/);
+});
+
+test("evidence CLI seals original bytes and verifies independently pinned identity", async (t) => {
+  const { root, save, run } = await evidenceFixture(t);
+  const original = await save("original", Buffer.from([0x80, 0xff, 0x0a]));
+  const output = path.join(root, "sealed.json");
+  const sealed = await run("seal", { original: original.file, provenance, labels, output });
+  assert.equal(sealed.status, 0, JSON.stringify(sealed));
+  const pin = { file: output, sha256: sealed.value.fileSha256 };
+  const verified = await run("verify", pin);
+  assert.deepEqual(verified.value, { ok: true, fileSha256: pin.sha256, wrapperSha256: sealed.value.wrapperSha256,
+    originalSha256: original.sha256, revision: provenance.revision });
+  assert.equal((await run("seal", { original: original.file, provenance, labels, output })).status, 1);
+  const wrong = await save("wrong.json", { ...JSON.parse(await readFile(output)), decodedOriginalSha256: "0".repeat(64) });
+  assert.match((await run("verify", wrong)).value.error, /wrapper SHA-256 mismatch/);
+});
+
+test("offline GitHub readbacks prove current and historical predicates with original evidence references", async (t) => {
+  const { save, run } = await evidenceFixture(t);
+  const pullRequest = "https://github.com/example/project/pull/12";
+  const head = expectedClaim.expectedHead;
+  const integrated = "b".repeat(40);
+  const verifiedRevision = "c".repeat(40);
+  const observedNotBefore = "2026-11-10T11:00:00Z";
+  const mergedAt = "2026-11-10T12:00:00Z";
+  const check = { id: "ci", head, conclusion: "success", completedAt: "2026-11-10T11:59:40Z" };
+  const issue = "https://github.com/example/project/issues/4";
+  const archive = "openspec/changes/archive/2026-11-10-example";
+  const receiptSha256 = "e".repeat(64);
+  const source = { pr: "github-pull-request", checks: "github-applicable-checks", checkRuns: "github-check-runs", threads: "github-review-threads", closure: "github-closure-readback" };
+  const pin = (key, payload, options = {}) => save(`${key}-${Object.keys(options).length}-${sha256(JSON.stringify(payload)).slice(0, 8)}.json`,
+    createRepresentation({ original: Buffer.from(JSON.stringify({ pullRequest, head, ...payload })),
+      provenance: { ...provenance, source: source[key], scope: pullRequest, revision: head,
+        readbackType: "original-response", pagination: "complete", observedAt: "2026-11-10T11:59:50Z", ...options },
+      labels: { ...labels, representation: options.readbackType ?? "original-response", completeness: options.pagination ?? "complete" } }));
+  const readbacks = {
+    pr: await pin("pr", { state: "OPEN", mergedAt: null }),
+    checks: await pin("checks", { checks: [check] }),
+    checkRuns: await pin("checkRuns", { checks: [check] }),
+    threads: await pin("threads", { threads: [{ id: "r1", resolved: true }] }),
+  };
+  const request = { pullRequest, expectedHead: head, applicableCheckIds: ["ci"], observedNotBefore, readbacks };
+  const assertReadback = async (change, predicate) => {
+    const result = await run("assert-closeout", { ...request, readbacks: { ...readbacks, ...change } });
+    assert.equal(result.status, 1, JSON.stringify(result));
+    assert.equal(result.value.predicate, predicate);
+  };
+  const ready = (await run("assert-closeout", request)).value;
+  assert.deepEqual(ready.assertions.map((entry) => entry.predicate), ["EXACT_PR_HEAD", "APPLICABLE_CHECKS_PASSED", "REVIEW_THREADS_RESOLVED"]);
+  assert.ok(ready.assertions.every((entry) => entry.sources.every((ref) => /^[a-f0-9]{64}$/.test(ref.wrapperSha256))));
+  assert.deepEqual(ready.pending, ["PROTECTED_MERGE_PENDING", "CLOSURE_PREDICATES_PENDING"]);
+  await assertReadback({ pr: await pin("pr", { head: "a".repeat(40), state: "OPEN", mergedAt: null }) }, "PR_IDENTITY_OR_STATE");
+  await assertReadback({ checks: await pin("checks", { checks: [check] }, { pagination: "partial" }) }, "APPLICABLE_CHECKS_INCOMPLETE_OR_FAILED");
+  await assertReadback({ checkRuns: await pin("checkRuns", { checks: [{ ...check, head: "a".repeat(40) }] }) }, "CHECK_RUNS_INCOMPLETE_OR_STALE");
+  await assertReadback({ threads: await pin("threads", { threads: [{ id: "r1", resolved: false }] }) }, "REVIEW_THREADS_INCOMPLETE_OR_UNRESOLVED");
+  const afterMerge = { observedAt: "2026-11-10T12:01:00Z" };
+  readbacks.pr = await pin("pr", { state: "MERGED", mergedAt, mergeCommit: integrated }, afterMerge);
+  readbacks.closure = await pin("closure", { integrated, verifiedRevision, archive, issue, receiptSha256, issueState: "CLOSED", recordOnly: true }, afterMerge);
+  const closureExpected = { verifiedRevision, issue, archive, receiptSha256 };
+  const closed = { ...request, mergedAt, closureExpected };
+  assert.equal((await run("assert-closeout", closed)).value.assertions.at(-1).predicate, "CLOSURE_PREDICATES_MET");
+  const stale = await pin("checks", { checks: [check] }, { ...afterMerge, readbackType: "fresh-corroboration" });
+  assert.equal((await run("assert-closeout", { ...closed, readbacks: { ...readbacks, checks: stale } })).value.predicate,
+    "HISTORICAL_CHECK_CLAIM_UNSUPPORTED");
+  assert.equal((await run("assert-closeout", { ...closed, closureExpected: { ...closureExpected, receiptSha256: "0".repeat(64) } })).value.predicate,
+    "CLOSURE_PREDICATES_UNVERIFIED");
+});
+
+test("capture retains partial bytes and refuses timed-out commands as complete evidence", async (t) => {
+  const { root, run } = await evidenceFixture(t);
+  const cwd = path.join(root, "checkout");
+  await mkdir(cwd);
+  const output = path.join(root, "interrupted.json");
+  const argv = [process.execPath, "-e", "require('node:fs').writeSync(1,'before wait');setTimeout(()=>{},30000)"];
+  const captured = await run("capture", { cwd, output, argv, timeoutMs: 500, scope: "synthetic gate", environmentScope: "fixture-clean" });
+  assert.equal(captured.status, 1);
+  const record = JSON.parse(await readFile(output, "utf8"));
+  assert.equal(record.interruption, "TIMEOUT");
+  assert.equal(record.stdout.labels.completeness, "partial");
+  assert.equal(verifyRepresentation(record.stdout).toString(), "before wait");
+  const verified = await run("verify", { file: output, sha256: captured.value.fileSha256 });
+  assert.equal(verified.status, 1);
+  assert.equal(verified.value.passed, false);
 });

@@ -186,27 +186,37 @@ for (const helper of ["change-guard.mjs", "change-workspace.mjs"]) {
     const ignored = path.join(f.scratch, "ignore");
     const global = path.join(f.scratch, "global.config");
     const system = path.join(f.scratch, "system.config");
+    const artifact = path.join(f.repo, "synthetic-untracked.txt");
+    const artifactBytes = Buffer.from("preserve this work\n");
     await writeFile(ignored, "synthetic-untracked.txt\n");
     const config = `[core]\n\texcludesFile = ${JSON.stringify(ignored)}\n`;
     await writeFile(global, config);
     await writeFile(system, config);
     await writeFile(path.join(f.home, ".gitconfig"), config);
-    await writeFile(path.join(f.repo, "synthetic-untracked.txt"), "preserve this work\n");
+    await writeFile(artifact, artifactBytes);
     const cases = [
-      { selectors: { GIT_CONFIG_GLOBAL: global, GIT_CONFIG_NOSYSTEM: "1" }, clean: true },
-      { selectors: { GIT_CONFIG_NOSYSTEM: "1" }, clean: true },
-      { selectors: { GIT_CONFIG_GLOBAL: "", GIT_CONFIG_NOSYSTEM: "1" }, clean: false },
-      { selectors: { GIT_CONFIG_GLOBAL: gitNullDevice, GIT_CONFIG_NOSYSTEM: "1" }, clean: false },
-      ...[undefined, "", "0", "1"].map((value) => ({ selectors: { GIT_CONFIG_GLOBAL: gitNullDevice, GIT_CONFIG_SYSTEM: system, ...(value === undefined ? {} : { GIT_CONFIG_NOSYSTEM: value }) }, clean: value !== "1" })),
-      { selectors: { GIT_CONFIG_GLOBAL: "", GIT_CONFIG_SYSTEM: "", GIT_CONFIG_NOSYSTEM: "" }, clean: false },
+      { selectors: { GIT_CONFIG_GLOBAL: global, GIT_CONFIG_NOSYSTEM: "1" }, ignored: true },
+      { selectors: { GIT_CONFIG_NOSYSTEM: "1" }, ignored: true },
+      { selectors: { GIT_CONFIG_GLOBAL: "", GIT_CONFIG_NOSYSTEM: "1" }, ignored: false },
+      { selectors: { GIT_CONFIG_GLOBAL: gitNullDevice, GIT_CONFIG_NOSYSTEM: "1" }, ignored: false },
+      ...[undefined, "", "0", "1"].map((value) => ({ selectors: { GIT_CONFIG_GLOBAL: gitNullDevice, GIT_CONFIG_SYSTEM: system, ...(value === undefined ? {} : { GIT_CONFIG_NOSYSTEM: value }) }, ignored: value !== "1" })),
+      { selectors: { GIT_CONFIG_GLOBAL: "", GIT_CONFIG_SYSTEM: "", GIT_CONFIG_NOSYSTEM: "" }, ignored: false },
     ];
     for (const entry of cases) {
       const env = { ...f.env };
       for (const name of selectors) delete env[name];
       Object.assign(env, entry.selectors);
       const result = f.invoke(helper, env);
-      assert.equal(result.status, entry.clean ? 0 : 1, JSON.stringify({ ...entry, result }));
-      if (!entry.clean) assert.match(result.error, /dirty|clean/i);
+      const diagnostic = JSON.stringify({ ...entry, result });
+      if (helper === "change-guard.mjs") {
+        assert.equal(result.status, 1, diagnostic);
+        assert.equal(result.error, entry.ignored
+          ? "Dirty checkout; unclassified ignored input: synthetic-untracked.txt"
+          : "Dirty checkout; preserve uncommitted work", diagnostic);
+      } else {
+        assert.equal(result.status, entry.ignored ? 0 : 1, diagnostic);
+        if (!entry.ignored) assert.match(result.error, /dirty|clean/i);
+      }
       const children = (await readFile(f.observed, "utf8")).trim().split("\n").map(JSON.parse);
       for (const { env: child } of children) {
         for (const name of selectors) {
@@ -215,7 +225,7 @@ for (const helper of ["change-guard.mjs", "change-workspace.mjs"]) {
         }
       }
       await rm(f.observed);
-      assert.equal(await readFile(path.join(f.repo, "synthetic-untracked.txt"), "utf8"), "preserve this work\n");
+      assert.deepEqual(await readFile(artifact), artifactBytes);
     }
     for (const name of ["GIT_CONFIG_GLOBAL", "GIT_CONFIG_SYSTEM"]) {
       const invalid = path.join(f.scratch, "invalid.config");
