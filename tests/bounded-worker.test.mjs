@@ -32,3 +32,32 @@ test("detached descendants after a successful leader exit prevent completion", a
   assert.equal(result.outcome, "surviving-descendants");
   assert.equal(result.quiescent, true);
 });
+
+const detached = (script) => `
+  const child = require("node:child_process").spawn(process.execPath,
+    ["-e", ${JSON.stringify(script)}], {detached:true, stdio:["ignore", 1, 2]});
+  child.unref();
+`;
+
+test("opt-in teardown grace requires natural quiescence within the worker limits", async () => {
+  const grace = { postLeaderGraceMs: 250 };
+  const orderly = detached('setTimeout(() => console.log("teardown"), 50)');
+  const result = await run(orderly, grace);
+  assert.deepEqual({
+    outcome: result.outcome, code: result.code, signal: result.signal,
+    quiescent: result.quiescent, stdout: result.stdout.toString(),
+  }, { outcome: "exit", code: 0, signal: null, quiescent: true, stdout: "teardown\n" });
+  assert.equal((await run(orderly)).outcome, "surviving-descendants");
+  for (const [script, outcome] of [
+    ["setInterval(() => {}, 1000)", "surviving-descendants"],
+    ['setTimeout(() => process.kill(process.pid, "SIGKILL"), 50)', "surviving-descendants"],
+    ['setTimeout(() => process.stdout.write("x".repeat(8192)), 50)', "stdout-quota"],
+  ]) {
+    const refused = await run(detached(script), grace);
+    assert.equal(refused.outcome, outcome);
+    assert.equal(refused.quiescent, true);
+  }
+  const timedOut = await run(detached("setInterval(() => {}, 1000)"), { ...grace, timeoutMs: 150 });
+  assert.equal(timedOut.outcome, "timeout");
+  assert.equal(timedOut.quiescent, true);
+});

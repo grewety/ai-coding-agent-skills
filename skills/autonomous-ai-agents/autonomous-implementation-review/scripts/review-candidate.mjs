@@ -299,13 +299,17 @@ export async function reviewCommand(argv, openRuntime = withReviewRuntime) {
     const directory = options.output;
     await newProtectedDirectory(directory, excluded);
     let phase = "probe-failed";
-    await openRuntime(config, { parent: directory, excluded: [directory], packetCount: 0 }, async (run) => {
-      const attempt = await run({ files: new Map(), prompt: probePrompt });
-      await capture(directory, 0, attempt);
-      if (audit(attempt, [], true) !== null) phase = "probe-passed";
-    });
-    await writeJson(directory, "status.json", { schemaVersion: 1, phase, deliveryAccepted: false });
-    await sealDirectories(directory);
+    try {
+      const passed = await openRuntime(config, { parent: directory, excluded: [directory], packetCount: 0 }, async (run) => {
+        const attempt = await run({ files: new Map(), prompt: probePrompt });
+        await capture(directory, 0, attempt);
+        return audit(attempt, [], true) !== null;
+      });
+      if (passed) phase = "probe-passed";
+    } finally {
+      await writeJson(directory, "status.json", { schemaVersion: 1, phase, deliveryAccepted: false });
+      await sealDirectories(directory);
+    }
     return { phase };
   }
   const { request, expect } = await loadInputs(options.request, options.expect);

@@ -1,6 +1,7 @@
 import { fileLimit, fields, need, parseStrictJson, text, utf8 } from "./review-inputs.mjs";
 
 const empty = (value) => Array.isArray(value) && value.length === 0;
+const nonnegativeInteger = (value) => Number.isSafeInteger(value) && value >= 0;
 const blocks = (event) => {
   need(Array.isArray(event.message?.content) && event.message.content.length > 0 && !event.parent_tool_use_id,
     "Invalid native stream message");
@@ -35,7 +36,14 @@ export function auditClaudeStream(proc, runtime, assigned, probe) {
   const seenPaths = new Set();
   let finalText = [];
   for (const event of events.slice(1, -1)) {
-    if (event.type === "assistant") {
+    if (event.type === "system" && event.subtype === "thinking_tokens") {
+      fields(event, ["type", "subtype", "session_id", "estimated_tokens", "estimated_tokens_delta"],
+        "native thinking advisory", ["uuid", "user_message_uuid"]);
+      need(nonnegativeInteger(event.estimated_tokens) && nonnegativeInteger(event.estimated_tokens_delta) &&
+        event.estimated_tokens_delta <= event.estimated_tokens &&
+        [event.uuid, event.user_message_uuid].every((value) => value === undefined || text(value)),
+      "Invalid native thinking advisory");
+    } else if (event.type === "assistant") {
       need(pending.size === 0 && (event.message?.model === undefined || event.message.model === runtime.model),
         "Unexpected native stream assistant turn");
       finalText = [];
@@ -46,7 +54,21 @@ export function auditClaudeStream(proc, runtime, assigned, probe) {
           finalText.push(block.text);
           continue;
         }
-        fields(block, ["type", "id", "name", "input"], "native Read");
+        if (block.type === "thinking") {
+          fields(block, ["type", "thinking", "signature"], "native thinking block");
+          need(typeof block.thinking === "string" && typeof block.signature === "string", "Invalid native thinking block");
+          continue;
+        }
+        if (block.type === "redacted_thinking") {
+          fields(block, ["type", "data"], "native redacted thinking block");
+          need(text(block.data), "Invalid native redacted thinking block");
+          continue;
+        }
+        fields(block, ["type", "id", "name", "input"], "native Read", ["caller"]);
+        if (block.caller !== undefined) {
+          fields(block.caller, ["type"], "native Read caller");
+          need(block.caller.type === "direct", "Unexpected native Read caller");
+        }
         fields(block.input, ["file_path"], "whole-file Read");
         const pathname = block.input.file_path;
         need(!probe && block.type === "tool_use" && block.name === "Read" && text(block.id) &&
@@ -55,15 +77,23 @@ export function auditClaudeStream(proc, runtime, assigned, probe) {
         pending.set(block.id, pathname);
       }
     } else if (event.type === "user") {
-      for (const block of blocks(event)) {
-        fields(block, ["type", "tool_use_id", "content"], "native Read result", ["is_error"]);
-        const pathname = pending.get(block.tool_use_id);
-        need(block.type === "tool_result" && pathname && [false, undefined].includes(block.is_error) &&
-          typeof block.content === "string" && !/(?:truncated|exceeds maximum|file content differs|no lines read)/i.test(block.content) &&
-          (block.content.length > 0 || pathname.endsWith(".patch")), "Failed or partial Read result");
-        seenPaths.add(pathname);
-        pending.delete(block.tool_use_id);
-      }
+      const results = blocks(event);
+      need(results.length === 1 && !event.isSynthetic, "Unpaired native Read result");
+      const [block] = results;
+      fields(block, ["type", "tool_use_id", "content"], "native Read result", ["is_error"]);
+      const pathname = pending.get(block.tool_use_id);
+      const metadata = event.tool_use_result;
+      fields(metadata, ["type", "file"], "native Read metadata");
+      const { file } = metadata;
+      fields(file, ["filePath", "content", "startLine", "numLines"], "native Read file metadata", ["totalLines"]);
+      need(block.type === "tool_result" && pathname && [false, undefined].includes(block.is_error) &&
+        typeof block.content === "string" && (block.content.length > 0 || pathname.endsWith(".patch")) &&
+        metadata.type === "text" && file.filePath === pathname && typeof file.content === "string" &&
+        file.startLine === 1 && nonnegativeInteger(file.numLines) &&
+        (file.numLines > 0 || (file.content === "" && pathname.endsWith(".patch"))) &&
+        (file.totalLines === undefined || file.numLines === file.totalLines), "Failed or partial Read result");
+      seenPaths.add(pathname);
+      pending.delete(block.tool_use_id);
     } else {
       throw new Error("Unexpected native stream event");
     }

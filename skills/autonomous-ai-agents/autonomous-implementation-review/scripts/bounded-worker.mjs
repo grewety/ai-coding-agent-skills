@@ -6,9 +6,10 @@ export const captureAggregateLimit = 32 * 1024 * 1024;
 
 export async function runBoundedWorker(command, args, {
   cwd, env, input = Buffer.alloc(0), timeoutMs = 30000,
-  stdoutLimit = 4 * 1024 * 1024, stderrLimit = 1024 * 1024,
+  stdoutLimit = 4 * 1024 * 1024, stderrLimit = 1024 * 1024, postLeaderGraceMs = 0,
 }) {
   if (process.platform !== "linux" || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 600000 ||
+      !Number.isSafeInteger(postLeaderGraceMs) || postLeaderGraceMs < 0 || postLeaderGraceMs > 250 ||
       ![stdoutLimit, stderrLimit, input.length].every((n) => Number.isSafeInteger(n) && n >= 0 && n <= captureLimit)) {
     throw new Error("Unavailable or invalid bounded worker supervision");
   }
@@ -28,6 +29,6 @@ export async function runBoundedWorker(command, args, {
     });
     child.stdin.on("error", () => {}); // The supervisor exit reports a control-channel failure.
     child.stdin.end(JSON.stringify({ argv: [command, ...args], cwd, env, timeoutMs, stdoutLimit, stderrLimit,
-      input: Buffer.from(input).toString("base64") }));
+      postLeaderGraceMs, input: Buffer.from(input).toString("base64") }));
   });
 }

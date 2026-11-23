@@ -6,13 +6,19 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { runBoundedWorker } from "./bounded-worker.mjs";
 import { safePath, writeClosed } from "./worker-handoff.mjs";
-import { absolute, digest, fields, hash, jsonBytes, need, separate, text } from "./review-inputs.mjs";
+import { absolute, digest, fields, hash, jsonBytes, need, separate } from "./review-inputs.mjs";
 
 export const claudeVersion = "2.1.330";
 export const bubblewrapVersion = "0.9.0";
 const moduleFile = (name) => fileURLToPath(new URL(name, import.meta.url));
 const bridge = moduleFile("./review-sandbox-bridge.mjs");
 const launcherEnv = { PATH: "/usr/bin:/bin", HOME: "/nonexistent", LC_ALL: "C" };
+const pluginSettings = JSON.stringify({ enabledPlugins: {
+  "cc-plugin-sec-default@builtin": false,
+  "cc-plugin-agents-md@builtin": false,
+  "cc-plugin-privacy@builtin": false,
+  "cc-plugin-plugin-authoring@builtin": false,
+} });
 
 export function validateHostConfig(config) {
   fields(config, ["schemaVersion", "bwrap", "claude", "node", "libraries", "model", "relay",
@@ -53,7 +59,7 @@ export function validateHostConfig(config) {
 
 export function containmentArgs(config, exportDirectory, socket, runtime) {
   return [
-    "--unshare-all", "--die-with-parent", "--new-session", "--disable-userns", "--cap-drop", "ALL",
+    "--unshare-all", "--unshare-user", "--die-with-parent", "--new-session", "--disable-userns", "--cap-drop", "ALL",
     "--clearenv", "--proc", "/proc", "--remount-ro", "/proc", "--dev", "/dev", "--remount-ro", "/dev",
     "--tmpfs", "/scratch", "--ro-bind", exportDirectory, "/review",
     "--ro-bind", socket, "/control/inference.sock", "--ro-bind", bridge, "/control/bridge.mjs",
@@ -70,7 +76,8 @@ export function containmentArgs(config, exportDirectory, socket, runtime) {
     "--remount-ro", "/", "--chdir", "/review", "--", "/control/node", "/control/bridge.mjs",
     "--print", "--verbose", "--output-format", "stream-json", "--session-id", runtime.session,
     "--model", config.model, "--permission-mode", "dontAsk", "--tools", "Read", "--allowedTools", "Read",
-    "--no-session-persistence", "--setting-sources", "", "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}',
+    "--no-session-persistence", "--setting-sources", "", "--settings", pluginSettings,
+    "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}',
     "--disable-slash-commands", "--no-chrome", "--permission-prompts", "none", "--max-turns", String(config.maxTurns), "--max-budget-usd", String(config.maxBudgetUsd),
   ];
 }
@@ -112,8 +119,14 @@ async function sameUidRelay(config, scratch, requestLimit) {
   const child = spawn(process.execPath, [moduleFile("./review-relay.mjs")], {
     env: launcherEnv, stdio: ["pipe", "ignore", "ignore", "ipc"],
   });
-  const closed = new Promise((resolve) => child.once("close", resolve));
-  child.stdin.on("error", () => {});
+  // Exit can precede close of the parent-side IPC and stdin handles.
+  let exited = false;
+  const stopped = new Promise((resolve) => {
+    const done = () => { exited = true; resolve(); };
+    child.once("exit", done);
+    child.on("error", () => { if (child.pid === undefined) done(); });
+  });
+  child.stdin?.on("error", () => {});
   const start = new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error("Host relay startup timed out")), 5000);
     child.once("message", (event) => {
@@ -122,14 +135,27 @@ async function sameUidRelay(config, scratch, requestLimit) {
       else reject(new Error("Host relay readiness failed"));
     });
     child.once("error", () => { clearTimeout(timeout); reject(new Error("Host relay unavailable")); });
-    child.once("close", () => { clearTimeout(timeout); reject(new Error("Host relay stopped before readiness")); });
+    child.once("exit", () => { clearTimeout(timeout); reject(new Error("Host relay stopped before readiness")); });
   });
-  child.stdin.end(jsonBytes({
+  child.stdin?.end(jsonBytes({
     socket, keyFile: config.relay.keyFile, keyFormat: config.relay.keyFormat, model: config.model, requestLimit, socketMode: 0o600,
   }));
   const close = async () => {
+    child.stdin?.destroy();
     if (child.connected) child.disconnect();
-    await closed;
+    if (exited) return;
+    const term = setTimeout(() => { if (!exited) child.kill("SIGTERM"); }, 500);
+    const kill = setTimeout(() => { if (!exited) child.kill("SIGKILL"); }, 1500);
+    let deadline;
+    try {
+      await Promise.race([stopped, new Promise((_, reject) => {
+        deadline = setTimeout(() => reject(new Error("Host relay did not exit")), 3000);
+      })]);
+    } finally {
+      clearTimeout(term);
+      clearTimeout(kill);
+      clearTimeout(deadline);
+    }
   };
   try { await start; } catch (error) { await close(); throw error; }
   return { socket, close };
@@ -162,12 +188,13 @@ export async function withReviewRuntime(config, { parent, excluded, packetCount 
       const runtime = runtimeBinding(config, session);
       const proc = await runBoundedWorker(config.bwrap.path, containmentArgs(config, packet, relay.socket, runtime), {
         cwd: scratch, env: launcherEnv, input: Buffer.from(prompt), timeoutMs: config.timeoutMs,
+        postLeaderGraceMs: 250, // Bubblewrap's namespace reaper can outlive its status-reporting launcher.
         stdoutLimit: 8 * 1024 * 1024, stderrLimit: 128 * 1024,
       });
       return { runtime, proc };
     });
   } finally {
-    await relay?.close();
-    await rm(scratch, { recursive: true, force: true });
+    try { await relay?.close(); }
+    finally { await rm(scratch, { recursive: true, force: true }); }
   }
 }

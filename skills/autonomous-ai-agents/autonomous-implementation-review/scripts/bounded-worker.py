@@ -11,15 +11,18 @@ import time
 
 
 def reap(worker):
+    descendant_signaled = False
     while True:
         try:
             pid, status = os.waitpid(-1, os.WNOHANG)
         except ChildProcessError:
-            return True
+            return True, descendant_signaled
         if pid == 0:
-            return False
+            return False, descendant_signaled
         if pid == worker.pid:
             worker.returncode = os.waitstatus_to_exitcode(status)
+        elif os.WIFSIGNALED(status):
+            descendant_signaled = True
 
 
 def kill_children():
@@ -57,6 +60,7 @@ def run(spec):
         os.close(fd)
     kill_children()
     deadline = time.monotonic() + spec["timeoutMs"] / 1000
+    grace = spec.get("postLeaderGraceMs", 0) / 1000
     captures = {"stdout": bytearray(), "stderr": bytearray()}
     with selectors.DefaultSelector() as ready:
         worker = subprocess.Popen(spec["argv"], cwd=spec["cwd"], env=spec["env"],
@@ -74,21 +78,33 @@ def run(spec):
                 worker.stdin.close()
             outcome = None
             cleanup_deadline = None
+            teardown_deadline = None
             while True:
-                quiescent = reap(worker)
+                quiescent, descendant_signaled = reap(worker)
                 now = time.monotonic()
                 if outcome is None:
                     if now >= deadline:
                         outcome = "timeout"
-                    elif worker.returncode is not None and not quiescent:
+                    elif grace and descendant_signaled:
                         outcome = "surviving-descendants"
+                    elif teardown_deadline is not None:
+                        if now >= teardown_deadline:
+                            outcome = "surviving-descendants"
+                    elif worker.returncode is not None and not quiescent:
+                        if grace and worker.returncode == 0:
+                            teardown_deadline = min(deadline, now + grace)
+                        else:
+                            outcome = "surviving-descendants"
                     if outcome:
                         cleanup_deadline = now + 2
                 if outcome and not quiescent:
                     if now >= cleanup_deadline:
                         break
                     kill_children()
-                events = ready.select(0 if quiescent else 0.01)
+                poll = 0.01
+                if outcome is None and teardown_deadline is not None:
+                    poll = min(poll, teardown_deadline - now)
+                events = ready.select(0 if quiescent else poll)
                 for key, _ in events:
                     name = key.data
                     if name == "stdin":
