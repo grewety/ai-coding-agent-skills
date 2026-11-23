@@ -17,7 +17,7 @@ Acceptance covers canonical claims across worktrees/clones, separate slots, pair
 
 ## 2. Delivery integration and operator readiness
 
-- [ ] 2.1 Connect verified settled handovers and post-worker scope checks to the existing delivery policy, align the next handoff, and ship synchronized operator documentation and all affected versions. Verify the policy, packaging and metadata gates, current-spec promotion and exact-candidate independent review.
+- [x] 2.1 Connect verified settled handovers and post-worker scope checks to the existing delivery policy, align the next handoff, and ship synchronized operator documentation and all affected versions. Verify the policy, packaging and metadata gates, current-spec promotion and exact-candidate independent review.
 
 Acceptance covers Task-Guided predecessor ordering and Goal-First acceptance, inspect and retained restrictions, no commits, no fallback, failed gates, stale or missing review, ownership uncertainty, correction and recovery continuity, exact candidate and plan checks, package and plugin inventory, and unsupported route dispositions. Update applicable current specs with the delta semantics and identity metadata before final readiness. Documentation must match what is available at this checkpoint and describe live support as pending until proved. This group depends on the accepted interface and evidence from 1.1.
 
