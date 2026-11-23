@@ -139,6 +139,7 @@ async function sameUidRelay(config, scratch, requestLimit) {
   });
   child.stdin?.end(jsonBytes({
     socket, keyFile: config.relay.keyFile, keyFormat: config.relay.keyFormat, model: config.model, requestLimit, socketMode: 0o600,
+    timeoutMs: config.timeoutMs,
   }));
   const close = async () => {
     child.stdin?.destroy();

@@ -63,22 +63,101 @@ export function relayRequest(req, bytes, model, maxRequests) {
   return headers;
 }
 
-async function serve(config) {
-  fields(config, ["socket", "keyFile", "keyFormat", "model", "requestLimit", "socketMode"], "relay configuration");
+function refuse(res) {
+  if (res.destroyed) return;
+  if (res.headersSent) res.destroy();
+  else res.writeHead(403, { "content-type": "text/plain", connection: "close" }).end("Inference relay refused request");
+}
+
+export function forwardInference(upstream, res, body, timeoutMs) {
+  const idleMs = Math.min(timeoutMs, 90000);
+  let response;
+  let idle;
+  let finished = false;
+  let received = 0;
+  const resume = () => response.resume();
+  const resetIdle = () => {
+    clearTimeout(idle);
+    idle = setTimeout(fail, idleMs);
+  };
+  const data = (chunk) => {
+    resetIdle();
+    received += chunk.length;
+    if (received > maximumResponse) fail();
+    else if (!res.write(chunk)) response.pause();
+  };
+  const cleanup = () => {
+    finished = true;
+    clearTimeout(deadline);
+    clearTimeout(idle);
+    res.off("drain", resume);
+    res.off("close", abort);
+    response?.off("data", data);
+  };
+  const abort = () => {
+    cleanup();
+    response?.destroy();
+    upstream.destroy();
+  };
+  function fail() {
+    if (finished) return;
+    abort();
+    refuse(res);
+  }
+  const deadline = setTimeout(fail, timeoutMs);
+  upstream.once("close", fail);
+  upstream.on("error", fail);
+  res.once("close", abort);
+  upstream.once("response", (incoming) => {
+    response = incoming;
+    response.on("error", fail);
+    response.once("close", fail);
+    if (finished) {
+      response.destroy();
+      return;
+    }
+    // Reject redirects and provider errors without forwarding their headers or bodies.
+    const type = response.headers["content-type"];
+    if (response.statusCode !== 200 || typeof type !== "string" ||
+        !/^(?:text\/event-stream|application\/json)(?:;|$)/.test(type)) {
+      fail();
+      return;
+    }
+    res.writeHead(200, { "content-type": type });
+    resetIdle();
+    res.on("drain", resume);
+    response.once("end", () => {
+      if (finished) return;
+      cleanup();
+      res.end();
+    });
+    response.on("data", data);
+  });
+  if (res.destroyed) abort();
+  else {
+    try { upstream.end(body); }
+    catch { fail(); }
+  }
+}
+
+export function validateRelayConfig(config) {
+  fields(config, ["socket", "keyFile", "keyFormat", "model", "requestLimit", "socketMode", "timeoutMs"], "relay configuration");
   need(absolute(config.socket) && path.basename(config.socket) === "inference.sock" && absolute(config.keyFile) &&
     ["raw", "assignment"].includes(config.keyFormat) && typeof config.model === "string" &&
     [0o600, 0o660].includes(config.socketMode) && Number.isSafeInteger(config.requestLimit) &&
-    config.requestLimit > 0 && config.requestLimit <= 4096, "Invalid host relay configuration");
+    config.requestLimit > 0 && config.requestLimit <= 4096 &&
+    Number.isSafeInteger(config.timeoutMs) && config.timeoutMs >= 1000 && config.timeoutMs <= 300000,
+    "Invalid host relay configuration");
+}
+
+async function serve(config) {
+  validateRelayConfig(config);
   await safePath(config.socket, true);
   const key = await readHostKey(config.keyFile, config.keyFormat);
   let available = config.requestLimit;
   const connections = new Set();
   const upstreams = new Set();
   const server = createServer({ maxHeaderSize: 8192, requestTimeout: 10000, headersTimeout: 10000 }, async (req, res) => {
-    const reject = () => {
-      if (res.headersSent) res.destroy();
-      else res.writeHead(403, { "content-type": "text/plain", connection: "close" }).end("Inference relay refused request");
-    };
     try {
       need(available-- > 0, "Relay quota exhausted");
       const data = [];
@@ -96,40 +175,14 @@ async function serve(config) {
         headers: { ...headers, "x-api-key": key },
       });
       upstreams.add(upstream);
-      const deadline = setTimeout(() => upstream.destroy(), 90000);
-      upstream.on("close", () => { clearTimeout(deadline); upstreams.delete(upstream); });
-      upstream.on("error", reject);
-      res.on("close", () => upstream.destroy());
-      upstream.on("response", (response) => {
-        if (response.statusCode !== 200) {
-          response.destroy();
-          reject(); // Do not reflect redirects, headers, or provider error bodies.
-          return;
-        }
-        const type = response.headers["content-type"];
-        if (typeof type !== "string" || !/^(?:text\/event-stream|application\/json)(?:;|$)/.test(type)) {
-          response.destroy();
-          reject();
-          return;
-        }
-        res.writeHead(200, { "content-type": type });
-        let received = 0;
-        response.on("data", (chunk) => {
-          received += chunk.length;
-          if (received > maximumResponse) { response.destroy(); res.destroy(); }
-          else if (!res.write(chunk)) response.pause();
-        });
-        res.on("drain", () => response.resume());
-        response.on("error", reject);
-        response.on("end", () => res.end());
-      });
-      upstream.end(body);
-    } catch { reject(); }
+      upstream.once("close", () => upstreams.delete(upstream));
+      forwardInference(upstream, res, body, config.timeoutMs);
+    } catch { refuse(res); }
   });
   server.maxConnections = 8;
+  server.setTimeout(config.timeoutMs + 10000, (socket) => socket.destroy());
   server.on("connection", (socket) => {
     connections.add(socket);
-    socket.setTimeout(100000, () => socket.destroy());
     socket.on("close", () => connections.delete(socket));
   });
   await new Promise((resolve, reject) => {

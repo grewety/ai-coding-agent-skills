@@ -1,4 +1,5 @@
 import { execFile, spawnSync } from "node:child_process";
+import { EventEmitter } from "node:events";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -128,7 +129,9 @@ import path from "node:path";
 import { hash, jsonBytes, buildExport } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-inputs.mjs";
 import { reviewCommand } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-candidate.mjs";
 import { containmentArgs, withReviewRuntime } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-runtime.mjs";
-import { readHostKey, credentialValue, relayRequest } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-relay.mjs";
+import * as relay from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-relay.mjs";
+
+const { readHostKey, credentialValue, relayRequest } = relay;
 
 const startupLabels = ["claude", "Explore", "general-purpose", "Plan", "statusline-setup"];
 
@@ -173,6 +176,128 @@ test("relay policy admits only the bounded pinned inference request and filtered
   assert.throws(() => relayRequest({ ...req, headers: { ...req.headers, "anthropic-beta": "invalid;value" } },
     body, runtime.model, 1), /feature header/);
 });
+
+test("relay timeout configuration requires a bounded safe integer", () => {
+  const config = { socket: "/fixture/inference.sock", keyFile: "/fixture/key", keyFormat: "raw",
+    model: runtime.model, requestLimit: 1, socketMode: 0o600 };
+  assert.throws(() => relay.validateRelayConfig(config), /configuration schema/);
+  for (const timeoutMs of [undefined, null, "1000", 999, 1000.5, 300001, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.throws(() => relay.validateRelayConfig({ ...config, timeoutMs }), /Invalid host relay configuration/);
+  }
+  for (const timeoutMs of [1000, 300000]) {
+    assert.doesNotThrow(() => relay.validateRelayConfig({ ...config, timeoutMs }));
+  }
+});
+
+function relayStreams(t, timeoutMs = 240000, blocked = false) {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const upstream = Object.assign(new EventEmitter(), { end() {},
+    destroy() { this.destroyed = true; this.emit("close"); } });
+  const response = Object.assign(new EventEmitter(), { statusCode: 200, headers: { "content-type": "text/event-stream" },
+    destroy() { this.destroyed = true; this.emit("close"); },
+    pause() { this.paused = true; }, resume() { this.paused = false; } });
+  const chunks = [];
+  const res = Object.assign(new EventEmitter(), {
+    writeHead(status) { this.status = status; this.headersSent = true; return this; },
+    write(chunk) { chunks.push(chunk.toString()); return !blocked; },
+    end() { this.ended = true; },
+    destroy() { this.destroyed = true; this.emit("close"); },
+  });
+  relay.forwardInference(upstream, res, Buffer.from("{}"), timeoutMs);
+  return { upstream, response, res, chunks, accept: () => upstream.emit("response", response),
+    send: (chunk) => response.emit("data", Buffer.from(chunk)), tick: (ms) => t.mock.timers.tick(ms) };
+}
+
+test("relay timeout allows healthy streaming past 90 seconds and cleans up after end", (t) => {
+  const { upstream, response, res, chunks, accept, send, tick } = relayStreams(t, 240000, true);
+  accept();
+  tick(80000);
+  send("first");
+  assert.equal(response.paused, true);
+  res.emit("drain");
+  assert.equal(response.paused, false);
+  tick(80000);
+  send("second");
+  assert.equal(upstream.destroyed, undefined);
+  response.emit("end");
+  tick(240000);
+  assert.deepEqual(chunks, ["first", "second"]);
+  assert.equal(res.ended, true);
+  assert.equal(res.listenerCount("drain"), 0);
+  assert.equal(upstream.destroyed, undefined);
+  assert.equal(res.destroyed, undefined);
+});
+
+test("relay timeout aborts a stalled accepted response after 90 seconds of inactivity", (t) => {
+  const { upstream, response, res, accept, send, tick } = relayStreams(t, 240000, true);
+  tick(20000);
+  accept();
+  tick(80000);
+  send("first");
+  tick(89999);
+  assert.equal(res.destroyed, undefined);
+  tick(1);
+  assert.equal(res.destroyed, true);
+  assert.equal(upstream.destroyed, true);
+  assert.equal(response.destroyed, true);
+  assert.equal(res.listenerCount("drain"), 0);
+});
+
+test("relay timeout hard cap starts before response and wins despite continued chunks", (t) => {
+  const { upstream, response, res, accept, send, tick } = relayStreams(t, 200000);
+  tick(60000);
+  accept();
+  send("first");
+  tick(70000);
+  send("second");
+  tick(69999);
+  send("third");
+  assert.equal(res.destroyed, undefined);
+  tick(1);
+  assert.equal(res.destroyed, true);
+  assert.equal(upstream.destroyed, true);
+  assert.equal(response.destroyed, true);
+});
+
+test("relay timeout watches an accepted response before its first chunk", (t) => {
+  const { upstream, response, res, accept, tick } = relayStreams(t);
+  accept();
+  tick(89999);
+  assert.equal(upstream.destroyed, undefined);
+  tick(1);
+  assert.equal(upstream.destroyed, true);
+  assert.equal(response.destroyed, true);
+  assert.equal(res.destroyed, true);
+});
+
+test("relay timeout caps a request waiting for response headers", (t) => {
+  const { upstream, res, tick } = relayStreams(t, 1000);
+  tick(999);
+  assert.equal(upstream.destroyed, undefined);
+  tick(1);
+  assert.equal(upstream.destroyed, true);
+  assert.equal(res.status, 403);
+  assert.equal(res.ended, true);
+});
+
+for (const event of ["downstream close", "upstream error", "response error", "response close"]) {
+  test(`relay timeout cleans up a paused response on ${event}`, (t) => {
+    const { upstream, response, res, accept, send, tick } = relayStreams(t, 240000, true);
+    accept();
+    send("first");
+    assert.equal(response.paused, true);
+    if (event === "downstream close") res.destroy();
+    if (event === "upstream error") upstream.emit("error", new Error("fixture"));
+    if (event === "response error") response.emit("error", new Error("fixture"));
+    if (event === "response close") response.destroy();
+    assert.equal(upstream.destroyed, true);
+    assert.equal(response.destroyed, true);
+    assert.equal(res.destroyed, true);
+    assert.equal(res.listenerCount("drain"), 0);
+    assert.equal(response.listenerCount("data"), 0);
+    tick(240000);
+  });
+}
 
 test("built-in agent labels are metadata while agent invocation and child turns are denied", () => {
   const startup = { ...init, agents: startupLabels };
