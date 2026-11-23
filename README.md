@@ -17,7 +17,7 @@ The five packages below are companions, not a replacement for those prerequisite
 | Skill | What it adds |
 | --- | --- |
 | [openspec-delivery](skills/software-development/openspec-delivery/SKILL.md) | Automatic workspace setup, bounded execution and verified closeout, with lossless evidence representation. |
-| [openspec-next](skills/software-development/openspec-next/SKILL.md) | Find and advance the next approved local task group; inspect mode is read-only. |
+| [openspec-next](skills/software-development/openspec-next/SKILL.md) | Inspect or advance the approved local goal or first eligible ordered task group. |
 | [git-commit-message](skills/software-development/git-commit-message/SKILL.md) | Logical batches, a preview, and exact staging. Commit authority stays explicit. |
 | [capability-wireframes](skills/software-development/capability-wireframes/SKILL.md) | Stable HTML/PNG review for a primary human-facing surface. |
 | [autonomous-implementation-review](skills/autonomous-ai-agents/autonomous-implementation-review/SKILL.md) | Optional fresh implementer and read-only reviewer for one task group. |
@@ -38,10 +38,13 @@ Installing these packages does not select the workflow for another project, tran
 The [delivery policy protocol](skills/software-development/openspec-delivery/references/delivery-policy.md)
 checks the integrated plan parent and declared contributor-contract paths before
 freeze/execution; independent review determines goal alignment without a separate
-approval checkpoint for an in-scope edit. Single-group continuation remains the default; pre-execution
-approach review and continuous-goal continuation require explicit selection at
-that parent and the optional orchestration package. Later policy edits do not
-widen frozen plans. Its [portable core](skills/autonomous-ai-agents/autonomous-implementation-review/references/portable-core.md)
+approval checkpoint for an in-scope edit. An integrated opt-in selects Goal-First
+for eligible reversible local work. It requires an exact approved Goal Contract,
+a separate bounded local grant and one native outcome checkbox. Task-Guided
+preserves frozen SHA and plan-digest approval for ordered, prescribed or staged
+work and when the verified parent has no opt-in. It defaults to one eligible group.
+Pre-execution approach review and continuous-goal continuation require explicit
+parent selection and the optional orchestration package. Its [portable core](skills/autonomous-ai-agents/autonomous-implementation-review/references/portable-core.md)
 checks outcome/review evidence without Hermes or Herdr; it does not qualify a
 client or retire a legacy route. Terminal adapter qualification remains a separate
 prerequisite for new role dispatch. Minimum-outcome authoring accompanies workflow
@@ -52,7 +55,9 @@ results. Execution completion never grants delivery acceptance. Routine correcti
 use the permitted writer and retained budget; one verified iteration-cap continuation
 is keyed to the native task, not a session or label. Unintegrated contract changes
 are inert for their own change through integration. This repository's future-policy
-selection becomes effective only for later plans after integration.
+selection becomes effective only for later plans after integration. The
+introducing change `goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc` retains
+its inherited Task-Guided policy and approval.
 
 The delivery Git helpers share an explicit [child environment contract](skills/software-development/openspec-delivery/references/git-environment.md):
 only allowlisted runtime/configuration values reach Git, with global/system selectors
@@ -61,11 +66,10 @@ Copy complete packages, including the shared constructor; Node 22+ and Git remai
 the prerequisites. Native macOS/Windows results are required separately from WSL or
 case simulations; missing results block hardening completion, not just publication.
 
-Separately, delivery's local representation support comprises
-`references/evidence-retention.md` and `scripts/evidence-retention.mjs`.
-Keep both in complete packages and copies. It preserves captured bytes/hashes
-and checks claim support; it is not a Git helper, gate runner, reviewer
-authenticator, scheduler, polling client or approval/publication authority.
+Delivery's local evidence support captures authorized exact-SHA gates,
+preserves both streams and hashes, and checks retained readback claims offline.
+Keep `references/evidence-retention.md`, `scripts/evidence-retention.mjs` and
+`scripts/evidence-cli.mjs` in complete packages and copies.
 Rejected records remain distinct from successor dispositions with inherited
 two-cycle continuity. Closure requires local closure gates, fresh independent
 factual review at the exact closure SHA, then separately authorized publication;
@@ -371,14 +375,23 @@ does not select a role transport; Herdr remains available as the prequalified
 same-session human-input fallback).
 
 For a project that explicitly adopts the short-invocation policy, the operator
-sends `/openspec-next` to advance the current approved group, or
-`/openspec-delivery <name>` to select a change. Setup, bootstrap, task updates and
-previewed autonomous local commits are included; push/PR/merge are not. Operator
-restrictions override defaults. `/openspec-next inspect` is read-only.
-`/openspec-delivery finish <name>` separately authorizes protected publication
-and verified receipt/archive/issue closure/clean-worktree retirement for that
-change, not branch deletion, a release or another change. See the SDLC for the
-complete contract. No operator worktree commands are required.
+sends the host-native next or delivery invocation to advance the approved local
+outcome or Task-Guided group. The bounded grant includes setup, bootstrap,
+orchestrator-only task updates and previewed local commits. Operator restrictions
+persist and inspect is read-only.
+
+| Host | Inspect | Continue | Local delivery |
+| --- | --- | --- | --- |
+| Codex CLI or IDE | `$openspec-next inspect pin-note` | `$openspec-next pin-note` | `$openspec-delivery pin-note` |
+| Hermes CLI | `/openspec-next inspect pin-note` | `/openspec-next pin-note` | `/openspec-delivery pin-note` |
+| Claude Code direct skill | `/openspec-next inspect pin-note` | `/openspec-next pin-note` | `/openspec-delivery pin-note` |
+| Claude Code enabled marketplace plugin | `/openspec-development:openspec-next inspect pin-note` | `/openspec-development:openspec-next pin-note` | `/openspec-development:openspec-delivery pin-note` |
+
+After the exact candidate passes readiness, the delivery skill's `finish <name>`
+verb separately authorizes the protected PR and verified receipt, archive, issue
+closure and clean-worktree retirement. Declared local UI gates use loopback
+try-out and accessible-name checks. External tests, tunnels, app triggers
+and PR deploy previews require their own single-run grants. [Authority, finish examples and upstream host syntax](docs/openspec-workflow.md#short-operator-commands).
 
 For a persisted Hermes goal, the optional short form is below. Displaying the
 template grants no authority.
@@ -735,11 +748,12 @@ no generated skill copies are committed. Its explicit skill lists separate the
 OpenSpec companion workflow from opt-in orchestration. Bump every affected plugin's version when
 its bundled content changes. See the [Claude release checks](docs/claude-installation.md#maintainer-verification).
 
-Current source versions are delivery 1.3.1 and its affected
-`openspec-development` plugin 1.3.1; `openspec-next` is 0.4.0 and
-`autonomous-orchestration` is 1.9.0 (core skill 0.19.0). Complete well-known output, the delivery
-skill ZIP, workflow plugin ZIP and isolated native copies must retain the lossless
-reference/helper pair byte-for-byte. Source assertions are not executed packaging
+Current source versions are delivery 1.4.0 and its affected
+`openspec-development` plugin 1.4.0; `openspec-next` is 0.5.0 and
+`autonomous-orchestration` is 1.9.0 (core skill 0.19.0). Complete well-known output,
+skill ZIPs, workflow plugin ZIP and isolated native copies must retain all support
+files byte-for-byte, including delivery's runtime and evidence commands and next's
+read-only routing script and reference. Source assertions are not executed packaging
 proof or a claim of updated public downloads, native client discovery, Desktop
 acceptance or scanner approval. No upstream prerequisite or installation route is
 added by this representation facility.

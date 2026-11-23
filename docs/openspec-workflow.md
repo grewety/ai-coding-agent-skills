@@ -32,17 +32,39 @@ Strict CLI validation does not prove semantic minimality. Existing approved plan
 remain unchanged; native `tasks.md` stays the sole mutable progress authority.
 
 Apply [delivery policy](../skills/software-development/openspec-delivery/references/delivery-policy.md)
-before freeze/execution: derive policy from the verified integrated plan parent,
-not a changed working-tree contributor contract. Declared goal-aligned contract
-edits receive independent alignment review, not a separate operator checkpoint;
-unintegrated edits cannot change their own authority through integration. The examples below
-show default single-group behavior. If the parent's contributor contract selected
-continuous-goal, a bare next advances consecutive eligible groups until an explicit
-stop, budget or authority boundary; a narrower operator restriction wins. Selected
-pre-execution review requires the optional orchestration package's matching retained
-whole-plan review before freeze and execution. Neither policy applies retroactively.
-The core is available without Hermes/Herdr; new terminal execution requires
-separate adapter qualification. Legacy routes are not retired by core delivery.
+before freeze and execution. Read it from the verified integrated plan parent.
+Review declared contributor-contract edits for alignment at the exact candidate.
+The Goal-First marker in this repository applies to eligible later plans only
+after its integration. The introducing change
+`goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc` retains its inherited
+Task-Guided policy and exact approval. All existing frozen approvals retain
+their original boundaries.
+
+| Mode | Select when | Local approval and execution |
+| --- | --- | --- |
+| Goal-First | The verified integrated parent opts in, work is reversible and local, and the boundary has no prescribed method, ordered dependencies or staged authority. | Approve the exact committed Goal Contract and its digest. Record a separate bounded local grant. Advance one native local outcome checkbox through verification and independent result review. |
+| Task-Guided | An ordered dependency, prescribed method or staged authority applies, or the verified parent has no valid opt-in. | Approve the frozen plan SHA and normalized digest and record the separate local grant. Advance the first eligible native group in order. Default to one group. Selected continuous-goal allows consecutive eligible groups within held budgets, declared stops and narrower operator restrictions. |
+
+Selected pre-execution review requires the optional orchestration package's
+matching whole-plan review before freeze and execution. When the parent also
+selects charter-v1, use the bounded convergence procedure. The portable core
+runs without Hermes or Herdr. Terminal dispatch requires a qualified adapter.
+
+### Host spelling
+
+Use the syntax for the way the skills were installed. These examples select
+the same change and preserve the authority and restrictions below.
+
+| Host | Continue | Inspect | Local delivery | Protected finish |
+| --- | --- | --- | --- | --- |
+| Codex CLI or IDE | `$openspec-next pin-note` | `$openspec-next inspect pin-note` | `$openspec-delivery pin-note` | `$openspec-delivery finish pin-note` |
+| Hermes CLI | `/openspec-next pin-note` | `/openspec-next inspect pin-note` | `/openspec-delivery pin-note` | `/openspec-delivery finish pin-note` |
+| Claude Code, direct personal or project skill | `/openspec-next pin-note` | `/openspec-next inspect pin-note` | `/openspec-delivery pin-note` | `/openspec-delivery finish pin-note` |
+| Claude Code, enabled marketplace plugin | `/openspec-development:openspec-next pin-note` | `/openspec-development:openspec-next inspect pin-note` | `/openspec-development:openspec-delivery pin-note` | `/openspec-development:openspec-delivery finish pin-note` |
+
+In Codex, `/skills` also opens the skill picker. If a Hermes built-in command
+collides with an installed skill, use `/skill openspec-next inspect pin-note`
+or `/skill openspec-delivery pin-note`. [Codex skill invocation](https://learn.chatgpt.com/docs/build-skills#how-chatgpt-and-codex-use-skills), [Hermes dynamic CLI commands](https://hermes-agent.nousresearch.com/docs/reference/slash-commands#dynamic-cli-slash-commands), [Claude Code skill locations and namespacing](https://code.claude.com/docs/en/skills#choose-where-skills-load).
 
 The agent owns the Git plumbing. This project explicitly selects the following
 invocation contract; other projects must adopt it in contributor instructions.
@@ -52,7 +74,7 @@ Operator restrictions override defaults and remain effective on a bare `next`.
 | Request | Agent behavior and authority |
 | --- | --- |
 | `/openspec-propose add-dark-mode` | Generate the name, prepare/reuse an isolated workspace before native scaffolding, draft the plan and bind the proposal-time issue. No implementation or commits. |
-| `/openspec-next` | Resolve the current change and advance one approved unfinished local task group through setup, bootstrap, implementation, gates, independent review, task updates and autonomous local commits with previews. No push/PR/merge. |
+| `/openspec-next` | Resolve the current change and advance its approved local outcome or eligible Task-Guided group through setup, bootstrap, implementation, gates, independent review, task updates and autonomous local commits with previews. Publication needs separate authority. |
 | `/openspec-next pin-note` | The same, selecting an unambiguous short slug; no operator-typed ULID. |
 | `/openspec-next inspect` | Read-only selection and evidence/approval/dependency assessment. No setup, bootstrap, dispatch or Git writes. |
 | `/openspec-delivery pin-note` | The same bounded local continuation as next, for the selected change. |
@@ -60,13 +82,15 @@ Operator restrictions override defaults and remain effective on a bare `next`.
 | `/openspec-delivery finish pin-note` | Separately authorize that change's frozen candidate publication, protected implementation/closure PRs, integrated gates, receipt/archive commits, acceptance-bound issue closure and clean dedicated worktree retirement. |
 | `/openspec-delivery document pin-note` | Create/reuse one documentation issue, read it back and bind its URL; no implementation, commits or PR. |
 
-Normally propose, approve the actual plan, then send `/openspec-next`; repeat next
-for the next group of the same change. The agent does not stop between worktree
+Normally propose, approve the exact identity selected by policy and grant the
+local run through `/openspec-next`. Task-Guided can resume another eligible
+group of the same change. The agent does not stop between worktree
 creation, bootstrap, testing and local commits to ask for the same authority
 again. It stops for missing approval, ambiguous selection/ownership, failed gates,
 review findings needing disposition, unsupported roles, or a new side-effect
-boundary. At a reviewed candidate it offers the short `finish` invocation rather
-than a paragraph of Git instructions. A bare next never grants remote authority.
+boundary. It offers the short `finish` invocation after exact-candidate readiness
+verifies completed native work and promoted current specs. A bare next never
+grants remote authority.
 With existing finish authority, resume remaining closure steps automatically;
 never ask again for each receipt, archive or clean-worktree removal.
 A published pull request that is only waiting for review or checks is a normal
@@ -121,9 +145,10 @@ reuse it. The same applies to bootstrap and authorized clean-worktree retirement
 If ownership, tooling or permissions block that work, the agent reports the
 specific decision needed instead of handing the operator a Git checklist.
 
-The two lanes below distinguish **operator actions** from **automatic agent
-work within the selected invocation's authority**. Arrows crossing into the
-operator lane are decision or authorization checkpoints, not manual setup tasks.
+The two lanes show a Task-Guided example with **operator actions** and
+**automatic agent work within the selected invocation's authority**. Arrows
+crossing into the operator lane mark decisions or authorizations. Goal-First
+uses the same lifecycle with one local outcome and one exact contract approval.
 Independent review is `/autonomous-implementation-review` on the exact candidate
 SHA. Under `/openspec-next` the agent loads that skill; pane handoff and finding
 disposition remain operator checkpoints.
@@ -146,10 +171,10 @@ flowchart TB
     implement["Implement one task group via native apply<br/>Gates, task updates, /git-commit-message<br/>No closing keyword and no push"]
     review["Independent review via /autonomous-implementation-review<br/>Exact candidate SHA, bounded corrections, renewed verification"]
     groups{"More approved<br/>implementation groups?"}
-    publish["Publish or reuse one PR<br/>for the exact reviewed SHA"]
-    reviewWait{"Protected checks and<br/>human review satisfied?"}
+    publish["Publish or reuse one PR<br/>Exact reviewed SHA, valid spec promotion, checked triggers"]
+    reviewWait{"Protected checks, human review<br/>and any declared preview satisfied?"}
     pause["Report that open PR and stop<br/>Waiting is normal, not a new authority"]
-    verify["Read back the integrated revision<br/>Sync specs if needed and verify the final revision"]
+    verify["Read back the integrated revision<br/>Verify the final revision and current specs"]
     closure["Commit receipt with Fixes #issue<br/>Native archive and the closure PR"]
     cleanup["Read back the close after default-branch merge<br/>Authorized issue close if needed; retire clean worktrees"]
     done(["Change complete<br/>Stop; no next change"])
@@ -180,9 +205,9 @@ flowchart TB
 | --- | --- | --- |
 | Before the first run | Review/install the required tools and skills, select the project workflow, and authorize any host/role configuration. | Inspect the actual project contracts, tooling and configured execution roles; report missing prerequisites. Installation alone does not start work. |
 | A new request | Describe the outcome and send `/openspec-propose pin-note`; exploration is optional. | Generate the full name, prepare the isolated workspace, draft native artifacts, bind the authorized proposal-time issue and add proposal wireframes when needed. |
-| Plan review | Approve the actual scope/plan or request changes; approval binds the immutable plan revision and digest presented by the agent. | Validate the planning artifacts and present the approval boundary. Approval is not permission to implement. |
-| Local implementation | Send `/openspec-next`, or select a change once with `/openspec-next pin-note`. Repeat only when another approved group is ready. | Resolve and execute one task group through setup/bootstrap, implementation, gates, `/autonomous-implementation-review`, task updates and previewed local commits. `/git-commit-message` adds no closing keyword and does not push. No repeated approval for each covered command; no push, PR, merge, or issue close. |
-| Terminal delivery | Send `/openspec-delivery finish pin-note` for the reviewed candidate. | Publish or reuse one pull request. If checks or human review are still pending, stop and report it. A later same finish resumes that pull request. Once they are satisfied, integrate through the protected route, verify the integrated revision, perform native sync/archive and receipt/closure work, and verify issue closure and clean-worktree retirement at acceptance. No second pull request and no separate prompts for each covered closeout command. |
+| Plan review | Approve the exact Goal Contract or frozen Task-Guided plan, or request changes. Approval binds the immutable revision and mode-specific digest presented by the agent. | Validate the planning artifacts and present the approval boundary. Execution requires a separate grant. |
+| Local implementation | Send `/openspec-next`, or select a change once with `/openspec-next pin-note`. | Resolve and execute the approved local outcome or eligible Task-Guided group through setup/bootstrap, implementation, gates, `/autonomous-implementation-review`, task updates and previewed local commits. Publication and issue closure require separate authority. |
+| Terminal delivery | Send `/openspec-delivery finish pin-note` for the reviewed candidate after positive finish readiness. | Publish or reuse one implementation PR. Pause for outstanding checks, human review or declared preview acceptance. Resume the same PR under held finish authority. After protected integration and named-revision gates, file the factual receipt and native archive in a record-only closure PR, then verify issue closure and clean-worktree retirement at acceptance. |
 | Pull-request wait | Leave the open pull request. When review or checks finish, or a real block is cleared, send the same `/openspec-delivery finish pin-note` only if that authority is not already held. | Read the actual head, checks and reviews. An unchanged reviewed SHA with satisfied protection continues into merge and closeout. Do not open a second pull request, replay implementation, bypass protection, or ask for a different authority. A changed head needs renewed gates and `/autonomous-implementation-review`. |
 | An exception | Resolve ambiguous ownership/selection, changed scope, failed verification, findings needing disposition, a pull-request head that changed, missing protection, or host/tool permission prompts when asked. | Preserve work and evidence, state the exact blocker and needed decision, then resume the interrupted step under the retained authority. Do not replay merged work or silently skip a gate. |
 
@@ -465,9 +490,10 @@ issue unassigned has not acquired a lock.
 working tree. If both changes are documented, a parent issue may link the two
 child issues. The parent is a group label, not a third plan.
 
-### Implement one task group
+### Implement one Task-Guided group
 
-The operator has approved the plan and wants the next local group. They send:
+In this Task-Guided example, the operator has approved the frozen plan and wants
+to grant execution for the next local group. They send:
 
 ```text
 /openspec-next pin-note
@@ -479,11 +505,11 @@ It selects task group 1 from the actual tasks and approval, not this example.
 The branch is `change/pin-note-01arz3ndektsv4rrffq69g5fav`.
 Keep it through specification, implementation and review.
 
-The implementer follows `/openspec-apply-change` for that
-group and reports commands, paths, and results. The orchestrator checks the
-matching boxes in `tasks.md` only after verifying that implementation evidence.
-Include those ticks in the final frozen commit before independent review; a later
-checkbox commit needs renewed review. Stock apply must not tick those boxes itself.
+The implementer follows `/openspec-apply-change` for that group and reports
+commands, paths and results. The orchestrator verifies exact-SHA gates and
+independent review before recording the proved boxes in `tasks.md`. Verify and
+review the final SHA again if recording progress changes it. The orchestrator
+mediates any checkbox write by stock apply.
 
 Commits use `/git-commit-message`: preview the exact batch, verify its staged
 content and commit automatically under the selected local execution contract.
@@ -504,6 +530,27 @@ Read-only. Do not merge the pull request and do not delete the branch.
 The loop stops after the named group. It does not open a pull request and it
 does not start `export-notes`. If no different reviewer can run, stop. The
 implementer must not review its own candidate.
+
+### Deliver a Goal-First outcome
+
+For an eligible later change, the native proposal holds one v1
+`openspec-goal-contract` JSON block and the change has native delta specs.
+Include the outcome, allowed paths, hard invariants, exclusions, adaptable legacy
+assumptions, verifiable acceptance and exact gate argument arrays, local commit
+scope and stop, and finite time and correction budgets. Use one native outcome
+checkbox. Keep external closeout predicates outside that checkbox. If breaking
+CLI, runtime or dependency behavior is uncertain, a separately scoped local
+scratch probe before contract lock can inform the contract. [Goal Contract and authority fields](../skills/software-development/openspec-delivery/references/delivery-policy.md#mode-selection-and-local-result), [scratch discovery](../skills/software-development/openspec-delivery/references/external-verification.md#scratch-discovery).
+
+After approval of the exact committed contract and digest, the same next or
+delivery invocation grants the bounded local run. The agent uses one dedicated
+workspace. At dispatch, each phase boundary, correction and result, it checks
+held authority and alignment. An evidenced legacy assumption may adapt inside
+the contract. In-scope routine failures consume the held budget. A material
+conflict returns `DIRECTION_DRIFT_CHOICE` and names the clause needing a decision.
+Local verification uses a clean disposable checkout pinned to the final
+candidate SHA and fresh independent read-only review of that SHA. A progress
+commit after acceptance needs fresh evidence. The orchestrator owns progress.
 
 ### Review on a pull request
 
@@ -529,15 +576,18 @@ cites issue 40 because the operator already created that documentation issue.
 The citation is not a reason to create an issue, and the guard does not call
 GitHub.
 
-Terminal delivery is one short authorization after the independent verdict on
-the actual frozen SHA and disposition of every finding. It includes protected
-publication/integration and verified closeout, not repeated prompts for plumbing:
+Terminal delivery is one short authorization after the independent verdict on the
+actual frozen SHA, disposition of every finding, and positive finish readiness.
+It includes protected publication, integration and verified closeout:
 
 ```text
 /openspec-delivery finish pin-note
 ```
 
-The agent verifies the bound candidate and actual repository/target first. If
+The agent verifies the bound candidate, promoted current specs and actual
+repository/target first. Before an authorized push, it checks for external app
+automation. When a deploy preview is declared, it waits for the separately
+authorized artifact-only preview and the operator's pre-merge review. If
 that pull request is still waiting on review or checks, stop and report it.
 That wait is typical. When it is later satisfied for the same SHA, send the
 same finish again if that authority is not already held. The agent reads that
@@ -604,7 +654,7 @@ two files is not combined-system evidence.
 | Human-facing visuals | `/capability-wireframes` |
 | Independent review before merge | `/autonomous-implementation-review` |
 | Workspace lifecycle, candidate identity, recovery and integrated evidence | `/openspec-delivery` |
-| Grounded next task group and bounded continuation | `/openspec-next` |
+| Grounded next local outcome or group, and read-only inspection | `/openspec-next` |
 | Documentation and human review | Proposal-time issue under explicit project policy; PR and later updates separately authorized |
 
 One concern has one authority. `tasks.md` is the only mutable task list. An
@@ -626,14 +676,14 @@ convention, not enforcement.
   evidence after integrated verification. It is not a scheduler and not a
   GitHub client. Its short invocation owns setup/bootstrap, local execution and
   bounded finish; the operator supplies exceptions, not a Git recipe.
-  Its local lossless representation support retains captured bytes and hashes,
-  not gate execution, reviewer authentication or new approval authority. Distinct
+  Its local evidence CLI captures authorized exact-SHA gates, retains streams
+  and hashes, verifies seals and asserts offline readback claims. Distinct
   rejected records and successor dispositions carry the inherited two-cycle
   limit; missing cycle evidence blocks continuation. Closure orders local closure
   gates, fresh independent factual review at the exact closure SHA, then separately
   authorized publication; implementation/integrated/closure evidence stays distinct.
-- `/openspec-next` finds the actual approved unfinished group and advances it
-  under the selected local policy; inspect mode performs no mutations.
+- `/openspec-next` finds the approved local outcome or first eligible ordered
+  group and routes it under the selected policy. Inspect mode reads state only.
 - `/git-commit-message` keeps logical batches, a preview, exact staging and
   separate commit authority. It does not push. Implementation commits omit
   closing keywords. The receipt commit, after acceptance, carries
@@ -673,7 +723,12 @@ Independent changes may be specified and implemented at the same time.
 
 ## Documentation and review
 
-For later changes whose verified integrated parent explicitly selects charter-v1 approach convergence, use the bounded operator procedure in [the portable core](../skills/autonomous-ai-agents/autonomous-implementation-review/references/portable-core.md). The introducing change retains its inherited strict approach and candidate gates. Readiness grants no freeze, exact-plan approval, execution, or remote writes; the qualified reviewer route and launch authority remain separate.
+When the verified integrated parent explicitly selects charter-v1 approach
+convergence, follow the bounded operator procedure. A change introducing a new
+policy retains its inherited approach and candidate gates. After planning
+review, freeze authority, exact approval in the selected mode, the local grant
+and any qualified reviewer launch each keep their own boundary.
+[Charter-v1 procedure](../skills/autonomous-ai-agents/autonomous-implementation-review/references/portable-core.md).
 
 GitHub is the documentation and review surface. It is not the specification
 system and not an execution lock.
@@ -697,7 +752,9 @@ system and not an execution lock.
 
 ## Integration and completion
 
-1. Refresh against the current target and shared capability specs. Reconcile
+1. Run exact-candidate `finish-readiness` before offering protected finish.
+   Verify native progress, promoted delta requirements and capability identity.
+   Refresh against the current target and shared capability specs. Reconcile
    overlaps. Include implemented behavior, tests, specs and current visuals
    together.
 2. Integrate only with explicit authority. Read back the exact result and the
@@ -719,6 +776,25 @@ Planning permission ends at the requested artifacts and the bounded proposal-tim
 issue write when explicitly selected by project policy. Approval of a plan is not
 permission to implement, commit, open a pull request or merge.
 
+### Optional UI and external acceptance
+
+When UI acceptance is declared, test the exact candidate on a loopback URL
+and retain try-out and role/accessibility-name interaction results. Use the
+`ui` decision for `LOCAL_UI_ACCEPTANCE_PENDING`, `PREVIEW_AUTHORITY_PENDING`
+and `PREVIEW_REVIEW_PENDING`. A deploy preview has its own approval and
+operator review before protected merge. Local acceptance and local execution
+authority stop at their respective boundaries.
+
+For any paid or external test, tunnel, deploy preview or app trigger, submit a
+single-run card that binds the exact candidate, target, test scope, data,
+expected cost or credits and run count. Use only the approved built artifact
+for a tunnel or preview, with source, credentials, live data and account actions
+outside the exposure. Reserve the separate grant before activation. Tear down
+the tunnel immediately on success or failure and retain the cleanup. A retry
+requires a new grant. Before any separately authorized push, verify the trigger
+inventory and obtain additional consent for any external app run. Vendor
+defaults do not authorize runs or retries. [External and UI request schemas](../skills/software-development/openspec-delivery/references/external-verification.md).
+
 ## Metadata and vault views
 
 Follow [OpenSpec metadata and Obsidian](openspec-metadata.md) for identity-only
@@ -730,6 +806,16 @@ capability identity, not the originating change. A Dataview dashboard is a view,
 not another task authority or proof of client filesystem synchronization.
 
 ## Guard
+
+The [delivery runtime](../skills/software-development/openspec-delivery/references/delivery-runtime.md)
+exposes read-only policy, preflight, workspace reconciliation, handover, status,
+decision and finish readiness. The preflight subcommand reports P1–P8 observations
+and missing or drifted evidence without starting a reviewer probe. For a selected change,
+the [next router](../skills/software-development/openspec-next/references/routing.md)
+returns the versioned status and advisory next action from retained observations.
+Use the exact blocker to reconcile a changed candidate, missing review, unmet
+authority or current-spec promotion. A ready status leaves protected publication
+subject to the separate named finish grant.
 
 `/openspec-delivery` ships the read-only package-relative `scripts/change-guard.mjs`
 helper. Its [guard](../skills/software-development/openspec-delivery/references/guard.md),
@@ -778,8 +864,8 @@ Orchestration is optional. It requires the workflow plugin, explicit role and
 model configuration, and a supported host. Package installation does not create
 those roles.
 
-Current source: delivery 1.3.1 in `openspec-development` 1.3.1;
-`openspec-next` 0.4.0 and core skill 0.19.0 in `autonomous-orchestration` 1.9.0.
+Current source: delivery 1.4.0 in `openspec-development` 1.4.0;
+`openspec-next` 0.5.0 and core skill 0.19.0 in `autonomous-orchestration` 1.9.0.
 Representation support adds no upstream workflow, runtime dependency or
 installation route. Package availability/byte checks do not establish account
 sync, host execution, native client discovery, Desktop acceptance or scanner approval.

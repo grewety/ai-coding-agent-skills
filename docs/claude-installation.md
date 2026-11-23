@@ -81,15 +81,16 @@ loaded something. The workflow plugin should list exactly
 and not `autonomous-implementation-review`.
 The optional orchestration plugin should list only that latter skill.
 
-Claude Code namespaces plugin skills: use
-`/openspec-development:openspec-delivery`, not the bare slash-command
-names used by direct directory copies. Resolve related skill names within the
-installed plugins and support files relative to the loaded skill directory;
-Hermes's `skill_view`, `terminal`, and `patch` tools are not installed by these packages.
+| Claude Code installation | Read-only inspect | Bounded local delivery |
+| --- | --- | --- |
+| Direct personal or project copy | `/openspec-next inspect pin-note` | `/openspec-delivery pin-note` |
+| Enabled marketplace plugin | `/openspec-development:openspec-next inspect pin-note` | `/openspec-development:openspec-delivery pin-note` |
 
-For an initial read-only check, ask Claude to describe the installed
-`openspec-delivery` workflow without creating or editing anything. This confirms
-loading, not the ability to execute a change safely.
+Use inspect to check an existing change without setup, commits or dispatch.
+Resolve related skills and support files relative to the loaded package. Check
+the skill picker, active scope and duplicate copies if the command is missing.
+The delivery invocation requires the approved mode-specific identity and local
+authority. [Claude Code skill locations and namespacing](https://code.claude.com/docs/en/skills#choose-where-skills-load), [host spellings and authority](openspec-workflow.md#short-operator-commands).
 
 Avoid enabling an individual upload, a plugin copy, and a manually copied local
 skill for the same workflow at once. Preserve any local customizations before
@@ -164,14 +165,16 @@ files plus their generated plugin metadata, README, and license.
 
 Bump the affected plugin version in the catalog whenever its selected skills or
 support files change; skill versions alone do not update the enclosing plugin.
-The source catalog's `openspec-development` 1.3.1 includes `openspec-delivery`
-1.3.1 with its shared `scripts/git-environment.mjs` and
+The source catalog's `openspec-development` 1.4.0 includes `openspec-delivery`
+1.4.0 with its shared `scripts/git-environment.mjs` and
 `references/git-environment.md` for the Git guard/workspace helpers. Also preserve
-`references/evidence-retention.md` and `scripts/evidence-retention.mjs` in complete
-copies and skill/plugin ZIP exports: this separate local representation support
-preserves captured bytes/hashes and checks claim support, not gate execution,
-reviewer authentication, approval or publication authority. The optional
-`autonomous-orchestration` is 1.9.0 (core skill 0.19.0) and `openspec-next` is 0.4.0. These
+`references/evidence-retention.md`, `scripts/evidence-retention.mjs`,
+`scripts/evidence-cli.mjs` and `scripts/delivery-cli.mjs` in complete copies and
+skill/plugin ZIP exports. The evidence command supports authorized exact-SHA gate
+capture and offline readback. Keep next's `references/routing.md` and
+`scripts/next.mjs` with that skill. If direct packages load from different scopes,
+use the router's explicit trusted runtime path. The optional
+`autonomous-orchestration` is 1.9.0 (core skill 0.19.0) and `openspec-next` is 0.5.0. These
 source versions do not assert that the public marketplace/downloads are updated.
 Preserve delivery's policy/task-authoring references and `delivery-policy.mjs`,
 and orchestration's `references/portable-core.md`, `scripts/orchestration-core.mjs`,

@@ -90,9 +90,8 @@ Selection contains that exact parent `revision`, retained contract-readback
 These are derived observations of contributor policy, not a new configuration
 file or permission flags. Never infer them from the working-tree contract.
 
-- Without explicit parent selection: single-group continuation and existing plan
-  approval behavior; no retroactive approach review. Policy selected after freeze
-  cannot widen that change or invalidate its existing approval.
+- Without explicit parent selection, use Task-Guided, single-group continuation
+  and existing plan approval behavior. Later policy applies only to later plans.
 - With pre-execution review and no explicit convergence selection, retain the strict literal no-findings, empty-findings and empty-limitations gate. A working-tree edit is inert for its own change.
 - With explicit `approachConvergence: true` in the verified integrated parent and pre-execution review selected, use the charter-v1 bounded procedure in orchestration’s `references/portable-core.md`; supply its matching acceptance with `policy: "charter-v1"`. Selection never grants a launch or writes.
 - With pre-execution review: invoke the orchestration core's approach protocol,
@@ -101,8 +100,9 @@ file or permission flags. Never infer them from the working-tree contract.
   and `orchestrationAvailable: true`. A draft/partial/recommended review cannot
   satisfy the gate or approve execution. Freeze still needs separate commit
   authority and subsequent operator approval bound to its actual SHA/digest.
-- With continuous-goal: an execution invocation advances consecutive eligible
-  groups of that same approved change within restrictions, budgets and stops.
+- With continuous-goal in Task-Guided, an execution invocation advances
+  consecutive eligible groups of that same approved change within restrictions,
+  budgets and stops.
   Delivery owns that decision; the core is not a scheduler or a second task list.
 - Verified legacy evidence that a frozen plan predates adoption of the integrated-
   parent integrity guard defers that guard until the next
@@ -146,8 +146,8 @@ review acceptance. Expired, missing or mismatched recovery evidence stops.
 
 ## Continuation and stop boundaries
 
-After each accepted group, resolve actual native tasks in document/dependency
-order. Resume interrupted work and incomplete candidate verification first. Keep
+In Task-Guided, resolve actual native tasks in document/dependency order after
+each accepted group. Resume interrupted work and incomplete candidate verification first. Keep
 one Git/task writer and the original invocation's restrictions; a bare `next`
 does not lift them. Default single-group delivery stops after one task group.
 Continuous-goal proceeds only if selected at the integrated plan parent, with no
@@ -201,8 +201,9 @@ Use orchestration's canonical `correctionDecision` and review-record continuity
 for routine in-scope failures/findings. Dispatch source/test/documentation repairs
 to the qualified implementer; planning amendments belong to the authorized
 orchestrator. Do not prompt merely to approve an already-granted repair, waive a
-failed gate or advance a later group. Changed planning bytes pause execution until
-fresh identity, whole-package review and explicit exact-plan approval. Missing
+failed gate or advance a later group. Changed Task-Guided planning identity or
+changed Goal Contract inputs pause execution for fresh identity, any selected
+planning review and renewed approval in the applicable mode. Missing
 authority, native waits, material conflicts or exhausted budgets remain stops.
 
 `workerContinuationDecision` is separate from group advancement. Every iteration-cap

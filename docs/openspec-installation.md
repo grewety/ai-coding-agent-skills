@@ -27,12 +27,12 @@ This adds no upstream skill or runtime dependency. Package installation/validati
 does not establish native Git behavior; missing native macOS/Windows results remain
 hardening completion blockers, and WSL or case simulations do not replace them.
 
-Delivery 1.3.1 (in `openspec-development` 1.3.1) also includes
-`references/evidence-retention.md` and `scripts/evidence-retention.mjs`; keep both
-in complete companion copies and ZIPs. This is local lossless representation and
-claim-support checking, not a Git helper, gate runner, reviewer authenticator or
-approval/publication authority. It adds no upstream workflow, runtime dependency
-or installation route. `openspec-next` is 0.4.0 and the separate optional
+Delivery 1.4.0 (in `openspec-development` 1.4.0) also includes
+`references/evidence-retention.md`, `scripts/evidence-retention.mjs`,
+`scripts/evidence-cli.mjs` and `scripts/delivery-cli.mjs`. Keep the complete
+evidence and runtime support in companion copies and ZIPs. `openspec-next` is 0.5.0
+and ships `references/routing.md` and `scripts/next.mjs` for read-only routing to
+delivery. Install both complete packages in the intended host. The separate optional
 `autonomous-orchestration` plugin is 1.9.0 (core skill 0.19.0). Installation, account sync and
 host execution verification remain separate; package byte checks establish none
 of native client discovery, Desktop acceptance or scanner approval.
@@ -49,8 +49,10 @@ and `scripts/orchestration-core.mjs`, plus its required `references/worker-hando
 `scripts/terminal-adapters.mjs` and `references/profile-preparation.md`, in complete copies and generated skill/plugin
 packages. Handoff support is not disposable worker scratch. Follow the
 [policy protocol](../skills/software-development/openspec-delivery/references/delivery-policy.md)
-for integrated-parent selection and contract-alignment/readiness checks. Single-group is the
-default. Explicitly selected pre-execution-review or continuous-goal policy
+for integrated-parent selection and contract-alignment/readiness checks.
+Goal-First applies to eligible local work with integrated parent opt-in.
+Task-Guided retains approved ordering and defaults to one group. Explicitly
+selected pre-execution-review or continuous-goal policy
 requires the optional orchestration package; missing it blocks freeze/execution.
 Core checks run without Hermes/Herdr, but do not qualify any terminal client,
 retire legacy routes or change installed profiles. No new installation route or
@@ -77,7 +79,7 @@ Verification is required in the installed inventory but remains advisory in use.
 It is not an `openspec verify` CLI gate and does not independently block archive.
 Project gates, independent review and finish authority still apply. Do not use an
 upstream apply/archive prompt to bypass `openspec-delivery`: one approved local
-task group, orchestrator-only Git/task writes, and separately authorized finish
+outcome or eligible ordered task group, orchestrator-only Git/task writes, and separately authorized finish
 remain the local policy. Other upstream workflows, including bulk archive and
 OpenSpec's own release/docs-maintainer skills, are not selected by these recipes.
 
@@ -263,6 +265,10 @@ Start a fresh session in that profile (or refresh its skill picker), check all
 seven names, and ask for a read-only `skill_view` of each. Check the returned
 path/content, not merely a model assertion. The list command is inventory
 evidence; a successful download alone is not evidence of model loading or execution.
+For the companion skills in that profile, use `/openspec-next inspect pin-note`
+for a read-only check and `/openspec-delivery pin-note` for an approved local run.
+If a built-in command collides, use `/skill openspec-next inspect pin-note` or
+`/skill openspec-delivery pin-note`. [Hermes CLI skill commands](https://hermes-agent.nousresearch.com/docs/reference/slash-commands#dynamic-cli-slash-commands).
 
 Source: [Hermes skills, profiles, discovery and scanning](https://hermes-agent.nousresearch.com/docs/user-guide/features/skills).
 
@@ -328,8 +334,10 @@ The host needs local OpenSpec 2.1.1 through its npm package on Node 22.20.0+,
 Git, project tools and repository permissions. A local directory copy is not a
 Claude account upload and does not
 sync back to the account. Avoid a second account/plugin/directory copy of the
-same skill. Companion plugin namespacing remains separate, for example
-`/openspec-development:openspec-delivery`.
+same skill. For direct companion copies, use `/openspec-next inspect pin-note`
+or `/openspec-delivery pin-note` under the applicable authority. Use
+`/openspec-development:openspec-next inspect pin-note` or
+`/openspec-development:openspec-delivery pin-note` when the plugin is enabled.
 
 Source: [Claude Code skill locations and invocation](https://code.claude.com/docs/en/skills).
 
@@ -348,7 +356,9 @@ when intentionally proposing, not as a setup test. Use the read-only inspection
 request above for loading verification. Codex detects changes automatically;
 restart if entries do not appear. Inspect any disabled `[[skills.config]]` entry
 in the intended Codex config and enable only the reviewed paths; preserve
-unrelated settings. There is no assumed `codex skills install` subcommand.
+unrelated settings. For the companions, use `$openspec-next inspect pin-note`
+or `$openspec-delivery pin-note` under the applicable authority.
+There is no assumed `codex skills install` subcommand.
 
 Source: [OpenAI skill discovery, invocation and enablement](https://learn.chatgpt.com/docs/build-skills).
 

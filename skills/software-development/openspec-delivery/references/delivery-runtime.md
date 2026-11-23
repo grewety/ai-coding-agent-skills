@@ -2,7 +2,7 @@
 
 Resolve `<runtime>` to this package's `scripts/delivery-cli.mjs`. The runtime
 uses Node 22+ and local Git. It consumes independently retained observations
-from the orchestrator and uses the existing portable role verifier when handover
+from the orchestrator and uses the matching companion verifier when handover
 verification is requested. Keep the verified companion package complete.
 
 ```sh
@@ -109,7 +109,9 @@ of `dispatch`, `boundary`, `correction`, or `result`. They consume
   `activeAttempt.implementerSession` in `observed`, and `attempt.id` plus
   `handover` for the exact reviewer attempt. The sealed reviewer request lists
   `gate-run:<wrapperSha256>` in its acceptance list. The runtime matches the
-  reviewer to the candidate, plan, raw input hashes, authority and held attempt.
+  reviewer to the candidate, plan, authority and held attempt. Portable-role
+  reviews bind the registered implementation checkout and the candidate's raw
+  planning input hashes.
   Same-SHA executable evidence and an independent, read-only, complete
   no-findings review are required even after accepted corrections.
 
@@ -124,6 +126,11 @@ States are `unresolved`, `draft`, `approval-pending`, `local-ready`,
 uses no wall clock. Its recommendation includes a stable `code` and the
 selected `subject`. It performs no action.
 
+For an already selected change, `openspec-next` routes inspect to `status` and
+local continuation assessment to `decision`. Preserve the retained request's
+mode, authority, phase, restrictions and evidence when invoking either entry.
+A pending or blocked predicate identifies the next evidence to reconcile.
+
 ## Handover and finish readiness
 
 A `portable-role` handover takes an absolute path to the trusted companion
@@ -135,6 +142,20 @@ handover, pin the companion's `review-candidate.mjs` and supply its `request`,
 `requestFileSha256`, `expect`, `exportDirectory` and `output` for replay through
 `--verify`. These paths point to the existing complete read-only reviewer package
 and retained files. Caller-owned verifier code and its package are trusted.
+
+Task-Guided result verification can consume a sealed contained candidate review.
+Set the review snapshot's `base` and `plan` to the frozen plan SHA and its
+`target` to the exact candidate SHA. The verifier rebuilds the complete diff
+and verifies packet coverage and independent read-only sessions. Supply the
+frozen plan's raw planning hashes, including the pre-progress `tasks.md`, and
+the Task-Guided digest, which normalizes only native checkbox progress. Use a
+canonical review checkout isolated from both the primary and implementation
+checkouts. Bind the held approval and grant references and the selected native
+group and task. Report exclusive ownership and the group's implementer session
+in `observed`. The exact disposable gate run and its matching acceptance tag
+remain required. Goal-First results use a qualified portable-role reviewer with
+the distinct Goal Contract digest. The contained renderer supports the
+Task-Guided normalized plan format.
 
 Before a terminal handover exists, the `active-attempt` variant reads the
 companion's sealed request and a separately pinned `active.json` in that same

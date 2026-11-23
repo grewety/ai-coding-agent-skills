@@ -115,6 +115,11 @@ NODE REVIEW_CLI --verify --request REQUEST --expect EXPECT --export EXPORT --out
 
 ## Troubleshooting
 
+- **Delivery reports a pending probe or result review.** Use the read-only
+  delivery preflight for P4/P5 and P8 evidence, and reconcile the exact candidate,
+  configuration and handover bindings. Each paid launch or retry needs its own
+  grant, including during a local Goal-First or Task-Guided run.
+  [Delivery runtime](../skills/software-development/openspec-delivery/references/delivery-runtime.md).
 - **Preparation or check rejects the export.** Check absolute path separation,
   private parent ownership, fresh directory names, exact Git and input
   identities, and every manifest member. Whole files are capped at 64 KiB and

@@ -2,12 +2,14 @@
 
 ## Scope and authority
 
-This reference preserves evidence already captured by an authorized command, API
-readback, or independent review. It is not a command runner, scheduler, GitHub
-client, polling loop, approval service, or publication authority. Run each named
-project gate through its own authorized surface, retain the actual command,
-revision, scope, environment policy, stdout, stderr, and numeric exit status, then
-represent the captured bytes under the repository's confidentiality policy.
+Preserve evidence from authorized commands, API readbacks and independent review.
+The representation library is not a command runner, scheduler, GitHub
+client, polling loop, approval service, or publication authority.
+The evidence CLI captures named authorized local gates in a disposable checkout
+pinned to the exact candidate. Use the recorded command, revision, scope,
+environment policy, stdout, stderr and exit status under the repository's
+confidentiality policy. Collect remote readbacks through their separately
+authorized surface before using the offline assertions.
 
 Do not infer a historical fact from current prose or a fresh query. A fresh
 corroboration is current evidence; it must say so and cannot establish earlier

@@ -70,3 +70,8 @@ with `matchedBy: "accessible-name"`. A declared deploy preview requires
 its own single-run authority, artifact-only exposure and matched preview
 readback. Preserve the review pause and separately retain the operator's
 preview decision before merge.
+
+Check declared local UI gates during local exact-candidate verification. Evaluate
+the separately declared deploy-preview gate at the protected pre-merge boundary.
+A pending preview never makes a successful local gate result into preview
+acceptance. Report the returned pending predicate and retain the local evidence.

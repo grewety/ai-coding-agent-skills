@@ -8,10 +8,10 @@ profile-local progress file, scheduler, lease or automatic backlog dispatch.
 Before freeze or execution, follow [delivery-policy.md](delivery-policy.md).
 It owns integrated-parent policy selection, contributor-contract alignment,
 pre-execution approach-review gating and the continuous-goal stop contract.
-Single-group is the default below. Where continuous-goal is selected at the
-frozen plan's integrated parent, repeat this procedure for consecutive eligible
-groups of the same change; stop on every policy boundary or narrower restriction.
-Installing the optional orchestration package does not select either policy.
+Goal-First advances one approved local outcome where the verified integrated
+parent opted in and the boundary is eligible. Task-Guided defaults to one
+eligible group. A verified continuous-goal selection permits consecutive
+eligible Task-Guided groups within the held limits.
 
 ## Select once
 
@@ -28,14 +28,15 @@ identity and confirmed refs before claiming absence. Duplicate active/archive
 locations, competing writers, unknown ownership or inaccessible remote state stop.
 Do not generate another ULID or copy artifacts to manufacture a match.
 
-Read native proposal/design/deltas/tasks and approved plan commit/digest, branch,
+Read native proposal/design/deltas/tasks and the exact mode-specific approval, branch,
 status, prerequisite evidence, gate output and any actual PRs/receipts. Use native
 OpenSpec status/instructions to discover artifact readiness; that is not approval
 or execution evidence. Never require a fake issue to obtain local task discovery.
-Missing approval stops with one concrete approval request for the actual plan.
+Missing approval stops with one concrete request for the actual frozen plan or
+Goal Contract, followed by separately bounded local execution authority.
 An owned draft may first be frozen in a separate local planning commit under an
-execution invocation's commit authority; present that SHA and raw planning digest
-for approval before implementation. Under `no commits`, report this prerequisite
+execution invocation's commit authority. Present the actual SHA and mode-specific
+digest for approval before implementation. Under `no commits`, report this prerequisite
 instead. Do not treat a branch tip, task checkboxes or editable issue as approval.
 Record/reference the actual operator approval with its SHA/digest in retained
 change evidence; on resume require that evidence or ask for the missing decision.
@@ -46,10 +47,11 @@ No mutable ownership/progress ledger is added to the common Git directory.
 | Observed state | Default next action |
 | --- | --- |
 | Incomplete or unapproved plan | Report missing native artifacts or request plan approval. Do not implement. |
-| Owned interrupted task group | Resume only its unfinished work in the same workspace, keeping restrictions. |
-| Approved plan, pending implementation | Select the first unfinished approved implementation task group in native document order whose dependencies are accepted. |
+| Owned interrupted outcome or task group | Resume only its unfinished work in the same workspace, keeping restrictions. |
+| Approved Goal Contract, pending local result | Advance its single local outcome through alignment, gates and exact-candidate result review. |
+| Approved Task-Guided plan, pending implementation | Select the first unfinished approved implementation task group in native document order whose dependencies are accepted. |
 | Candidate frozen, gates/review incomplete | Complete gates/review for that candidate before selecting another group. |
-| All approved implementation groups accepted | Report the candidate and offer `finish`; no remote write without its authority. |
+| Local outcome or all approved groups accepted | Check exact candidate `finish-readiness` and offer `finish` when positive. |
 | Open implementation PR waiting on checks or human review | Normal pause, not a failure. Read that pull request; do not open another. `next` does not merge it. Under finish already held, resume when the same SHA is approved and checks pass; otherwise request that same finish once. |
 | Open PR blocked, or head no longer the reviewed SHA | Report the exact blocker. Renew gates and independent review before merging a changed SHA. Do not bypass protection or replay a timed-out write. The same finish resumes after the block is cleared. |
 | Implementation already merged | Do not replay it; resume integrated verification/receipt/archive under existing finish authority, otherwise request it once. |
@@ -57,8 +59,8 @@ No mutable ownership/progress ledger is added to the common Git directory.
 | Closure merged, cleanup pending | Resume only authorized cleanup/issue closure; never recreate implementation or archive. |
 | Change fully closed and cleanup verified | Report complete; no next change. |
 
-By default, one `next` runs one task group through its remaining local verification/review and
-commits, not one shell command and not the whole backlog. A group is the native
+In Task-Guided, one `next` runs one task group by default through its remaining local
+verification, review and commits. A group is the native
 heading/task-number group in `tasks.md`, not an invented phase. Explicit `group N`
 is a scope restriction, not permission to skip unfinished dependencies. If grouping
 or the boundary between implementation and remote/release tasks is ambiguous,
@@ -69,8 +71,11 @@ unless the operator or approved plan explicitly selects that ordering.
 Earlier operator restrictions remain in effect. `no commits` means keep changes
 and report the uncommitted boundary; do not call a clean-candidate guard as if a
 commit existed. `inspect` means read-only. Approval of a plan is not the invocation
-that starts it. Scope/gate/dependency changes require renewed approval. A correction
-stays in the same change/group under the canonical orchestration correction loop:
+that starts it. Changes to approved identity or authority require renewed
+approval. Goal-First implementation choices and declared legacy assumptions
+may adapt within the same Goal Contract. Recheck alignment at every phase and
+after corrections. A correction stays in the same outcome or group under the
+canonical orchestration correction loop:
 eight cumulative automatic cycles or the narrower inherited group/authority limit.
 Existing legacy two-cycle limits remain effective for their frozen changes.
 
@@ -85,12 +90,14 @@ Do not bypass its pane-selection approvals, manufacture a second model or use
 Without a supported independent reviewer, preserve the candidate and report the
 review blocker. The implementer never approves its own work.
 
-Run actual gates, inspect evidence and update only proved task boxes. Preview
+Use the [runtime decision](delivery-runtime.md) for dispatch, boundary,
+correction and result. Run exact-SHA disposable gates, inspect evidence and
+update only proved task boxes. Preview
 exact path batches through `git-commit-message`, then under this invocation's
 explicit autonomous local-commit policy stage/commit without another prompt.
-Check evidence and include proved ticks in the final candidate commit before
-independent review. The reviewer reviews that exact commit including its ticks;
-a tick/evidence commit after review changes the SHA and requires renewed review.
+Check the implementation evidence and exact result review before recording proved
+ticks in the final candidate. A tick or evidence commit after review changes the SHA
+and requires renewed gates and independent review at the resulting SHA.
 Per-group verdicts do not substitute for review of the final delivery candidate.
 Retain committed plan identity, candidate and review evidence; transient reports
 are not completion. Retain correction/review attempt identities and dispositions
@@ -127,7 +134,9 @@ a release, starts another change or authorizes unrelated remote writes. If an
 earlier instruction excludes an action, ask only about that conflict. Confirm
 actual repository/target and candidate SHA; if either is ambiguous, stop.
 The current receipt guard requires every real checkbox task complete on that
-reviewed candidate. A plan containing future tasks whose completion depends on
+reviewed candidate. Check exact-candidate current-spec promotion and identity
+before protected publication, and evaluate external triggers before any
+authorized push. A plan containing future tasks whose completion depends on
 this same merge/receipt/archive is circular for that guard: report the exact
 planning defect for native plan correction/reapproval, never tick prospective
 outcomes or silently exclude those boxes. Keep terminal workflow obligations in
