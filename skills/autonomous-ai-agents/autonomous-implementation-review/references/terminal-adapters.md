@@ -295,3 +295,11 @@ qualified (otherwise recording it unsupported and naming only qualified
 adapters), without modifying installed `.claude/agents` files. `HERDR_ENV`
 neither selects nor forces Herdr pane dispatch; Herdr remains available only as
 the bound same-session interaction fallback.
+
+## Exclusive candidate runtime
+
+[run-implementer.md](run-implementer.md) uses the existing adapter role
+and stdin transport checks, and [worker-runtime.md](worker-runtime.md)
+defines its host claim, slot and supervisor bindings. Require independent
+qualification for that exact packaged runtime and both roles before use.
+Legacy adapter records and bootstrap evidence do not transfer qualification.

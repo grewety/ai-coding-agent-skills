@@ -148,3 +148,12 @@ clean up, approve a plan, tick tasks or advance. Delivery independently verifies
 actual outputs, gates, review and its approved-plan/digest, ownership and continuation
 boundaries. Legacy observations do not silently become artifact-first evidence;
 legacy host migration waits for adapter qualification.
+
+## Exclusive implementer handover
+
+The [packaged runtime](run-implementer.md) retains `request.md` and the
+native `report.md` with sealed `native.txt`, `stdout.jsonl`, `stderr.log`,
+`launch.json` and `lifecycle.jsonl`. Its adapter publishes `result.json`
+from the original positively settled process and native session. Replay
+checks the original settlement, exact request and publisher bytes.
+Candidate delivery acceptance belongs to the orchestrator.
