@@ -4,6 +4,8 @@ import { equal, fields, hash, jsonBytes, need, parseStrictJson, relative, text }
 
 const clean = "Verdict: No findings";
 const findings = "Verdict: Findings";
+const beginReceipt = "BEGIN_REVIEW_RECEIPT";
+const endReceipt = "END_REVIEW_RECEIPT";
 const details = ["path", "line", "impact", "trigger", "remedy"];
 const body = (value) => need(relative(value.path) && Number.isSafeInteger(value.line) && value.line > 0 &&
   ["impact", "trigger", "remedy"].every((key) => text(value[key])), "Invalid receipt finding");
@@ -36,20 +38,29 @@ export function reviewPrompt(request, context, packet, index, count, reference) 
     ...packet.paths.map((name) => "/review/" + name),
     "The JSON object in your final response must be on one line and follow this schema: " + schema,
     `Packet: ${packetNumber} of ${count}`, "Native reference: " + reference, JSON.stringify(context),
-    "The template shows the clean result. If you find genuine issues, use the literal Verdict: Findings on line one and populate the findings array on line three. Use the literal Verdict: No findings only when findings is empty.",
+    "The template shows the clean result. If you find genuine issues, use the literal Verdict: Findings on the first line inside the block and populate the findings array in the JSON. Use the literal Verdict: No findings only when findings is empty.",
     ...(candidate ? [
       "Inherent read-only, no-shell, no-network constraints and future groups are not coverageLimitations. Use [] for coverageLimitations when all assigned files were read. Report any actual gaps in reading the assigned files.",
     ] : [
       "In the JSON, copy the verdict line exactly. Populate observations and coverageLimitations when warranted, even when findings is empty.",
       "Include exactly one ledgerChecks entry for each open ledger item, using its id. Use [] only when there are no open ledger items. For an applied resolution, reReviewReference must equal the supplied native reference.",
     ]),
-    "Your FINAL assistant message MUST contain ONLY these exact three lines and NOTHING else — no preamble, no prose before or after, no markdown code fences, no blank lines:",
-    clean, header, JSON.stringify(receipt),
+    "End your final assistant message with the exact five-line block below, with each marker on its own line and nothing after END_REVIEW_RECEIPT. Do not use lines beginning with Verdict: outside the block, even if indented.",
+    beginReceipt, clean, header, JSON.stringify(receipt), endReceipt,
   ].join("\n");
 }
 
 export function admitReceipt(request, context, report, index, reference, packet) {
-  const [verdict, header, json, ...rest] = report.trimEnd().split("\n");
+  let lines = report.trimEnd().split("\n");
+  const begin = lines.indexOf(beginReceipt);
+  const end = lines.indexOf(endReceipt);
+  if (begin !== -1 || end !== -1) {
+    need(begin !== -1 && begin === lines.lastIndexOf(beginReceipt) && end === lines.length - 1 &&
+      end === begin + 4 && !lines.slice(0, begin).some((line) => line.trimStart().startsWith("Verdict:")),
+      "Invalid native receipt framing");
+    lines = lines.slice(begin + 1, end);
+  }
+  const [verdict, header, json, ...rest] = lines;
   need([clean, findings].includes(verdict) && json && rest.length === 0, "Invalid native receipt framing");
   const receipt = parseStrictJson(Buffer.from(json));
   if (request.mode === "candidate") {

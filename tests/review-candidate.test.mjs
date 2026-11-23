@@ -5,16 +5,18 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { packetize, parseStrictJson } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-inputs.mjs";
 import { auditClaudeStream } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-stream.mjs";
-import { reviewPrompt } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-admission.mjs";
+import { admitReceipt, reviewPrompt } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-admission.mjs";
+import { convergencePacket, startConvergenceReview } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/orchestration-core.mjs";
 
-const finalPromptRule = "Your FINAL assistant message MUST contain ONLY these exact three lines and NOTHING else — no preamble, no prose before or after, no markdown code fences, no blank lines:";
+const beginReceipt = "BEGIN_REVIEW_RECEIPT";
+const endReceipt = "END_REVIEW_RECEIPT";
 
 test("candidate prompt ends with the exact clean packet template", () => {
   const target = "0123456789abcdef0123456789abcdef01234567";
   const context = { target };
   const prompt = reviewPrompt({ mode: "candidate" }, context, { paths: ["base/a", "target/b"] }, 1, 3, "candidate-ref");
-  const suffix = [finalPromptRule, "Verdict: No findings", `Target: ${target}`,
-    `{"target":"${target}","packet":2,"findings":[],"coverageLimitations":[]}`].join("\n");
+  const suffix = [beginReceipt, "Verdict: No findings", `Target: ${target}`,
+    `{"target":"${target}","packet":2,"findings":[],"coverageLimitations":[]}`, endReceipt].join("\n");
   assert.equal(prompt.slice(-suffix.length), suffix);
   const instructions = prompt.slice(0, -suffix.length);
   assert.match(instructions, /Batch multiple whole-file Read calls in parallel per turn/);
@@ -23,6 +25,8 @@ test("candidate prompt ends with the exact clean packet template", () => {
   assert.match(instructions, /Inherent read-only, no-shell, no-network constraints and future groups are not coverageLimitations/);
   assert.match(instructions, /Use \[\] for coverageLimitations when all assigned files were read/);
   assert.match(instructions, /Verdict: Findings.*findings/);
+  assert.match(instructions, /nothing after END_REVIEW_RECEIPT/);
+  assert.match(instructions, /Do not use lines beginning with Verdict: outside the block, even if indented/);
   assert.ok(instructions.includes(`Packet: 2 of 3\nNative reference: candidate-ref\n${JSON.stringify(context)}\n`));
 });
 
@@ -31,8 +35,8 @@ test("approach prompt ends with the exact clean charter template", () => {
   const context = { identity };
   const reference = 'approach "ref"';
   const prompt = reviewPrompt({ mode: "approach" }, context, { paths: ["plan/a", "plan/b"] }, 0, 1, reference);
-  const suffix = [finalPromptRule, "Verdict: No findings", "Policy: charter-v1",
-    `{"identity":${JSON.stringify(identity)},"readOnly":true,"reference":${JSON.stringify(reference)},"verdict":"Verdict: No findings","findings":[],"observations":[],"coverageLimitations":[],"ledgerChecks":[]}`].join("\n");
+  const suffix = [beginReceipt, "Verdict: No findings", "Policy: charter-v1",
+    `{"identity":${JSON.stringify(identity)},"readOnly":true,"reference":${JSON.stringify(reference)},"verdict":"Verdict: No findings","findings":[],"observations":[],"coverageLimitations":[],"ledgerChecks":[]}`, endReceipt].join("\n");
   assert.equal(prompt.slice(-suffix.length), suffix);
   const instructions = prompt.slice(0, -suffix.length);
   assert.match(instructions, /Batch multiple whole-file Read calls in parallel per turn/);
@@ -43,6 +47,64 @@ test("approach prompt ends with the exact clean charter template", () => {
   assert.match(instructions, /copy the verdict line/);
   assert.match(instructions, /Populate observations and coverageLimitations/);
   assert.ok(instructions.includes(`Packet: 1 of 1\nNative reference: ${reference}\n${JSON.stringify(context)}\n`));
+});
+
+const candidateTarget = "0123456789abcdef0123456789abcdef01234567";
+const candidateValue = { target: candidateTarget, packet: 1, findings: [], coverageLimitations: [] };
+const bareReceipt = ["Verdict: No findings", `Target: ${candidateTarget}`, JSON.stringify(candidateValue)].join("\n");
+const block = (receipt) => [beginReceipt, receipt, endReceipt].join("\n");
+const admitCandidate = (report) => admitReceipt({ mode: "candidate" }, { target: candidateTarget },
+  report, 0, "candidate-ref", { paths: ["target/a"] });
+
+test("candidate receipt admits terminal framing with prose and the legacy bare form", () => {
+  const expected = { ...candidateValue, verdict: "Verdict: No findings" };
+  assert.deepEqual(admitCandidate(bareReceipt), expected);
+  assert.deepEqual(admitCandidate(`Reviewed the assigned files.\n\n${block(bareReceipt)}\n \t`), expected);
+});
+
+test("approach receipt admits prose before the terminal block", () => {
+  const change = "fixture-change";
+  const inputs = Object.fromEntries(["openspec/config.yaml", ...[".openspec.yaml", "proposal.md", "tasks.md"]
+    .map((name) => `openspec/changes/${change}/${name}`)].map((name) => [name, "a".repeat(64)]));
+  const record = startConvergenceReview({ change, goal: "Review the fixture", passRule: "charter-v1", budget: 2,
+    charter: { clauses: ["scope"], boundaries: ["fixture"], tasks: ["1.1"], gates: ["test"] },
+    binding: { route: "terminal-adapter", client: "claude-code", model: "fixture", qualified: true,
+      independent: true, readOnly: true, permissions: ["read"] } });
+  const context = convergencePacket({ record, inputs, packetHashes: { "packet-1": "b".repeat(64) },
+    authorSession: "fixture-author", reviewerSession: "fixture-reviewer" });
+  const request = { mode: "approach", snapshot: { record }, worker: { identity: { inputs } } };
+  const packet = { paths: ["plan/proposal.md"] };
+  const reference = "approach-ref";
+  const template = reviewPrompt(request, context, packet, 0, 1, reference).split("\n").slice(-5).join("\n");
+  const result = admitReceipt(request, context, `Reviewed the fixture plan.\n${template}`, 0, reference, packet);
+  assert.equal(result.admission.action, "freeze-ready");
+});
+
+test("candidate receipt rejects malformed blocks and outside verdict lines", () => {
+  const validBlock = block(bareReceipt);
+  for (const report of [
+    `${validBlock}\nTrailing text`,
+    `${beginReceipt}\n${validBlock}`,
+    `${endReceipt}\n${validBlock}`,
+    `${validBlock}\n${endReceipt}`,
+    `${beginReceipt}\n${bareReceipt}`,
+    `${bareReceipt}\n${endReceipt}`,
+    `${endReceipt}\n${bareReceipt}\n${beginReceipt}`,
+    ` ${validBlock}`,
+    block(bareReceipt + "\nExtra interior line"),
+    `Verdict:\n${validBlock}`,
+    `Verdict: No findings\n${validBlock}`,
+    ` \tVerdict: Findings\n${validBlock}`,
+    `Verdict: contradictory prose\n${validBlock}`,
+  ]) {
+    assert.throws(() => admitCandidate(report), /Invalid native receipt framing/, report);
+  }
+});
+
+test("candidate receipt validates JSON and verdict consistency inside the block", () => {
+  assert.throws(() => admitCandidate(block(bareReceipt.slice(0, -1))), /JSON/);
+  assert.throws(() => admitCandidate(block(bareReceipt.replace("Verdict: No findings", "Verdict: Findings"))),
+    /Contradictory candidate receipt/);
 });
 
 test("strict JSON rejects decoded duplicate keys and trailing data", () => {
@@ -400,7 +462,8 @@ if (behavior !== "no-coverage") assigned.forEach((file_path, index) => {
     tool_use_result: { type: "text", file: { filePath: file_path, content, numLines, startLine: 1, totalLines: numLines } } });
 });
 const verdict = "Verdict: No findings";
-const input = probe ? null : JSON.parse(lines.at(-1));
+if (!probe && (lines.at(-5) !== "BEGIN_REVIEW_RECEIPT" || lines.at(-1) !== "END_REVIEW_RECEIPT")) process.exit(32);
+const input = probe ? null : JSON.parse(lines.at(-2));
 const reference = lines.find((line) => line.startsWith("Native reference: "))?.slice(18);
 const candidate = input?.target;
 const value = candidate
@@ -409,7 +472,8 @@ const value = candidate
   : { identity: input?.identity, readOnly: true, reference, verdict, findings: [], observations: [],
       coverageLimitations: behavior === "packet-gap" ? [{ class: "packet-gap", detail: "fixture gap" }] : [], ledgerChecks: [] };
 const result = probe ? "REVIEW_PROBE_OK" : behavior === "bad-receipt" || (behavior === "retry" && !reference.includes("retried"))
-  ? "malformed fixture receipt" : [verdict, candidate ? "Target: " + candidate : "Policy: charter-v1", JSON.stringify(value)].join("\\n");
+  ? "malformed fixture receipt" : ["Reviewed the assigned fixture files.", "BEGIN_REVIEW_RECEIPT", verdict,
+    candidate ? "Target: " + candidate : "Policy: charter-v1", JSON.stringify(value), "END_REVIEW_RECEIPT"].join("\\n");
 message("assistant", [{ type: "text", text: result }]);
 emit({ type: "result", subtype: "success", is_error: false, num_turns: 1, total_cost_usd: 0, permission_denials: [], result });
 `, { mode: 0o700 });
