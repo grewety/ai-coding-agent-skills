@@ -190,7 +190,7 @@ test("CLI usage rejects a request-selected host override before filesystem reads
 });
 
 import { randomUUID } from "node:crypto";
-import { chmod, mkdir, mkdtemp, readFile, realpath, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, realpath, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { hash, jsonBytes, buildExport } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-inputs.mjs";
@@ -476,6 +476,7 @@ const value = candidate
       findings: [], coverageLimitations: [] }
   : { identity: input?.identity, readOnly: true, reference, verdict, findings: [], observations: [],
       coverageLimitations: behavior === "packet-gap" ? [{ class: "packet-gap", detail: "fixture gap" }] : [], ledgerChecks: [] };
+if (behavior === "wrong-second-sha" && candidate && value.packet === 2) value.target = "f".repeat(40);
 const result = probe ? "REVIEW_PROBE_OK" : behavior === "bad-receipt" || (behavior === "retry" && !reference.includes("retried"))
   ? "malformed fixture receipt" : ["Reviewed the assigned fixture files.", "BEGIN_REVIEW_RECEIPT", verdict,
     candidate ? "Target: " + candidate : "Policy: charter-v1", JSON.stringify(value), "END_REVIEW_RECEIPT"].join("\\n");
@@ -666,8 +667,8 @@ test("malformed approach receipt permits one exact zero-cycle retry and a packet
   assert.equal(observed.approach.record.cumulativeCycles, 0);
 });
 
-test("candidate subprocess fixtures seal a complete multi-packet run against exact Git objects", async (t) => {
-  const f = await fixture(t, "candidate");
+async function gitCandidate(t, behavior = "valid") {
+  const f = await fixture(t, "candidate", behavior);
   const git = (...args) => {
     const result = spawnSync("/usr/bin/git", ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
       "-c", "core.hooksPath=/dev/null", ...args], { cwd: f.workspace, encoding: "utf8",
@@ -688,15 +689,21 @@ test("candidate subprocess fixtures seal a complete multi-packet run against exa
   const planBytes = Object.entries(f.source).sort(([a], [b]) => a < b ? -1 : 1).map(([name, value]) =>
     JSON.stringify([name, "100644", Buffer.byteLength(value)]) + "\0" + value + "\0").join("");
   const planDigest = hash(planBytes);
-  const diff = git("diff", "--no-color", "--no-ext-diff", "--no-textconv", "--no-relative", "--find-renames=50%",
+  const diff = (before, after) => git("diff", "--no-color", "--no-ext-diff", "--no-textconv", "--no-relative", "--find-renames=50%",
     "--diff-algorithm=myers", "--no-indent-heuristic", "--patch", "--text", "--full-index", "--unified=3",
-    "--src-prefix=a/", "--dst-prefix=b/", base, target, "--");
+    "--src-prefix=a/", "--dst-prefix=b/", before, after, "--");
   await writeFile(path.join(f.workspace, "gate.txt"), "synthetic test passed\n");
   f.request.attachments["gate.txt"] = hash("synthetic test passed\n");
   f.request.limits.diffBytes = 400;
   Object.assign(f.request.worker.identity, { candidate: target, plan: base, planDigest });
-  f.request.snapshot = { base, target, plan: base, planDigest, diffSha256: hash(diff),
+  f.request.snapshot = { base, target, plan: base, planDigest, diffSha256: hash(diff(base, target)),
     gates: [{ command: "synthetic test", commit: target, exitCode: 0, evidence: "gate.txt" }] };
+  return { ...f, git, diff, base, target, changeFiles };
+}
+
+test("candidate subprocess fixtures seal a complete multi-packet run against exact Git objects", async (t) => {
+  const f = await gitCandidate(t);
+  const { target, changeFiles } = f;
   const packed = await buildExport(f.request);
   assert.equal(packed.manifest.packets.length, 2);
   assert.ok(packed.manifest.packets.every((p) => p.paths.includes("context/gate.txt")));
@@ -712,4 +719,92 @@ test("candidate subprocess fixtures seal a complete multi-packet run against exa
   f.request.snapshot.diffSha256 = "a".repeat(64);
   const wrong = await prepareFixture(f, "wrong", false);
   assert.match(invoke(["--prepare", ...wrong.flags], 1), /diff hash mismatch/);
+});
+
+test("candidate seals exact second-packet SHA rejection and replays it without a handover", async (t) => {
+  const f = await gitCandidate(t, "wrong-second-sha");
+  const a = await prepareFixture(f);
+  const packed = await buildExport(f.request);
+  const launched = await launchFixture(a.launch);
+  assert.equal(launched.phase, "receipt-invalid");
+  assert.deepEqual(launched.rejection, { packet: 2, target: f.target,
+    packetSha256: hash(jsonBytes(packed.manifest.packets[1])), session: launched.rejection.session });
+  assert.notEqual(launched.rejection.session, f.request.session);
+  await retain(a, launched);
+  const verified = invoke(["--verify", ...a.flags, "--output", f.output], 1);
+  assert.deepEqual(verified.rejection, launched.rejection);
+  assert.deepEqual(verified.result.rejection, launched.rejection);
+  assert.equal(verified.result.mode, "candidate");
+  assert.equal(verified.result.status, undefined);
+  assert.equal(verified.deliveryAccepted, false);
+  const status = JSON.parse(await readFile(path.join(f.output, "status.json"), "utf8"));
+  assert.equal(status.count, 3);
+  assert.equal(status.captures.length, 9);
+  assert.deepEqual(status.rejection, launched.rejection);
+  assert.match(await readFile(path.join(f.output, "report.md"), "utf8"), /f{40}/);
+  assert.equal((await stat(path.join(f.output, "status.json"))).mode & 0o777, 0o400);
+});
+
+async function archivedCandidate(t, variant) {
+  const f = await gitCandidate(t);
+  const change = f.request.worker.identity.change;
+  const active = "openspec/changes/" + change;
+  const archive = "openspec/changes/archive/2026-11-23-" + change;
+  const file = (p) => path.join(f.workspace, p);
+  await writeFile(file(active + "/tasks.md"), "- [x] 1.1 Synthetic task\n");
+  await mkdir(file(active + "/evidence"), { recursive: true });
+  await writeFile(file(active + "/evidence/verified.txt"), "verified fixture record\n");
+  f.git("add", active);
+  f.git("commit", "-qm", "fixture verified predecessor with native tick");
+  const parent = f.git("rev-parse", "HEAD").trim();
+  await mkdir(file("openspec/changes/archive"));
+  await rename(file(active), file(archive));
+  if (variant === "bytes") await writeFile(file(archive + "/tasks.md"), "- [X] 1.1 Synthetic task\n");
+  if (variant === "mode") await chmod(file(archive + "/proposal.md"), 0o755);
+  if (variant === "missing") await rm(file(archive + "/evidence/verified.txt"));
+  if (variant === "addition") await writeFile(file(archive + "/evidence/extra.json"), "{}\n");
+  if (variant === "duplicate") {
+    await mkdir(file(active));
+    await writeFile(file(active + "/tasks.md"), "- [x] 1.1 Synthetic task\n");
+  }
+  if (variant === "code") await writeFile(file("one.txt"), "unrelated change\n");
+  if (variant === "bad-date") await rename(file(archive), file(archive.replace("11-23", "02-30")));
+  if (variant === "authorized-receipt") {
+    const relative = archive + "/evidence/closure.json";
+    await writeFile(file(relative), "{}\n");
+    f.request.attachments[relative] = hash("{}\n");
+  }
+  f.git("add", "-A", "openspec", "one.txt");
+  f.git("commit", "-qm", "fixture record-only closure");
+  const target = f.git("rev-parse", "HEAD").trim();
+  f.request.worker.identity.candidate = target;
+  f.request.snapshot = { ...f.request.snapshot, base: parent, target, diffSha256: hash(f.diff(parent, target)),
+    gates: f.request.snapshot.gates.map((gate) => ({ ...gate, commit: target })) };
+  f.request.limits.diffBytes = 8192;
+  return { ...f, active, archive, target };
+}
+
+test("archive closure checks and replays identical bytes and modes in logical planning coordinates", async (t) => {
+  const f = await archivedCandidate(t, "authorized-receipt");
+  const { manifest, files } = await buildExport(f.request);
+  assert.equal(manifest.packets.length, 1);
+  assert.equal(files.get("plan/" + f.active + "/tasks.md").toString(), "- [ ] 1.1 Synthetic task\n");
+  assert.equal(files.get("target/" + f.archive + "/tasks.md").toString(), "- [x] 1.1 Synthetic task\n");
+  const a = await prepareFixture(f);
+  assert.equal(invoke(["--check", ...a.flags]).packets, 1);
+  await retain(a, await launchFixture(a.launch));
+  const verified = invoke(["--verify", ...a.flags, "--output", f.output]);
+  assert.equal(verified.result.identity.candidate, f.target);
+  assert.equal(verified.result.identity.planDigest, f.request.snapshot.planDigest);
+});
+
+test("archive rejects changed bytes or modes, additions, omissions, unsafe dates and out-of-scope changes", async (t) => {
+  for (const [variant, message] of [
+    ["bytes", /changed or omitted/], ["mode", /changed or omitted/], ["missing", /changed or omitted/],
+    ["addition", /Unexpected archive addition/], ["duplicate", /Ambiguous active\/archive/],
+    ["code", /record-only diff/], ["bad-date", /Noncanonical archive/],
+  ]) {
+    const f = await archivedCandidate(t, variant);
+    await assert.rejects(buildExport(f.request), message, variant);
+  }
 });

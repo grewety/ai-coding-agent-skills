@@ -45,7 +45,7 @@ def kill_children():
             os.close(fd)
 
 
-def run(spec):
+def run(spec, on_started=None, on_delivered=None, observe=None):
     if ctypes.CDLL(None, use_errno=True).prctl(36, 1, 0, 0, 0) != 0:
         raise OSError("subreaper unavailable")
     # Validate the kernel's pidfd and procfs interfaces before starting a worker.
@@ -66,24 +66,40 @@ def run(spec):
         worker = subprocess.Popen(spec["argv"], cwd=spec["cwd"], env=spec["env"],
                                   stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         with worker.stdin, worker.stdout, worker.stderr:
+            control_failed = False
+            if on_started:
+                try:
+                    on_started(worker.pid)
+                except Exception:
+                    control_failed = True
             for name in captures:
                 pipe = getattr(worker, name)
                 os.set_blocking(pipe.fileno(), False)
                 ready.register(pipe, selectors.EVENT_READ, name)
             payload = base64.b64decode(spec["input"])
-            if payload:
+            if payload and not control_failed:
                 os.set_blocking(worker.stdin.fileno(), False)
                 ready.register(worker.stdin, selectors.EVENT_WRITE, "stdin")
             else:
                 worker.stdin.close()
             outcome = None
+            delivery_recorded = False
             cleanup_deadline = None
             teardown_deadline = None
             while True:
                 quiescent, descendant_signaled = reap(worker)
                 now = time.monotonic()
                 if outcome is None:
-                    if now >= deadline:
+                    if control_failed:
+                        stop = "control-failed"
+                    else:
+                        try:
+                            stop = observe() if observe else None
+                        except Exception:
+                            stop = "control-failed"
+                    if stop:
+                        outcome = stop
+                    elif now >= deadline:
                         outcome = "timeout"
                     elif grace and descendant_signaled:
                         outcome = "surviving-descendants"
@@ -110,18 +126,38 @@ def run(spec):
                     if name == "stdin":
                         try:
                             payload = payload[os.write(key.fd, payload[:65536]):]
+                            if not payload and on_delivered and not delivery_recorded:
+                                try:
+                                    on_delivered()
+                                    delivery_recorded = True
+                                except Exception:
+                                    control_failed = True
                         except BrokenPipeError:
                             payload = b""
+                        except BlockingIOError:
+                            continue
                         if not payload:
                             ready.unregister(key.fileobj)
                             worker.stdin.close()
                         continue
                     remaining = spec[name + "Limit"] - len(captures[name])
-                    data = os.read(key.fd, min(65536, remaining + 1))
+                    try:
+                        data = os.read(key.fd, min(65536, remaining + 1))
+                    except BlockingIOError:
+                        continue
                     if not data:
                         ready.unregister(key.fileobj)
                         continue
-                    captures[name].extend(data[:remaining])
+                    chunk = data[:remaining]
+                    captures[name].extend(chunk)
+                    if name == "stdout" and observe and outcome is None:
+                        try:
+                            stop = observe(chunk)
+                        except Exception:
+                            stop = "control-failed"
+                        if stop:
+                            outcome = stop
+                            cleanup_deadline = time.monotonic() + 2
                     if len(data) > remaining:
                         if outcome is None:
                             outcome = name + "-quota"

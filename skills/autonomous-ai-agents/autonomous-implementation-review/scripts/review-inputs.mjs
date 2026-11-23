@@ -1,3 +1,4 @@
+import { relocatedPlan } from "./review-archive.mjs";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { chmod, lstat, mkdir, readdir } from "node:fs/promises";
@@ -116,10 +117,11 @@ export function packetize(diff, entries, limit, fits = () => true) {
   return result;
 }
 
-function git(workspace, ...args) {
+export function git(workspace, ...args) {
   try {
     return execFileSync("/usr/bin/git", [
       "--no-pager", "-c", "core.hooksPath=/dev/null", "-c", "core.quotePath=true",
+      "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false",
       "-c", "diff.external=", "-c", "core.attributesFile=/dev/null", ...args,
     ], {
       cwd: workspace, env: { PATH: "/usr/bin:/bin", HOME: "/nonexistent", XDG_CONFIG_HOME: "/nonexistent",
@@ -129,12 +131,25 @@ function git(workspace, ...args) {
   } catch { throw new Error("Git identity or bounded object read failed"); }
 }
 
-const planningPrefix = (change) => `openspec/changes/${change}/`;
+export async function verifiedGitRoot(workspace) {
+  await safePath(workspace);
+  await safePath(path.join(workspace, ".git"));
+  need(utf8(git(workspace, "rev-parse", "--show-toplevel")).trimEnd() === workspace, "Git workspace identity mismatch");
+  need(!utf8(git(workspace, "for-each-ref", "--format=%(refname)", "refs/replace/")).trim(), "Unsupported Git replace references");
+  for (const local of ["info/grafts", "objects/info/alternates"]) {
+    const file = utf8(git(workspace, "rev-parse", "--path-format=absolute", "--git-path", local)).trimEnd();
+    need(absolute(file), "Malformed Git object topology locator");
+    try { await lstat(file); throw new Error("Unsupported Git graft or alternate object store"); }
+    catch (error) { if (error.code !== "ENOENT") throw error; }
+  }
+}
+
+export const planningPrefix = (change) => `openspec/changes/${change}/`;
 const requiredPlanning = (change) => ["openspec/config.yaml", ...[".openspec.yaml", "proposal.md", "tasks.md"].map((name) => planningPrefix(change) + name)];
 const isPlanning = (name, change) => requiredPlanning(change).includes(name) ||
   name === planningPrefix(change) + "design.md" || name.startsWith(planningPrefix(change) + "specs/");
 
-function tree(workspace, ref, paths = []) {
+export function tree(workspace, ref, paths = []) {
   const entries = utf8(git(workspace, "ls-tree", "-r", "-z", "--full-tree", ref, "--", ...paths)).split("\0").filter(Boolean);
   return new Map(entries.map((entry) => {
     const match = /^(\d{6}) (blob|commit) ([a-f0-9]+)\t([^\n]+)$/.exec(entry);
@@ -257,7 +272,7 @@ async function readApproved(root, name, sha256) {
 
 // Canonical frozen plan digest uses the same length framing as change-guard.
 // Once frozen, task progress may change only real task checkboxes.
-function normalizeTasks(source) {
+export function normalizeTasks(source, onTask = () => {}) {
   let fence = null;
   let comment = false;
   let count = 0;
@@ -280,13 +295,14 @@ function normalizeTasks(source) {
     if (!/^[ xX]$/.test(task[4]) && task[4].trim().length > 1 && /^[([]/.test(task[5])) return line;
     need(/^[ xX]$/.test(task[4]) && (!task[5] || /^[ \t]/.test(task[5])), "Invalid task checkbox");
     count++;
+    onTask(/^[ \t]+(\d+\.\d+)(?=\s|$)/.exec(task[5])?.[1] ?? null, task[4].toLowerCase() === "x");
     return `${quote}${task[1]}${task[2]}${task[3]}[ ]${task[5]}${line.slice(body.length)}`;
   }).join("");
   need(!fence && !comment && count > 0, "Invalid frozen task file");
   return Buffer.from(bom + normalized);
 }
 
-function planFiles(w, entries, frozen) {
+export function planFiles(w, entries, frozen, expectedDigest = w.identity.planDigest) {
   const planning = [...entries.keys()].filter((name) => isPlanning(name, w.identity.change)).sort();
   need(equal(planning, Object.keys(w.identity.inputs).sort()), "Git planning inventory mismatch");
   const hasher = createHash("sha256");
@@ -299,7 +315,7 @@ function planFiles(w, entries, frozen) {
     const bytes = name === planningPrefix(w.identity.change) + "tasks.md" ? normalizeTasks(utf8(raw)) : raw;
     hasher.update(JSON.stringify([name, entry.mode, bytes.length]) + "\0").update(bytes).update("\0");
   }
-  need(hasher.digest("hex") === w.identity.planDigest, "Frozen Git plan digest mismatch");
+  need(hasher.digest("hex") === expectedDigest, "Frozen Git plan digest mismatch");
   return files;
 }
 
@@ -322,7 +338,7 @@ export async function buildExport(request) {
   let packets;
   if (request.mode === "candidate") {
     const s = request.snapshot;
-    need(utf8(git(workspace, "rev-parse", "--show-toplevel")).trimEnd() === workspace, "Git workspace identity mismatch");
+    await verifiedGitRoot(workspace);
     for (const commit of [s.base, s.target, s.plan]) {
       need(utf8(git(workspace, "rev-parse", "--verify", commit + "^{commit}")).trimEnd() === commit, "Expected exact Git commit");
     }
@@ -330,8 +346,22 @@ export async function buildExport(request) {
     git(workspace, "merge-base", "--is-ancestor", s.plan, s.target);
     const oldTree = tree(workspace, s.base);
     const newTree = tree(workspace, s.target);
-    for (const [name, bytes] of planFiles(w, tree(workspace, s.plan), true)) common.push(remember("plan/" + name, bytes));
-    planFiles(w, newTree, false);
+    const frozenTree = tree(workspace, s.plan);
+    for (const [name, bytes] of planFiles(w, frozenTree, true)) common.push(remember("plan/" + name, bytes));
+    const logicalTree = relocatedPlan({ change, targetTree: newTree, baseTree: oldTree, frozenTree,
+      predecessor: () => {
+        const [target, ...parents] = utf8(git(workspace, "rev-list", "--parents", "-n", "1", s.target)).trim().split(" ");
+        need(target === s.target && parents.length === 1 && sha(parents[0]), "Archive requires one verified immediate parent");
+        git(workspace, "merge-base", "--is-ancestor", s.plan, parents[0]);
+        git(workspace, "merge-base", "--is-ancestor", s.base, parents[0]);
+        const parentTree = tree(workspace, parents[0]);
+        planFiles(w, parentTree, false);
+        return parentTree;
+      },
+      additions: (name, entry) => Object.hasOwn(request.attachments, name) &&
+        request.attachments[name] === hash(blob(workspace, entry, name)),
+    });
+    planFiles(w, logicalTree, false);
     const { diff, entries } = changedEntries(workspace, s.base, s.target, oldTree, newTree);
     need(hash(diff) === s.diffSha256, "Approved diff hash mismatch");
     for (const entry of entries) for (const name of entry.paths) {

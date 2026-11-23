@@ -92,6 +92,7 @@ async function replay(directory, request, expect, prepared, count) {
   const receipts = [];
   const reports = [];
   const sessions = [probeSession];
+  let rejection = null;
   let phase = audit(probe, [], true) === null ? "probe-failed" : "complete";
   for (let index = 1; index < count; index++) {
     need(phase === "complete", "Capture exists after a failed launch");
@@ -108,13 +109,18 @@ async function replay(directory, request, expect, prepared, count) {
     reports.push(report);
     try {
       receipts.push(admitReceipt(request, context, report, index - 1, path.join(directory, "report.md"), packet));
-    } catch { phase = "invalid-receipt"; }
+    } catch {
+      phase = request.mode === "candidate" ? "receipt-invalid" : "invalid-receipt";
+      if (request.mode === "candidate") {
+        rejection = { packet: index, packetSha256: hash(jsonBytes(packet)), target: context.target, session };
+      }
+    }
   }
   if (phase === "complete") need(count === packetCount + 1, "Missing packet results");
   const native = reports.length
     ? Buffer.from(reports.map((report, index) => reports.length === 1 ? report : `Packet ${index + 1}\n${report}`).join("\n\n") + "\n")
     : Buffer.from("No extracted native report. See the retained raw captures.\n");
-  return { phase, sessions, captures, receipts, native, runtime: attemptRuntime({ ...probe.runtime, session: request.session }) };
+  return { phase, rejection, sessions, captures, receipts, native, runtime: attemptRuntime({ ...probe.runtime, session: request.session }) };
 }
 
 async function outcome(directory, request, expect, prepared, count, expected) {
@@ -130,8 +136,11 @@ async function outcome(directory, request, expect, prepared, count, expected) {
   } else {
     files["report.md"] = observed.native;
     result = { schemaVersion: 1, mode: request.mode, requestSha256: expect.requestSha256,
-      phase: observed.phase, native: observed.receipts[0]?.receipt ?? null,
-      approachAction: observed.receipts[0]?.admission.action ?? null, report: describe("report.md", observed.native) };
+      phase: observed.phase,
+      ...(request.mode === "approach" ? {
+        native: observed.receipts[0]?.receipt ?? null, approachAction: observed.receipts[0]?.admission.action ?? null,
+      } : { ...(observed.rejection ? { rejection: observed.rejection } : { native: null, approachAction: null }) }),
+      report: describe("report.md", observed.native) };
   }
   const resultBytes = handoff ? null : jsonBytes(result);
   return { files, observed, result, handoff, resultBytes };
@@ -141,6 +150,7 @@ function statusFor(directory, expect, count, outcome, resultBytes, requestBytes)
   return {
     schemaVersion: 1, requestSha256: expect.requestSha256, exportSha256: expect.exportSha256,
     configurationSha256: expect.configurationSha256, model: expect.model, phase: outcome.observed.phase, count,
+    ...(outcome.observed.rejection ? { rejection: outcome.observed.rejection } : {}),
     sessions: outcome.observed.sessions, captures: outcome.observed.captures, deliveryAccepted: false,
     files: [...Object.entries(outcome.files), ["request.md", requestBytes], ["result.json", resultBytes]]
       .map(([name, bytes]) => describeFile(directory, name, bytes)),
@@ -177,7 +187,7 @@ async function verify(directory, request, expect, prepared) {
   need(equal((await readdir(directory)).sort(), ["raw", "status.json", "request.md", "result.json",
     ...Object.keys(reconstructed.files)].sort()), "Handover inventory mismatch");
   return {
-    phase: status.phase, result: reconstructed.result, sessions: status.sessions, deliveryAccepted: false,
+    phase: status.phase, ...(status.rejection ? { rejection: status.rejection } : {}), result: reconstructed.result, sessions: status.sessions, deliveryAccepted: false,
     ...(request.mode === "approach" && reconstructed.observed.phase === "complete"
       ? { approach: reconstructed.observed.receipts[0].admission } : {}),
   };
@@ -256,7 +266,8 @@ export async function runReview({ request, expect, prepared, directory, excluded
   await sealDirectories(directory);
   const statusSha256 = hash(status);
   await verify(directory, request, { ...expect, statusSha256 }, prepared);
-  return { phase: reconstructed.observed.phase, statusSha256, deliveryAccepted: false };
+  return { phase: reconstructed.observed.phase, statusSha256, deliveryAccepted: false,
+    ...(reconstructed.observed.rejection ? { rejection: reconstructed.observed.rejection } : {}) };
 }
 
 const commands = {
@@ -347,7 +358,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   try {
     const result = await reviewCommand(process.argv.slice(2));
     writeSync(1, JSON.stringify(result) + "\n");
-    if (result.phase?.endsWith("-failed") || result.phase === "invalid-receipt") process.exitCode = 1;
+    if (result.phase?.endsWith("-failed") || ["invalid-receipt", "receipt-invalid"].includes(result.phase)) process.exitCode = 1;
   } catch (error) {
     writeSync(2, `Review stopped: ${error.code ? "unsafe, missing or existing local artifact (" + error.code + ")" : error.message}\n`);
     process.exitCode = 1;
