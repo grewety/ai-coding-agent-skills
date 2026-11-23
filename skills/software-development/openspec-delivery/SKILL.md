@@ -1,7 +1,7 @@
 ---
 name: openspec-delivery
 description: Automate setup, execution and closeout of OpenSpec changes.
-version: 1.3.1
+version: 1.4.0
 author: Raphael (forgegod), Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -18,9 +18,8 @@ OpenSpec change in a project that explicitly selects this workflow. This is an
 orchestrator procedure, not a scheduler, distributed lock, approval service or
 GitHub API client, and installing OpenSpec or this package never selects it.
 The agent handles the plumbing; the operator selects scope and exceptions.
-For byte-preserving gate, readback, and review evidence, use
-[references/evidence-retention.md](references/evidence-retention.md); it retains
-captured facts without executing gates, polling APIs, or widening authority.
+Use the local capture, seal and offline readback interfaces for byte-preserving
+gate, readback and review evidence. [Evidence retention](references/evidence-retention.md).
 
 ## When to Use
 
@@ -72,8 +71,9 @@ continue without another confirmation. Operator restrictions override defaults,
 including natural-language restrictions such as `inspect only`, `no commits`,
 `group 1 only`, or `keep the worktree`. A missing policy is not implied consent:
 present the bounded contract once for adoption, not a command-by-command quiz.
-Plan approval, risk acceptance, remote publication and host permission checks
-remain separate from this local authority. Never infer approval from `next`.
+Exact Goal Contract or plan approval, risk acceptance, remote publication and
+host permission checks remain separate from local authority. Never infer
+approval from `next`.
 
 Before freeze or execution, apply
 [references/delivery-policy.md](references/delivery-policy.md): verify the
@@ -86,6 +86,12 @@ at that parent and the available orchestration package. Otherwise preserve
 single-group behavior and existing approval; later policy edits cannot widen it.
 Working-tree and committed unintegrated contract changes remain inert for their
 own change through integration, including authority, review, commits and continuation.
+The [delivery runtime](references/delivery-runtime.md) supplies policy, preflight,
+workspace, decision, status, handover and finish-readiness commands. Use the
+verified integrated parent to select Goal-First for eligible reversible local
+work when it explicitly opts in. Use Task-Guided for prescribed methods, ordered
+dependencies, staged authority or an absent opt-in. Preserve frozen approvals.
+Both paths require matching approval and separate bounded local execution authority.
 
 ## Parallel specification and documentation
 
@@ -144,7 +150,16 @@ those commands without a verified, authorized issue.
 
 ## Short invocation
 
-On Hermes (map the skill name to the host's native spelling):
+Use the installed client's spelling. These examples select `pin-note` under
+the same project authority boundary:
+
+| Host | Local delivery | Protected finish |
+| --- | --- | --- |
+| Codex | `$openspec-delivery pin-note` | `$openspec-delivery finish pin-note` |
+| Hermes or direct Claude Code skill | `/openspec-delivery pin-note` | `/openspec-delivery finish pin-note` |
+| Claude Code with the marketplace plugin enabled | `/openspec-development:openspec-delivery pin-note` | `/openspec-development:openspec-delivery finish pin-note` |
+
+The Hermes/direct forms show the available verbs:
 
 ```text
 /openspec-delivery <name>
@@ -158,14 +173,15 @@ On Hermes (map the skill name to the host's native spelling):
 `openspec-next`. A longer prompt is not required. Never ask the operator to type
 a ULID or remember a worktree path. Load [references/continuation.md](references/continuation.md).
 
-- Default / `next`: resume the next unfinished task group of the approved change;
-  create/reuse its isolated checkout, bootstrap, implement, verify, independently
-  review, update `tasks.md`, and commit the local candidate. Stop after one group
-  by default; under selected continuous-goal policy, repeat the eligibility and
-  authority gates for consecutive groups until its declared stop boundary.
-  This does not authorize push, a pull request, merge, issue closure or retirement.
-  If already merged, recover rather than implement again; request `finish` only
-  when its authority is missing. A repeated `next` advances the same change.
+- Default / `next`: deliver the single approved Goal-First outcome or resume the
+  next unfinished task group in approved Task-Guided delivery. Create/reuse its isolated checkout,
+  bootstrap, implement, verify, independently review, record native progress,
+  and preview authorized local commits. Task-Guided stops after one group by
+  default; selected continuous-goal policy rechecks eligibility and authority for
+  consecutive groups until its declared stop.
+  Local execution does not authorize push, a pull request, merge, issue closure or retirement.
+  Recover an already integrated change from
+  actual readbacks under held finish authority.
 - `prepare`: workspace setup/bootstrap only. No implementation, commits or remote
   writes. For a new proposal the project's selected proposal policy can invoke
   this recipe internally after naming and before upstream scaffolding.
@@ -173,8 +189,8 @@ a ULID or remember a worktree path. Load [references/continuation.md](references
   and record-only closure PRs through the protected route, integrated gates,
   factual receipt/archive commits, issue closure when acceptance is satisfied,
   and removal of clean dedicated worktrees. No direct target push, bypass,
-  force-push, release, branch deletion or next change. Bind an existing frozen
-  candidate/review first; do not implement missing groups under `finish`.
+  force-push, release, branch deletion or next change. Require exact candidate acceptance and current-spec
+  promotion through `finish-readiness` first; do not implement missing groups under `finish`.
 - `document`: load `references/ticket.md`, create/reuse one issue, read it back,
   bind its verified URL, then stop. No implementation, commits or PR. Reuse
   does not authorize rewriting an existing issue. No second task list.
@@ -198,14 +214,23 @@ restrictions continue until explicitly lifted; a bare `next` never cancels them.
    `prepare` stops after bootstrap. Isolate mutable test resources per change.
    Independent changes may run concurrently; dependent execution waits for accepted
    integrated prerequisite evidence. One implementation writer per change initially.
-5. Prepare native proposal/spec/design/tasks and obtain approval bound to an
-   immutable plan commit and digest. Before freezing, run the policy/contract checks
+5. Prepare native proposal/spec/design/tasks. Task-Guided approval binds the
+   immutable plan commit and normalized digest. Goal-First approval binds the
+   committed Goal Contract and its mode-specific digest, with one native local
+   outcome checkbox. For uncertain breaking upgrades before contract lock, use
+   the [bounded scratch discovery procedure](references/external-verification.md)
+   when explicitly authorized. Before freezing, run the policy/contract checks
    above and, when selected, retain an independent approach review of the complete
    planning hash set through orchestration's `references/portable-core.md`.
-   Re-hash after review; acceptance is readiness, not plan approval. Only checkbox progress edits preserve that
-   digest; scope, acceptance, gates and dependencies changing require reapproval.
+   Re-hash after approach review. Freeze readiness precedes exact approval.
+   Task-Guided only normalizes native checkbox progress. Goal-First can adapt
+   implementation choices and declared legacy assumptions within the approved
+   promise. Changes to covered identity or authority require renewed approval.
    Only the orchestrator may create commits, with explicit local commit authority.
-6. Implement only the authorized change/task group. `finish` skips implementation
+6. Use the runtime `decision` at dispatch, each boundary, correction and result.
+   Check retained P1–P8 inputs before dispatch. Implement only the authorized
+   outcome or task group. A routine in-scope failure consumes the held correction
+   budget. Stop on `DIRECTION_DRIFT_CHOICE` and report the conflicting clause. `finish` skips implementation
    and resumes at its actual publication/integration/closure boundary. Retain actual
    gate output and report failed prerequisites. When the project's role loop is selected,
    load `autonomous-implementation-review` and its OpenSpec reference; unsupported
@@ -213,14 +238,21 @@ restrictions continue until explicitly lifted; a bare `next` never cancels them.
    validate the artifact-first handoff with orchestration's `readHandoff` before
    using its report as evidence. Completion, review verdict and delivery acceptance
    are distinct; neither worker output nor a missing result advances tasks.
-7. Freeze a clean committed candidate. Use `references/guard.md` for candidate
+7. Freeze a clean committed candidate. Capture gates from a clean disposable
+   checkout at that exact SHA. For a declared UI flow verify local-only try-out
+   and accessible-name checks. Route a separately authorized deploy preview to
+   its own pre-merge review pause. Use `references/guard.md` for candidate
    and review checks. Independently review its exact full SHA, delta specs,
    implementation, executable evidence and current-behavior changes. Review is a
    gate within this change, not a new change for every comment. Use orchestration's
    canonical correction loop: eight cumulative automatic cycles or a narrower
    inherited group/authority limit, never reset on refreeze or role change. A changed
    candidate invalidates review; confirmed defects are not silently waived.
-8. Before an authorized publication, load `references/integration.md`. Re-read the
+8. Before an authorized publication, load `references/integration.md` and
+   require positive exact-SHA `finish-readiness` with valid promoted current
+   specs. Use the [external verification boundary](references/external-verification.md)
+   for trigger inventory, distinct single-run approval, reservation, artifact-only
+   exposure and immediate teardown. Re-read the
    actual target and shared capability specs. Reconcile semantic overlap. Include
    implemented behavior, specs and current visuals in the review record. A clean
    Git merge alone is not compatibility proof. A pull request is that review

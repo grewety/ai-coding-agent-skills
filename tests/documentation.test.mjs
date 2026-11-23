@@ -55,6 +55,40 @@ test("current installation guidance matches package versions and preserves hando
   }
 });
 
+test("next and delivery spellings preserve authority across native host routes", async () => {
+  const root = new URL("../", import.meta.url);
+  const workflow = await readFile(new URL("docs/openspec-workflow.md", root), "utf8");
+  const readmeSource = await readFile(readme, "utf8");
+  const codex = ["$openspec-next inspect pin-note", "$openspec-next pin-note", "$openspec-delivery pin-note"];
+  const direct = ["/openspec-next inspect pin-note", "/openspec-next pin-note", "/openspec-delivery pin-note"];
+  const marketplace = direct.map((example) => example.replace("/", "/openspec-development:"));
+  for (const [host, examples] of [
+    ["Codex CLI or IDE", codex], ["Hermes CLI", direct],
+    ["Claude Code, direct personal or project skill", direct], ["Claude Code, enabled marketplace plugin", marketplace],
+  ]) {
+    const row = workflow.split("\n").find((line) => line.startsWith(`| ${host} |`));
+    assert.ok(row, host);
+    for (const example of examples) {
+      assert.ok(row.includes(`\`${example}\``), `${host} omits ${example}`);
+      assert.ok(readmeSource.includes(`\`${example}\``), `README omits ${example}`);
+    }
+    assert.ok(row.includes(`\`${examples[2].replace(" pin-note", " finish pin-note")}\``));
+  }
+  for (const url of [
+    "https://learn.chatgpt.com/docs/build-skills#how-chatgpt-and-codex-use-skills",
+    "https://hermes-agent.nousresearch.com/docs/reference/slash-commands#dynamic-cli-slash-commands",
+    "https://code.claude.com/docs/en/skills#choose-where-skills-load",
+  ]) assert.ok(workflow.includes(url), url);
+  assert.match(workflow, /inspect` \| Read-only selection/);
+  assert.match(workflow, /exact-candidate readiness\s+verifies completed native work and promoted current specs/);
+  assert.match(workflow, /deploy preview has its own approval and\s+operator review before protected merge/);
+  assert.match(workflow, /Before any separately authorized push, verify the trigger\s+inventory/);
+  const contract = await readFile(new URL("AGENTS.md", root), "utf8");
+  assert.equal(contract.match(/^<!-- openspec-delivery-mode: goal-first -->$/gm)?.length, 1);
+  assert.match(contract, /verified integrated plan parent contains this contract/);
+  assert.match(contract, /retains its inherited Task-Guided policy/);
+});
+
 test("all launch examples carry the same bounded operator authorization", async () => {
   const files = [readme,
     fileURLToPath(new URL("../skills/autonomous-ai-agents/autonomous-implementation-review/SKILL.md", import.meta.url))];
@@ -145,7 +179,7 @@ test("autonomous goal documentation distinguishes orchestration from polling", a
   const withoutRetirementManifest = withoutLocalInstaller(source);
   assert.match(source, /### Run the autonomous implementation-review goal/);
   assert.match(source, /\/goal draft \/openspec-delivery <name>/);
-  assert.match(source, /push\/PR\/merge are not/);
+  assert.match(source, /finish <name>`\s*verb separately authorizes the protected PR/);
   assert.match(source, /qualified terminal adapter/);
   assert.match(source, /resolveLegacyRouteRequest/);
   assert.match(source, /retired-route/);

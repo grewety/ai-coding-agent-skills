@@ -51,20 +51,19 @@ function matchesAuthority(record, identity) {
     Object.entries(identity).every(([key, value]) => record[key] === value);
 }
 
-function reviewPassed(handoff, candidate, planDigest, gateReference, active) {
+function reviewMatches(handoff, candidate, gateReference, active, group) {
   const result = handoff?.result;
   const request = handoff?.request;
-  return result?.status === "completed" && result.identity?.role === "reviewer" &&
-    result.identity.candidate === candidate.head && result.identity.change === candidate.change &&
-    result.identity.plan === candidate.plan && result.identity.planDigest === planDigest &&
-    result.identity.workspace === candidate.workspace &&
-    (active?.group === result.identity.group || active?.group === result.identity.task) &&
-    candidate.taskIds?.includes(result.identity.task) &&
-    result.identity.implementerSession === active?.implementerSession && text(active?.implementerSession) &&
+  const id = result?.identity;
+  return result?.status === "completed" && id?.role === "reviewer" &&
+    id.candidate === candidate.head && id.change === candidate.change &&
+    id.plan === candidate.plan && id.planDigest === candidate.planDigest &&
+    (handoff.reviewSnapshot ? id.group === group?.id && id.group === active?.group && group.taskIds.includes(id.task) :
+      id.workspace === candidate.workspace && (active?.group === id.group || active?.group === id.task)) &&
+    candidate.taskIds?.includes(id.task) &&
+    id.implementerSession === active?.implementerSession && text(active?.implementerSession) &&
     text(result.runtime?.session) && result.runtime.session !== active.implementerSession &&
-    result.runtime.readOnly === true && result.verdict === "no_findings" && result.nativeVerdict === "Verdict: No findings" &&
-    result.findings?.length === 0 && result.coverageLimitations?.length === 0 &&
-    request?.acceptance?.includes(`gate-run:${gateReference}`);
+    result.runtime.readOnly === true && result.coverageLimitations?.length === 0 && request?.acceptance?.includes(`gate-run:${gateReference}`);
 }
 
 export function selectTaskGroup({ groups, eligibleGroups, requested, activeGroup = null }) {
@@ -193,9 +192,11 @@ export function deliveryDecision({ phase, policy, identity, contract, approval, 
   }
   if (!gates.passed) return observed.failure === "routine-in-scope" && observed.failureReference === gates.reference ?
     correct() : state("stop", "EXACT_GATES_FAILED");
-  if (handoff?.result?.status === "completed" && handoff.result.verdict === "findings" &&
-      observed.failure === "routine-in-scope" && observed.failureReference === handoff.result.report?.sha256) return correct();
-  if (!reviewPassed(handoff, candidate, identity.planDigest, gates.reference, observed.activeAttempt)) {
+  const review = handoff?.result;
+  const exactReview = reviewMatches(handoff, candidate, gates.reference, observed.activeAttempt, group);
+  if (review?.status === "completed" && review.verdict === "findings" && (!handoff.reviewSnapshot || exactReview) &&
+      observed.failure === "routine-in-scope" && observed.failureReference === review.report?.sha256) return correct();
+  if (!exactReview || review.verdict !== "no_findings" || review.nativeVerdict !== "Verdict: No findings" || review.findings?.length !== 0) {
     return state("queue", "EXACT_REVIEW_PENDING");
   }
   return state("accept-result", null, { group: group?.id ?? null, head: candidate.head, commits, eligibleForTaskUpdate: true });

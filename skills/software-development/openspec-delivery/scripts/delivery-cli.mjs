@@ -9,7 +9,7 @@ import { contractChangePaths, resolveDeliveryPolicy } from "./delivery-policy.mj
 import { deliveryDecision, goalContractIdentity, readGoalContract } from "./delivery-control.mjs";
 import { deliveryStatus, preflight } from "./delivery-status.mjs";
 import { evidenceCommand } from "./evidence-cli.mjs";
-import { readBounded, readJson, scopedPath, sha256, stableJson } from "./evidence-retention.mjs";
+import { readBounded, readJson, scopedPath, separate, sha256, stableJson } from "./evidence-retention.mjs";
 import { planningLayout } from "./planning-inventory.mjs";
 import { finishReadiness } from "./finish-readiness.mjs";
 import { discovery, externalVerificationDecision, pushTriggerDecision, reserveExternalRun, uiAcceptanceDecision } from "./external-verification.mjs";
@@ -60,10 +60,17 @@ export async function verifyHandover(input) {
     need(digest(input.requestFileSha256) && sha256(requestBytes) === input.requestFileSha256,
       "Reviewer request file identity mismatch");
     const requestRecord = JSON.parse(utf8.decode(requestBytes));
+    const expectBytes = readBounded(expect, 1024 * 1024);
+    const expectation = JSON.parse(utf8.decode(expectBytes));
+    need(requestRecord.mode === "candidate" && expectation.requestSha256 === sha256(`${stableJson(requestRecord)}\n`),
+      "Expected independently retained candidate review request");
     const verified = await reviewCommand(["--verify", "--request", request, "--expect", expect, "--export", exportDirectory, "--output", output]);
-    need(verified.result?.identity?.role === "reviewer" && stableJson(requestRecord.worker.identity) === stableJson(verified.result.identity) &&
-      readBounded(request, 1024 * 1024).equals(requestBytes), "Reviewer request identity differs from its handover");
-    return { request: requestRecord.worker, ...verified };
+    need(verified.phase === "complete" && verified.result?.identity?.role === "reviewer" &&
+      stableJson(requestRecord.worker.identity) === stableJson(verified.result.identity) &&
+      verified.result.runtime?.session === requestRecord.session && verified.sessions?.[1] === requestRecord.session &&
+      readBounded(request, 1024 * 1024).equals(requestBytes) && readBounded(expect, 1024 * 1024).equals(expectBytes),
+    "Reviewer request or runtime identity differs from its handover");
+    return { ...verified, request: requestRecord.worker, reviewSnapshot: requestRecord.snapshot };
   }
   const { readClosed, readHandoff, requestBytes, validateRequest } = await companion(input, "worker-handoff.mjs");
   const { expected, runtime } = input;
@@ -104,7 +111,8 @@ function nativeGroups(input, evaluation, workspace) {
     stableJson(record.groups.flatMap((group) => group.taskIds)) && taskStates.every((task) => task.id) &&
     new Set(taskStates.map((task) => task.id)).size === taskStates.length, "Frozen task guidance does not cover native tasks in order");
   const states = new Map(current.taskStates.map(({ id, checked }) => [id, checked]));
-  return record.groups.map(({ taskIds, ...group }) => {
+  return record.groups.map((group) => {
+    const { taskIds } = group;
     need(Array.isArray(taskIds) && taskIds.length > 0 && Array.isArray(group.gates) && group.gates.length > 0, "Incomplete frozen group gates or tasks");
     const acceptance = record.acceptedGroups?.find((entry) => entry.id === group.id);
     let accepted = false;
@@ -159,13 +167,25 @@ async function deliveryEvaluation(input) {
     if (input.handover) {
       handoff = await verifyHandover(input.handover);
       const id = handoff.request.identity;
-      need(id.change === identity.change && id.workspace === identity.workspace && id.plan === identity.plan &&
+      need(id.change === identity.change && id.plan === identity.plan &&
         id.planDigest === identity.planDigest && id.attempt === input.attempt?.id &&
         handoff.request.authority.approvalReference === input.approval?.reference &&
-        handoff.request.authority.executionReference === input.grant?.reference &&
-        (id.role === "reviewer" ? snapshot && id.candidate === snapshot.head && stableJson(id.inputs) === stableJson(current.inputs) :
-          id.role === "implementer" && id.candidate === null && stableJson(id.inputs) === stableJson(context.inputs)),
+        handoff.request.authority.executionReference === input.grant?.reference,
       "Handover is outside the retained active candidate or authority");
+      if (handoff.reviewSnapshot) {
+        const review = handoff.reviewSnapshot;
+        need(input.deliveryPhase === "result" && policy.mode === "task-guided" && snapshot &&
+          id.candidate === snapshot.head && review.target === snapshot.head && review.base === context.plan &&
+          review.plan === context.plan && review.planDigest === context.planDigest &&
+          stableJson(id.inputs) === stableJson(context.inputs) &&
+          separate(id.workspace, identity.workspace) && separate(id.workspace, input.repo),
+        "Contained review does not cover the full approved candidate from an isolated checkout");
+      } else {
+        need(id.workspace === identity.workspace &&
+          (id.role === "reviewer" ? snapshot && id.candidate === snapshot.head && stableJson(id.inputs) === stableJson(current.inputs) :
+            id.role === "implementer" && id.candidate === null && stableJson(id.inputs) === stableJson(context.inputs)),
+        "Portable handover does not match the active checkout or inputs");
+      }
     }
   } catch {
     handoff = null;

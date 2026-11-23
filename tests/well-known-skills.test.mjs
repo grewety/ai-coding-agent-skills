@@ -42,7 +42,14 @@ test("well-known build publishes every skill and all advertised files", async ()
       const source = await readFile(path.join(endpoint, skill.name, "SKILL.md"), "utf8");
       assert.equal(frontmatterField(source, "name"), skill.name);
       assert.equal(frontmatterField(source, "description"), skill.description);
+      const category = skill.name === "autonomous-implementation-review" ? "autonomous-ai-agents" : "software-development";
+      for (const file of skill.files) {
+        assert.deepEqual(await readFile(path.join(endpoint, skill.name, file)), await readFile(path.join(root, "skills", category, skill.name, file)));
+      }
     }
+
+    const next = index.skills.find(({ name }) => name === "openspec-next");
+    assert.deepEqual([...next.files].sort(), ["SKILL.md", "references/routing.md", "scripts/next.mjs"]);
 
     const autonomous = index.skills.find((skill) => skill.name === "autonomous-implementation-review");
     const contract = await readFile(path.join(root, "skills/autonomous-ai-agents/AGENTS.md"), "utf8");

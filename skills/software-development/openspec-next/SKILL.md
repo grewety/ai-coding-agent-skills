@@ -1,7 +1,7 @@
 ---
 name: openspec-next
-description: Find and advance the next approved OpenSpec task group.
-version: 0.4.0
+description: Inspect or advance an approved OpenSpec goal or task group.
+version: 0.5.0
 author: Raphael (forgegod), Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -13,16 +13,26 @@ metadata:
 
 # OpenSpec Next
 
-Resolve the real unfinished boundary of one change and advance an approved local
-task group, or consecutive eligible groups under selected continuous-goal policy.
+Resolve the real unfinished boundary of one change and advance its approved local
+goal or Task-Guided group within the selected continuation policy.
 The operator need not remember its full name, worktree or Git recipe.
 This is repository-grounded selection and recovery, not a scheduler or another
 specification/task authority. OpenSpec owns native artifacts and `tasks.md`.
 
 ## When to Use
 
-- `/openspec-next`, `/openspec-next <name>`, or `next` in verified OpenSpec context.
-- `/openspec-next inspect [name]` to inspect without executing anything.
+Use the installed client's spelling in verified OpenSpec context:
+
+| Host | Continue the selected change | Inspect the selected change |
+| --- | --- | --- |
+| Codex | `$openspec-next pin-note` | `$openspec-next inspect pin-note` |
+| Hermes or direct Claude Code skill | `/openspec-next pin-note` | `/openspec-next inspect pin-note` |
+| Claude Code with the marketplace plugin enabled | `/openspec-development:openspec-next pin-note` | `/openspec-development:openspec-next inspect pin-note` |
+
+A bare invocation or `next` reuses verified current-change context.
+Task-Guided advances one task group by default. Report a verified closure with
+no next change.
+
 - Do not use to invent a new proposal, prioritize several independent changes,
   approve a plan, infer remote authority or start the next change after closure.
 
@@ -32,15 +42,17 @@ Read the project's contributor contract and selected short-invocation policy.
 Installation alone grants nothing. In an explicitly adopting project, the normal
 invocation grants the same bounded local execution/commit authority as
 `openspec-delivery <name>`; `inspect` is read-only. Operator restrictions override
-defaults and persist across a bare `next`. Do not push, open PRs, merge, close an
+defaults and persist across a bare `next`. Require the selected mode’s exact
+approval and separate local grant. Do not push, open PRs, merge, close an
 issue, remove a worktree or start another change under this invocation alone.
 An existing explicitly authorized finish operation can be resumed, but do not
 convert a local-only request into finish authority.
 
 Apply delivery's `references/delivery-policy.md` before execution: derive policy
-from the verified integrated parent of the frozen plan, not a changed local
-contract. Default single-group behavior and existing approval remain when that
-parent did not select continuous-goal or pre-execution review. New integrity
+from the verified integrated parent of the frozen plan, using a retained readback.
+Goal-First requires that parent’s opt-in and an eligible reversible local
+boundary. Task-Guided preserves the applicable ordered groups, existing approval
+and single-group default or selected continuous-goal continuation. New integrity
 guards still apply unless retained legacy evidence defers them until refreeze.
 Selected policies require the available orchestration package and, for approach
 review, the matching complete frozen planning hashes. Never infer approval.
@@ -56,7 +68,7 @@ and forbids continuation; idle or cap output alone is insufficient.
 
 ## Procedure
 
-1. Through `terminal`, batch root, branch, full HEAD, status, worktree inventory
+1. Through the host terminal, batch root, branch, full HEAD, status, worktree inventory
    and relevant local refs. Read the root/owning contracts. Confirm the named
    repository/target instead of inferring them from a skill-installation path.
 2. Resolve an explicit full name or unique short slug with delivery's packaged
@@ -77,27 +89,24 @@ and forbids continuation; idle or cap output alone is insufficient.
    or fully complete. Read native task syntax and headings, not a scratch task list.
    Retain exact group, target/base, workspace and evidence. Missing task grouping,
    ambiguous approval or unknown ownership blocks execution.
-5. Select the first unfinished approved implementation group in document order,
-   honoring dependencies and existing restrictions. Resume an incomplete candidate's
-   checks/review first. Release/remote acceptance boxes are not local implementation.
-   Do not skip blocked dependencies or turn checked tasks into merge evidence.
-6. For `inspect`, report selected change/group, workspace/branch/base, approval,
-   dependency and evidence state, blocker or next short invocation, then stop.
-   Do not bootstrap, create a checkout, stage, commit or dispatch a role.
-7. For normal execution, load `openspec-delivery` and its continuation/workspace
-   recipes, pass the verified selection and constraints, and execute the remaining
-   local boundary without a second permission prompt. Require artifact-first
-   handoff admission before trusting terminal worker evidence; actual gates and
-   independent review still decide acceptance. Routine fixes stay in this group
-   under orchestration's permitted-writer correction loop. Stop after one task group
-   by default. With selected continuous-goal policy and no narrower restriction,
-   repeat grounded selection for consecutive eligible groups of this change.
-   Recheck every delivery-policy stop: authority, gates, review, ownership, host,
-   native human-input wait, plan/digest identity, declared stop and finite inherited
-   or group budget. No remote write or next change. If a pull request is open and
-   only waiting, report it and do not merge. If already merged, do not replay
-   implementation; request `finish` only when that authority is absent. Fully
-   complete means report completion with no next change.
+5. Follow [routing](references/routing.md). Use the packaged `scripts/next.mjs`
+   with delivery's retained observations. For `inspect`, report deterministic
+   status, verified workspace/approval/evidence and the blocking predicate or
+   advisory next action. End without setup, bootstrap, role dispatch or writes.
+6. For execution, load `openspec-delivery`. Goal-First uses the approved Goal
+   Contract and its single native outcome. Task-Guided resumes incomplete
+   checks/review first, then selects the first eligible unfinished approved group
+   in dependency order. Preserve the held restrictions and budgets. Require
+   artifact-first handover admission and exact-SHA gates and independent review.
+   A routine in-scope correction uses the existing bounded loop. Material drift
+   stops with the affected clause; Task-Guided rechecks inherited stops at every
+   eligible continuation.
+7. For declared UI acceptance, route local loopback try-out and accessible-name
+   results through delivery, and preserve the separate deploy-preview authority
+   and review pause. Offer the protected finish invocation only on positive
+   exact-candidate finish readiness. With an existing finish grant, resume the
+   observed PR or closeout boundary. A pending check or human review stays
+   pending. A verified closure ends the change.
 
 ## Pitfalls
 
@@ -109,8 +118,8 @@ and forbids continuation; idle or cap output alone is insufficient.
 
 ## Verification
 
-Report the selected full identity, actual group and workspace, approval/dependency
-checks, executed verification and candidate/review identities or the exact blocker.
+Report the selected full identity, mode, outcome or group, workspace,
+approval/dependency checks and exact verification and review identities or blocker.
 In inspect mode report no mutations. In execution mode preserve uncompleted work,
 keep `tasks.md` as the sole task authority and stop at the authorized boundary.
 
