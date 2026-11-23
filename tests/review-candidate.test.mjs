@@ -46,6 +46,11 @@ test("approach prompt ends with the exact clean charter template", () => {
   assert.match(instructions, /reReviewReference must equal the supplied native reference/);
   assert.match(instructions, /copy the verdict line/);
   assert.match(instructions, /Populate observations and coverageLimitations/);
+  assert.match(instructions, /Every findings item must use scopeDisposition "in-scope" and a clause copied exactly from charter\.clauses\./);
+  assert.match(instructions, /Every observations item must use scopeDisposition "outside-charter" and clause null\./);
+  assert.match(instructions, /For declared-deferral, use class and exactly one of task \(copied exactly from charter\.tasks\) or gate \(copied exactly from charter\.gates\)\./);
+  assert.match(instructions, /For containment-boundary, use class and boundary copied exactly from charter\.boundaries\./);
+  assert.match(instructions, /For packet-gap, use class and detail\./);
   assert.ok(instructions.includes(`Packet: 1 of 1\nNative reference: ${reference}\n${JSON.stringify(context)}\n`));
 });
 
