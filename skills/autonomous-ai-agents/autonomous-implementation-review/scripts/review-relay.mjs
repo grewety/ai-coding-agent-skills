@@ -69,6 +69,9 @@ function refuse(res) {
   else res.writeHead(403, { "content-type": "text/plain", connection: "close" }).end("Inference relay refused request");
 }
 
+// Node can emit errors after forwarding has finished or a stream is destroyed.
+function ignoreLateError() {}
+
 export function forwardInference(upstream, res, body, timeoutMs) {
   const idleMs = Math.min(timeoutMs, 90000);
   let response;
@@ -93,6 +96,10 @@ export function forwardInference(upstream, res, body, timeoutMs) {
     res.off("drain", resume);
     res.off("close", abort);
     response?.off("data", data);
+    upstream.on("error", ignoreLateError);
+    upstream.off("error", fail);
+    response?.on("error", ignoreLateError);
+    response?.off("error", fail);
   };
   const abort = () => {
     cleanup();
@@ -109,13 +116,14 @@ export function forwardInference(upstream, res, body, timeoutMs) {
   upstream.on("error", fail);
   res.once("close", abort);
   upstream.once("response", (incoming) => {
+    if (finished) {
+      incoming.on("error", ignoreLateError);
+      incoming.destroy();
+      return;
+    }
     response = incoming;
     response.on("error", fail);
     response.once("close", fail);
-    if (finished) {
-      response.destroy();
-      return;
-    }
     // Reject redirects and provider errors without forwarding their headers or bodies.
     const type = response.headers["content-type"];
     if (response.statusCode !== 200 || typeof type !== "string" ||

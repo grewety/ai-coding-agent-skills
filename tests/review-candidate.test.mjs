@@ -219,7 +219,12 @@ test("relay timeout allows healthy streaming past 90 seconds and cleans up after
   tick(80000);
   send("second");
   assert.equal(upstream.destroyed, undefined);
+  const [activeErrorHandler] = upstream.listeners("error");
   response.emit("end");
+  assert.equal(upstream.listenerCount("error", activeErrorHandler), 0);
+  assert.equal(response.listenerCount("error", activeErrorHandler), 0);
+  upstream.emit("error", new Error("late request error"));
+  response.emit("error", new Error("late response error"));
   tick(240000);
   assert.deepEqual(chunks, ["first", "second"]);
   assert.equal(res.ended, true);
@@ -271,13 +276,33 @@ test("relay timeout watches an accepted response before its first chunk", (t) =>
 });
 
 test("relay timeout caps a request waiting for response headers", (t) => {
-  const { upstream, res, tick } = relayStreams(t, 1000);
+  const { upstream, response, res, accept, tick } = relayStreams(t, 1000);
   tick(999);
   assert.equal(upstream.destroyed, undefined);
   tick(1);
   assert.equal(upstream.destroyed, true);
   assert.equal(res.status, 403);
   assert.equal(res.ended, true);
+  accept();
+  assert.equal(response.destroyed, true);
+  upstream.emit("error", new Error("late request error"));
+  response.emit("error", new Error("late response error"));
+});
+
+test("relay refuses a response that cumulatively exceeds the byte limit", (t) => {
+  const { upstream, response, res, chunks, accept, send } = relayStreams(t);
+  const halfLimit = 4 * 1024 * 1024;
+  accept();
+  send(Buffer.alloc(halfLimit, "a"));
+  send(Buffer.alloc(halfLimit, "b"));
+  assert.deepEqual(chunks.map((chunk) => chunk.length), [halfLimit, halfLimit]);
+  assert.equal(res.destroyed, undefined);
+  send("c");
+  assert.equal(chunks.length, 2);
+  assert.equal(res.destroyed, true);
+  assert.equal(res.ended, undefined);
+  assert.equal(upstream.destroyed, true);
+  assert.equal(response.destroyed, true);
 });
 
 for (const event of ["downstream close", "upstream error", "response error", "response close"]) {
