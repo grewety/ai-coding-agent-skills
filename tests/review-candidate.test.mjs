@@ -47,7 +47,11 @@ test("real stream requires a successful full-file Read for every assignment", ()
   const output = assistant([{ type: "text", text: answer }]);
   const thinking = { type: "thinking", thinking: "fixture", signature: "fixture-signature" };
   const advisory = { type: "system", subtype: "thinking_tokens", session_id: session, estimated_tokens: 12, estimated_tokens_delta: 5 };
-  assert.equal(auditClaudeStream(proc([init, advisory, assistant([thinking, use]), reply, output, end]), runtime, ["a"], false), answer);
+  const readRequest = assistant([thinking, use]);
+  assert.equal(auditClaudeStream(proc([init, advisory, readRequest, reply, output, end]), runtime, ["a"], false), answer);
+  const syntheticReply = { ...reply, isSynthetic: true };
+  assert.throws(() => auditClaudeStream(proc([init, advisory, readRequest, syntheticReply, output, end]), runtime, ["a"], false),
+    /Unpaired native Read result/);
   const metadata = (patch) => ({ ...reply, tool_use_result: { type: "text", file: { ...file, ...patch } } });
   assert.equal(auditClaudeStream(proc([init, { ...advisory, uuid: session, user_message_uuid: session },
     assistant([{ type: "redacted_thinking", data: "Zml4dHVyZQ==" }, use]), metadata({ totalLines: undefined }), output, end]),
