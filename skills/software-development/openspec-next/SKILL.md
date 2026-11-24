@@ -96,6 +96,10 @@ and forbids continuation; idle or cap output alone is insufficient.
    For configured delegation, pass the original runtime assignment, retained
    attempt and restrictions through to delivery, including no commits and any
    fixed group. Let delivery reconcile settlement and exact predecessor evidence.
+   Render the returned Next-Step Footer at each nonterminal stop. For a current
+   approval card, route the immediate reply through delivery's durable card
+   checks. On a session change, read the named sealed checkpoint and replay
+   the original authority and ownership checks before resuming.
 6. For execution, load `openspec-delivery`. Goal-First uses the approved Goal
    Contract and its single native outcome. Task-Guided resumes incomplete
    checks/review first, then selects the first eligible unfinished approved group

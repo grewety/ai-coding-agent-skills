@@ -48,7 +48,7 @@ export function verifyContractGrant(request) {
 }
 
 export function resolveDeliveryPolicy({ phase, context, selection, contractPaths, declaredContractPaths, legacy, recovery, orchestrationAvailable, reviewAcceptance, deliveryBoundary }) {
-  requireThat(["freeze", "execute"].includes(phase), "Unknown delivery policy phase");
+  requireThat(["draft", "freeze", "execute"].includes(phase), "Unknown delivery policy phase");
   requireThat(context && sha(context.parent) && sha(context.target), "Missing integrated parent identity");
   validatePlanningInputs(context.change, context.inputs, context.inventory);
   if (phase === "execute") requireThat(sha(context.plan) && digest(context.planDigest), "Missing frozen plan identity");
@@ -83,7 +83,7 @@ export function resolveDeliveryPolicy({ phase, context, selection, contractPaths
   requireThat(selection.approachConvergence === undefined || typeof selection.approachConvergence === "boolean", "Invalid convergence selection");
   requireThat(selection.approachConvergence !== true || selection.preExecutionReview === true, "Convergence requires approach review");
   if (selection.preExecutionReview || selection.continuousGoal) requireThat(orchestrationAvailable === true, "Selected policy requires the orchestration package");
-  if (selection.preExecutionReview) requireThat(reviewAcceptance?.action === "freeze-ready" && text(reviewAcceptance.reference) &&
+  if (selection.preExecutionReview && phase !== "draft") requireThat(reviewAcceptance?.action === "freeze-ready" && text(reviewAcceptance.reference) &&
     sameInputs(reviewAcceptance.inputs, context.inputs) &&
     (selection.approachConvergence === true ? reviewAcceptance.policy === "charter-v1" : reviewAcceptance.policy === undefined || reviewAcceptance.policy === "strict"), "Missing matching complete approach-review acceptance");
   requireThat(selection.goalFirst === undefined || typeof selection.goalFirst === "boolean", "Invalid Goal-First selection");
@@ -95,7 +95,9 @@ export function resolveDeliveryPolicy({ phase, context, selection, contractPaths
   const mode = !exempt && recovery === undefined && context.goalFirstOptIn === true &&
     selection.goalFirst === true && eligible ? "goal-first" : "task-guided";
   return { mode, continuation: selection.continuousGoal ? "continuous-goal" : "single-group", requireApproachReview: selection.preExecutionReview,
-    approachPolicy: selection.approachConvergence === true ? "charter-v1" : "strict", integrityGuards: !exempt, policyRevision, planApproved: false, executionAuthorized: false };
+    approachPolicy: selection.approachConvergence === true ? "charter-v1" : "strict",
+    proposeToFreeze: !exempt && recovery === undefined && context.proposeToFreeze === true,
+    integrityGuards: !exempt, policyRevision, planApproved: false, executionAuthorized: false };
 }
 
 export function continuationDecision({ policy, change, group, authority, restrictions, observed, runtimeAdmission = false }) {

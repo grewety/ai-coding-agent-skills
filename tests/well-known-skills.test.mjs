@@ -124,6 +124,7 @@ test("well-known build publishes every skill and all advertised files", async ()
       "references/guard.md",
       "references/integration.md",
       "references/naming.md",
+      "references/operator-workflow.md",
       "references/recovery.md",
       "references/task-authoring.md",
       "references/ticket.md",
@@ -141,6 +142,9 @@ test("well-known build publishes every skill and all advertised files", async ()
       "scripts/external-verification.mjs",
       "scripts/finish-readiness.mjs",
       "scripts/git-environment.mjs",
+      "scripts/operator-planning.mjs",
+      "scripts/operator-records.mjs",
+      "scripts/operator-status.mjs",
       "scripts/planning-inventory.mjs",
       "SKILL.md",
     ]);

@@ -402,6 +402,12 @@ closure and clean-worktree retirement. Declared local UI gates use loopback
 try-out and accessible-name checks. External tests, tunnels, app triggers
 and PR deploy previews require their own single-run grants. [Authority, finish examples and upstream host syntax](docs/openspec-workflow.md#short-operator-commands).
 
+For later plans whose integrated parent selects `propose-to-freeze`, the
+short workflow can display a frozen approval card and record `approve` or
+`approve and run` against it. Use the Next-Step Footer to inspect the
+retained decision or reopen its checkpoint in a fresh session.
+[Short operator checkpoints](docs/openspec-workflow.md#short-operator-checkpoints).
+
 For a persisted Hermes goal, the optional short form is below. Displaying the
 template grants no authority.
 Hermes' `/goal draft` expands the request into a persisted completion contract

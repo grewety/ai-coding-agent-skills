@@ -522,7 +522,9 @@ export function integratedPolicyContext(repo, parent, target, allowUnintegratedP
   requireThat(!integrated || !workers.length || workers.length === 1 && workers[0][1] === "exclusive",
     "Ambiguous or unsupported exclusive worker runtime selection");
   const delegatedRuntime = integrated && workers.length === 1;
-  return { ok: integrated, parent, target, contractInputs, goalFirstOptIn: integrated && goalFirstOptIn, delegatedRuntime };
+  const proposals = [...source.matchAll(/^<!-- openspec-proposal: ([^\r\n]*?) -->\r?$/gm)];
+  const proposeToFreeze = integrated && proposals.length === 1 && proposals[0][1] === "propose-to-freeze";
+  return { ok: integrated, parent, target, contractInputs, goalFirstOptIn: integrated && goalFirstOptIn, delegatedRuntime, proposeToFreeze };
 }
 
 export function policyContext(o, { allowUnintegratedParent = false } = {}) {
@@ -537,10 +539,15 @@ export function policyContext(o, { allowUnintegratedParent = false } = {}) {
 }
 export function draftPolicyContext(o) {
   const context = integratedPolicyContext(o.repo, o.parent, o.target);
-  requireThat(git(o.repo, "rev-parse", "HEAD").trim() === context.parent, "Draft checkout is not at the declared integrated parent");
+  const draftHead = o.draftHead ?? context.parent;
+  requireThat(git(o.repo, "rev-parse", "HEAD").trim() === draftHead, "Draft checkout is not at the declared integrated parent or predecessor");
+  if (o.draftHead) requireThat(policyContext({ ...o, plan: draftHead }).parent === context.parent,
+    "Superseded plan does not share the integrated draft parent");
   const draft = planningWorktree(o.repo, o.change);
-  const changes = git(o.repo, "status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all", "--ignore-submodules=none");
-  const changedPaths = changes.split("\0").filter(Boolean).map((entry) => entry.slice(3)).sort();
+  const changes = git(o.repo, "diff", "--name-only", "-z", "--no-renames", "--ignore-submodules=none", context.parent, "--");
+  const untracked = git(o.repo, "ls-files", "--others", "--exclude-standard", "-z");
+  const staged = git(o.repo, "diff", "--cached", "--name-only", "-z", "--no-renames", context.parent, "--");
+  const changedPaths = [...new Set([changes, untracked, staged].flatMap((list) => list.split("\0").filter(Boolean)))].sort();
   return { ...context, ...draft, plan: null, planDigest: null, changedPaths };
 }
 

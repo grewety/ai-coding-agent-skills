@@ -30,6 +30,13 @@ gate, readback and review evidence. [Evidence retention](references/evidence-ret
   documentation or recovery. A planning-only request ends at
   proposal/spec/design/tasks plus a bounded issue write only when the project's
   explicitly selected proposal policy includes it.
+- For a short proposal, `/goal draft` or an immediate approval-card reply,
+  use [the operator workflow](references/operator-workflow.md). If the verified
+  integrated parent explicitly selects `propose-to-freeze`, run its packaged
+  planning assessment and plan-only freeze readback before displaying a card.
+  Under the inherited policy or a draft-only restriction, stop at the
+  uncommitted draft after applicable review. An approval reply uses the
+  original retained display; dispatch still requires the separate local grant.
 - Do not use to create a second task tracker, or to require a GitHub issue
   before local specification can begin. The selected policy requires the verified
   issue before plan approval, not before drafting.
@@ -253,6 +260,9 @@ authority for each provider run.
    validate the artifact-first handoff with orchestration's `readHandoff` before
    using its report as evidence. Completion, review verdict and delivery acceptance
    are distinct; neither worker output nor a missing result advances tasks.
+   At every operator stop use the packaged `status` observations and Markdown
+   footer. Use the [file-backed checkpoint procedure](references/operator-workflow.md#read-only-status-and-checkpoint-relay)
+   for a fresh session or a separately authorized, already qualified relay.
 7. Freeze a clean committed candidate. Capture gates from a clean disposable
    checkout at that exact SHA. For a declared UI flow verify local-only try-out
    and accessible-name checks. Route a separately authorized deploy preview to

@@ -78,6 +78,11 @@ export async function readDelegation(input, { context, policy, identity, impleme
   need(groupRestrictions.length <= 1 && (!groupRestrictions.length ||
     groupRestrictions[0] === `group:${input.restrictions?.group}`), "Retained delegated group restriction differs");
   const roles = await bindings.bindPair(assignment, grant, selected.runtimeSha256, registry);
+  if (input.verifiedShortRoles) {
+    need(["implementer", "reviewer"].every((role) => input.verifiedShortRoles[role].route === roles.pair[role].route &&
+      input.verifiedShortRoles[role].runtimeBindingSha256 === bindings.roleQualificationBinding(roles.pair[role])),
+    "Exclusive runtime selected a different pair than the short approval card");
+  }
   const directory = claims.claimPath(registry, repository, id.change);
   const owner = await exists(directory) ? await state.readState(directory, "owner.json") : null;
   const reviewerInventorySha256 = sha256(encoding.jsonBytes(roles.pair.reviewer.inventory));

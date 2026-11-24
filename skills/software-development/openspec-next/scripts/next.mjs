@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
@@ -8,6 +9,9 @@ import { parseArgs } from "node:util";
 const companion = fileURLToPath(new URL("../../openspec-delivery/scripts/delivery-cli.mjs", import.meta.url));
 const routes = new Map([
   ["inspect", "status"],
+  ["init", "init"],
+  ["proposal", "proposal"],
+  ["checkpoint-relay", "checkpoint-relay"],
   ["next", "decision"],
   ["finish-readiness", "finish-readiness"],
   ["ui", "ui"],
@@ -18,10 +22,11 @@ const routes = new Map([
 try {
   const [verb, ...args] = process.argv.slice(2);
   const command = routes.get(verb);
-  if (!command) throw new Error("Expected inspect, next, finish-readiness, ui, external or push-triggers");
+  if (!command) throw new Error(`Expected one of ${[...routes.keys()].join(", ")}`);
   const { values } = parseArgs({ args, options: {
     input: { type: "string", multiple: true },
     runtime: { type: "string", multiple: true },
+    "runtime-sha256": { type: "string" },
     json: { type: "boolean" },
   } });
   if (values.input?.length !== 1) throw new Error("Expected one --input JSON file");
@@ -29,6 +34,9 @@ try {
   const runtime = values.runtime?.[0] ?? companion;
   if (!path.isAbsolute(runtime) || path.basename(runtime) !== "delivery-cli.mjs") {
     throw new Error("Expected an absolute path to the trusted delivery-cli.mjs");
+  }
+  if (values["runtime-sha256"] && createHash("sha256").update(readFileSync(runtime)).digest("hex") !== values["runtime-sha256"]) {
+    throw new Error("Selected delivery runtime digest differs from the verified package inventory");
   }
   const result = spawnSync(process.execPath, [runtime, command, "--input", values.input[0], "--json"], {
     stdio: ["ignore", "pipe", "pipe"],
@@ -40,6 +48,8 @@ try {
   if (result.stderr.length > 0) writeFileSync(2, result.stderr);
   process.exitCode = result.status ?? 1;
 } catch (error) {
-  writeFileSync(1, `${JSON.stringify({ schemaVersion: 1, ok: false, error: error.message })}\n`);
+  writeFileSync(1, `${JSON.stringify({ schemaVersion: 1, ok: false, error: error.message,
+    stopPredicate: "DELIVERY_COMPANION_UNVERIFIED",
+    footer: `### Next step\nDELIVERY_COMPANION_UNVERIFIED (${error.message})\n- Verify the selected delivery package and rerun $openspec-next inspect` })}\n`);
   process.exitCode = 1;
 }

@@ -150,6 +150,11 @@ function main() {
   for (const key of ["repo", "change", "base", ...(command === "retire" ? ["head", "target"] : [])]) requireThat(o[key], `Missing --${key}`);
   if (command === "reconcile") return reconcileWorkspace({ ...o, closureBranch: o["closure-branch"],
     verificationWorkspace: o["verification-workspace"], verificationSha: o["verification-sha"] });
+  return workspacePreview(command, o);
+}
+
+export function workspacePreview(command, o) {
+  requireThat(["prepare", "locate", "retire"].includes(command), "Unknown workspace preview");
   requireThat(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(o.change) && o.change.length <= 200 && o.change !== "archive", "Malformed full change name");
   canonical(o.repo);
   requireThat(realpathSync(git(o.repo, "rev-parse", "--show-toplevel")) === o.repo, "Expected the canonical repository root");
