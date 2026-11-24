@@ -34,6 +34,7 @@ export function auditClaudeStream(proc, runtime, assigned, probe) {
   const pending = new Map();
   const usedIds = new Set();
   const seenPaths = new Set();
+  let activeMessageId;
   let finalText = [];
   for (const event of events.slice(1, -1)) {
     if (event.type === "system" && event.subtype === "thinking_tokens") {
@@ -44,9 +45,14 @@ export function auditClaudeStream(proc, runtime, assigned, probe) {
         [event.uuid, event.user_message_uuid].every((value) => value === undefined || text(value)),
       "Invalid native thinking advisory");
     } else if (event.type === "assistant") {
-      need(pending.size === 0 && (event.message?.model === undefined || event.message.model === runtime.model),
+      const { id: messageId, model } = event.message ?? {};
+      const sameMessage = typeof messageId === "string" && messageId.length > 0 && messageId === activeMessageId;
+      need((pending.size === 0 || sameMessage) && (model === undefined || model === runtime.model),
         "Unexpected native stream assistant turn");
-      finalText = [];
+      if (!sameMessage) {
+        activeMessageId = messageId;
+        finalText = [];
+      }
       for (const block of blocks(event)) {
         if (block.type === "text") {
           fields(block, ["type", "text"], "native text", ["citations"]);

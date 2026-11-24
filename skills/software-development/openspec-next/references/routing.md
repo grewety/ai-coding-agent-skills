@@ -32,6 +32,22 @@ The helper returns their JSON and exit status. Even an affirmative result is an
 observation. The helper creates no worktree, writes no tasks or reservations,
 launches no worker or gate, and performs no external operation.
 
+When the project selects the exclusive runtime, pass the resolved full
+change and workspace, pinned `delegation` inputs and original restrictions
+as one request. The router forwards the request file byte-for-byte.
+`inspect` reports original-attempt readback and any ownership, recovery
+or review predicate. A delegated dispatch decision still requires the
+runtime's exclusive claim and qualified pair, with independent acceptance
+before any dependent successor. The sealed Group 3.1 trials qualified the
+pinned pair on one Linux host for synthetic Task-Guided and Goal-First
+changes. The pair used dedicated Codex 0.171.0 with GPT-6.2-sol and native
+named workspace-write, and fresh read-only Claude Code 2.1.330 with Claude
+Sonnet 4.6 on Bubblewrap 0.9.0 via the `same-uid-key` relay. Verify the exact
+runtime and role bindings against the orchestration skill's worker-runtime
+reference. Other hosts, clients, versions and provider routes require
+matching qualification. Each future live review requires separate authority
+for the exact export and paid inference.
+
 ## Apply the decision
 
 1. Derive mode and policy from the verified integrated plan parent. Inspect
@@ -57,8 +73,11 @@ launches no worker or gate, and performs no external operation.
 5. Reconcile exact-SHA disposable gates and independent review before trusting
    a result. Task-Guided can use a sealed contained candidate review of the full
    frozen-plan-to-candidate diff from an isolated checkout. Pass its retained
-   `review-candidate` handover to delivery with the matching gate run. Goal-First
-   uses a qualified portable-role reviewer with its Goal Contract digest. Only
+   `review-candidate` handover to delivery with the matching gate run. For
+   exclusive delegation, both modes use their paired contained reviewer.
+   Its Goal-First request repeats the approved Goal Contract digest alongside
+   the normalized Git plan identity. Inherited Goal-First routes use their
+   qualified portable-role reviewer with the approved digest. Only
    the orchestrator records native progress. Any later commit
    requires fresh evidence. Before offering the protected finish invocation,
    require `finish-readiness` for the exact accepted candidate and both the

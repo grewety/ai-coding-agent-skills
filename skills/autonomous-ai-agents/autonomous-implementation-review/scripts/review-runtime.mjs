@@ -1,12 +1,13 @@
 import { createHash, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { constants } from "node:fs";
-import { lstat, mkdir, mkdtemp, open, rm } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, open } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { runBoundedWorker } from "./bounded-worker.mjs";
+import { allocateReviewScratch, checkSocketLength, defaultReviewScratchRoot } from "./review-runtime-scratch.mjs";
 import { safePath, writeClosed } from "./worker-handoff.mjs";
-import { absolute, digest, fields, hash, jsonBytes, need, separate } from "./review-inputs.mjs";
+import { absolute, digest, fields, hash, jsonBytes, need, relative, separate } from "./review-inputs.mjs";
 
 export const claudeVersion = "2.1.330";
 export const bubblewrapVersion = "0.9.0";
@@ -98,6 +99,10 @@ async function verifyPin(pin, excluded) {
   } finally { await handle.close(); }
 }
 
+export async function verifyRuntimePins(config, excluded) {
+  await Promise.all([config.bwrap, config.node, config.claude, ...config.libraries].map((pin) => verifyPin(pin, excluded)));
+}
+
 export function runtimeBinding(config, session) {
   return { session, model: config.model, version: claudeVersion, bubblewrapVersion,
     maxTurns: config.maxTurns, maxBudgetUsd: config.maxBudgetUsd,
@@ -106,6 +111,7 @@ export function runtimeBinding(config, session) {
 
 async function brokerSocket(relay, excluded) {
   need(excluded.every((root) => separate(root, relay.socket)), "Broker socket overlaps protected roots");
+  checkSocketLength(relay.socket);
   await safePath(relay.socket);
   const st = await lstat(relay.socket);
   const parent = await lstat(path.dirname(relay.socket));
@@ -116,6 +122,7 @@ async function brokerSocket(relay, excluded) {
 
 async function sameUidRelay(config, scratch, requestLimit) {
   const socket = path.join(scratch, "inference.sock");
+  checkSocketLength(socket);
   const child = spawn(process.execPath, [moduleFile("./review-relay.mjs")], {
     env: launcherEnv, stdio: ["pipe", "ignore", "ignore", "ipc"],
   });
@@ -158,44 +165,64 @@ async function sameUidRelay(config, scratch, requestLimit) {
       clearTimeout(deadline);
     }
   };
-  try { await start; } catch (error) { await close(); throw error; }
+  try {
+    await start;
+    const entry = await lstat(socket);
+    need(entry.isSocket() && entry.uid === process.getuid() && (entry.mode & 0o7777) === 0o600,
+      "Unsafe same-UID relay socket");
+  } catch (error) {
+    try { await close(); } catch (closeError) { closeError.relayUnsettled = true; throw closeError; }
+    throw error;
+  }
   return { socket, close };
 }
 
-export async function withReviewRuntime(config, { parent, excluded, packetCount }, callback, startRelay = sameUidRelay) {
+export async function withReviewRuntime(config, { parent, excluded, packetCount, scratchRoot }, callback, startRelay = sameUidRelay) {
   validateHostConfig(config);
   need(process.platform === "linux", "Linux namespaces and pidfds required");
-  await Promise.all([config.bwrap, config.node, config.claude, ...config.libraries].map((pin) => verifyPin(pin, excluded)));
+  await verifyRuntimePins(config, excluded);
   const bwrap = await runBoundedWorker(config.bwrap.path, ["--version"], {
     cwd: parent, env: launcherEnv, timeoutMs: 4000, stdoutLimit: 4096, stderrLimit: 4096,
   });
   need(bwrap.quiescent && bwrap.outcome === "exit" && bwrap.code === 0 &&
     bwrap.stdout.toString().trim() === "bubblewrap " + bubblewrapVersion, "Bubblewrap version pin mismatch");
-  const scratch = await mkdtemp(path.join(parent, "runtime-"));
+  const owned = await allocateReviewScratch(scratchRoot ?? await defaultReviewScratchRoot(), [parent, ...excluded]);
+  const scratch = owned.directory;
   let relay;
+  let workersSettled = true;
   try {
     if (config.relay.route === "same-uid-key") {
       need(excluded.every((root) => separate(root, config.relay.keyFile)), "Host key overlaps protected roots");
       relay = await startRelay(config, scratch, Math.min((config.maxTurns + 8) * (packetCount + 1), 4096));
     } else relay = { socket: await brokerSocket(config.relay, excluded), close: async () => {} };
+    checkSocketLength(relay.socket);
     return await callback(async ({ files, session = randomUUID(), prompt }) => {
+      need(workersSettled, "Previous reviewer process has no quiescence proof");
+      await owned.verify();
       const packet = await mkdtemp(path.join(scratch, "packet-"));
       for (const [name, bytes] of files) {
+        need(relative(name), "Unsafe runtime packet path");
         const filename = path.join(packet, name);
         await mkdir(path.dirname(filename), { recursive: true, mode: 0o700 });
         await writeClosed(filename, bytes, true);
       }
 
       const runtime = runtimeBinding(config, session);
+      workersSettled = false;
       const proc = await runBoundedWorker(config.bwrap.path, containmentArgs(config, packet, relay.socket, runtime), {
         cwd: scratch, env: launcherEnv, input: Buffer.from(prompt), timeoutMs: config.timeoutMs,
         postLeaderGraceMs: 250, // Bubblewrap's namespace reaper can outlive its status-reporting launcher.
         stdoutLimit: 8 * 1024 * 1024, stderrLimit: 128 * 1024,
       });
+      workersSettled = proc.quiescent;
       return { runtime, proc };
     });
+  } catch (error) {
+    if (error.relayUnsettled) workersSettled = false;
+    throw error;
   } finally {
-    try { await relay?.close(); }
-    finally { await rm(scratch, { recursive: true, force: true }); }
+    await relay?.close();
+    if (workersSettled) await owned.clean();
+    else throw new Error("Reviewer process has no quiescence proof; private scratch retained");
   }
 }

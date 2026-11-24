@@ -3,6 +3,16 @@
 Load this when the operator has authorized execution of one OpenSpec change.
 Selecting or approving a change grants nothing by itself.
 
+For projects selecting exclusive delegation, use the
+[packaged runtime](run-implementer.md) and its [role binding](worker-runtime.md).
+The pinned Linux pair passed sealed synthetic Task-Guided and Goal-First
+trials. Delivery owns readback of the original claim and session, exact file
+allowlist admission for settled outputs, exact gates and sealed independent
+review. A dependent Task-Guided group waits for exact predecessor acceptance.
+Goal-First binds the approved Goal Contract digest and single outcome to the
+exact candidate. Require the bounded local grant and separate per-run inference
+authority. This route blocks on missing qualification or uncertain ownership.
+
 For agent-neutral packets and review, use [portable-core.md](portable-core.md),
 [terminal-adapters.md](terminal-adapters.md), and
 [profile-preparation.md](profile-preparation.md).

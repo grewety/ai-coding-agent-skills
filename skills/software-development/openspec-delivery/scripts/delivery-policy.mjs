@@ -98,7 +98,7 @@ export function resolveDeliveryPolicy({ phase, context, selection, contractPaths
     approachPolicy: selection.approachConvergence === true ? "charter-v1" : "strict", integrityGuards: !exempt, policyRevision, planApproved: false, executionAuthorized: false };
 }
 
-export function continuationDecision({ policy, change, group, authority, restrictions, observed }) {
+export function continuationDecision({ policy, change, group, authority, restrictions, observed, runtimeAdmission = false }) {
   const stop = (reason) => ({ action: "stop", reason, commits: false, remoteWrites: false });
   if (restrictions?.inspect === true) return { ...stop("Read-only inspection"), action: "inspect" };
   if (observed?.workerStatus === "capped") return stop("Worker cap requires workerContinuationDecision; current group remains incomplete");
@@ -108,7 +108,9 @@ export function continuationDecision({ policy, change, group, authority, restric
       !text(authority.reference) || !text(authority.approvalReference)) return stop("Missing approval or execution authority");
   if (!observed || observed.plan !== authority.plan || observed.planDigest !== authority.planDigest) return stop("Approved-plan/digest mismatch");
   if (!text(group?.id) || (restrictions.group !== null && restrictions.group !== group.id)) return stop("Narrower group restriction");
-  for (const [key, expected] of Object.entries({ ownership: "exclusive", dependencies: "accepted", gates: "pass", review: "pass", host: "ready", humanInput: "none", stopReached: false, remoteRequired: false, nextChange: false })) {
+  for (const [key, expected] of Object.entries({ ownership: runtimeAdmission ? "runtime-admission" : "exclusive",
+    dependencies: "accepted", gates: "pass", review: "pass", host: "ready", humanInput: "none",
+    stopReached: false, remoteRequired: false, nextChange: false })) {
     if (observed[key] !== expected) return stop(`Unresolved ${key} boundary`);
   }
   const budget = group.budget ?? authority.budget;
@@ -136,7 +138,8 @@ export function contractAlignment({ declared, changed, head, review }) {
 
 // Observations must come from retained history and fresh adapter identity readback.
 // This returns one record to retain BEFORE launch; it never launches or resumes.
-export function workerContinuationDecision({ actor, orchestrator, before, after, nativeTasks, history, historyVerified, previousSession, nextSession, cappedProcess, observed }) {
+export function workerContinuationDecision({ actor, orchestrator, before, after, nativeTasks, history, historyVerified,
+  previousSession, nextSession, nextAttempt, cappedProcess, observed }) {
   const stop = (reason) => ({ action: "stop", reason, progressComplete: false, preserveProcess: true });
   if (!text(orchestrator) || actor !== orchestrator) return stop("Only the orchestrator may continue a worker");
   if (!before || !after || !sameInputs(before, after)) return stop("Changed continuation boundary");
@@ -153,10 +156,18 @@ export function workerContinuationDecision({ actor, orchestrator, before, after,
   if (historyVerified !== true || !Array.isArray(history) || history.some((r) =>
     r?.schemaVersion !== 1 || ![r.change, r.group, r.task, r.previousSession, r.nextSession, r.progressReference].every(text))) return stop("Missing retained continuation history");
   if (history.some((r) => r.change === before.change && r.group === before.group && r.task === before.task)) return stop("Native action continuation already consumed");
-  if (![previousSession, nextSession].every(text) || previousSession === nextSession ||
-      [previousSession, nextSession].includes(orchestrator) || history.some((r) => [r.previousSession, r.nextSession].includes(nextSession))) return stop("Continuation requires a fresh distinct session");
+  if (!text(previousSession) || previousSession === orchestrator) return stop("Continuation requires a distinct original session");
+  if (nextAttempt !== undefined) {
+    // The native session is emitted only after the exclusive launcher starts.
+    // Check that session at settlement, and reserve this bounded attempt first.
+    if (before.role !== "implementer" || nextSession !== undefined || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,119}$/.test(nextAttempt)) {
+      return stop("Continuation requires a fresh bounded native attempt");
+    }
+  } else if (!text(nextSession) || nextSession === previousSession || nextSession === orchestrator ||
+      history.some((r) => [r.previousSession, r.nextSession].includes(nextSession))) return stop("Continuation requires a fresh distinct session");
   const required = { status: "capped", identityVerified: true, session: previousSession, onTrack: true, unfinishedAction: before.task,
-    freshSession: true, nativePrompt: false, failedGate: false, drift: false, contradictory: false, stopReached: false };
+    ...(nextAttempt === undefined ? { freshSession: true } : {}), nativePrompt: false, failedGate: false, drift: false,
+    contradictory: false, stopReached: false };
   if (!observed || Object.entries(required).some(([key, value]) => observed[key] !== value) ||
       !text(observed.progressReference) || JSON.stringify(observed.acceptance) !== JSON.stringify(before.acceptance) ||
       !text(observed.qualifiedRoute) || observed.nextQualifiedRoute !== observed.qualifiedRoute ||
@@ -176,6 +187,7 @@ export function workerContinuationDecision({ actor, orchestrator, before, after,
         (proof.method === "non-writing" && proof.cannotWriteVerified === true))) return stop("Unverified capped process-tree quiescence; preserve process and evidence");
   return { action: "continue-worker", progressComplete: false, record: structuredClone({ schemaVersion: 1,
     change: before.change, group: before.group, task: before.task, action: before.task,
-    previousSession, nextSession, boundary: before, route: observed.qualifiedRoute, progressReference: observed.progressReference,
+    previousSession, ...(nextAttempt === undefined ? { nextSession } : { nextAttempt }),
+    boundary: before, route: observed.qualifiedRoute, progressReference: observed.progressReference,
     quiescence: proof }) };
 }

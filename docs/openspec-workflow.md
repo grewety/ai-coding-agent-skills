@@ -853,6 +853,24 @@ authorized bootstrap is not implementation. Plan drift requires separately
 approved recovery. `--plan` equal to `--head` computes identity only, granting
 neither approval nor commit authority nor restriction/correction-budget reset.
 
+## Optional exclusive worker runtime
+
+For an integrated project selection, both delivery modes use a qualified
+external implementer and a fresh independently contained reviewer.
+`openspec-next` resolves the full change and registered workspace and hands
+the held restrictions to delivery. Inspection reads original-attempt evidence
+and reports its state. The orchestrator uses sealed settlement and exact
+post-worker scope to decide whether to prepare the candidate, then requires
+exact-SHA executable gates and independent review with a sealed single-run
+session binding. A Task-Guided successor
+needs the predecessor's accepted evidence. Goal-First uses its exact Goal
+Contract and single outcome. Missing qualification, uncertain ownership or
+stale evidence keeps the boundary closed. The sealed trials at repair SHA
+`9b909f9467ddea6b12f7ca77f959f39ef01e2702` cover this behavior for synthetic
+changes on the pinned Linux pair. Exact approval and the bounded local grant
+govern delivery. Each provider run requires separate authority, and finish
+requires its own authorized invocation. [Qualification, setup and operator recovery](worker-runtime.md).
+
 ## Packages
 
 | Plugin | Skills |
@@ -864,8 +882,9 @@ Orchestration is optional. It requires the workflow plugin, explicit role and
 model configuration, and a supported host. Package installation does not create
 those roles.
 
-Current source: delivery 1.4.0 in `openspec-development` 1.4.0;
-`openspec-next` 0.5.0 and core skill 0.19.0 in `autonomous-orchestration` 1.9.0.
+Current source versions are delivery 1.5.0 and `openspec-next` 0.6.0 in
+`openspec-development` 1.5.0, and core skill 0.20.0 in
+`autonomous-orchestration` 1.10.0.
 Representation support adds no upstream workflow, runtime dependency or
 installation route. Package availability/byte checks do not establish account
 sync, host execution, native client discovery, Desktop acceptance or scanner approval.
@@ -877,11 +896,12 @@ admission rules. The guide records the limited packaged live qualification. Appl
 project's approved reviewer procedure when selecting a route.
 
 Complete copies and generated packages preserve delivery's policy/task-authoring
-references and `scripts/delivery-policy.mjs`, plus orchestration's
+references, `scripts/delivery-policy.mjs` and `scripts/delegated-delivery.mjs`, plus orchestration's
 `references/portable-core.md`, `scripts/orchestration-core.mjs`,
 `references/worker-handoff.md`, `scripts/worker-handoff.mjs`,
 `references/terminal-adapters.md`, `scripts/terminal-adapters.mjs` and
-`references/profile-preparation.md`.
+`references/profile-preparation.md`, `scripts/run-implementer.mjs` and
+its runtime helpers.
 The handoff pair is required portable support; it does not qualify a client or
 replace protected publication, independent review or delivery acceptance.
 

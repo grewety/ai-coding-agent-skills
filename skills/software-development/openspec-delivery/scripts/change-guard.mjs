@@ -290,8 +290,20 @@ export function committedDocument(repo, ref, file) {
   requireThat(Number.isSafeInteger(size) && size >= 0 && size <= planningLimits.fileBytes, `Committed document too large: ${file}`);
   return decode(runGit(repo, size + 1, ["cat-file", "blob", entry.oid]), `Invalid UTF-8: ${file}`);
 }
-function changedFiles(repo, before, after) {
+export function changedFiles(repo, before, after) {
   return git(repo, "diff-tree", "--no-commit-id", "--no-renames", "--name-only", "-r", "-z", before, after).split("\0").filter(Boolean).sort();
+}
+
+export function committedOutputHashes(repo, ref, paths, maxBytes) {
+  if (!paths.length) return {};
+  requireThat(paths.every(safePlanningPath), "Unsafe committed output path");
+  const tree = entries(repo, ref, paths);
+  return Object.fromEntries(paths.map((file) => {
+    const entry = tree.get(file);
+    if (!entry) return [file, null];
+    requireThat(entry.type === "blob" && ["100644", "100755"].includes(entry.mode), "Non-regular committed worker output");
+    return [file, sha256(runGit(repo, maxBytes, ["cat-file", "blob", entry.oid]))];
+  }));
 }
 
 export function candidate(o, requireCheckout = true) {
@@ -506,7 +518,11 @@ export function integratedPolicyContext(repo, parent, target, allowUnintegratedP
   const source = rootContractSource.replace(/^ {0,3}(`{3,}|~{3,}).*\r?\n[\s\S]*?^ {0,3}\1[ \t]*\r?$/gm, "");
   const markers = [...source.matchAll(/^<!-- openspec-delivery-mode: ([a-z-]+) -->\r?$/gm)];
   const goalFirstOptIn = markers.length === 1 && markers[0][1] === "goal-first";
-  return { ok: integrated, parent, target, contractInputs, goalFirstOptIn: integrated && goalFirstOptIn };
+  const workers = [...source.matchAll(/^<!-- openspec-worker-runtime: ([^\r\n]*?) -->\r?$/gm)];
+  requireThat(!integrated || !workers.length || workers.length === 1 && workers[0][1] === "exclusive",
+    "Ambiguous or unsupported exclusive worker runtime selection");
+  const delegatedRuntime = integrated && workers.length === 1;
+  return { ok: integrated, parent, target, contractInputs, goalFirstOptIn: integrated && goalFirstOptIn, delegatedRuntime };
 }
 
 export function policyContext(o, { allowUnintegratedParent = false } = {}) {

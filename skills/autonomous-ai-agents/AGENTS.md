@@ -15,6 +15,7 @@ Herdr pane-selection helper.
 | `autonomous-implementation-review/scripts/worker-handoff.mjs` and `references/worker-handoff.md` | Portable strict request/result schemas, adapter-only local publication and complete retained-artifact admission; no launch, cleanup or delivery acceptance. |
 | `autonomous-implementation-review/scripts/terminal-adapters.mjs`, `references/terminal-adapters.md` and `references/profile-preparation.md` | Candidate qualification records, terminal worker adapters (`hermes`, `claude-code`, `codex`, `grok-build`), role/model bindings, non-argv transport, process supervision, same-session interaction exposure, bootstrap-exception expiry, Hermes profile preparation and legacy-route retirement. |
 | `autonomous-implementation-review/scripts/review-candidate.mjs`, `scripts/review-*.mjs` in that package, and `references/review-candidate.md` | Opt-in contained Claude reviewer, candidate and charter-v1 export and receipt verification, pinned inference and sealed captures. |
+| `autonomous-implementation-review/scripts/run-implementer.mjs`, its `implementer-*.mjs`, `implementer-supervisor.py` and `worker-runtime-policy.mjs` helpers, and `references/run-implementer.md` and `references/worker-runtime.md` | Candidate exclusive Linux runtime, host assignment and physical slot ownership, pinned role pairs, native Codex preflight, durable supervision and original handover recovery. |
 | `autonomous-implementation-review/scripts/bounded-worker.mjs` and `scripts/bounded-worker.py` in that package | Shared bounded process-tree supervision and stream capture. |
 | `autonomous-implementation-review/scripts/herdr_panes.py` | Read-only overview and fail-closed validation of supplied operator selection against fresh pane JSON. |
 | `autonomous-implementation-review/scripts/herdr_lifecycle_watch.mjs` | Passive output-based Herdr lifecycle watcher, read-only inspection and arming gate; never sends pane input. |
@@ -30,6 +31,8 @@ Herdr pane-selection helper.
 ## Local Contracts
 
 - Portable core work follows `references/portable-core.md` without Hermes or Herdr. Delivery owns integrated-parent policy, contributor-contract alignment and continuation; qualified terminal adapters (`hermes`, `claude-code`, `codex`, `grok-build`) in `references/terminal-adapters.md` and `scripts/terminal-adapters.mjs` own native worker processes, non-argv prompt transport, process supervision and same-session interaction. Core artifact checks require independently retained request/runtime bindings and protected publisher roots; they never grant worker writes or qualification. With `replacementReadiness` verified, `resolveLegacyRouteRequest` retires `code-tab-phase-roles` and operator-selected Herdr pane dispatch (`status: "retired-route"`), without fallback or `.claude/agents` edits.
+
+- The exclusive worker runtime requires separate exact qualification of the runtime and both roles. It retains assignment and physical slot ownership until authorized release with original process-tree settlement. Bootstrap and synthetic fixture evidence cannot qualify the candidate. The orchestration package owns launch and recovery observations. Delivery owns task order, exact candidate gates, independent acceptance and Git.
 
 - The implementation and review phases use distinct, goal-named sessions; review is read-only. One qualified client and the same model may run roles sequentially unless project policy sets `requireDistinctModels: true`.
 - Never infer autonomous commit authority or a pane selection from labels, focus, or agent identity.
@@ -57,7 +60,8 @@ Run `npm test` and `npm run build`. Confirm the generated package advertises
 `scripts/herdr_lifecycle_watch.mjs`, `scripts/herdr-pane-state.mjs`,
 `templates/phase-implementer.md`, and `templates/phase-reviewer.md`.
 
-Verify the contained reviewer CLI, reference and runtime helpers are
+Verify the implementer CLI, runtime helpers and references alongside the
+contained reviewer. They must be
 byte-identical in the individual skill and optional orchestration bundle,
 with five skills and two bundles still advertised. Synthetic tests cover
 offline admission and containment checks. Packaged live qualification

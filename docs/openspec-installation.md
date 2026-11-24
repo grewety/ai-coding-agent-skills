@@ -27,13 +27,14 @@ This adds no upstream skill or runtime dependency. Package installation/validati
 does not establish native Git behavior; missing native macOS/Windows results remain
 hardening completion blockers, and WSL or case simulations do not replace them.
 
-Delivery 1.4.0 (in `openspec-development` 1.4.0) also includes
+Delivery 1.5.0 (in `openspec-development` 1.5.0) also includes
 `references/evidence-retention.md`, `scripts/evidence-retention.mjs`,
-`scripts/evidence-cli.mjs` and `scripts/delivery-cli.mjs`. Keep the complete
-evidence and runtime support in companion copies and ZIPs. `openspec-next` is 0.5.0
+`scripts/evidence-cli.mjs`, `scripts/delivery-cli.mjs` and
+`scripts/delegated-delivery.mjs`. Keep the complete
+evidence and runtime support in companion copies and ZIPs. `openspec-next` is 0.6.0
 and ships `references/routing.md` and `scripts/next.mjs` for read-only routing to
 delivery. Install both complete packages in the intended host. The separate optional
-`autonomous-orchestration` plugin is 1.9.0 (core skill 0.19.0). Installation, account sync and
+`autonomous-orchestration` plugin is 1.10.0 (core skill 0.20.0). Installation, account sync and
 host execution verification remain separate; package byte checks establish none
 of native client discovery, Desktop acceptance or scanner approval.
 
@@ -41,6 +42,16 @@ The [contained Claude reviewer](claude-reviewer.md) is optional within the orche
 package. Its limited packaged live qualification and separate grant for export and paid
 inference are documented in the guide. OpenSpec prerequisites and skill installation are
 separate from reviewer runtime and inference route setup.
+
+The [exclusive worker runtime](worker-runtime.md) uses the optional
+orchestration package only when the project selects delegated delivery.
+Sealed synthetic trials on one Linux host qualified the dedicated pinned Codex
+implementer and read-only Claude reviewer. Verify the exact runtime, host and
+role records and provision the dedicated operator configuration before use.
+Dispatch requires bounded workflow authority and separate per-run inference
+authority. Its packaged `scripts/run-implementer.mjs` launch, recovery and
+evidence interfaces retain the seven upstream skills, CLI pin and installation
+procedures.
 
 Keep delivery's `references/delivery-policy.md`, `references/task-authoring.md`
 and `scripts/delivery-policy.mjs`, plus orchestration's `references/portable-core.md`

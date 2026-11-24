@@ -6,7 +6,7 @@ const changeName = (value) => typeof value === "string" && /^[a-z][a-z0-9]*(?:-[
 const attemptId = (value) => typeof value === "string" && /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(value);
 const retained = (value) => value?.verified === true && text(value.reference);
 
-export function preflight({ live, auth, local, reviewer, relay, runtime, checkpoint, companions }, source, policy) {
+export function preflight({ live, auth, local, reviewer, relay, runtime, checkpoint, companions }, source, policy, delegation = null) {
   function matchInventory(actual, expected) {
     if (!actual || !expected || typeof actual !== "object" || typeof expected !== "object" ||
         Array.isArray(actual) || Array.isArray(expected)) return false;
@@ -15,14 +15,16 @@ export function preflight({ live, auth, local, reviewer, relay, runtime, checkpo
       wanted.every((key) => digest(expected[key]) && actual[key] === expected[key]);
   }
   const entries = [
-    ["P1", "live-target", live, () => text(live.remote) && text(live.branch) && text(live.repository) && sha(live.head)],
+    ["P1", "live-target", live, () => text(live.remote) && text(live.branch) && text(live.repository) && sha(live.head) &&
+      (!delegation || live.repository === delegation.repository)],
     ["P2", "repository-auth", auth, () => auth.authenticated === true && text(auth.repository) && auth.repository === live?.repository &&
       auth.requiredScopesPresent === true],
     ["P3", "local-baseline", local, () => sha(live?.head) && source && source.branch === `refs/heads/${live.branch}` &&
       source.head === live.head && source.targetHead === live.head && source.trackingHead === live.head && source.dirty === false && local.activeChangeInventoryVerified === true],
     ["P4", "reviewer-probe", reviewer, () => reviewer.outcome === "pass" && digest(reviewer.configurationSha256) &&
       reviewer.configurationSha256 === reviewer.expectedConfigurationSha256 && digest(reviewer.packageSha256) &&
-      reviewer.packageSha256 === companions?.expected?.reviewer],
+      reviewer.packageSha256 === companions?.expected?.reviewer &&
+      (!delegation || reviewer.configurationSha256 === delegation.configuration && reviewer.packageSha256 === delegation.inventory)],
     ["P5", "reviewer-relay", relay, () => relay.ready === true && relay.materialRetained === false &&
       relay.configurationSha256 === reviewer?.configurationSha256],
     ["P6", "local-runtime", runtime, () => ["node", "openspec"].every((tool) => text(runtime[tool]) &&
@@ -48,7 +50,7 @@ export function deliveryStatus({ change, policy, identity, candidate, decision, 
   const pinned = candidate?.change === selected && sha(candidate?.head) ? candidate.head : null;
   const planDigest = mode && identity?.change === selected && digest(identity.planDigest) ? identity.planDigest : null;
   const id = handoff?.result?.identity ?? handoff?.active?.identity;
-  const boundAttempt = selected && id?.change === selected && id.planDigest === planDigest &&
+  const boundAttempt = selected && id?.change === selected && (id.planDigest === planDigest || handoff.goalContractDigest === planDigest) &&
     (id.role === "reviewer" ? pinned && id.candidate === pinned : id.candidate === null) ? id.attempt : null;
   const activeAttemptId = boundAttempt === attempt?.id && attemptId(boundAttempt) ? boundAttempt : null;
   const contextHint = activeAttemptId && ["same-session", "fresh-session"].includes(context) ? context : null;
@@ -62,8 +64,8 @@ export function deliveryStatus({ change, policy, identity, candidate, decision, 
     code = "RESOLVE_STOP";
   } else if (selected && (attempt?.invalid === true || (attempt?.id && !activeAttemptId))) {
     state = "blocked";
-    stopPredicate = "HANDOVER_UNVERIFIED";
-    code = "VERIFY_HANDOVER";
+    stopPredicate = attempt?.invalid === true || !reasonPattern.test(decision?.reason ?? "") ? "HANDOVER_UNVERIFIED" : decision.reason;
+    code = stopPredicate === "HANDOVER_UNVERIFIED" ? "VERIFY_HANDOVER" : "RESOLVE_STOP";
   } else if (selected && pinned && closure?.verified === true && closure.candidateSha === pinned && closure.change === selected) {
     state = "closed";
     code = null;
@@ -76,6 +78,10 @@ export function deliveryStatus({ change, policy, identity, candidate, decision, 
       state = "result-review-pending";
       stopPredicate = decision.reason;
       code = "VERIFY_EXACT_RESULT_REVIEW";
+    } else if (activeAttemptId && ["ORIGINAL_ATTEMPT_ACTIVE", "HUMAN_INPUT_PENDING"].includes(decision.reason) && handoff?.active) {
+      state = "active";
+      stopPredicate = decision.reason === "HUMAN_INPUT_PENDING" ? decision.reason : null;
+      code = stopPredicate ? "WAIT_FOR_ORIGINAL_OPERATOR_INPUT" : "RESUME_BOUNDED_ATTEMPT";
     } else if (decision.action === "stop" || decision.action === "queue") {
       state = "blocked";
       stopPredicate = reasonPattern.test(decision.reason ?? "") ? decision.reason : "DELIVERY_OBSERVATIONS_UNVERIFIED";

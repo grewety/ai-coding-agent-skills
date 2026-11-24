@@ -1,0 +1,163 @@
+{
+  "binding": {
+    "client": "claude-code",
+    "independent": true,
+    "model": "claude-sonnet-4-6",
+    "permissions": [
+      "read"
+    ],
+    "qualified": true,
+    "readOnly": true,
+    "route": "terminal-adapter"
+  },
+  "budget": 3,
+  "change": "exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m",
+  "charter": {
+    "boundaries": [
+      "Approach review reads only the manifest-approved export through the pinned contained Claude route. It has no Git, source, profile, task or remote write authority.",
+      "Implementation mechanics and style are outside the planning charter. Live runtime qualification results belong to task 3.1 and need separate run authority."
+    ],
+    "clauses": [
+      "exclusive-host-claim-role-reservation-and-original-attempt-recovery",
+      "qualified-paired-bindings-codex-auth-isolation-and-no-inline-fallback",
+      "checkout-sandbox-smoke-check-and-process-tree-quiescence",
+      "bounded-foreground-file-handover-and-misleading-signal-controls",
+      "short-private-socket-sealed-receipt-invalid-and-verified-archive-move",
+      "task-guided-authority-dependencies-exact-acceptance-and-live-deferral",
+      "operator-documentation-capability-deltas-and-package-version-inventory"
+    ],
+    "gates": [
+      "openspec validate exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m --strict",
+      "npm run validate:openspec",
+      "npm test",
+      "npm run build",
+      "exact-SHA independent candidate review"
+    ],
+    "tasks": [
+      "1.1",
+      "2.1",
+      "3.1"
+    ]
+  },
+  "cumulativeCycles": 0,
+  "entries": [
+    {
+      "inputs": {
+        "openspec/changes/exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m/.openspec.yaml": "01c3365f21ad2129d7e1db5577bc59c382883cdcbfece60900a8ac86293e3398",
+        "openspec/changes/exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m/design.md": "6fc3d405d748cf4f709ec99287c1209a550afa17f2aac71893d9e15d5c2d0859",
+        "openspec/changes/exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m/proposal.md": "bd68ccfa4bf6349dd59d4a23a1ce994986fd38075848ede99b58d36f6a1ddd1f",
+        "openspec/changes/exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m/specs/contained-independent-review/spec.md": "584bebf557aa12efd14840dd734ef73e068e780b29ee125321747e11d507757b",
+        "openspec/changes/exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m/specs/exclusive-worker-runtime/spec.md": "b70e9bc138954163b5c4ce70060e4653077a2aa34c1cb3ce639166bbf238bfd4",
+        "openspec/changes/exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m/specs/openspec-integration/spec.md": "a9dc5bee7856c7eafb2dce5c43e2387b82f1556434572e9f8462dca98ef0f165",
+        "openspec/changes/exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m/tasks.md": "ebbef4bf28cb86c43e8f36287c0cced97e25b8dbc8391aeb97b4b030a362f361",
+        "openspec/config.yaml": "e00255bbcd0689f475861788f7e3cacbfab12c16ae6f49a0b730abbba6d2437a"
+      },
+      "authorSession": "codex-planning-author-exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m",
+      "reviewerSession": "eed56430-7647-4d7b-820b-8508575571ec",
+      "reference": "/home/raphael/verification-records/i3-a1/output/report.md",
+      "coverageLimitations": [
+        {
+          "class": "containment-boundary",
+          "boundary": "Approach review reads only the manifest-approved export through the pinned contained Claude route. It has no Git, source, profile, task or remote write authority."
+        },
+        {
+          "class": "containment-boundary",
+          "boundary": "Implementation mechanics and style are outside the planning charter. Live runtime qualification results belong to task 3.1 and need separate run authority."
+        },
+        {
+          "class": "declared-deferral",
+          "task": "3.1"
+        }
+      ],
+      "receipt": {
+        "identity": {
+          "change": "exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m",
+          "goal": "Plan Task-Guided Item 3: one qualified and exclusively owned worker assignment across a host, with paired roles, native sandbox checks, bounded supervised file handover, process-tree quiescence and same-attempt crash recovery. Preserve exact candidate and plan gates and fix all three observed reviewer defects. Synchronize operator instructions and versions. Keep live qualification and optional Hermes delegation behind separate execution authority.",
+          "charter": {
+            "boundaries": [
+              "Approach review reads only the manifest-approved export through the pinned contained Claude route. It has no Git, source, profile, task or remote write authority.",
+              "Implementation mechanics and style are outside the planning charter. Live runtime qualification results belong to task 3.1 and need separate run authority."
+            ],
+            "clauses": [
+              "exclusive-host-claim-role-reservation-and-original-attempt-recovery",
+              "qualified-paired-bindings-codex-auth-isolation-and-no-inline-fallback",
+              "checkout-sandbox-smoke-check-and-process-tree-quiescence",
+              "bounded-foreground-file-handover-and-misleading-signal-controls",
+              "short-private-socket-sealed-receipt-invalid-and-verified-archive-move",
+              "task-guided-authority-dependencies-exact-acceptance-and-live-deferral",
+              "operator-documentation-capability-deltas-and-package-version-inventory"
+            ],
+            "gates": [
+              "openspec validate exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m --strict",
+              "npm run validate:openspec",
+              "npm test",
+              "npm run build",
+              "exact-SHA independent candidate review"
+            ],
+            "tasks": [
+              "1.1",
+              "2.1",
+              "3.1"
+            ]
+          },
+          "binding": {
+            "client": "claude-code",
+            "independent": true,
+            "model": "claude-sonnet-4-6",
+            "permissions": [
+              "read"
+            ],
+            "qualified": true,
+            "readOnly": true,
+            "route": "terminal-adapter"
+          },
+          "passRule": "charter-v1",
+          "budget": 3,
+          "cumulativeCycles": 0,
+          "inputs": {
+            "openspec/changes/exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m/.openspec.yaml": "01c3365f21ad2129d7e1db5577bc59c382883cdcbfece60900a8ac86293e3398",
+            "openspec/changes/exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m/design.md": "6fc3d405d748cf4f709ec99287c1209a550afa17f2aac71893d9e15d5c2d0859",
+            "openspec/changes/exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m/proposal.md": "bd68ccfa4bf6349dd59d4a23a1ce994986fd38075848ede99b58d36f6a1ddd1f",
+            "openspec/changes/exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m/specs/contained-independent-review/spec.md": "584bebf557aa12efd14840dd734ef73e068e780b29ee125321747e11d507757b",
+            "openspec/changes/exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m/specs/exclusive-worker-runtime/spec.md": "b70e9bc138954163b5c4ce70060e4653077a2aa34c1cb3ce639166bbf238bfd4",
+            "openspec/changes/exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m/specs/openspec-integration/spec.md": "a9dc5bee7856c7eafb2dce5c43e2387b82f1556434572e9f8462dca98ef0f165",
+            "openspec/changes/exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m/tasks.md": "ebbef4bf28cb86c43e8f36287c0cced97e25b8dbc8391aeb97b4b030a362f361",
+            "openspec/config.yaml": "e00255bbcd0689f475861788f7e3cacbfab12c16ae6f49a0b730abbba6d2437a"
+          },
+          "packetHashes": {
+            "packet-1": "af77bac6fcea3249a3c10d617e3b7a12481359d69ebae43f747298ecff9cf022"
+          },
+          "authorSession": "codex-planning-author-exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m",
+          "reviewerSession": "eed56430-7647-4d7b-820b-8508575571ec",
+          "model": "claude-sonnet-4-6",
+          "ledger": [],
+          "correction": null
+        },
+        "readOnly": true,
+        "reference": "/home/raphael/verification-records/i3-a1/output/report.md",
+        "verdict": "Verdict: No findings",
+        "findings": [],
+        "observations": [],
+        "coverageLimitations": [
+          {
+            "class": "containment-boundary",
+            "boundary": "Approach review reads only the manifest-approved export through the pinned contained Claude route. It has no Git, source, profile, task or remote write authority."
+          },
+          {
+            "class": "containment-boundary",
+            "boundary": "Implementation mechanics and style are outside the planning charter. Live runtime qualification results belong to task 3.1 and need separate run authority."
+          },
+          {
+            "class": "declared-deferral",
+            "task": "3.1"
+          }
+        ],
+        "ledgerChecks": []
+      }
+    }
+  ],
+  "goal": "Plan Task-Guided Item 3: one qualified and exclusively owned worker assignment across a host, with paired roles, native sandbox checks, bounded supervised file handover, process-tree quiescence and same-attempt crash recovery. Preserve exact candidate and plan gates and fix all three observed reviewer defects. Synchronize operator instructions and versions. Keep live qualification and optional Hermes delegation behind separate execution authority.",
+  "ledger": [],
+  "passRule": "charter-v1",
+  "schemaVersion": 1
+}

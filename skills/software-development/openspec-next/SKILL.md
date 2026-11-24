@@ -1,7 +1,7 @@
 ---
 name: openspec-next
 description: Inspect or advance an approved OpenSpec goal or task group.
-version: 0.5.0
+version: 0.6.0
 author: Raphael (forgegod), Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -93,6 +93,9 @@ and forbids continuation; idle or cap output alone is insufficient.
    with delivery's retained observations. For `inspect`, report deterministic
    status, verified workspace/approval/evidence and the blocking predicate or
    advisory next action. End without setup, bootstrap, role dispatch or writes.
+   For configured delegation, pass the original runtime assignment, retained
+   attempt and restrictions through to delivery, including no commits and any
+   fixed group. Let delivery reconcile settlement and exact predecessor evidence.
 6. For execution, load `openspec-delivery`. Goal-First uses the approved Goal
    Contract and its single native outcome. Task-Guided resumes incomplete
    checks/review first, then selects the first eligible unfinished approved group

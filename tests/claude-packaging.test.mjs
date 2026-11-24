@@ -13,11 +13,11 @@ const marketplacePath = path.join(root, ".claude-plugin/marketplace.json");
 
 const expectedBundles = {
   "openspec-development": {
-    version: "1.4.0",
+    version: "1.5.0",
     skills: ["openspec-delivery", "openspec-next", "git-commit-message", "capability-wireframes"],
   },
   "autonomous-orchestration": {
-    version: "1.9.0",
+    version: "1.10.0",
     skills: ["autonomous-implementation-review"],
   },
 };
@@ -33,10 +33,10 @@ test("Claude marketplace selects exact canonical packages for two isolated bundl
   const packages = await discoverSkillPackages({ root });
   const delivery = packages.find(({ name }) => name === "openspec-delivery");
   assert.ok(delivery);
-  assert.match(await readFile(path.join(delivery.directory, "SKILL.md"), "utf8"), /^version: 1\.4\.0$/m);
+  assert.match(await readFile(path.join(delivery.directory, "SKILL.md"), "utf8"), /^version: 1\.5\.0$/m);
   const next = packages.find(({ name }) => name === "openspec-next");
   assert.ok(next);
-  assert.match(await readFile(path.join(next.directory, "SKILL.md"), "utf8"), /^version: 0\.5\.0$/m);
+  assert.match(await readFile(path.join(next.directory, "SKILL.md"), "utf8"), /^version: 0\.6\.0$/m);
   assert.deepEqual([...next.files].sort(), ["SKILL.md", "references/routing.md", "scripts/next.mjs"]);
   const selected = new Map();
   for (const plugin of marketplace.plugins) {
@@ -128,10 +128,16 @@ test("distribution builds complete skill and plugin ZIPs from canonical bytes", 
   const reviewEntry = catalog.skills.find(({ name }) => name === reviewPackage.name);
   assert.ok(reviewEntry, "individual reviewer ZIP must be advertised");
   const reviewArchive = unzipSync(await readFile(path.join(output, "downloads", reviewEntry.file)));
-  assert.match(Buffer.from(reviewArchive[`${reviewPackage.name}/SKILL.md`]).toString(), /^version: 0\.19\.0$/m);
+  assert.match(Buffer.from(reviewArchive[`${reviewPackage.name}/SKILL.md`]).toString(), /^version: 0\.20\.0$/m);
   const orchestrationArchive = unzipSync(await readFile(path.join(output, "downloads", catalog.plugins[1].file)));
   const reviewFiles = [
     "references/review-candidate.md",
+    "references/run-implementer.md",
+    "references/worker-runtime.md",
+    "scripts/implementer-runtime.mjs",
+    "scripts/implementer-sandbox.mjs",
+    "scripts/worker-runtime-policy.mjs",
+    "scripts/run-implementer.mjs",
     "scripts/review-candidate.mjs",
     "scripts/review-admission.mjs",
     "scripts/review-inputs.mjs",
@@ -148,13 +154,15 @@ test("distribution builds complete skill and plugin ZIPs from canonical bytes", 
     assert.deepEqual(Buffer.from(reviewArchive[key]), canonical, key);
     assert.deepEqual(Buffer.from(orchestrationArchive[`skills/${key}`]), canonical, key);
   }
-  for (const file of ["README.md", "docs/claude-installation.md", "docs/openspec-installation.md", "docs/openspec-workflow.md"]) {
+  for (const file of ["README.md", "docs/claude-installation.md", "docs/openspec-installation.md", "docs/openspec-workflow.md",
+    "docs/worker-runtime.md"]) {
     const guide = await readFile(path.join(root, file), "utf8");
     const reviewerLink = file === "README.md" ? "(docs/claude-reviewer.md)" : "(claude-reviewer.md)";
     assert.ok(guide.includes(reviewerLink), `${file} links to reviewer setup`);
-    assert.ok(guide.includes("0.19.0") && guide.includes("1.9.0"), `${file} lists paired versions`);
+    assert.ok(guide.includes("0.20.0") && guide.includes("1.10.0"), `${file} lists paired versions`);
   }
   const reviewerGuide = await readFile(path.join(root, "docs/claude-reviewer.md"), "utf8");
+  assert.ok(reviewerGuide.includes("0.20.0") && reviewerGuide.includes("1.10.0"), "reviewer guide lists paired versions");
   const reviewerReference = await readFile(path.join(reviewPackage.directory, "references/review-candidate.md"), "utf8");
   const commandForms = (guide) => guide.split("\n")
     .filter((line) => /^(NODE REVIEW_CLI|node review-candidate\.mjs) --/.test(line))
@@ -166,7 +174,7 @@ test("distribution builds complete skill and plugin ZIPs from canonical bytes", 
   assert.ok(deliveryEntry, "individual delivery ZIP must be advertised");
   const deliveryArchive = unzipSync(await readFile(path.join(output, "downloads", deliveryEntry.file)));
   // Explicit pair checks must not depend on the generator's discovery inventory.
-  for (const file of ["references/evidence-retention.md", "scripts/evidence-retention.mjs"]) {
+  for (const file of ["references/evidence-retention.md", "scripts/evidence-retention.mjs", "scripts/delegated-delivery.mjs"]) {
     const canonical = await readFile(path.join(root, "skills/software-development/openspec-delivery", file));
     for (const [archive, key] of [[deliveryArchive, `openspec-delivery/${file}`], [integrationArchive, `skills/openspec-delivery/${file}`]]) {
       assert.ok(Object.hasOwn(archive, key), `ZIP omits ${key}`);

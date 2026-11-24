@@ -32,12 +32,25 @@ and replays the native stream and receipt checks offline. Obtain a separate
 explicit grant for the approved export and paid inference before either
 live mode or a standalone probe.
 
-Standalone probe and both launch modes can incur charges. The packaged
-candidate and charter-v1 approach modes passed live qualification only on the
-tested Linux/WSL pairing of Bubblewrap 0.9.0 and Claude Code 2.1.330, using
-`claude-sonnet-4-6` with the `same-uid-key` relay. Operator setup details are
-in the source repository’s `docs/claude-reviewer.md`. Select a route under the
-project's approved reviewer procedure.
+Standalone probe and both launch modes can incur charges. The historical
+standalone trial at `4eddbade12fab2a032755a446f9176005b7b04a1` qualified
+candidate and charter-v1 modes on the tested Linux/WSL pairing of Bubblewrap
+0.9.0 and Claude Code 2.1.330, using `claude-sonnet-4-6` with the
+`same-uid-key` relay.
+
+The separate sealed Group 3.1 trials at repair SHA
+`9b909f9467ddea6b12f7ca77f959f39ef01e2702` qualified fresh read-only candidate
+review with those reviewer pins, `dontAsk` permissions and `Read` as the sole
+tool. The trials paired that reviewer with dedicated Codex 0.171.0, GPT-6.2-sol
+and native named workspace-write for synthetic Task-Guided and Goal-First
+changes on one Linux host. The evidence is bound to that runtime, host and
+role pair. Other hosts, clients, versions and provider routes require matching
+qualification.
+[Paired runtime and role bindings](worker-runtime.md).
+
+Select a route under the project's approved reviewer procedure and obtain the
+separate per-run grant before any future live review or probe. Operator setup
+details are in the source repository’s `docs/claude-reviewer.md`.
 
 ## Retained inputs
 
@@ -57,7 +70,13 @@ provide the required `native.txt` and `lifecycle.jsonl` captures.
   text conversion or indentation heuristic, and 50% rename detection. The
   changed paths, exact plan files and all required context are packed together
   under both diff and whole-file scope limits. A deletion includes its base
-  file and a rename includes both sides.
+  file and a rename includes both sides. For a record-only archive closure,
+  review the exact closure target and immediate active predecessor. The
+  complete change must move to one canonical dated archive for the same
+  identity with identical bytes and modes, including task ticks. Pin any
+  newly authorized archive JSON receipt as an attachment. Review exports
+  keep frozen planning inputs in active-path coordinates and the actual
+  diff in its committed paths.
 - Approach snapshot fields are `record` (the retained charter-v1 convergence
   record), `correction` (null or the verified correction), `authority`
   (`reference`, `write`, `validate`, `review`), and `priorLaunches` (empty or
@@ -97,7 +116,11 @@ OAuth fails closed under this release's pinned inference and startup policy.
 Alternative routes require independent qualification.
 
 The sandbox exposes private scratch, the read-only packet and runtime, and
-the approved Unix socket. Startup must report only `Read` as a tool and empty
+the approved Unix socket. The relay socket lives in short owner-private
+temporary scratch separate from the output, with a UTF-8 path shorter than
+108 bytes. The runner checks path length and privacy before binding and
+removes owned scratch after process and relay settlement. Review evidence
+stays at its approved destination. Startup must report only `Read` as a tool and empty
 plugin, MCP, skill and slash-command inventories. Native agent labels may
 appear as startup metadata. Agent invocation and child activity fail the
 audit. Every assigned file must have a successful whole-file `Read`.
@@ -118,7 +141,10 @@ directories for any authorized successor.
 Candidate replay preserves packet verdicts, findings and limitations, and
 checks completed candidate results through the portable `readHandoff`.
 Only a complete literal no-findings candidate with zero limitations can
-satisfy the existing candidate acceptance rules. Approach replay returns
+satisfy the existing candidate acceptance rules. A rejected candidate
+receipt seals `receipt-invalid`, the one-based packet number, packet hash,
+expected target and packet session. Replay verifies the same rejection
+using the retained stream and export. Approach replay returns
 charter admission with ledger changes, preserving advisory findings,
 deferrals and packet-gap handling. A verified malformed receipt can be
 referenced once with a fresh session and predecessor on the same binding,

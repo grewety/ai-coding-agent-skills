@@ -1,7 +1,7 @@
 # Contained Claude reviewer
 
-The optional `autonomous-implementation-review` 0.19.0 skill and
-`autonomous-orchestration` 1.9.0 bundle ship a standalone command for candidate
+The optional `autonomous-implementation-review` 0.20.0 skill and
+`autonomous-orchestration` 1.10.0 bundle ship a standalone command for candidate
 review and charter-v1 approach review. Use the complete package from a reviewed
 checkout or the [Claude installation guide](claude-installation.md). Resolve
 `scripts/review-candidate.mjs` inside that package. This command runs locally
@@ -18,9 +18,16 @@ returned `freeze-ready` with 7/7 whole-file coverage. Both passed offline
 verification at their original request-bound output paths and returned
 `deliveryAccepted: false`.
 
-Qualification applies only to that tested pairing. Obtain a separate explicit
-grant covering the approved export and paid inference, including any standalone
-probe, before running live.
+The standalone trial is historical and bound to that exact source and pairing.
+The 0.20.0 reviewer adds local regression coverage for short private relay
+scratch, sealed invalid candidate receipts and byte-identical OpenSpec archive
+moves. The [exclusive worker pair](worker-runtime.md) has separate live evidence
+from synthetic trials on one Linux host at repair SHA
+`9b909f9467ddea6b12f7ca77f959f39ef01e2702`. Four read-only review invocations
+produced three accepted sealed candidate reviews and one retained finding on
+the original Group 2 context. The separately approved corrected context used
+the same Group 2 candidate. Each live run requires its own explicit grant for
+approved export and paid inference, including any standalone probe.
 
 ## Host setup and credential routes
 
@@ -30,7 +37,9 @@ probe, before running live.
   **2.1.330**. Use known runtime binaries and minimal required shared libraries.
 - Keep trusted host configuration, reviewed checkout, export, publisher output
   and independent expectations separate. Use private, existing parents for
-  fresh output and export directories. Use absolute paths throughout.
+  fresh output and export directories. Use absolute paths throughout. The
+  runner allocates separate private runtime scratch and checks the Unix socket
+  path in UTF-8 bytes before binding. Teardown keeps the retained review output.
 - In the schema-version-1 host JSON, pin the absolute `bwrap`, `claude` and
   `node` binaries by `path` and SHA-256. Pin each entry in `libraries` by
   source path, SHA-256 and exact sandbox `target`. Use regular files owned by
@@ -45,7 +54,7 @@ probe, before running live.
 
 | Route | Host configuration and qualification |
 | --- | --- |
-| `same-uid-key` | Relay used in the qualified pairing above. Set `keyFile` and `keyFormat` explicitly. Use a host-owned single-link 0400 regular file with only the key for `raw`, or a host-owned single-link 0600 regular file with one literal `ANTHROPIC_API_KEY` assignment for `assignment`. The relay parses text without sourcing it and keeps the key host-side. Same-UID protection depends on isolation and trust in host processes running under that UID. |
+| `same-uid-key` | Relay used in the historical standalone trial and the exclusive Linux pair. Set `keyFile` and `keyFormat` explicitly. Use a host-owned single-link 0400 regular file with only the key for `raw`, or a host-owned single-link 0600 regular file with one literal `ANTHROPIC_API_KEY` assignment for `assignment`. The relay parses text without sourcing it and keeps the key host-side. Same-UID protection depends on isolation and trust in host processes running under that UID. |
 | `dedicated-uid-broker` | Implemented interface pending independent qualification. Set `socket` to an absolute `inference.sock` and `ownerUid` to the distinct non-root broker UID. The socket must be mode 0660 and its parent must be owned by that UID and protected from group/other writes. The separately operated broker needs its own route and policy evidence. |
 | `scoped-oauth` | Unavailable under the pinned inference and startup constraints. The command rejects the route. Ambient login, cloud-provider sign-in and account sync are unqualified. |
 
@@ -134,6 +143,8 @@ NODE REVIEW_CLI --verify --request REQUEST --expect EXPECT --export EXPORT --out
 - **Runtime or receipt fails.** A failed probe, runtime failure or invalid
   receipt exits nonzero. Preserve the complete sealed output where available.
   An interrupted or partial output without a verified status is inadmissible.
+  A candidate receipt rejection records `receipt-invalid` and the offending
+  packet with its captures. Offline verification reproduces the rejection.
   One verified malformed approach receipt can be retried under the existing
   zero-correction-cycle convergence decision with a fresh session and output,
   matching binding and retained predecessor. A packet gap follows the
