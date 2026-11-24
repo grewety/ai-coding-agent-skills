@@ -36,7 +36,20 @@ function invoke(repo, ...args) {
 test("exclusive worker runtime promotes the full native deltas with capability metadata", async () => {
   const change = "exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m";
   const capabilities = new Map([["contained-independent-review", 3], ["exclusive-worker-runtime", 5], ["openspec-integration", 1]]);
-  const deltaRoot = path.join(root, "openspec", "changes", change, "specs");
+  const { readdir } = await import("node:fs/promises");
+  const changesRoot = path.join(root, "openspec", "changes");
+  const archiveRoot = path.join(changesRoot, "archive");
+  const archivedName = new RegExp(`^\\d{4}-\\d{2}-\\d{2}-${change}$`);
+  const [active, archived] = await Promise.all([
+    readdir(changesRoot, { withFileTypes: true }),
+    readdir(archiveRoot, { withFileTypes: true }),
+  ]);
+  const matches = [...active.filter((entry) => entry.name === change),
+    ...archived.filter((entry) => archivedName.test(entry.name))];
+  assert.equal(matches.length, 1, `Expected exactly one active or archived copy of ${change}`);
+  const [match] = matches;
+  assert.ok(match.isDirectory(), `${match.name} must be a directory`);
+  const deltaRoot = path.join(match.name === change ? changesRoot : archiveRoot, match.name, "specs");
   for (const [capability, requirements] of capabilities) {
     const [delta, current] = await Promise.all([
       readFile(path.join(deltaRoot, capability, "spec.md"), "utf8"),
