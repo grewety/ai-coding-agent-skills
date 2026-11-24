@@ -22,6 +22,9 @@ const repository = "github.com/example/runtime";
 const gitEnv = { PATH: "/usr/bin:/bin", HOME: "/nonexistent", GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null" };
 const taskGuidedSource = { "openspec/config.yaml": "schema: spec-driven\n", [prefix + ".openspec.yaml"]: "schema: spec-driven\n",
   [prefix + "proposal.md"]: "# Synthetic plan\n", [prefix + "tasks.md"]: "- [ ] 1.1 First group\n- [ ] 2.1 Dependent group\n" };
+const startupWarning = "Under-development features enabled: skip_host_skill_discovery. " +
+  "Under-development features are incomplete and may behave unpredictably. " +
+  "To suppress this warning, set `suppress_unstable_features_warning = true` in ";
 const shim = String.raw`#!/usr/bin/python3
 import json, os, subprocess, sys, time, uuid
 assert sys.argv[1] == "exec" and sys.argv[-1] == "-" and "--ephemeral" in sys.argv
@@ -39,6 +42,9 @@ if behavior == "echo":
     sys.exit(0)
 session = str(uuid.uuid4())
 emit("thread.started", thread_id=session)
+if behavior == "startup-warning":
+    emit("item.completed", item={"id": "item_0", "type": "error",
+         "message": ${JSON.stringify(startupWarning)} + os.environ["CODEX_HOME"] + "/config.toml."})
 emit("turn.started")
 if behavior == "wait":
     emit("approval.requested", kind="credential", thread_id=session, request_id="fixture-approval")
@@ -199,7 +205,7 @@ const resultPath = (f, name) => path.join(f.evidence, name, "result.json");
 
 test("sealed completion, immutable recovery and explicit slot/claim retirement", async (t) => {
   const f = await fixture(t);
-  const entry = await f.assignment("original");
+  const entry = await f.assignment("original", "startup-warning");
   const phases = [];
   const [result] = await run(f, [entry], { emit: ({ phase }) => phases.push(phase) });
   assert.equal(result.phase, "completed", result.reason);
@@ -212,7 +218,14 @@ test("sealed completion, immutable recovery and explicit slot/claim retirement",
   const replay = await observeImplementer(entry, { registry: f.registry, action: "recover" });
   assert.deepEqual(replay.result, result.result);
   assert.equal(checkoutStatus(f.workspace), "");
-  const launch = await readState(attemptDirectory(f, "original"), "launch.json");
+  const originalAttempt = attemptDirectory(f, "original");
+  const launch = await readState(originalAttempt, "launch.json");
+  const settlement = await readState(originalAttempt, "settlement.json");
+  const stdout = await readFile(path.join(f.evidence, "original", "stdout.jsonl"));
+  assert.deepEqual(stdout, Buffer.from(settlement.result.stdout, "base64"));
+  assert.deepEqual(JSON.parse(stdout.toString("utf8").split("\n")[1]), { type: "item.completed",
+    item: { id: "item_0", type: "error", message: startupWarning + f.pair.implementer.codexHome + "/config.toml." } });
+  assert.equal(await readFile(path.join(f.evidence, "original", "native.txt"), "utf8"), "Synthetic native result\n");
   const releaseFor = (action, label) => f.locator(label, { schemaVersion: 1, kind: "exclusive-runtime-release",
     action, claimId: launch.claimId, change, attempt: "original", settlementSha256: result.settlementSha256,
     orchestrator: entry.request.authority.orchestrator, quiescent: true, falloutVerified: true, assignmentClosed: true });

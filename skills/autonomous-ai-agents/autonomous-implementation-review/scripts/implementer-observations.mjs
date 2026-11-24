@@ -2,8 +2,22 @@ import { lstat } from "node:fs/promises";
 import path from "node:path";
 import { captureLimit } from "./bounded-worker.mjs";
 import { checkoutIdentity, checkoutStatus, gitState } from "./worker-runtime-policy.mjs";
-import { equal, hash, need, parseStrictJson, relative, utf8 } from "./review-inputs.mjs";
+import { absolute, equal, hash, need, parseStrictJson, plain, relative, utf8 } from "./review-inputs.mjs";
 import { readClosed } from "./worker-handoff.mjs";
+
+const codexStartupWarning = "Under-development features enabled: skip_host_skill_discovery. " +
+  "Under-development features are incomplete and may behave unpredictably. " +
+  "To suppress this warning, set `suppress_unstable_features_warning = true` in ";
+
+function isCodexStartupWarning(event) {
+  const { item } = event;
+  if (Object.keys(event).length !== 2 || !plain(item) || Object.keys(item).length !== 3 ||
+      item.id !== "item_0" || item.type !== "error" || typeof item.message !== "string" ||
+      !item.message.startsWith(codexStartupWarning)) return false;
+  // The unquoted location uses portable path characters so it cannot absorb another diagnostic.
+  const location = /^(\/[A-Za-z0-9_.@+/-]*\/config\.toml)\.$/.exec(item.message.slice(codexStartupWarning.length));
+  return location !== null && absolute(location[1]);
+}
 
 function decode(value, limit) {
   need(typeof value === "string" && value.length <= Math.ceil(limit / 3) * 4, "Capture exceeds the admitted stream limit");
@@ -42,7 +56,8 @@ export function auditCodexCapture(state, captured, limits) {
   let report = null;
   let waiting = null;
   let terminal = null;
-  for (const item of events.slice(1)) {
+  for (let index = 1; index < events.length; ++index) {
+    const item = events[index];
     if (!item || (item.thread_id !== undefined && item.thread_id !== state.session.session) || terminal === "failed") {
       return reduce("failed", "native-event-identity-mismatch");
     }
@@ -54,6 +69,8 @@ export function auditCodexCapture(state, captured, limits) {
       terminal = null;
       break;
     case "item.completed":
+      // Codex 0.171.0 emits this diagnostic before opening the first turn.
+      if (index === 1 && events[index + 1]?.type === "turn.started" && isCodexStartupWarning(item)) break;
       if (!open || waiting) return reduce("failed", "native-event-outside-active-turn");
       if (item.item?.type === "agent_message" && typeof item.item.text === "string" && item.item.text.trim()) report = item.item.text;
       break;
