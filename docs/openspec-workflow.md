@@ -864,8 +864,11 @@ post-worker scope to decide whether to prepare the candidate, then requires
 exact-SHA executable gates and independent review. A Task-Guided successor
 needs the predecessor's accepted evidence. Goal-First uses its exact Goal
 Contract and single outcome. Missing qualification, uncertain ownership or
-stale evidence keeps the boundary closed. The candidate Linux pair is pending
-live qualification. [Setup and operator recovery](worker-runtime.md).
+stale evidence keeps the boundary closed. The sealed trials at repair SHA
+`9b909f9467ddea6b12f7ca77f959f39ef01e2702` cover this behavior for synthetic
+changes on the pinned Linux pair. Exact approval and the bounded local grant
+govern delivery. Each provider run requires separate authority, and finish
+requires its own authorized invocation. [Qualification, setup and operator recovery](worker-runtime.md).
 
 ## Packages
 

@@ -1,10 +1,10 @@
 # Packaged implementer command
 
-The exclusive worker runtime is a candidate pending separate live qualification.
-Group 1.1 uses an already-qualified standalone Codex 0.171.0 bootstrap launcher
-with its independently verified narrower native named permission profile.
-That bootstrap evidence applies to the launcher that authored the candidate.
-The new command requires its own exact runtime and role-pair qualification.
+The command has [sealed synthetic live qualification](worker-runtime.md) for
+the exact pinned Linux runtime and dedicated Codex and read-only Claude roles.
+Verify the matching runtime and role-pair records before launch. The historical
+Group 1.1 Codex 0.171.0 bootstrap qualification applies to its standalone
+launcher and narrower native named permission profile.
 
 Use Node 22 or later on Linux with Python 3, procfs and pidfds. Run the pinned
 package outside the mutable checkout and supply protected records from the
@@ -59,7 +59,9 @@ The input has `schemaVersion: 1` and `assignments`. Each entry has `request`
 paths also appear in the portable authority object. The implementer uses
 one fresh evidence root, exact mutable file paths, a positive budget in
 minutes and the required captures `native.txt`, `lifecycle.jsonl`,
-`stdout.jsonl`, `stderr.log` and `launch.json`.
+`stdout.jsonl`, `stderr.log` and `launch.json`. The native write roots are the
+containing directories of the allowed files. Delivery enforces the exact file
+allowlist when admitting settled outputs.
 
 Approval and execution grant both carry `schemaVersion: 1`, `kind`,
 `workspace`, `change`, normalized `repository`, exact `plan`, `planDigest`,

@@ -63,8 +63,10 @@ The optional [exclusive worker runtime](docs/worker-runtime.md) connects a
 host-wide claim and sealed, settled worker attempt to both delivery modes.
 `openspec-next inspect` reads that evidence. Execution preserves the
 selected role pair, restrictions, exact candidate gates and independent
-review across ordered groups and corrections. The intended Linux Codex and
-contained Claude pairing is pending separate live qualification.
+review across ordered groups and corrections. Sealed synthetic trials on one
+Linux host qualified dedicated Codex 0.171.0 / GPT-6.2-sol and read-only Claude
+Code 2.1.330 / Claude Sonnet 4.6 on Bubblewrap 0.9.0 via the `same-uid-key` relay.
+The qualification is bound to the pinned runtime and role configuration.
 
 The delivery Git helpers share an explicit [child environment contract](skills/software-development/openspec-delivery/references/git-environment.md):
 only allowlisted runtime/configuration values reach Git, with global/system selectors

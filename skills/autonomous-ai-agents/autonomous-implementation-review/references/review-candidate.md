@@ -32,13 +32,25 @@ and replays the native stream and receipt checks offline. Obtain a separate
 explicit grant for the approved export and paid inference before either
 live mode or a standalone probe.
 
-Standalone probe and both launch modes can incur charges. The preceding
-reviewer release passed candidate and charter-v1 live qualification on the
-tested Linux/WSL pairing of Bubblewrap 0.9.0 and Claude Code 2.1.330, using
-`claude-sonnet-4-6` with the `same-uid-key` relay. This runtime candidate
-requires separate live qualification. Operator setup details are in the
-source repository’s `docs/claude-reviewer.md`. Select a route under the
-project's approved reviewer procedure.
+Standalone probe and both launch modes can incur charges. The historical
+standalone trial at `4eddbade12fab2a032755a446f9176005b7b04a1` qualified
+candidate and charter-v1 modes on the tested Linux/WSL pairing of Bubblewrap
+0.9.0 and Claude Code 2.1.330, using `claude-sonnet-4-6` with the
+`same-uid-key` relay.
+
+The separate sealed Group 3.1 trials at repair SHA
+`9b909f9467ddea6b12f7ca77f959f39ef01e2702` qualified fresh read-only candidate
+review with those reviewer pins, `dontAsk` permissions and `Read` as the sole
+tool. The trials paired that reviewer with dedicated Codex 0.171.0, GPT-6.2-sol
+and native named workspace-write for synthetic Task-Guided and Goal-First
+changes on one Linux host. The evidence is bound to that runtime, host and
+role pair. Other hosts, clients, versions and provider routes require matching
+qualification.
+[Paired runtime and role bindings](worker-runtime.md).
+
+Select a route under the project's approved reviewer procedure and obtain the
+separate per-run grant before any future live review or probe. Operator setup
+details are in the source repository’s `docs/claude-reviewer.md`.
 
 ## Retained inputs
 

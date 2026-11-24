@@ -33,7 +33,7 @@ execution or remote writes.
 
 ## Optional worker runtime and reviewer
 
-[Exclusive runtime](references/worker-runtime.md) awaits joint live qualification.
+The pinned [Linux runtime](references/worker-runtime.md) passed sealed trials.
 [Contained review](references/review-candidate.md) needs separate launch authority.
 
 ## Legacy host execution

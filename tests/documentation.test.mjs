@@ -55,16 +55,23 @@ test("current installation guidance matches package versions and preserves hando
   }
 });
 
-test("exclusive runtime guides distinguish the pinned candidate route and the required operator controls", async () => {
+test("exclusive runtime guides document the observed qualification limits and required operator controls", async () => {
   const root = new URL("../", import.meta.url);
   const guide = await readFile(new URL("docs/worker-runtime.md", root), "utf8");
   const profiles = await readFile(new URL("skills/autonomous-ai-agents/autonomous-implementation-review/references/profile-preparation.md", root), "utf8");
-  for (const file of ["README.md", "docs/openspec-installation.md", "docs/openspec-workflow.md",
-    "docs/claude-installation.md", "docs/claude-reviewer.md"]) {
+  for (const [file, qualification] of [
+    ["README.md", /Sealed synthetic trials on one\s+Linux host qualified/],
+    ["docs/openspec-installation.md", /Sealed synthetic trials on one Linux host qualified the dedicated pinned Codex\s+implementer and read-only Claude reviewer/],
+    ["docs/openspec-workflow.md", /sealed trials at repair SHA\s+`[a-f0-9]{40}` cover this behavior for synthetic\s+changes on the pinned Linux pair/],
+    ["docs/claude-installation.md", /sealed\s+synthetic trials qualify a dedicated Codex[\s\S]*?bound to the recorded host and runtime/],
+    ["docs/claude-reviewer.md", /exclusive worker pair\]\(worker-runtime\.md\) has separate live evidence\s+from synthetic trials on one Linux host/],
+  ]) {
     const source = await readFile(new URL(file, root), "utf8");
     assert.ok(source.includes(file === "README.md" ? "(docs/worker-runtime.md)" : "(worker-runtime.md)"), file);
-    assert.match(source, /pending(?:\s+separate)?\s+live\s+qualification/, file);
+    assert.match(source, qualification, file);
   }
+  assert.match(guide, /covers synthetic local changes on the recorded pinned pair/);
+  assert.match(guide, /Other hosts, clients, versions and provider routes require their own\s+qualification/);
   for (const field of ["Codex 0.171.0", "Claude Code 2.1.330", "Bubblewrap 0.9.0", "CODEX_HOME",
     "--ignore-user-config", "--enable skip_host_skill_discovery", "no new privileges", "profile_routes", "Group 3.1"]) {
     assert.ok(guide.includes(field), field);

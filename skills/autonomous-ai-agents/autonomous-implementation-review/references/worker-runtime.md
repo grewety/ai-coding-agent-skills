@@ -1,14 +1,23 @@
 # Exclusive worker runtime bindings and recovery
 
-[run-implementer.md](run-implementer.md) describes the candidate CLI and
-its approval and grant records. The selected candidate pairing is a
-standalone Codex 0.171.0 implementer using its native named workspace-write
-profile, and a fresh Claude Code 2.1.330 reviewer using the contained
-Bubblewrap 0.9.0 route in [review-candidate.md](review-candidate.md).
-A terminal adapter’s existing qualification does not qualify this
-combined runtime. Both exact role records are required before dispatch.
-Live qualification of the pair remains pending. Paid attempts, profile provisioning and publication
-depend on separate authority.
+[run-implementer.md](run-implementer.md) describes the CLI and its approval
+and grant records. The sealed synthetic trials for
+`exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m` at repair SHA
+`9b909f9467ddea6b12f7ca77f959f39ef01e2702` qualified the exact pair on one
+Linux host. The implementer was dedicated standalone Codex 0.171.0 with
+OpenAI GPT-6.2-sol and native named workspace-write. The fresh read-only
+reviewer was Claude Code 2.1.330 with Anthropic Claude Sonnet 4.6 on pinned
+Bubblewrap 0.9.0 via `same-uid-key`. [Contained reviewer requirements](review-candidate.md).
+
+The trials verified original recovery without a replay launch, ordered
+Task-Guided continuation and blocking on missing or stale review evidence,
+and Goal-First candidate review bound to the approved Goal Contract digest.
+Four Codex starts and four Claude review invocations yielded three accepted
+sealed independent reviews. The original Group 2 finding was retained, and a
+separately approved review of corrected context used the unchanged candidate.
+This evidence covers the pinned synthetic runs. Verify both exact role records
+and the bound runtime before dispatch. Paid attempts, profile provisioning and
+publication depend on separate authority.
 
 ## Pair and sandbox
 
@@ -21,17 +30,17 @@ no-symlink regular file pins. Inventory files are rechecked after the
 original attempt settles.
 
 - The implementer sets route `codex-native-named-workspace-write`,
-  client `codex`, provider `openai`, version `0.171.0`, and pins an
-  absolute native executable. Supply separate, persistent, owner-private
+  client `codex`, provider `openai`, version `0.171.0`, the qualified model
+  and an absolute native executable pin. Supply separate, persistent, owner-private
   `codexHome`, `home` and `xdg` directories. `slot` equals `codexHome`.
   The configuration record has `schemaVersion: 1`,
   `role: "implementer"`, `auth: "dedicated-file"`,
   `disableHostDiscovery: true` and
   `permissionMode: "named-workspace-write"`.
 - The reviewer sets route `claude-bubblewrap-read-only`, client
-  `claude-code`, provider `anthropic`, version `2.1.330`, an independent
-  fresh `session` UUID and a separate private configuration slot. Its
-  configuration is the pinned contained reviewer host record. The implementer
+  `claude-code`, provider `anthropic`, version `2.1.330`, the qualified model,
+  an independent fresh `session` UUID and a separate private configuration
+  slot. Its configuration is the pinned contained reviewer host record. The implementer
   runner validates and retains this binding for the orchestrator’s separate
   reviewer dispatch.
 
@@ -51,10 +60,12 @@ Provision the worker authentication separately. Keep the dedicated Codex home
 free of ambient `config.toml`, rules and skill discovery. The runner executes
 the pinned native binary directly with `exec --json --ephemeral`,
 `--ignore-user-config`, `--ignore-rules` and
-`--enable skip_host_skill_discovery`. Its named profile supplies scoped
-workspace writes, denies writes to frozen tasks and blocks access to
-protected Git, publisher and profile locations. The launch clears inherited session, Python, provider and
-publishing variables and uses a fixed PATH and isolated HOME and XDG config.
+`--enable skip_host_skill_discovery`. The named profile `worker` uses the containing
+directories of allowed files as workspace write roots, denies writes to frozen
+tasks and protects Git, publisher and profile locations. After settlement,
+delivery admits changes against the exact file allowlist. The launch clears
+inherited session, Python, provider and publishing variables and uses a fixed
+PATH and isolated HOME and XDG config.
 The controller never opens the worker’s credential file. An authentication
 failure stays on the selected dedicated route and requires operator handling.
 Do not share `CODEX_HOME` with a parent session or copy credentials into
@@ -67,8 +78,9 @@ write denial, disposal of a writable workspace control, and denied
 access to protected benign paths. It compares checkout status before and
 after. Unsupported namespaces, path resolution, UID or capability settings
 block launch. Keep the tested security controls at the operator boundary.
-Optional routes, including Hermes `advanced-delegation`, require their own
-independent qualification.
+Other hosts, clients, versions and routes require independent qualification.
+Hermes `advanced-delegation` is unqualified for this runtime and ineligible
+for contained review.
 
 ## Ownership and replay
 

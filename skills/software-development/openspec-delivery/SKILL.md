@@ -205,12 +205,16 @@ If the project selected the exclusive worker runtime, use the sealed
 assignment and original-attempt readback in
 [references/delivery-runtime.md](references/delivery-runtime.md#configured-exclusive-worker-runtime).
 Proceed only with the pinned pair, atomic claim and role admission,
-native containment and verified settlement. Validate scoped worker outputs
+native containment and verified settlement. Check the exact file allowlist
+when admitting settled worker outputs from the native containing-directory roots
 before forming the candidate. Both modes require exact gates and contained
 review from the bound independent session. Ordered successors replay
-predecessor acceptance. Corrections retain authority, restrictions and
-consumed budgets. Missing or uncertain evidence stops the selected route.
-Live qualification of the distributed pair is pending separate authority.
+predecessor acceptance. Goal-First review binds the candidate and approved
+Goal Contract digest. Corrections retain authority, restrictions and consumed
+budgets. Missing or uncertain evidence stops the selected route. The pinned
+dedicated Codex and read-only Claude pair passed sealed synthetic qualification
+on one Linux host. Verify the exact runtime and role records and require separate
+authority for each provider run.
 
 1. If the request is `document <name>`, perform only the short invocation above.
    Read back the issue. Stop. Do not continue this procedure.

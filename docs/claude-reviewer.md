@@ -18,13 +18,16 @@ returned `freeze-ready` with 7/7 whole-file coverage. Both passed offline
 verification at their original request-bound output paths and returned
 `deliveryAccepted: false`.
 
-The trial is historical and bound to that exact source and pairing. The
-0.20.0 reviewer adds local regression coverage for short private relay
+The standalone trial is historical and bound to that exact source and pairing.
+The 0.20.0 reviewer adds local regression coverage for short private relay
 scratch, sealed invalid candidate receipts and byte-identical OpenSpec archive
-moves. The [exclusive worker pair](worker-runtime.md) is pending live
-qualification. Obtain a separate explicit
-grant covering the approved export and paid inference, including any standalone
-probe, before running live.
+moves. The [exclusive worker pair](worker-runtime.md) has separate live evidence
+from synthetic trials on one Linux host at repair SHA
+`9b909f9467ddea6b12f7ca77f959f39ef01e2702`. Four read-only review invocations
+produced three accepted sealed candidate reviews and one retained finding on
+the original Group 2 context. The separately approved corrected context used
+the same Group 2 candidate. Each live run requires its own explicit grant for
+approved export and paid inference, including any standalone probe.
 
 ## Host setup and credential routes
 
@@ -51,7 +54,7 @@ probe, before running live.
 
 | Route | Host configuration and qualification |
 | --- | --- |
-| `same-uid-key` | Relay used in the historical standalone trial. Set `keyFile` and `keyFormat` explicitly. Use a host-owned single-link 0400 regular file with only the key for `raw`, or a host-owned single-link 0600 regular file with one literal `ANTHROPIC_API_KEY` assignment for `assignment`. The relay parses text without sourcing it and keeps the key host-side. Same-UID protection depends on isolation and trust in host processes running under that UID. |
+| `same-uid-key` | Relay used in the historical standalone trial and the exclusive Linux pair. Set `keyFile` and `keyFormat` explicitly. Use a host-owned single-link 0400 regular file with only the key for `raw`, or a host-owned single-link 0600 regular file with one literal `ANTHROPIC_API_KEY` assignment for `assignment`. The relay parses text without sourcing it and keeps the key host-side. Same-UID protection depends on isolation and trust in host processes running under that UID. |
 | `dedicated-uid-broker` | Implemented interface pending independent qualification. Set `socket` to an absolute `inference.sock` and `ownerUid` to the distinct non-root broker UID. The socket must be mode 0660 and its parent must be owned by that UID and protected from group/other writes. The separately operated broker needs its own route and policy evidence. |
 | `scoped-oauth` | Unavailable under the pinned inference and startup constraints. The command rejects the route. Ambient login, cloud-provider sign-in and account sync are unqualified. |
 

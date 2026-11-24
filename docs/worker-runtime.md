@@ -1,14 +1,49 @@
 # Exclusive OpenSpec worker runtime
 
-The repository ships the Linux runtime and offline delivery integration. Live
-qualification of the combined route is pending Group 3.1 of
-`exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m`. The intended pair is
-standalone Codex 0.171.0 with its native named workspace-write profile and a
-fresh Claude Code 2.1.330 reviewer in Bubblewrap 0.9.0 with pinned Anthropic
-inference. Historical standalone reviewer and bootstrap Codex results apply
-to their recorded runners. Other versions, provider routes and hosts need
-their own qualification. Hermes `advanced-delegation` with `profile_routes`
-is an optional implementer evaluation. Its in-process depth-one behavior
+## Observed qualification
+
+The sealed Group 3.1 qualification batch for
+`exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m` passed on one Linux host
+at repair SHA `9b909f9467ddea6b12f7ca77f959f39ef01e2702` with runtime SHA-256
+`7357b3895ded46cf9b5a79824328d7573a8a763349c0541ef16f68d402c1799e`.
+The implementer was dedicated standalone Codex 0.171.0 with OpenAI GPT-6.2-sol
+(`gpt-6.2-sol`) and the native named workspace-write profile `worker`
+(`codex-native-named-workspace-write`). The fresh reviewer was read-only
+Claude Code 2.1.330 with Anthropic Claude Sonnet 4.6 (`claude-sonnet-4-6`),
+pinned Bubblewrap 0.9.0 and the `same-uid-key` relay
+(`claude-bubblewrap-read-only`). The reviewer used `dontAsk` with only `Read`
+and the contained inference route.
+
+| Synthetic trial | Codex starts | Accepted sealed reviews | Observed result |
+| --- | ---: | ---: | --- |
+| Positive Task-Guided | 2 | 2 | Two checkouts competed for the claim. After a foreground interruption, recovery read back the original worker and sealed handoff with one original Group 1 launch and zero replay launches. Group 2 started once after exact Group 1 gates and independent review were accepted. |
+| Negative Task-Guided | 1 | 0 | Withheld and stale predecessor review evidence blocked advancement. Group 2 started zero times. |
+| Goal-First | 1 | 1 | Bounded foreground execution produced one eligible local outcome with distinct orchestrator, implementer and reviewer sessions. The exact candidate and approved Goal Contract digest were verified in the review context. |
+
+The registry recorded four actual Codex worker starts. Four Claude review
+invocations each used a probe and a candidate packet. Three sealed independent
+reviews were accepted after offline verification. The original Positive Group 2
+review finding is retained as the fourth record. That review lacked the accepted
+predecessor context. A separate operator grant approved one corrected-context
+review on the unchanged Group 2 candidate, with no additional implementer
+launch or replay.
+
+The qualification included protected path, sealed handoff, Git/task and
+publisher denials. The negative controls also exercised a failed preflight
+before native launch, out-of-scope writes and synthetic credential and
+connectivity denials, with positive and wrong-credential controls for the
+synthetic service. The earlier ambient-settings preflight stop, native
+writable-root startup failure and startup-event admission failure are separate
+records. The offline parser replay checked the third failure with six rejection
+controls. Earlier approvals and standalone reviewer and bootstrap Codex trials
+retain their own scope.
+
+This evidence covers synthetic local changes on the recorded pinned pair.
+Production integration, publication, installed-profile changes and paid review
+of the exact final Group 3.1 delivery candidate are outside that evidence.
+Other hosts, clients, versions and provider routes require their own
+qualification. Hermes `advanced-delegation` with `profile_routes` remains an
+optional, unqualified implementer route. Its in-process depth-one behavior
 provides no OS isolation and is ineligible for the reviewer role.
 
 ## Install and bind
@@ -35,7 +70,7 @@ provides no OS isolation and is ineligible for the reviewer role.
    model, provider, native route and effective settings. Select an explicit
    project-default pair or independently approved bounded override. Fresh
    reviewer sessions and actual role observations are required for each
-   attempt. After qualification, a project can select the runtime prospectively
+   attempt. With matching qualification, a project can select the runtime prospectively
    with `<!-- openspec-worker-runtime: exclusive -->` in its integrated root
    contributor contract. Keep a selected run's binding and restrictions
    through recovery and corrections. A missing, expired, changed or
@@ -45,9 +80,12 @@ provides no OS isolation and is ineligible for the reviewer role.
 Codex's ordinary CLI state stays in its own `CODEX_HOME`. Use dedicated
 pre-authentication and the pinned native executable with stdin transport,
 `--ephemeral`, `--ignore-user-config`, `--ignore-rules` and
-`--enable skip_host_skill_discovery`. The named profile controls the exact
-write paths. The launch uses isolated environment values and removes inherited
-parent, Hermes and foreign runtime selectors, including `VIRTUAL_ENV`,
+`--enable skip_host_skill_discovery`. The native named profile uses the
+containing directories of allowed files as writable roots and separately
+protects reserved paths. After settlement, delivery checks the observed changes
+against the exact file allowlist before admitting outputs. The launch uses
+isolated environment values and removes inherited parent, Hermes and foreign
+runtime selectors, including `VIRTUAL_ENV`,
 `PYTHONHOME` and `PYTHONPATH`. Preserve the native sandbox and use the
 reviewer's separate OS-contained route. Run Codex directly under its native
 sandbox. Hand authentication or approval waits to the operator in the
@@ -62,7 +100,7 @@ and task paths, and a synthetic credential control. Compare checkout status
 before and after and prove cleanup. Live qualification separately needs
 positive and negative synthetic service connectivity and publisher denials.
 
-For a Docker evaluation, use container-native absolute mount and checkout paths
+For a separate Docker evaluation, use container-native absolute mount and checkout paths
 and map the host UID/GID to the worker. The workbook uses the default Docker
 seccomp baseline with a targeted allowance for native unprivileged user and
 mount namespaces. The allowance covers `clone`, `clone3`, `mount`,
@@ -107,8 +145,9 @@ successor, retain elapsed time and correction history, and verify the fresh
 session at handover. A verified native turn cap can allow one same-action
 continuation under retained budget and authority.
 
-Delivery checks sealed output scope before the orchestrator prepares the exact
-candidate. The orchestrator alone owns task ticks and logical local commits.
+The dedicated implementer makes the scoped edits. Delivery checks sealed output
+scope before the orchestrator prepares the exact candidate. The orchestrator
+alone owns task ticks and logical local commits.
 If commits are restricted, keep the restriction and stop where an exact
 candidate cannot be produced. Verify executable gates and fresh independent
 review on the exact SHA. Task-Guided unlocks the next eligible native group

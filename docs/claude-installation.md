@@ -116,10 +116,13 @@ configures an adapter nor authorizes commits, checkout creation, publication, or
 unattended execution.
 
 Projects selecting the [exclusive worker runtime](worker-runtime.md) need the
-complete separate orchestration package on a Linux execution host and an
-independently qualified, pinned Codex implementer and contained Claude reviewer.
-The combined route is pending live qualification. An account upload, plugin
-activation or previously qualified terminal adapter cannot satisfy that check.
+complete separate orchestration package on a Linux execution host. The sealed
+synthetic trials qualify a dedicated Codex 0.171.0 / GPT-6.2-sol implementer and
+read-only Claude Code 2.1.330 / Claude Sonnet 4.6 reviewer on Bubblewrap 0.9.0
+with the `same-uid-key` relay, bound to the recorded host and runtime. Before
+dispatch, verify the exact host and role bindings and obtain the separate
+execution and inference grants. Account upload and plugin activation cover
+skill installation.
 
 Anthropic documents account skills and plugins syncing into Claude Code v2.1.273+
 when signed in with the same Claude account. API-key and cloud-provider sign-ins

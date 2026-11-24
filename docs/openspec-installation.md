@@ -45,10 +45,13 @@ separate from reviewer runtime and inference route setup.
 
 The [exclusive worker runtime](worker-runtime.md) uses the optional
 orchestration package only when the project selects delegated delivery.
-It needs a separately qualified Linux role pair and dedicated operator
-configuration. The combined route is pending live qualification. Its
-packaged `scripts/run-implementer.mjs` launch, recovery and evidence interfaces leave the seven upstream
-skills, CLI pin and installation procedures in place.
+Sealed synthetic trials on one Linux host qualified the dedicated pinned Codex
+implementer and read-only Claude reviewer. Verify the exact runtime, host and
+role records and provision the dedicated operator configuration before use.
+Dispatch requires bounded workflow authority and separate per-run inference
+authority. Its packaged `scripts/run-implementer.mjs` launch, recovery and
+evidence interfaces retain the seven upstream skills, CLI pin and installation
+procedures.
 
 Keep delivery's `references/delivery-policy.md`, `references/task-authoring.md`
 and `scripts/delivery-policy.mjs`, plus orchestration's `references/portable-core.md`
