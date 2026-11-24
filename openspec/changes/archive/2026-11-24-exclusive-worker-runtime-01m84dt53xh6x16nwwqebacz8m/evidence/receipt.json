@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "change": "exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m",
+  "issueUrl": "https://github.com/grewety/ai-coding-agent-skills/issues/49",
+  "base": "97a9f0afa64a435d41c36e45733645a031bfb6fe",
+  "head": "4bce2647c15ca40f754ab827f413b278722a4299",
+  "plan": "1f66c1b75dcfd09cf44b9c64245ac2329f41d4fe",
+  "planDigest": "5f0e4560884d1995beed53ab018aeb6799f511ccf5674f2fdf428ff1ca6aced6",
+  "integrated": "6c0f95c40a35e5acec45535338ba940b58de73d8",
+  "verified": "6c0f95c40a35e5acec45535338ba940b58de73d8",
+  "integrationReference": "https://github.com/grewety/ai-coding-agent-skills/pull/50",
+  "mergedAt": "2026-11-24T14:31:05Z",
+  "mergeReadback": "i3-c5/pr50-publication/finish.n2xKeH/implementation-merged.json (SHA-256 c71cc507e96493b18b15f9147b742275b0dffdb575473dc3e99677c80cd5d43f)",
+  "verifiedPremergeChecks": "i3-c5/pr50-publication/finish.n2xKeH/observe.a2vhEY/checks.stdout (SHA-256 55d430124ad125d9e9a0df5c5aff01e4a1758343bd17441b0900f768ebad64c4)",
+  "verifiedPremergeThreads": "i3-c5/pr50-publication/finish.n2xKeH/observe.a2vhEY/graphql.stdout (SHA-256 a8c851d8f6a092379265f44e655b9c2adf2cfb76ce3a4a561232a0d51830c75c)",
+  "requiredVerification": {
+    "rulesetId": 26268609,
+    "context": "verify",
+    "head": "4bce2647c15ca40f754ab827f413b278722a4299",
+    "conclusion": "success",
+    "checks": [
+      {
+        "id": 138452816307,
+        "url": "https://github.com/grewety/ai-coding-agent-skills/actions/runs/45396282200/job/138452816307",
+        "completedAt": "2026-11-24T12:45:13Z"
+      },
+      {
+        "id": 138452791149,
+        "url": "https://github.com/grewety/ai-coding-agent-skills/actions/runs/45396274668/job/138452791149",
+        "completedAt": "2026-11-24T12:45:18Z"
+      }
+    ],
+    "githubJobs": {
+      "tests": 485,
+      "passed": 484,
+      "skipped": 1,
+      "failed": 0,
+      "skipReason": "Hosted runner Bubblewrap did not match the pinned socket-fixture runtime.",
+      "logEvidence": [
+        "i3-c5/pr50-publication/finish.n2xKeH/job-138452816307.log (SHA-256 34066eda0d8df36bd2bb62ce24304a27a55c614e5cac2b332fc505f071be6356)",
+        "i3-c5/pr50-publication/finish.n2xKeH/job-138452791149.log (SHA-256 26d28286584e17f667dbf285c967a8b399d77defc889e5feab0b9d8f7facd6bf)"
+      ]
+    },
+    "sealedLocalTests": {
+      "tests": 485,
+      "passed": 485,
+      "skipped": 0,
+      "failed": 0
+    }
+  },
+  "optionalAikido": {
+    "app": "aikido-pr-checks",
+    "suiteId": 122834665344,
+    "head": "4bce2647c15ca40f754ab827f413b278722a4299",
+    "requiredByRuleset": false,
+    "status": "queued",
+    "checkRuns": 0,
+    "conclusion": null,
+    "observedAt": "2026-11-24T14:27:39Z",
+    "operatorDisposition": "ai-coding-agent-skills/exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m/pr50-resolve-and-finish-addendum.json (SHA-256 536c3b914f020b51127518bcaa1f11ee958c5dac897d09422f8443c00830fda4)",
+    "suiteReadback": "i3-c5/pr50-publication/finish.n2xKeH/aikido-suite.stdout (SHA-256 3b937202e0686ca6ec5f4b5da8ff4d07494668967c548c45b0b664031c31b9a5)",
+    "runsReadback": "i3-c5/pr50-publication/finish.n2xKeH/aikido-runs.stdout (SHA-256 e83cfac35507982a40cfeb776ce85aa0367e7646f81fe857df4a6c841ea8a170)"
+  },
+  "review": {
+    "schemaVersion": 1,
+    "change": "exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m",
+    "issueUrl": "https://github.com/grewety/ai-coding-agent-skills/issues/49",
+    "head": "4bce2647c15ca40f754ab827f413b278722a4299",
+    "planDigest": "5f0e4560884d1995beed53ab018aeb6799f511ccf5674f2fdf428ff1ca6aced6",
+    "verdict": "pass",
+    "findings": [],
+    "reviewer": "Claude Code 2.1.330 / claude-sonnet-4-6 / f9b819cf-0f37-4112-aeba-fe36e6fc1269",
+    "reference": "i3-c5/out/status.json (SHA-256 8a46bb26973fc4c94f7a09bbac973260a56d8c8e9a4e68c9a14cfc854ed058af)",
+    "gates": [
+      {
+        "command": "openspec validate exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m --strict",
+        "commit": "4bce2647c15ca40f754ab827f413b278722a4299",
+        "exitCode": 0,
+        "evidence": "i3-c5/export/files/context/review-evidence/strict.txt (SHA-256 e854f553c14fe2d495d154d7e0c59fd780e68f217c9438bef251a55451483403)"
+      },
+      {
+        "command": "npm run validate:openspec",
+        "commit": "4bce2647c15ca40f754ab827f413b278722a4299",
+        "exitCode": 0,
+        "evidence": "i3-c5/export/files/context/review-evidence/metadata.txt (SHA-256 875dc1e8fbcae00d174107ef82ec9db660a678aac55a244c139f6a441a498541)"
+      },
+      {
+        "command": "npm test",
+        "commit": "4bce2647c15ca40f754ab827f413b278722a4299",
+        "exitCode": 0,
+        "evidence": "i3-c5/export/files/context/review-evidence/tests.txt (SHA-256 ce5aa67230892c8fc8073e8d27329060494c03bec350c55754d422c3f94c050d)"
+      },
+      {
+        "command": "npm run build",
+        "commit": "4bce2647c15ca40f754ab827f413b278722a4299",
+        "exitCode": 0,
+        "evidence": "i3-c5/export/files/context/review-evidence/build.txt (SHA-256 79d0c4ab379498b5e45b43856351c7482bbc363ee213ce829f470f3cb75a951e)"
+      }
+    ],
+    "reviewId": "i3-c5",
+    "statusSha256": "8a46bb26973fc4c94f7a09bbac973260a56d8c8e9a4e68c9a14cfc854ed058af",
+    "wholeFileReads": 292,
+    "coverageLimitations": [],
+    "exportSha256": "56795cb779c78cf5d80472880ce1dc9a86a25e84409830398d1a46c1e9f2cb4e",
+    "requestSha256": "ce5cbe7e7b6e74d5bafd79696b2dc1142ce593279499b16b4186d7ac0a18680b",
+    "gateRunWaiver": null
+  },
+  "gates": [
+    {
+      "command": "npm ci --offline --no-audit --no-fund",
+      "commit": "6c0f95c40a35e5acec45535338ba940b58de73d8",
+      "exitCode": 0,
+      "evidence": "i3-c5/pr50-publication/finish.n2xKeH/integrated-gate-run.json (SHA-256 dc1b62db1bf13eb1aecfcfc365698a55c079569efc5146c903d6f59bc82f4c36) command 1"
+    },
+    {
+      "command": "openspec validate exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m --strict",
+      "commit": "6c0f95c40a35e5acec45535338ba940b58de73d8",
+      "exitCode": 0,
+      "evidence": "i3-c5/pr50-publication/finish.n2xKeH/integrated-gate-run.json (SHA-256 dc1b62db1bf13eb1aecfcfc365698a55c079569efc5146c903d6f59bc82f4c36) command 2"
+    },
+    {
+      "command": "npm run validate:openspec",
+      "commit": "6c0f95c40a35e5acec45535338ba940b58de73d8",
+      "exitCode": 0,
+      "evidence": "i3-c5/pr50-publication/finish.n2xKeH/integrated-gate-run.json (SHA-256 dc1b62db1bf13eb1aecfcfc365698a55c079569efc5146c903d6f59bc82f4c36) command 3"
+    },
+    {
+      "command": "npm test",
+      "commit": "6c0f95c40a35e5acec45535338ba940b58de73d8",
+      "exitCode": 0,
+      "evidence": "i3-c5/pr50-publication/finish.n2xKeH/integrated-gate-run.json (SHA-256 dc1b62db1bf13eb1aecfcfc365698a55c079569efc5146c903d6f59bc82f4c36) command 4"
+    },
+    {
+      "command": "npm run build",
+      "commit": "6c0f95c40a35e5acec45535338ba940b58de73d8",
+      "exitCode": 0,
+      "evidence": "i3-c5/pr50-publication/finish.n2xKeH/integrated-gate-run.json (SHA-256 dc1b62db1bf13eb1aecfcfc365698a55c079569efc5146c903d6f59bc82f4c36) command 5"
+    }
+  ],
+  "candidateGateRun": {
+    "fileSha256": "d2ef11fa7eb6117f229763ad9a4cfa09761260e8328c42cbde3649723c6aa608",
+    "wrapperSha256": "16601497bbd69bcdb518112f06169c44385f9c8c7a016d38e0d0e6e007c1399a",
+    "reviewAcceptanceTagBound": true
+  },
+  "integratedGateRun": {
+    "fileSha256": "dc1b62db1bf13eb1aecfcfc365698a55c079569efc5146c903d6f59bc82f4c36",
+    "wrapperSha256": "ed499f8121e4a8bcf3288a52df53b40b147361f7d322bca52c1de2e217e65596"
+  },
+  "promotedCurrentSpecs": [
+    {
+      "capability": "contained-independent-review",
+      "requirements": 3
+    },
+    {
+      "capability": "exclusive-worker-runtime",
+      "requirements": 5
+    },
+    {
+      "capability": "openspec-integration",
+      "requirements": 1
+    }
+  ],
+  "historicalReviews": [
+    {
+      "reviewId": "i3-c3",
+      "head": "0bbd0fa8b9d927bdfc652badd8f8e3100d5177a2",
+      "statusSha256": "fc393c0689c78962ba9b214bd9db3444c739c4d81f02a7a92c43333e1046b104",
+      "acceptedUnderHistoricalWaiver": "finish-and-sync-grant.json / explicitOperatorWaiver"
+    },
+    {
+      "reviewId": "i3-c4",
+      "head": "7820be1cb5dffd10c89e39db81d100c2cba9e038",
+      "statusSha256": "039dae9fe5682c0415b20991dad86a38dfd12cb8350735efe297fa0f06a58aa1",
+      "phase": "runtime-failed"
+    }
+  ]
+}
