@@ -53,9 +53,9 @@ async function companion(entry, filename) {
   return import(pathToFileURL(selected).href);
 }
 
-export async function verifyHandover(input) {
+export async function verifyHandover(input, pinnedReviewCommand) {
   if (input.kind === "review-candidate") {
-    const { reviewCommand } = await companion(input, "review-candidate.mjs");
+    const reviewCommand = pinnedReviewCommand ?? (await companion(input, "review-candidate.mjs")).reviewCommand;
     const { request, expect, exportDirectory, output } = input;
     const requestBytes = readBounded(request, 1024 * 1024);
     need(digest(input.requestFileSha256) && sha256(requestBytes) === input.requestFileSha256,
@@ -187,10 +187,9 @@ async function inspectPredecessor(input, delegation, implementation, taskGroups,
     Object.entries(grant.limits).every(([key, value]) => value <= previous.grant.limits[key]) &&
     grant.expiresAt <= previous.grant.expiresAt &&
     evaluated.policy.mode === grant.mode &&
-    ["minutes", "corrections"].every((key) => input.grant.budgets?.[key] <= prior.grant.budgets?.[key]) &&
     ["minutesUsed", "correctionsUsed"].every((key) => input.observed?.[key] >= prior.observed?.[key]) &&
     (previous.id.task !== id.task || input.observed?.groupMinutesUsed >= prior.observed?.groupMinutesUsed) &&
-    (!prior.grant.commits ? input.grant.commits === false : true) &&
+    (!previous.verifiedGrant.commits ? !delegation.verifiedGrant.commits : true) &&
     (previous.noCommits !== true || delegation.noCommits === true), "Successor widened its retained role, limits or restrictions");
   if (control.reason === "ordered-successor") {
     const predecessor = taskGroups?.find((group) => group.taskIds.includes(previous.id.task));
@@ -257,9 +256,10 @@ function verifyCapContinuation(input, delegated, prior, implementation) {
 async function readDeliveryHandover(input, { context, policy, identity, snapshot, current, delegation }) {
   const delegated = Boolean(delegation);
   if (delegated) need(input.handover.kind === "review-candidate" && digest(input.handover.expectFileSha256) &&
-    input.handover.verifier === path.join(delegation.scripts, "review-candidate.mjs"),
+    input.handover.verifier === path.join(delegation.scripts, "review-candidate.mjs") &&
+    input.handover.verifierSha256 === delegation.reviewVerifierSha256 && input.handover.reviewSessionBinding,
   "Delegated delivery requires its pinned contained reviewer");
-  const handoff = await verifyHandover(input.handover);
+  const handoff = await verifyHandover(input.handover, delegation?.reviewCommand);
   const id = handoff.request.identity;
   need(id.change === identity.change && id.plan === identity.plan &&
     id.planDigest === (delegated && policy.mode === "goal-first" ? context.planDigest : identity.planDigest) &&
@@ -397,8 +397,12 @@ async function deliveryEvaluation(input, options) {
     let gateRun;
     try { gateRun = input.gateRun ? retainedJson(input.gateRun) : null; }
     catch (error) { if (!delegated) throw error; }
-    const decisionInput = { phase: input.deliveryPhase, policy, identity, contract: goal, approval: input.approval,
-      grant: input.grant, restrictions: input.restrictions, observed: observations, taskGroups: groups, candidate: snapshot,
+    const grant = delegation ? { ...delegation.verifiedGrant,
+      eligibleGroups: groups?.filter(({ taskIds }) => taskIds.some((task) => delegation.grant.eligibleTasks.includes(task)))
+        .map(({ id }) => id) } : input.grant;
+    const decisionInput = { phase: input.deliveryPhase, policy, identity, contract: goal,
+      approval: delegation?.verifiedApproval ?? input.approval, grant,
+      restrictions: input.restrictions, observed: observations, taskGroups: groups, candidate: snapshot,
       gateRun, handoff, delegated: delegation };
     decision = deliveryDecision(decisionInput);
     if (delegated && input.handover && decision.reason === "EXACT_REVIEW_PENDING") {

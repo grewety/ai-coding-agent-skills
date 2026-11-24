@@ -15,7 +15,8 @@ const distinctList = (value, predicate, min = 1) => Array.isArray(value) && valu
   value.every(predicate) && new Set(value.map(stableJson)).size === value.length;
 const exactKeys = (value, names) => value && typeof value === "object" && !Array.isArray(value) &&
   Object.keys(value).length === names.length && names.every((key) => Object.hasOwn(value, key));
-const finiteBudget = (value) => exactKeys(value, ["minutes", "corrections"]) && nonnegative(value.minutes) &&
+const finiteBudget = (value, fractionalMinutes = false) => exactKeys(value, ["minutes", "corrections"]) &&
+  (fractionalMinutes ? elapsed(value.minutes) : nonnegative(value.minutes)) &&
   value.minutes > 0 && nonnegative(value.corrections);
 
 export function readGoalContract(proposal) {
@@ -113,7 +114,7 @@ export function deliveryDecision({ phase, policy, identity, contract, approval, 
   if (approval?.kind !== (policy.mode === "goal-first" ? "exact-goal-approval" : "exact-plan-approval") ||
       !matchesAuthority(approval, binding) || approval.approved !== true) return state("queue", "EXACT_APPROVAL_PENDING");
   if (grant?.kind !== "local-execution-grant" || !matchesAuthority(grant, binding) || grant.reference === approval.reference ||
-      grant.approvalReference !== approval.reference || grant.localOnly !== true || !finiteBudget(grant.budgets) ||
+      grant.approvalReference !== approval.reference || grant.localOnly !== true || !finiteBudget(grant.budgets, Boolean(delegated)) ||
       typeof grant.commits !== "boolean" || !text(grant.stop)) return state("queue", "LOCAL_AUTHORITY_PENDING");
   if (restrictions?.inspect !== false || typeof restrictions.noCommits !== "boolean" ||
       !(restrictions.group === null || text(restrictions.group))) return state("stop", "RESTRICTIONS_UNVERIFIED");
@@ -158,6 +159,10 @@ export function deliveryDecision({ phase, policy, identity, contract, approval, 
   }
 
   if (!goal && phase === "dispatch") {
+    if (delegated && (!elapsed(observed.authorityBudgetUsed) || observed.authorityBudgetUsed >= grant.budgets.minutes ||
+      (!group.budget && (!elapsed(observed.budgetUsed) || observed.budgetUsed >= grant.budgets.minutes)))) {
+      return state("stop", "TASK_GUIDED_CONTINUATION_BLOCKED", { detail: "Missing or exhausted authority budget" });
+    }
     const next = continuationDecision({ policy, change: identity.change, group, authority: grant, restrictions, observed,
       runtimeAdmission: Boolean(delegated) });
     if (next.action !== "advance") return state("stop", "TASK_GUIDED_CONTINUATION_BLOCKED", { detail: next.reason });

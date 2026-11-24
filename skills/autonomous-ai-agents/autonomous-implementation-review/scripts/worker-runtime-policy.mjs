@@ -209,14 +209,15 @@ export async function loadAuthority(entry, repository) {
   fields(approval, [...authorityFields, "approved", "approvedAt"], "exact approval");
   fields(grant, [...authorityFields, "localOnly", "stop", "checkoutIdentity", "head", "eligibleTasks", "accepted", "knownWorkspaces",
     "mutablePaths", "restrictions", "limits", "issuedAt", "expiresAt", "approvalSha256", "hostSha256", "requestSha256",
-    "overrideSha256", "continuation", "inference"], "bounded local execution grant", ["normalizedPlanDigest"]);
+    "overrideSha256", "continuation", "inference"], "bounded local execution grant", ["normalizedPlanDigest", "commits"]);
   for (const record of [approval, grant]) need(record.schemaVersion === 1 &&
     Object.entries(identity).every(([name, value]) => record[name] === value), "Exact approved assignment identity differs");
   need(["task-guided", "goal-first"].includes(grant.mode) && approval.mode === grant.mode &&
     approval.kind === (grant.mode === "goal-first" ? "exact-goal-approval" : "exact-plan-approval") && approval.approved === true &&
     grant.kind === "local-execution-grant" && grant.approvalSha256 === entry.approval.sha256 &&
     grant.hostSha256 === entry.host.sha256 && grant.requestSha256 === hash(requestBytes(r)) &&
-    grant.localOnly === true && grant.stop === r.stop && sha(grant.policyRevision) && grant.policyRevision === approval.policyRevision &&
+    grant.localOnly === true && (!Object.hasOwn(grant, "commits") || typeof grant.commits === "boolean") &&
+    grant.stop === r.stop && sha(grant.policyRevision) && grant.policyRevision === approval.policyRevision &&
     sha(grant.head) && typeof grant.branch === "string" && grant.branch === approval.branch &&
     /^refs\/heads\/[a-zA-Z0-9_.\/-]+$/.test(grant.branch), "Missing matching exact approval and bounded local grant");
   need(Array.isArray(grant.eligibleTasks) && grant.eligibleTasks.length > 0 && grant.eligibleTasks.length <= 128 &&

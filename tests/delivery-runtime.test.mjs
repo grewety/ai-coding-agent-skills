@@ -2,21 +2,18 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { chmod, mkdir, mkdtemp, readdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
+import { chmod, cp, mkdir, mkdtemp, readdir, readFile, realpath, rename, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { sha256 } from "../skills/software-development/openspec-delivery/scripts/evidence-cli.mjs";
-import { deliveryCommand } from "../skills/software-development/openspec-delivery/scripts/delivery-cli.mjs";
-import { createAttempt, publishResult, requestBytes } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/worker-handoff.mjs";
-import { roleQualificationBinding } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-bindings.mjs";
-import { claimPath } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-claims.mjs";
-import { observeImplementer, runImplementers, runtimeIdentity } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-runtime.mjs";
-import { readState } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-state.mjs";
-import { privateCheckoutIdentity } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/worker-runtime-policy.mjs";
+import { readDelegation } from "../skills/software-development/openspec-delivery/scripts/delegated-delivery.mjs";
+import { createAttempt, publishResult } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/worker-handoff.mjs";
+import { runtimeIdentity } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-runtime.mjs";
 import { runReview } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-candidate.mjs";
 import { buildExport, jsonBytes, prepareExport } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-inputs.mjs";
 import { bubblewrapVersion, claudeVersion } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-runtime.mjs";
+import { buildExclusiveFixture } from "./delivery-runtime-fixtures.mjs";
 
 const delivery = fileURLToPath(new URL("../skills/software-development/openspec-delivery/scripts/delivery-cli.mjs", import.meta.url));
 const nextRouter = fileURLToPath(new URL("../skills/software-development/openspec-next/scripts/next.mjs", import.meta.url));
@@ -545,152 +542,77 @@ test("finish checks current-spec promotion in the exact accepted candidate", asy
   assert.equal((await f.route("finish-readiness", input)).stdout, result.stdout);
 });
 
-const fakeCodex = `#!/usr/bin/python3
-import json, pathlib, sys, uuid
-fence = chr(96) * 3
-request = json.loads(sys.stdin.read().split(fence + "json\\n", 1)[1].split("\\n" + fence, 1)[0])
-def emit(kind, **fields):
-    print(json.dumps(dict(type=kind, **fields)), flush=True)
-emit("thread.started", thread_id=str(uuid.uuid4()))
-emit("turn.started")
-if "synthetic cap" in request["acceptance"]:
-    emit("item.completed", item=dict(type="agent_message", text="Partial synthetic progress"))
-    emit("turn.failed", error=dict(code="turn_limit"))
-    sys.exit(12)
-for name in request["mutablePaths"]:
-    pathlib.Path(name).write_text("new" if request["identity"]["task"] == "1.1" else "next")
-emit("item.completed", item=dict(type="agent_message", text="Synthetic implementation result"))
-emit("turn.completed", usage=dict(output_tokens=3))
-`;
+const exclusiveFixture = (f) => buildExclusiveFixture(f, { workerRequest, containedHandover });
 
-async function exclusiveFixture(f) {
-  const registry = path.join(f.root, "exclusive-registry");
-  const trusted = path.join(f.root, "trusted-worker-inputs");
-  const evidence = path.join(f.root, "worker-evidence");
-  const paths = ["worker-home", "worker-xdg", "worker-codex", "review-slot"].map((name) => path.join(f.root, name));
-  const [home, xdg, codexHome, reviewSlot] = paths;
-  await Promise.all([trusted, evidence, ...paths].map((dir) => mkdir(dir, { mode: 0o700 })));
-  const pin = async (name, bytes, mode = 0o400) => {
-    const file = path.join(trusted, name);
-    await writeFile(file, bytes, { mode, flag: "wx" });
-    return { path: file, sha256: sha256(bytes) };
+test("exclusive delivery verifies the complete transitive inventory before loading code", { skip: process.platform !== "linux" }, async (t) => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "verify-worker-inventory-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const source = path.dirname(verifier);
+  const scripts = path.join(root, "scripts");
+  await cp(source, scripts, { recursive: true });
+  const launcher = "run-implementer.mjs";
+  const input = {
+    repo: path.join(root, "repo"),
+    delegation: {
+      verifier: path.join(scripts, launcher), verifierSha256: sha256(await readFile(path.join(source, launcher))),
+      runtimeSha256: await runtimeIdentity(),
+    },
   };
-  const retain = (name, value) => pin(name, jsonBytes(value));
-  const runtimeSha256 = await runtimeIdentity();
-  const binary = await pin("synthetic-native", fakeCodex, 0o700);
-  const codexConfiguration = await retain("codex-configuration.json", {
-    schemaVersion: 1, role: "implementer", auth: "dedicated-file", disableHostDiscovery: true, permissionMode: "named-workspace-write",
-  });
-  const reviewerConfiguration = await retain("review-configuration.json", {
-    schemaVersion: 1, bwrap: binary, claude: binary, node: binary, libraries: [], model: "claude-fixture",
-    relay: { route: "same-uid-key", keyFile: path.join(f.root, "synthetic-relay-pin"), keyFormat: "raw" },
-    timeoutMs: 2000, maxTurns: 4, maxBudgetUsd: 1, requirePreExposureAttestation: false,
-  });
-  const inventory = async (name) => [await pin(name + "-skill.md", "Synthetic skill"), await pin(name + "-helper.mjs", "Synthetic helper")];
-  const pair = {
-    implementer: { client: "codex", provider: "openai", model: "fixture-codex", version: "0.171.0", route: "codex-native-named-workspace-write",
-      configuration: codexConfiguration, inventory: await inventory("implementer"), slot: codexHome, home, xdg, codexHome, executable: binary },
-    reviewer: { client: "claude-code", provider: "anthropic", model: "claude-fixture", version: claudeVersion, route: "claude-bubblewrap-read-only",
-      configuration: reviewerConfiguration, inventory: await inventory("reviewer"), slot: reviewSlot, session: randomUUID() },
-  };
-  for (const [name, role] of Object.entries(pair)) {
-    const { client, provider, version, model, route, configuration } = role;
-    role.qualification = await retain(name + "-qualification.json", {
-      schemaVersion: 1, kind: "exclusive-runtime-qualification", status: "qualified", role: name, client, provider, version, model,
-      route, configurationSha256: configuration.sha256, inventorySha256: sha256(jsonBytes(role.inventory)), runtimeSha256,
-      bindingSha256: roleQualificationBinding(role), supervisor: name + "-synthetic-controller", positiveControl: true,
-      deniedPublication: true, protectedPaths: true, settlementVerified: true, inventoryUnchanged: true,
-    });
+  const options = { identity: { workspace: path.join(root, "workspace") } };
+  // Start at both executable entry points and follow their literal package-local
+  // loads, including Python and the sandbox bridge invoked as subprocesses.
+  const pending = [launcher, "review-candidate.mjs"];
+  const files = new Map();
+  for (const name of pending) {
+    if (files.has(name)) continue;
+    const contents = await readFile(path.join(source, name), "utf8");
+    files.set(name, contents);
+    for (const match of contents.matchAll(/["'](?:\.\/)?([a-z-]+\.(?:mjs|py))["']/g)) {
+      if (!files.has(match[1])) pending.push(match[1]);
+    }
   }
-  const repository = "github.com/example/fixture";
-  const { change, plan, planDigest, mode, policyRevision, workspace } = f.request.approval;
-  const base = { schemaVersion: 1, change, plan, planDigest, mode, policyRevision, workspace, repository,
-    branch: `refs/heads/change/${change}`, orchestrator: "fixture-owner", authorSession: "fixture-author" };
-  const issuedAt = Date.now() - 1000;
-  const expiresAt = issuedAt + 240000;
-  const approval = await retain("approval.json", { ...base, kind: f.request.approval.kind, approved: true, approvedAt: issuedAt });
-  const implementer = path.join(path.dirname(verifier), "run-implementer.mjs");
-  const verifierSha256 = sha256(await readFile(implementer));
-  const decide = (input) => deliveryCommand("decision", input, { registry });
-  const status = (input) => deliveryCommand("status", input, { registry });
-  const readClaim = (attempt) => path.join(claimPath(registry, repository, change), "attempt-" + attempt);
+  assert.equal(sha256(jsonBytes(Object.fromEntries([...files].map(([name, bytes]) => [name, sha256(bytes)])))),
+    input.delegation.runtimeSha256, "pin covers the transitive package inventory");
 
-  async function assignment(attempt, {
-    task = "1.1", predecessor = null, continuation = null, accepted = [], initialHead = plan, reviewSession = pair.reviewer.session,
-    noCommits = false, behavior,
-  } = {}) {
-    const host = await retain(attempt + "-host.json", {
-      schemaVersion: 1, runtimeSha256, pair: { ...pair, reviewer: { ...pair.reviewer, session: reviewSession } }, override: null,
-      restrictions: { allowedClients: ["codex", "claude-code"], allowedModels: ["fixture-codex", "claude-fixture"],
-        allowedProviders: ["openai", "anthropic"], requireDistinctModels: true },
-    });
-    const grantFile = path.join(trusted, attempt + "-grant.json");
-    const group = task.split(".")[0];
-    const request = workerRequest(f, null, "", attempt, path.join(evidence, attempt), "implementer");
-    Object.assign(request, { outcome: mode === "goal-first" ? f.contract.outcome : "Deliver the fixture group",
-      scope: mode === "goal-first" ? f.contract.scope : ["widget.txt"], acceptance: mode === "goal-first" ? f.contract.acceptance :
-        ["Widget loads", ...(behavior ? [behavior] : [])], stop: "Scope conflict", budget: { limit: 1, unit: "minutes" },
-      mutablePaths: ["widget.txt"], requiredEvidence: ["native.txt", "lifecycle.jsonl", "stdout.jsonl", "stderr.log", "launch.json"],
-    });
-    Object.assign(request.identity, { group, task, action: task, predecessor });
-    Object.assign(request.authority, { approvalReference: approval.path, executionReference: grantFile });
-    if (noCommits) request.restrictions.push("no commits");
-    const requestSha256 = sha256(requestBytes(request));
-    const inference = await retain(attempt + "-inference.json", { schemaVersion: 1, kind: "worker-inference-authority", attempt,
-      requestSha256, hostSha256: host.sha256, orchestrator: base.orchestrator, maxRuns: 1, expiresAt });
-    const grant = await retain(attempt + "-grant.json", {
-      ...base, kind: "local-execution-grant", localOnly: true, requestSha256, hostSha256: host.sha256, approvalSha256: approval.sha256,
-      checkoutIdentity: await privateCheckoutIdentity(workspace), head: initialHead, eligibleTasks: [task], accepted, knownWorkspaces: [],
-      mutablePaths: request.mutablePaths, restrictions: request.restrictions, stop: request.stop, issuedAt, expiresAt, overrideSha256: null,
-      limits: { timeoutMs: 3500, stdoutBytes: 16384, stderrBytes: 16384, maxTurns: 1, totalMs: 240000, groupMs: 180000,
-        corrections: 1, batchSize: 1 }, continuation, inference,
-      ...(mode === "goal-first" ? { normalizedPlanDigest: f.evaluated.context.planDigest } : {}),
-    });
-    const entry = { request, host, approval, grant };
-    const reviewerInventory = sha256(jsonBytes(pair.reviewer.inventory));
-    const preflight = { ...f.request.preflight,
-      live: { ...f.request.preflight.live, repository }, auth: { ...f.request.preflight.auth, repository },
-      reviewer: { ...f.request.preflight.reviewer, configurationSha256: reviewerConfiguration.sha256,
-        expectedConfigurationSha256: reviewerConfiguration.sha256, packageSha256: reviewerInventory },
-      relay: { ...f.request.preflight.relay, configurationSha256: reviewerConfiguration.sha256 },
-      companions: { ...f.request.preflight.companions, actual: { reviewer: reviewerInventory }, expected: { reviewer: reviewerInventory } },
-    };
-    const input = { ...f.request, approval: { ...f.request.approval, reference: approval.path },
-      grant: { ...f.request.grant, reference: grant.path, approvalReference: approval.path, stop: request.stop, eligibleGroups: ["1", "2"] },
-      preflight, delegation: { verifier: implementer, verifierSha256, runtimeSha256, assignment: await retain(attempt + "-input.json",
-        { schemaVersion: 1, assignments: [entry] }) } };
-    return { entry, input, reviewSession };
-  }
+  // A malformed but inert runtime would fail parsing if loaded. Removing another
+  // dependency must still report the missing file from the non-executing read.
+  const runtime = path.join(scripts, "implementer-runtime.mjs");
+  const helper = path.join(scripts, "worker-runtime-policy.mjs");
+  await writeFile(runtime, "export {");
+  await rm(helper);
+  await assert.rejects(readDelegation(input, options), { code: "ENOENT", path: helper });
+  await writeFile(helper, files.get("worker-runtime-policy.mjs"));
+  await writeFile(runtime, files.get("implementer-runtime.mjs"));
 
-  async function settled(attempt, options = {}) {
-    const [outcome] = await runImplementers([attempt.entry], { registry, runProbe: async () => ({ proof: [] }), ...options });
-    return outcome;
+  for (const [name, bytes] of files) {
+    const file = path.join(scripts, name);
+    await writeFile(file, bytes + "\n# synthetic byte mismatch\n");
+    await assert.rejects(readDelegation(input, options),
+      name === launcher ? /launcher pin changed/ : /runtime inventory changed/, name);
+    await writeFile(file, bytes);
   }
+  await rm(helper);
+  await symlink(path.join(source, "worker-runtime-policy.mjs"), helper);
+  await assert.rejects(readDelegation(input, options), /Input is not canonical/);
+});
 
-  async function release(attempt, result) {
-    const id = attempt.entry.request.identity.attempt;
-    const { claimId } = await readState(readClaim(id), "launch.json");
-    const proof = await retain(id + "-release.json", {
-      schemaVersion: 1, kind: "exclusive-runtime-release", action: "release-slot", claimId, change, attempt: id,
-      orchestrator: base.orchestrator, settlementSha256: result.settlementSha256, quiescent: true, falloutVerified: true,
-    });
-    const released = await observeImplementer(attempt.entry, { registry, action: "release-slot", release: proof });
-    assert.equal(released.phase, "slot-released", released.reason);
-    return readState(readClaim(id), "publication.json");
-  }
-
-  async function review(attempt, runtime, head, gates, label, overrides = {}) {
-    const checkout = path.join(f.root, label + "-checkout");
-    f.git(f.repo, "worktree", "add", "--detach", checkout, head);
-    const { task, group, action, attempt: predecessor } = attempt.entry.request.identity;
-    return containedHandover(f, checkout, head, gates, label, {
-      identity: { task, group, action, predecessor, implementerSession: runtime.result.runtime.session },
-      authority: attempt.entry.request.authority, work: attempt.entry.request, session: attempt.reviewSession, configurationSha256: reviewerConfiguration.sha256,
-      ...(mode === "goal-first" ? { goalDigest: f.planDigest } : {}), ...overrides,
-    });
-  }
-  return { registry, assignment, settled, decide, status, retain, release, review, readClaim, pair };
-}
+test("exclusive delivery uses only sealed grant terms even when caller fields share its reference", { skip: process.platform !== "linux" }, async (t) => {
+  const f = await fixture(t, { staged: true, exclusive: true });
+  const w = await exclusiveFixture(f);
+  const { input } = await w.assignment("sealed-terms", { commits: false });
+  const taskGuidance = twoGroupGuidance(f.planDigest);
+  const inflated = { ...input, taskGuidance, grant: { ...input.grant, commits: true, stop: "other",
+    budgets: { minutes: 180, corrections: 8 }, eligibleGroups: ["2"], budget: { limit: 180, unit: "minutes" } } };
+  const dispatch = await w.decide(inflated);
+  assert.equal(dispatch.action, "dispatch", JSON.stringify(dispatch));
+  assert.equal(dispatch.group, "1");
+  assert.equal(dispatch.commits, false);
+  assert.equal((await w.decide({ ...inflated, observed: { ...input.observed, minutesUsed: 4 } })).reason, "BUDGET_EXHAUSTED");
+  assert.equal((await w.decide({ ...inflated, observed: { ...input.observed, authorityBudgetUsed: 4 } })).reason,
+    "TASK_GUIDED_CONTINUATION_BLOCKED");
+  assert.equal((await w.decide({ ...inflated, grant: { ...inflated.grant, reference: "different" } })).reason,
+    "DELEGATED_RUNTIME_UNVERIFIED");
+});
 
 test("exclusive Goal-First reads the original worker, checks output scope and binds exact gates and paired review", { skip: process.platform !== "linux" }, async (t) => {
   const f = await fixture(t, { exclusive: true });
@@ -734,10 +656,28 @@ test("exclusive Goal-First reads the original worker, checks output scope and bi
   assert.equal(verdict.head, head);
   assert.equal(verdict.commits, false);
   assert.equal((await w.status(accepted)).state, "local-verified");
-  const wrongGoal = await w.review(attempt, runtime, head, gates, "wrong-goal-review", { goalDigest: "2".repeat(64) });
+  const wrongGoal = await w.review(attempt, runtime, head, gates, "wrong-goal-review", {
+    session: randomUUID(), goalDigest: "2".repeat(64),
+  });
   assert.equal((await w.decide({ ...result, handover: wrongGoal, attempt: { id: "wrong-goal-review" } })).reason, "HANDOVER_UNVERIFIED");
-  const wrongRole = await w.review(attempt, runtime, head, gates, "wrong-pair-review", { session: randomUUID() });
+  const wrongRole = await w.review(attempt, runtime, head, gates, "wrong-pair-review", {
+    session: randomUUID(), configurationSha256: sha256("different synthetic reviewer configuration"),
+  });
   assert.equal((await w.decide({ ...result, handover: wrongRole, attempt: { id: "wrong-pair-review" } })).reason, "HANDOVER_UNVERIFIED");
+  async function rejectReuse(label, candidate, gateRun) {
+    const reused = await w.review(attempt, runtime, candidate, gateRun, label, { bind: false });
+    const rereview = { ...accepted, head: candidate, gateRun: gateRun.gateRun, handover: reused, attempt: { id: label } };
+    assert.equal((await w.decide(rereview)).reason, "HANDOVER_UNVERIFIED");
+    const original = handover.reviewSessionBinding;
+    reused.reviewSessionBinding = original;
+    assert.equal((await w.decide(rereview)).reason, "HANDOVER_UNVERIFIED");
+    const record = JSON.parse(await readFile(original.path, "utf8"));
+    reused.reviewSessionBinding = await w.retain(label + ".json", {
+      ...record, candidate, requestFileSha256: reused.requestFileSha256, expectFileSha256: reused.expectFileSha256,
+    });
+    assert.equal((await w.decide(rereview)).reason, "HANDOVER_UNVERIFIED");
+  }
+  await rejectReuse("same-candidate-session-reuse", head, gates);
   const priorDir = w.readClaim("goal-first");
   const file = path.join(priorDir, "publication.json");
   const unpublished = file + ".held";
@@ -751,15 +691,8 @@ test("exclusive Goal-First reads the original worker, checks output scope and bi
     (await readFile(path.join(f.workspace, own, "tasks.md"), "utf8")).replace("[ ]", "[x]"));
   const progress = f.commit(f.workspace, "Synthetic orchestrator records accepted outcome");
   const fresh = await gateFixture(f, progress, "goal-progress");
-  const session = randomUUID();
-  const review = await w.review(attempt, runtime, progress, fresh, "goal-progress-review", { session });
-  const { claimId } = await readState(priorDir, "launch.json");
-  review.reviewSessionBinding = await w.retain("goal-progress-authority.json", {
-    schemaVersion: 1, kind: "exclusive-review-session", claimId, change, plan: f.plan, planDigest: f.planDigest,
-    attempt: "goal-first", candidate: progress, orchestrator: "fixture-owner", originalSession: attempt.reviewSession, session,
-    configurationSha256: w.pair.reviewer.configuration.sha256, inventorySha256: sha256(jsonBytes(w.pair.reviewer.inventory)),
-    requestFileSha256: review.requestFileSha256, reviewAuthority: "synthetic single-run approval", maxRuns: 1,
-  });
+  await rejectReuse("changed-candidate-session-reuse", progress, fresh);
+  const review = await w.review(attempt, runtime, progress, fresh, "goal-progress-review", { session: randomUUID() });
   assert.equal((await w.decide({ ...accepted, head: progress, gateRun: fresh.gateRun, handover: review,
     attempt: { id: "goal-progress-review" } })).action, "accept-result");
 });

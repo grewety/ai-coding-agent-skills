@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { readdir, rename } from "node:fs/promises";
+import { lstat, readdir, rename, rm } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { readClosed, createAttempt, requestBytes, safePath } from "./worker-handoff.mjs";
@@ -14,6 +14,7 @@ import { identifier, newDirectory, privateDirectory, readState, syncDirectory, t
 import { checkCheckout, checkoutProtectedPaths, gitState, loadAuthority, maximumBatch, validateInvocation } from "./worker-runtime-policy.mjs";
 
 const packageRoot = fileURLToPath(new URL("../", import.meta.url)).replace(/\/$/, "");
+// Keep this inventory in sync with the delivery verifier and its transitive inventory test.
 const runtimeSources = [
   "bounded-worker.mjs", "bounded-worker.py", "implementer-bindings.mjs", "implementer-claims.mjs",
   "implementer-observations.mjs", "implementer-recovery.mjs", "implementer-runtime.mjs", "implementer-sandbox.mjs",
@@ -75,7 +76,7 @@ function checkRemaining(request, grant, owner, history, expiresAt) {
     grant.expiresAt <= previous.grantExpiresAt), "A successor cannot widen retained limits");
   const priorGroup = history.filter((launch) => launch.task === request.identity.task);
   const groupStart = Math.min(now, ...priorGroup.map((launch) => launch.startedAt));
-  need(now + timeoutMs <= Math.min(grant.expiresAt, expiresAt, owner.createdAt + totalMs, groupStart + groupMs),
+  need(now + timeoutMs + smokeBudgetMs <= Math.min(grant.expiresAt, expiresAt, owner.createdAt + totalMs, groupStart + groupMs),
     "Finite grant, assignment or group deadline cannot admit the worker");
   return Math.min(grant.expiresAt, expiresAt, owner.createdAt + totalMs, groupStart + groupMs);
 }
@@ -147,6 +148,7 @@ function physicalReservation(claimId, attempt, roles) {
     profiles: [codexHome, home, xdg].map((name, i) => ({ path: name, id: roles.profileIds[i] })) };
 }
 
+const smokeBudgetMs = 28000;
 const delay = (time) => new Promise((resolve) => setTimeout(resolve, time));
 const milestone = (emit, request, phase, detail = {}) => emit({ attempt: request.identity.attempt, change: request.identity.change, phase, ...detail });
 
@@ -171,48 +173,76 @@ async function prepareAttempt(entry, registry, runtimeSha256, batchSize, emit, r
   await safePath(workspace);
   const repository = repositoryIdentity(workspace);
   const claimDirectory = claimPath(registry, repository, change);
-  let owner;
-  if (predecessor === null) {
-    const claim = await acquireClaim(registry, retainedIdentity(entry, repository));
-    if (claim.occupied) return { phase: "occupied", resource: "repository-change" };
-    owner = claim.owner;
-  } else owner = await claimOwnerFor(claimDirectory, entry, repository);
-  milestone(emit, request, "claim-held", { claimId: owner.claimId });
   const { grant, inference } = await loadAuthority(entry, repository);
   need(batchSize <= grant.limits.batchSize && (batchSize === 1 || (predecessor === null && grant.accepted.length === 0)),
     "Batch must contain independently admitted initial assignments");
+  need(predecessor !== null || grant.continuation === null, "Continuation lacks its original predecessor");
   const roles = await bindPair(entry, grant, runtimeSha256, registry);
-  const context = { entry, grant, roles, registry, repository, claimDirectory, owner, runtimeSha256 };
+  const context = { entry, grant, roles, registry, repository, claimDirectory, runtimeSha256 };
   await dimensions(context);
-  await checkCheckout(request, grant);
-  const prepared = await withRepositoryLock(registry, repository, () => exclusiveOperation(claimDirectory, async () => {
-    need(await readState(claimDirectory, "claim-release.json", true) === null, "Original assignment has closed");
-    const history = await readHistory(claimDirectory);
-    const transition = await predecessorCheck(entry, grant, roles, claimDirectory, history);
-    await noConcurrentScope(registry, claimDirectory, repository, request);
-    const deadline = checkRemaining(request, grant, owner, history, Math.min(roles.expiresAt, inference.expiresAt));
+  const evidence = request.evidenceRoots[0];
+  const { home, xdg, codexHome } = roles.pair.implementer;
+  const excludedRoots = [workspace, registry, home, xdg, codexHome, roles.pair.reviewer.slot];
+  need(excludedRoots.every((root) => separate(root, evidence)), "Attempt overlaps repository/profile/worker scratch");
+  await safePath(evidence, true);
+  try {
+    await lstat(evidence);
+    throw new Error("Attempt evidence already exists");
+  } catch (error) { if (error.code !== "ENOENT") throw error; }
+  const expiry = Math.min(roles.expiresAt, inference.expiresAt);
+  checkRemaining(request, grant, { createdAt: Date.now() }, [], expiry);
+  // Check the checkout under the repository lock before publishing a launch.
+  const prepare = async (directory, owner, history, transition) => {
+    const refreshed = await loadAuthority(entry, repository);
+    need(equal(refreshed.grant, grant) && equal(refreshed.inference, inference), "Execution authority changed at claim admission");
+    await checkCheckout(request, grant);
+    const deadline = checkRemaining(request, grant, owner, history, expiry);
     const binding = physicalReservation(owner.claimId, attempt, roles);
-    const nonce = randomUUID();
     const launch = { schemaVersion: 1, repository, workspace, change, task, attempt, predecessor, transition,
-      claimId: owner.claimId, nonce, startedAt: Date.now(), sequence: history.length, deadline,
+      claimId: owner.claimId, nonce: randomUUID(), startedAt: Date.now(), sequence: history.length, deadline,
       limits: grant.limits, grantExpiresAt: grant.expiresAt,
       requestSha256: hash(requestBytes(request)), invocationSha256: hash(jsonBytes(entry)), runtimeSha256,
-      pair: roles.pair, mutablePaths: request.mutablePaths, reservation: binding, slot: roles.physicalSlot, evidence: request.evidenceRoots[0] };
-    const attemptDirectory = path.join(claimDirectory, "attempt-" + attempt);
-    await newDirectory(attemptDirectory);
-    await writeState(attemptDirectory, "launch.json", launch);
+      pair: roles.pair, mutablePaths: request.mutablePaths, reservation: binding, slot: roles.physicalSlot, evidence };
+    const name = "attempt-" + attempt;
+    const destination = path.join(directory, name);
+    const staging = path.join(directory, ".attempt-" + launch.nonce);
+    await newDirectory(staging);
+    try {
+      await writeState(staging, "launch.json", launch);
+      await rename(staging, destination);
+      await syncDirectory(directory);
+    } finally { await rm(staging, { recursive: true, force: true }); }
+    return { launch, binding, owner, attemptDirectory: path.join(claimDirectory, name) };
+  };
+  const prepared = await withRepositoryLock(registry, repository, async () => {
+    await noConcurrentScope(registry, claimDirectory, repository, request);
+    let admission;
+    if (predecessor === null) {
+      const claim = await acquireClaim(registry, retainedIdentity(entry, repository),
+        (staging, owner) => prepare(staging, owner, [], "initial"));
+      if (claim.occupied) return { phase: "occupied", resource: "repository-change" };
+      admission = claim.prepared;
+    } else {
+      const owner = await claimOwnerFor(claimDirectory, entry, repository);
+      admission = await exclusiveOperation(claimDirectory, async () => {
+        need(await readState(claimDirectory, "claim-release.json", true) === null, "Original assignment has closed");
+        const history = await readHistory(claimDirectory);
+        const transition = await predecessorCheck(entry, grant, roles, claimDirectory, history);
+        return prepare(claimDirectory, owner, history, transition);
+      });
+    }
+    const { owner, binding } = admission;
+    milestone(emit, request, "claim-held", { claimId: owner.claimId });
     const slotDirectory = await reserveSlot(registry, roles.physicalSlot, binding);
     if (!slotDirectory) return { phase: "occupied", resource: "physical-role-slot", claimId: owner.claimId };
-    const evidence = request.evidenceRoots[0];
-    await createAttempt({ directory: evidence, request, excludedRoots: [workspace, registry,
-      roles.pair.implementer.home, roles.pair.implementer.xdg, roles.pair.implementer.codexHome, roles.pair.reviewer.slot] });
-    return { launch, attemptDirectory, slotDirectory, binding, evidence };
-  }));
+    await createAttempt({ directory: evidence, request, excludedRoots });
+    return { ...admission, slotDirectory, evidence };
+  });
   if (prepared.phase === "occupied") return prepared;
-  const { launch, attemptDirectory, evidence } = prepared;
+  const { owner, launch, attemptDirectory } = prepared;
   milestone(emit, request, "slot-held", { claimId: owner.claimId });
   const smokeDeadline = launch.deadline - grant.limits.timeoutMs;
-  need(Date.now() + 28000 <= smokeDeadline, "Finite preflight budget cannot admit native sandbox checks");
+  need(Date.now() + smokeBudgetMs <= smokeDeadline, "Finite preflight budget cannot admit native sandbox checks");
   const smoke = await runProbe({ request, role: roles.pair.implementer, registry, attemptDirectory: evidence,
     protectedFile: entry.grant.path, controlDirectory: attemptDirectory });
   await writeState(attemptDirectory, "smoke.json", smoke);

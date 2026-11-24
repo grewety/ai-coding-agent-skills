@@ -16,6 +16,27 @@ const exists = async (file) => {
   catch (error) { if (error.code === "ENOENT") return false; throw error; }
 };
 
+// This allowlist is local to delivery so verification never loads companion code.
+const runtimeSources = [
+  "bounded-worker.mjs", "bounded-worker.py", "implementer-bindings.mjs", "implementer-claims.mjs",
+  "implementer-observations.mjs", "implementer-recovery.mjs", "implementer-runtime.mjs", "implementer-sandbox.mjs",
+  "implementer-state.mjs", "implementer-supervisor.mjs", "implementer-supervisor.py", "orchestration-core.mjs",
+  "review-admission.mjs", "review-archive.mjs", "review-candidate.mjs", "review-inputs.mjs", "review-relay.mjs",
+  "review-runtime-scratch.mjs", "review-runtime.mjs", "review-sandbox-bridge.mjs", "review-stream.mjs",
+  "run-implementer.mjs", "terminal-adapters.mjs", "worker-handoff.mjs", "worker-runtime-policy.mjs",
+];
+
+function verifyRuntimeInventory(selected, scripts) {
+  need(digest(selected.verifierSha256) && digest(selected.runtimeSha256), "Independent implementer package pin is missing");
+  const inventory = Object.fromEntries(runtimeSources.map((name) => {
+    const filename = path.join(scripts, name);
+    return [name, sha256(readBounded(filename, 64 * 1024))];
+  }));
+  need(inventory["run-implementer.mjs"] === selected.verifierSha256, "Independent implementer launcher pin changed");
+  need(sha256(stableJson(inventory) + "\n") === selected.runtimeSha256, "Exclusive runtime inventory changed");
+  return inventory;
+}
+
 export async function readDelegation(input, { context, policy, identity, implementation, goal }, registryOverride) {
   need(process.platform === "linux", "Exclusive runtime requires a qualified Linux host");
   const selected = input.delegation;
@@ -23,16 +44,12 @@ export async function readDelegation(input, { context, policy, identity, impleme
   const verifier = scopedPath(selected?.verifier);
   const scripts = path.dirname(verifier);
   need(path.basename(verifier) === "run-implementer.mjs" &&
-    [input.repo, identity.workspace].every((root) => separate(root, scripts)) &&
-    digest(selected.verifierSha256) && sha256(readBounded(verifier)) === selected.verifierSha256 &&
-    digest(selected.runtimeSha256), "Independent implementer package pin is missing or changed");
-  // The installed companion and its complete transitive code are trusted.
+    [input.repo, identity.workspace].every((root) => separate(root, scripts)), "Independent implementer package is outside its allowed location");
+  const inventory = verifyRuntimeInventory(selected, scripts);
   const load = (name) => import(pathToFileURL(path.join(scripts, name + ".mjs")).href);
-  const runtime = await load("implementer-runtime");
-  need(await runtime.runtimeIdentity() === selected.runtimeSha256, "Exclusive runtime inventory changed");
-  const [state, claims, worker, bindings, handover, recovery, observations, encoding] = await Promise.all(
-    ["implementer-state", "implementer-claims", "worker-runtime-policy", "implementer-bindings",
-      "worker-handoff", "implementer-recovery", "implementer-observations", "review-inputs"].map(load));
+  const [runtime, state, claims, worker, bindings, handover, recovery, observations, encoding, reviewer] = await Promise.all(
+    ["implementer-runtime", "implementer-state", "implementer-claims", "worker-runtime-policy", "implementer-bindings",
+      "worker-handoff", "implementer-recovery", "implementer-observations", "review-inputs", "review-candidate"].map(load));
   const registry = registryOverride ?? claims.defaultRegistry();
   await handover.safePath(registry, true);
   if (await exists(registry)) await state.privateDirectory(registry);
@@ -51,9 +68,9 @@ export async function readDelegation(input, { context, policy, identity, impleme
     id.planDigest === identity.planDigest && same(id.inputs, context.inputs) &&
     assignment.approval.path === input.approval?.reference && assignment.grant.path === input.grant?.reference,
   "Worker request differs from the active plan, checkout or authority");
-  const { grant, inference } = await worker.loadAuthority(assignment, repository);
+  const { approval, grant, inference } = await worker.loadAuthority(assignment, repository);
   need(grant.mode === policy.mode && grant.policyRevision === policy.policyRevision &&
-    grant.branch === `refs/heads/${implementation.branch}` && request.stop === input.grant.stop &&
+    grant.branch === `refs/heads/${implementation.branch}` &&
     (policy.mode !== "goal-first" || goal && request.mutablePaths.every((file) => withinScope(file, goal.contract.scope))),
   "Runtime grant differs from integrated policy, branch, stop or scope");
   const noCommits = input.restrictions?.noCommits === true || request.restrictions.includes("no commits");
@@ -64,8 +81,16 @@ export async function readDelegation(input, { context, policy, identity, impleme
   const directory = claims.claimPath(registry, repository, id.change);
   const owner = await exists(directory) ? await state.readState(directory, "owner.json") : null;
   const reviewerInventorySha256 = sha256(encoding.jsonBytes(roles.pair.reviewer.inventory));
+  const verifiedApproval = { ...identity, schemaVersion: 1, verified: true, approved: approval.approved,
+    kind: approval.kind, mode: approval.mode, policyRevision: approval.policyRevision, reference: assignment.approval.path };
+  const verifiedGrant = { ...identity, schemaVersion: 1, verified: true, kind: grant.kind, mode: grant.mode,
+    policyRevision: grant.policyRevision, reference: assignment.grant.path, approvalReference: assignment.approval.path,
+    localOnly: grant.localOnly, stop: grant.stop, commits: grant.commits === true,
+    budgets: { minutes: grant.limits.totalMs / 60000, corrections: grant.limits.corrections },
+    budget: { limit: Math.ceil(grant.limits.totalMs / 60000), unit: "minutes" } };
   const data = { id, request, grant, roles, scripts, noCommits, owner, state, directory, history: [],
-    repository, reviewerInventorySha256 };
+    repository, registry, reviewerInventorySha256, verifiedApproval, verifiedGrant,
+    reviewCommand: reviewer.reviewCommand, reviewVerifierSha256: inventory["review-candidate.mjs"] };
 
   if (owner) {
     const expected = runtime.retainedIdentity(assignment, repository);
@@ -184,27 +209,29 @@ export async function verifyPairedReview(delegation, handoff, input) {
   const { result, request, roles } = delegation;
   const reviewed = handoff?.result;
   const role = roles.pair.reviewer;
-  let session = role.session;
+  const session = reviewed.runtime.session;
   const pin = input.handover.reviewSessionBinding;
-  if (pin !== undefined) {
-    const locations = [input.repo, request.identity.workspace, reviewed.identity.workspace, delegation.directory,
-      input.handover.output, input.handover.exportDirectory, role.slot, ...request.evidenceRoots];
-    need(pin && locations.every((root) => separate(root, pin.path)), "Review session authority overlaps mutable or publisher state");
-    const record = await delegation.state.trustedJson(pin);
-    const identity = {
-      schemaVersion: 1, kind: "exclusive-review-session", claimId: delegation.owner.claimId,
-      change: request.identity.change, plan: request.identity.plan, planDigest: request.identity.planDigest,
-      attempt: request.identity.attempt, candidate: reviewed.identity.candidate, orchestrator: request.authority.orchestrator,
-      originalSession: role.session, session: reviewed.runtime.session, maxRuns: 1,
-      configurationSha256: role.configuration.sha256, inventorySha256: delegation.reviewerInventorySha256,
-      requestFileSha256: input.handover.requestFileSha256,
-    };
-    need(Object.entries(identity).every(([key, value]) => record[key] === value) &&
-      typeof record.reviewAuthority === "string" && record.reviewAuthority.trim() &&
-      delegation.history.every((launch) => launch.pair.reviewer.session !== record.session),
-    "Fresh reviewer session lacks exact single-run authority or reuses a retained session");
-    session = record.session;
-  }
+  need(typeof session === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(session),
+    "Invalid reviewer session identity");
+  const bindingPath = path.join(path.dirname(delegation.verifiedGrant.reference), `review-session-${session}.json`);
+  const locations = [input.repo, request.identity.workspace, reviewed.identity.workspace, delegation.registry,
+    input.handover.output, input.handover.exportDirectory, role.slot, ...request.evidenceRoots];
+  need(pin?.path === bindingPath && locations.every((root) => separate(root, pin.path)),
+    "Review session authority is missing or outside its unique retained location");
+  const record = await delegation.state.trustedJson(pin);
+  const identity = {
+    schemaVersion: 1, kind: "exclusive-review-session", claimId: delegation.owner.claimId,
+    change: request.identity.change, plan: request.identity.plan, planDigest: request.identity.planDigest,
+    attempt: request.identity.attempt, candidate: reviewed.identity.candidate, orchestrator: request.authority.orchestrator,
+    originalSession: role.session, session, maxRuns: 1,
+    configurationSha256: role.configuration.sha256, inventorySha256: delegation.reviewerInventorySha256,
+    requestFileSha256: input.handover.requestFileSha256, expectFileSha256: input.handover.expectFileSha256,
+  };
+  need(Object.entries(identity).every(([key, value]) => record[key] === value) &&
+    typeof record.reviewAuthority === "string" && record.reviewAuthority.trim() &&
+    delegation.history.every((launch) => launch.attempt === identity.attempt || launch.pair.reviewer.session !== session) &&
+    ![request.authority.authorSession, request.authority.orchestrator, result.runtime.session].includes(session),
+  "Reviewer session lacks exact single-run authority or reuses a retained session");
   need(handoff?.reviewSnapshot && reviewed.identity.predecessor === request.identity.attempt &&
     reviewed.identity.implementerSession === result.runtime.session &&
     reviewed.identity.group === request.identity.group && reviewed.identity.task === request.identity.task &&
@@ -214,7 +241,7 @@ export async function verifyPairedReview(delegation, handoff, input) {
     request.acceptance.every((criterion) => handoff.request.acceptance.includes(criterion)) &&
     request.nonGoals.every((excluded) => handoff.request.nonGoals.includes(excluded)) &&
     same(handoff.request.scope, request.scope) &&
-    reviewed.runtime.session === session && reviewed.runtime.client === role.client &&
+    reviewed.runtime.client === role.client &&
     reviewed.runtime.version === role.version && reviewed.runtime.provider === role.provider &&
     reviewed.runtime.model === role.model && reviewed.runtime.configurationSource === role.configuration.sha256 &&
     reviewed.runtime.configurationScope === "contained-review" && reviewed.runtime.readOnly === true,

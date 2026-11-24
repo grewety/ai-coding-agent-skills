@@ -1,3 +1,5 @@
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { auditCodexCapture } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-observations.mjs";
@@ -103,4 +105,46 @@ test("the warning preserves session, turn, and completion checks as well as in-t
   assert.equal(audit([threadStarted, warning, ...turn], { completion: { kind: "exit", code: 1, signal: null } }).reason,
     "no-authentic-native-completion");
   assert.equal(audit([threadStarted, warning, ...turn, ...turn]).reason, "native-turn-order-or-bound");
+});
+
+
+test("supervisor stat reader requires a positive integer PID and a canonical proc path", { skip: process.platform !== "linux" }, () => {
+  const script = fileURLToPath(new URL(
+    "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-supervisor.py", import.meta.url));
+  const program = `
+import os
+import runpy
+import sys
+from unittest.mock import patch
+
+module = runpy.run_path(sys.argv[1])
+identity = module["identity"]
+pid = os.getpid()
+assert identity(pid)["pid"] == pid
+
+def reject(value, reason):
+    try:
+        identity(value)
+    except ValueError as error:
+        assert reason in str(error), str(error)
+    else:
+        raise AssertionError("accepted an invalid stat locator")
+
+with patch("os.open", side_effect=AssertionError("opened an unverified stat path")):
+    with patch("os.path.realpath", side_effect=AssertionError("resolved an invalid PID")):
+        for value in (None, True, 0, -1, 1.0, "1", "../1"):
+            reject(value, "invalid process ID")
+    for resolved in ("/proc/1/stat", "/proc-fixture/stat", "/outside-fixture/stat"):
+        with patch("os.path.realpath", return_value=resolved):
+            reject(pid, "noncanonical process stat path")
+    for directory in (None, "relative", "/proc/../proc", "/proc//self", "/proc/self", "/proc/"):
+        try:
+            module["Attempt"](directory, "0" * 64)
+        except ValueError as error:
+            assert "noncanonical supervisor state directory" in str(error)
+        else:
+            raise AssertionError("accepted a noncanonical state directory")
+`;
+  const result = spawnSync("/usr/bin/python3", ["-I", "-B", "-c", program, script], { encoding: "utf8", timeout: 5000 });
+  assert.equal(result.status, 0, result.stderr);
 });

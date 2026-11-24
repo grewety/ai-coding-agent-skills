@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
-import { chmod, lstat, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { chmod, copyFile, lstat, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -69,7 +69,8 @@ async function fixture(t) {
   await writeFile(path.join(evidence, "sentinel"), "retained review evidence");
   const launcher = path.join(root, "fixture-bwrap");
   await writeFile(launcher, "#!/bin/sh\n[ \"$1\" = --version ] && { echo 'bubblewrap 0.9.0'; exit 0; }\nexit 47\n", { mode: 0o700 });
-  const node = await realpath(process.execPath);
+  const node = path.join(root, "fixture-node");
+  await writeFile(node, "#!/bin/sh\nexit 47\n", { mode: 0o700 });
   const keyFile = path.join(root, "synthetic-key");
   await writeFile(keyFile, "synthetic input", { mode: 0o400 });
   const pin = async (file) => ({ path: file, sha256: hash(await readFile(file)) });
@@ -77,6 +78,15 @@ async function fixture(t) {
     libraries: [], model: "claude-fixture", relay: { route: "same-uid-key", keyFile, keyFormat: "raw" },
     timeoutMs: 3000, maxTurns: 4, maxBudgetUsd: 1, requirePreExposureAttestation: false };
   return { root, short, evidence, config, pin };
+}
+
+async function bridgeNodePin(fixture, executable) {
+  const source = await realpath(executable);
+  if (((await lstat(source)).mode & 0o022) === 0) return fixture.pin(source);
+  const privateCopy = path.join(fixture.root, "bridge-node");
+  await copyFile(source, privateCopy);
+  await chmod(privateCopy, 0o700);
+  return fixture.pin(privateCopy);
 }
 
 const options = ({ evidence, short }) => ({ parent: evidence, excluded: [evidence], packetCount: 1, scratchRoot: short });
@@ -89,6 +99,11 @@ test("private scratch validation rejects group-writable pins, unsafe scratch and
   await writeFile(groupWritable, "synthetic binary pin");
   await chmod(groupWritable, 0o770);
   await assert.rejects(withReviewRuntime({ ...f.config, node: await f.pin(groupWritable) }, options(f), noBind, noBind), /Unsafe runtime pin/);
+  const privateCopy = await bridgeNodePin(f, groupWritable);
+  assert.notEqual(privateCopy.path, groupWritable);
+  assert.equal((await lstat(privateCopy.path)).mode & 0o777, 0o700);
+  assert.equal((await lstat(groupWritable)).mode & 0o777, 0o770);
+  assert.equal(privateCopy.sha256, (await f.pin(groupWritable)).sha256);
   const oversized = path.join(f.short, "ü".repeat(45));
   await mkdir(oversized, { mode: 0o700 });
   await assert.rejects(withReviewRuntime(f.config, { ...options(f), scratchRoot: oversized }, noBind, noBind), /socket path exceeds/);
@@ -151,8 +166,8 @@ test("real contained bridge over a private Unix socket denies synthetic publicat
   }
   assert.equal(capability.status, 0, capability.stderr);
   f.config.bwrap = await f.pin(bwrap);
-  const node = f.config.node.path;
-  const ldd = execFileSync("/usr/bin/ldd", [node], { encoding: "utf8" });
+  f.config.node = await bridgeNodePin(f, process.execPath);
+  const ldd = execFileSync("/usr/bin/ldd", [f.config.node.path], { encoding: "utf8" });
   const targets = [...ldd.matchAll(/(?:=>\s+|^\s+)(\/lib(?:64)?\/[^\s]+)\s+\(/gm)].map((match) => match[1]);
   f.config.libraries = await Promise.all(targets.map(async (target) => ({ ...await f.pin(await realpath(target)), target })));
   const c = path.join(f.root, "fixture.c");

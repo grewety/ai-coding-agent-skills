@@ -15,9 +15,16 @@ module_spec.loader.exec_module(bounded)
 
 
 def identity(pid):
+    if type(pid) is not int or pid <= 0:
+        raise ValueError("invalid process ID")
+    proc_root = "/proc"
+    stat_path = os.path.join(proc_root, str(pid), "stat")
+    canonical = os.path.realpath(stat_path)
+    if os.path.commonpath((proc_root, canonical)) != proc_root or canonical != stat_path:
+        raise ValueError("noncanonical process stat path")
     with open("/proc/sys/kernel/random/boot_id", encoding="ascii") as fd:
         boot = fd.read().strip()
-    with open(f"/proc/{pid}/stat", encoding="ascii") as fd:
+    with os.fdopen(os.open(canonical, os.O_RDONLY | os.O_NOFOLLOW), encoding="ascii") as fd:
         # The process name may contain spaces and other delimiter-looking characters.
         tail = fd.read().rsplit(")", 1)[1].split()
     return {"pid": pid, "start": tail[19], "session": tail[3], "boot": boot,
@@ -26,7 +33,12 @@ def identity(pid):
 
 class Attempt:
     def __init__(self, directory, digest):
-        self.directory = os.open(directory, os.O_DIRECTORY | os.O_NOFOLLOW)
+        if (not isinstance(directory, str) or not os.path.isabs(directory)
+                or os.path.normpath(directory) != directory
+                or any(ord(character) < 32 or ord(character) == 127 for character in directory)
+                or os.path.realpath(directory, strict=True) != directory):
+            raise ValueError("noncanonical supervisor state directory")
+        self.directory = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
         state = os.fstat(self.directory)
         if state.st_uid != os.getuid() or stat.S_IMODE(state.st_mode) != 0o700:
             raise OSError("unsafe supervisor state directory")

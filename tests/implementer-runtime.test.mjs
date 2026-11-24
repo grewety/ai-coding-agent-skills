@@ -347,6 +347,9 @@ test("wrong order, changed scope and unapproved role override stop before native
     assert.equal(result.phase, "blocked", JSON.stringify(result));
     assert.doesNotMatch(result.reason, /unadmitted run reached/);
     await assert.rejects(lstat(resultPath(f, behavior)), { code: "ENOENT" });
+    await assert.rejects(lstat(claimPath(f.registry, repository, change)), { code: "ENOENT" }, behavior);
+    const [retry] = await run(f, [await f.assignment("valid-after-" + behavior)]);
+    assert.equal(retry.phase, "completed", retry.reason);
   }
 });
 

@@ -80,7 +80,9 @@ of `dispatch`, `boundary`, `correction`, or `result`. They consume
 - Separate `approval` and `grant` records binding the selected `change`, frozen
   `plan`, mode-specific `planDigest`, `mode`, `policyRevision` and absolute
   `workspace`. Supply the stable references and normalized fields in
-  [delivery-policy.md](delivery-policy.md).
+  [delivery-policy.md](delivery-policy.md). For exclusive delegation, supply the
+  approval and grant references. Delivery derives the normalized authority fields
+  from the sealed assignment.
 - `restrictions` with explicit `inspect`, `noCommits` and `group` (selected
   native group or null). Keep the narrower retained restrictions on every call.
   Supply P1–P8 observations at dispatch.
@@ -144,11 +146,16 @@ or local grant can also require it with `delegatedRuntime: true`. Include a
   with `verifierSha256` and the qualified full `runtimeSha256`. Choose this
   complete trusted installation outside both checkouts, the registry and
   publisher output. Resolve the inventory hash through `--runtime-identity`.
+  Delivery reads and hashes the complete transitive runtime inventory before
+  importing any companion module.
 - `assignment: {path, sha256}` locates an independently retained sealed
   single-assignment input to the packaged runtime. Its approval and grant
   paths must match the normalized delivery references. Delivery checks the
   role pair, qualification, effective settings, scope, plan, authority and
-  restrictions against that original input. Encode a no-commit restriction
+  restrictions against that original input. The sealed grant supplies delivery's
+  stop, budgets and eligible native tasks. An explicit sealed `commits: true`
+  allows local commits only within the applicable Goal Contract and retained
+  restrictions. Encode a no-commit restriction
   as `no commits`, or a fixed group as `group:<id>`, in the portable
   restrictions as applicable, and preserve the outer restrictions.
 - For successor dispatch, add `predecessor: {path, sha256}` pointing to the
@@ -165,8 +172,10 @@ or local grant can also require it with `delegatedRuntime: true`. Include a
 
 `dispatch` for this route is advisory and returns
 `requiresExclusiveAdmission: true`. Run the pinned implementer under its
-separate bounded authority. The runtime must win the atomic claim and slot,
-then pass its native sandbox probe before providing input. A subsequent
+separate bounded authority. The runtime checks admission and atomically
+publishes the initial claim with its launch record. Publication failures before
+that boundary leave the claim available. The runtime then reserves the slot and
+passes its native sandbox probe before providing input. A subsequent
 `boundary` reads the same registry attempt. Delivery verifies process-tree
 quiescence, sealed publication and matching workspace outputs. The
 orchestrator may then prepare the exact candidate within held authority.
@@ -177,8 +186,8 @@ separately authorized original-attempt recovery before rechecking delivery.
 normal gate and review requirements. The `handover` must be the pinned
 companion's `review-candidate` handover. Set its `predecessor` to the
 implementer attempt, its `implementerSession` to the verified native
-session, and its native group/task to the same action. Use the fresh
-reviewer session and configuration pinned by the pair. Retain the same
+session, and its native group/task to the same action. Use the reviewer
+configuration pinned by the pair and a session bound to this review. Retain the same
 outcome, acceptance criteria, scope and exclusions in the review request.
 Pin the independent expectation file as `expectFileSha256`. For either delivery
 mode, the contained reviewer uses the normalized Git plan digest and
@@ -199,17 +208,17 @@ probe configuration to the assignment. Use the hash of the paired
 reviewer's canonical inventory in P4 and P8. A changed source inventory
 needs fresh applicable verification.
 
-For a fresh review of a changed candidate after recording native progress,
-keep the same settled implementer and qualified reviewer configuration.
-Retain the authorized new attempt as `handover.reviewSessionBinding`
-with a protected `{path, sha256}` locator. The v1
-`exclusive-review-session` record binds `claimId`, `change`, `plan`,
-`planDigest`, implementer `attempt`, exact `candidate`, `orchestrator`,
-`originalSession`, new reviewer `session`, `configurationSha256`,
-`inventorySha256`, `requestFileSha256`, `reviewAuthority` and
-`maxRuns: 1`. The new session must be distinct. This readback requires
-the same complete gate and review checks. Obtain the separate paid-run
-grant before launching the reviewer.
+For every review, retain `handover.reviewSessionBinding` as a protected
+`{path, sha256}` locator. Seal it once as `review-session-<session>.json`
+beside the sealed execution grant. The v1 `exclusive-review-session` record
+binds `claimId`, `change`, `plan`, `planDigest`, implementer `attempt`,
+exact `candidate`, `orchestrator`, the pair's `originalSession`, reviewer
+`session`, `configurationSha256`, `inventorySha256`, `requestFileSha256`,
+`expectFileSha256`, `reviewAuthority` and `maxRuns: 1`. The first review can
+bind the session pinned by the pair. Re-review uses a distinct session with a
+new binding, including when the candidate changes after recording progress.
+Readback can replay the same exact bound review. Obtain a separate paid-run
+grant before launching each reviewer.
 Keep the native task pending while a scoped product correction may still
 be needed. A verified finding or failed gate requires a fresh bounded worker
 attempt under the same action and accepted scope.

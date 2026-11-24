@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { execFile, execFileSync } from "node:child_process";
-import { lstat, mkdir, mkdtemp, rm } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { test } from "node:test";
-import { normalizeRepository, openRegistry, reserveSlot, retireReservation, slotPath } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-claims.mjs";
+import { acquireClaim, claimPath, normalizeRepository, openRegistry, reserveSlot, retireReservation, slotPath } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-claims.mjs";
 
 const claimsModule = new URL("../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-claims.mjs", import.meta.url).href;
 const change = "fixture-01m84dt53xh6x16nwwqebacz8m";
@@ -60,6 +60,18 @@ writeSync(1, JSON.stringify(state));
   assert.equal(new Set(results.map(({ directory }) => directory)).size, 1);
   assert.equal(results.filter(({ occupied }) => !occupied).length, 1);
   assert.equal((await invoke(clone)).occupied, true, "a dead launcher cannot silently release ownership");
+});
+
+test("failed staging never publishes a claim or blocks a fresh launch", async (t) => {
+  const registry = await openRegistry(path.join(await root(t), "registry"));
+  const assignment = { repository: "github.com/fixture/replay", change };
+  const directory = claimPath(registry, assignment.repository, change);
+  await assert.rejects(acquireClaim(registry, assignment, async () => {
+    await assert.rejects(lstat(directory), { code: "ENOENT" });
+    throw new Error("inert pre-launch failure");
+  }), /inert pre-launch failure/);
+  assert.deepEqual(await readdir(registry), []);
+  assert.equal((await acquireClaim(registry, assignment)).occupied, false);
 });
 
 test("physical slots compare persistent path and inode across different assignments", async (t) => {

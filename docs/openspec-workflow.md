@@ -861,7 +861,8 @@ external implementer and a fresh independently contained reviewer.
 the held restrictions to delivery. Inspection reads original-attempt evidence
 and reports its state. The orchestrator uses sealed settlement and exact
 post-worker scope to decide whether to prepare the candidate, then requires
-exact-SHA executable gates and independent review. A Task-Guided successor
+exact-SHA executable gates and independent review with a sealed single-run
+session binding. A Task-Guided successor
 needs the predecessor's accepted evidence. Goal-First uses its exact Goal
 Contract and single outcome. Missing qualification, uncertain ownership or
 stale evidence keeps the boundary closed. The sealed trials at repair SHA

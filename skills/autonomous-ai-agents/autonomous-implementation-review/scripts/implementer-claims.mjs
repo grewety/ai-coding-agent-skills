@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { userInfo } from "node:os";
-import { lstat, readdir, rename, rmdir } from "node:fs/promises";
+import { lstat, readdir, rename, rm, rmdir } from "node:fs/promises";
 import path from "node:path";
 import { git, hash, jsonBytes, need, separate, utf8 } from "./review-inputs.mjs";
 import { newDirectory, privateDirectory, readState, syncDirectory, writeState } from "./implementer-state.mjs";
@@ -41,16 +41,27 @@ export async function openRegistry(registry) {
   return registry;
 }
 
-export async function acquireClaim(registry, assignment) {
+export async function acquireClaim(registry, assignment, prepare = async () => {}) {
   const directory = claimPath(registry, assignment.repository, assignment.change);
-  try { await newDirectory(directory); }
-  catch (error) {
-    if (error.code === "EEXIST") return { directory, occupied: true };
-    throw error;
-  }
+  try {
+    await lstat(directory);
+    return { directory, occupied: true };
+  } catch (error) { if (error.code !== "ENOENT") throw error; }
+
   const owner = { ...assignment, claimId: randomUUID(), createdAt: Date.now() };
-  await writeState(directory, "owner.json", owner);
-  return { directory, owner, occupied: false };
+  const staging = path.join(registry, ".claim-" + owner.claimId);
+  await newDirectory(staging);
+  try {
+    await writeState(staging, "owner.json", owner);
+    const prepared = await prepare(staging, owner);
+    try { await rename(staging, directory); }
+    catch (error) {
+      if (["EEXIST", "ENOTEMPTY"].includes(error.code)) return { directory, occupied: true };
+      throw error;
+    }
+    await syncDirectory(registry);
+    return { directory, owner, occupied: false, prepared };
+  } finally { await rm(staging, { recursive: true, force: true }); }
 }
 
 export async function reserveSlot(registry, slot, binding) {

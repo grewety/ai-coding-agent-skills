@@ -89,8 +89,10 @@ passwd home. Every worktree and clone on the qualified host must see
 the same private registry. SSH and HTTPS origin spellings normalize to
 one repository key, with the full change name as the other claim component.
 Physical slots separately fence canonical profile paths and device/inode
-identities. An occupation remains until a verified explicit release.
-An incomplete record or unknown owner blocks reuse. Preserve the registry
+identities. Initial admission publishes the claim and its launch record
+together. A failed check before publication leaves the claim available.
+A published claim remains occupied until a verified explicit release.
+An incomplete published record or unknown owner blocks reuse. Preserve the registry
 and handover bytes for read-only diagnosis and any separately authorized
 repair. Designate one OS user and shared host registry per qualification.
 

@@ -28,8 +28,9 @@ node run-implementer.mjs --release-claim INPUT INPUT_SHA256 RELEASE RELEASE_SHA2
 - `--runtime-identity` hashes the exact launcher and supporting runtime files.
   `--inspect` reads the original attempt without starting a worker or
   publishing a handover.
-- `--run` consumes bounded local delegation authority and attempts exclusive
-  claim, slot admission, native preflight, and foreground launch. The selected
+- `--run` checks bounded local delegation authority and checkout admission,
+  then publishes the initial claim with its launch record, reserves the slot
+  and runs native preflight before foreground launch. The selected
   provider route uses a separate single-run inference record. A batch
   admits up to four independent assignments, subject to every grant’s
   narrower batch bound. Output remains in input order and names each attempt.
@@ -77,6 +78,7 @@ The separate `local-execution-grant` adds these fields.
 | --- | --- |
 | `approvalSha256`, `hostSha256`, `requestSha256` | Exact approval, host config and portable Markdown request. |
 | `localOnly`, `stop`, `mutablePaths`, `restrictions` | True, matching stop and scoped output paths, and retained restrictions. |
+| `commits` | Optional boolean for the orchestrator's delivery decision. Omission grants no local commits. |
 | `head`, `checkoutIdentity` | Exact clean launch HEAD and checkout device/inode as decimal strings under `device` and `inode`. |
 | `eligibleTasks`, `accepted`, `knownWorkspaces` | Eligible native task IDs, ordered accepted predecessors, and explicitly known sibling clones. |
 | `issuedAt`, `expiresAt`, `limits` | Grant time fence in Unix milliseconds and positive `timeoutMs`, `stdoutBytes`, `stderrBytes`, `maxTurns`, `totalMs`, `groupMs`, `batchSize`, plus nonnegative `corrections`. |
@@ -91,7 +93,9 @@ inherit the original time fence and can narrow limits. Each accepted
 predecessor is `{ task, candidate, receipt }`. Its `accepted-dependency`
 record binds `task`, `change`, `candidate`, `plan`, `planDigest` and
 `verdict: "pass"`. The runtime checks real Git ancestry, the planning bytes
-and current native checkbox order under the claim. It checks known
+and current native checkbox order under the repository lock before publishing
+an initial claim or successor launch. Admission failures before publication
+leave the active claim or attempt history intact. The runtime checks known
 worktrees and clones for overlap. The orchestrator supplies accepted evidence
 from the delivery gates and records the actual approved authority.
 The inference record has `schemaVersion: 1`,

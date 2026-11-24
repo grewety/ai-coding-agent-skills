@@ -130,7 +130,7 @@ Use the pinned CLI with protected assignment and hash inputs.
 | Action | Effect |
 | --- | --- |
 | `--runtime-identity`, `--inspect` | Read the runtime inventory or positively identified original attempt. |
-| `--run` | Acquire the change claim and role slot, check the checkout and run an authorized foreground attempt. |
+| `--run` | Check authority and checkout admission, publish the claim and launch record together, then reserve the role slot and run the authorized foreground attempt. |
 | `--recover` | Read the same process or finish sealing its original settlement. The prompt is sent once. |
 | `--cancel` | Request the verified original supervisor to stop its process tree. |
 | `--release-slot`, `--release-claim` | Retire the exact owned record after verified settlement, fallout and applicable release authority. |
@@ -148,14 +148,16 @@ continuation under retained budget and authority.
 The dedicated implementer makes the scoped edits. Delivery checks sealed output
 scope before the orchestrator prepares the exact candidate. The orchestrator
 alone owns task ticks and logical local commits.
-If commits are restricted, keep the restriction and stop where an exact
-candidate cannot be produced. Verify executable gates and fresh independent
-review on the exact SHA. Task-Guided unlocks the next eligible native group
+The sealed execution grant governs local commit authority, task eligibility and
+budgets. If commits are restricted, keep the restriction and stop where an
+exact candidate cannot be produced. Verify executable gates and fresh
+independent review on the exact SHA. Task-Guided unlocks the next eligible native group
 only after accepted predecessor evidence. Goal-First evaluates the single
 approved local outcome through the same evidence. Correct a confirmed
 in-scope finding within retained budgets and repeat exact-SHA verification.
-If recording accepted native progress changes the SHA, bind a fresh
-reviewer session to the same qualified configuration and new candidate
-under a separate single-run grant.
+Every review needs a sealed session binding. If recording accepted native
+progress changes the SHA, bind a fresh reviewer session to the same qualified
+configuration and new candidate under a separate single-run grant.
+[Delegated review session binding](../skills/software-development/openspec-delivery/references/delivery-runtime.md#configured-exclusive-worker-runtime).
 Stale or missing evidence, invalid coverage, a wider correction or exhausted
 authority leaves the result pending or blocked.
