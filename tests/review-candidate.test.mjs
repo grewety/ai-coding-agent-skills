@@ -133,7 +133,7 @@ const init = { type: "system", subtype: "init", session_id: session, model: runt
   claude_code_version: runtime.version, cwd: "/review", tools: ["Read"], permissionMode: "dontAsk",
   mcp_servers: [], skills: [], slash_commands: [], plugins: [] };
 const answer = "REVIEW_PROBE_OK";
-const assistant = (content) => ({ type: "assistant", session_id: session, message: { content } });
+const assistant = (content, id) => ({ type: "assistant", session_id: session, message: { id, content } });
 const end = { type: "result", subtype: "success", session_id: session, is_error: false,
   num_turns: 1, total_cost_usd: 0.01, permission_denials: [], result: answer };
 const proc = (events) => ({ code: 0, signal: null, outcome: "exit", quiescent: true,
@@ -179,6 +179,63 @@ test("real stream requires a successful full-file Read for every assignment", ()
     [init, assistant([{ ...use, input: { ...use.input, limit: 1 } }]), reply, output, end],
     [init, assistant([use]), { ...reply, message: { content: [{ ...reply.message.content[0], is_error: true }] } }, output, end],
   ]) assert.throws(() => auditClaudeStream(proc(events), runtime, ["a"], false), /Read|coverage|stream|thinking/);
+});
+
+test("native stream allows parallel Reads only within the same identified message", () => {
+  const read = (id, name) => {
+    const filePath = "/review/" + name;
+    const file = { filePath, content: "fixture", startLine: 1, numLines: 1, totalLines: 1 };
+    return {
+      use: { type: "tool_use", id, name: "Read", input: { file_path: filePath } },
+      reply: { type: "user", session_id: session,
+        message: { content: [{ type: "tool_result", tool_use_id: id, content: "1\tfixture" }] },
+        tool_use_result: { type: "text", file } },
+    };
+  };
+  const a = read("read-a", "a");
+  const b = read("read-b", "b");
+  const readMessageId = "message-reads";
+  const request = assistant([a.use], readMessageId);
+  const parallel = assistant([b.use], readMessageId);
+  const finalBlock = { type: "text", text: answer };
+  const output = assistant([finalBlock], "message-final");
+  const audit = (events) => auditClaudeStream(proc([init, ...events, end]), runtime, ["a", "b"], false);
+  assert.equal(audit([request, parallel, b.reply, a.reply, output]), answer);
+
+  for (const [firstId, nextId] of [[readMessageId, "message-other"], [readMessageId, undefined],
+    [readMessageId, ""], [undefined, undefined], ["", ""], [undefined, readMessageId], ["", readMessageId]]) {
+    assert.throws(() => audit([assistant([a.use], firstId), assistant([b.use], nextId), b.reply, a.reply, output]),
+      /Unexpected native stream assistant turn/);
+  }
+  assert.throws(() => audit([request, parallel, b.reply, output, a.reply]), /Unexpected native stream assistant turn/);
+  const wrongModel = { ...parallel, message: { ...parallel.message, model: "other-model" } };
+  assert.throws(() => audit([request, wrongModel, b.reply, a.reply, output]), /Unexpected native stream assistant turn/);
+
+  const reread = assistant([finalBlock, { ...a.use, id: "read-again" }], readMessageId);
+  assert.throws(() => audit([request, parallel, b.reply, a.reply, reread]), /Native Read coverage or final stream text mismatch/);
+  const duplicate = { ...b.use, id: a.use.id };
+  assert.throws(() => audit([request, assistant([duplicate], readMessageId)]), /Unexpected native Read/);
+  assert.throws(() => audit([request, a.reply, assistant([duplicate], "message-other")]), /Unexpected native Read/);
+  const unassigned = read("read-c", "c");
+  assert.throws(() => audit([request, assistant([unassigned.use], readMessageId)]), /Unexpected native Read/);
+
+  const mismatched = { ...b.reply, tool_use_result: a.reply.tool_use_result };
+  const partial = { ...b.reply, tool_use_result: { ...b.reply.tool_use_result,
+    file: { ...b.reply.tool_use_result.file, totalLines: 2 } } };
+  for (const reply of [mismatched, partial]) {
+    assert.throws(() => audit([request, parallel, reply, a.reply, output]), /Failed or partial Read result/);
+  }
+});
+
+test("native stream compares only the final message text in fragment order", () => {
+  const earlier = assistant([{ type: "text", text: "Earlier turn" }], "message-earlier");
+  const prefix = assistant([{ type: "text", text: "REVIEW_" }, { type: "text", text: "PROBE_" }], "message-final");
+  const suffix = assistant([{ type: "text", text: "OK" }], "message-final");
+  const audit = (events, result = answer) => auditClaudeStream(proc([init, ...events, { ...end, result }]), runtime, [], true);
+  assert.equal(audit([earlier, prefix, suffix]), answer);
+  assert.throws(() => audit([earlier, suffix, prefix]), /final stream text mismatch/);
+  assert.throws(() => audit([earlier, prefix, suffix], answer + "\n"), /final stream text mismatch/);
+  assert.throws(() => audit([earlier, prefix, assistant(suffix.message.content, "message-other")]), /final stream text mismatch/);
 });
 
 test("CLI usage rejects a request-selected host override before filesystem reads", () => {
