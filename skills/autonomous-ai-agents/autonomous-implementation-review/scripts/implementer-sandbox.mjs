@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { runBoundedWorker } from "./bounded-worker.mjs";
 import { preparePromptTransport } from "./terminal-adapters.mjs";
 import { requestBytes, writeClosed } from "./worker-handoff.mjs";
-import { equal, need } from "./review-inputs.mjs";
+import { equal, need, within } from "./review-inputs.mjs";
 import { checkoutProtectedPaths, checkoutStatus } from "./worker-runtime-policy.mjs";
 
 const bin = "/usr/bin/python3";
@@ -122,6 +122,11 @@ async function filesystemPolicy(request, role, registry, writable) {
   for (const name of writable) paths[name] = "write";
   for (const name of [role.codexHome, role.home, role.xdg, registry, ...request.evidenceRoots, ...git]) paths[name] = "deny";
   paths[path.join(workspace, "openspec/changes", change, "tasks.md")] = "read";
+  // Bubblewrap cannot mount a deny beneath an already denied parent.
+  const denied = Object.keys(paths).filter((name) => paths[name] === "deny");
+  for (const name of denied) {
+    if (denied.some((parent) => within(parent, name) && !within(name, parent))) delete paths[name];
+  }
   return paths;
 }
 

@@ -9,11 +9,12 @@ import { buildCodexLaunch, smokeCheck } from "../skills/autonomous-ai-agents/aut
 import { checkoutStatus } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/worker-runtime-policy.mjs";
 import { requestBytes } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/worker-handoff.mjs";
 
-async function fixture(t) {
+async function fixture(t, { linked = false } = {}) {
   const root = await mkdtemp(path.join(tmpdir(), "sandbox-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const p = (...names) => path.join(root, ...names);
-  const workspace = p("operator-home", "src", "checkout");
+  const checkout = p("operator-home", "src", "checkout");
+  const workspace = linked ? p("operator-home", "src", "linked") : checkout;
   const change = "fixture-sandbox";
   const relativeTask = "openspec/changes/" + change + "/tasks.md";
   const relativeConfig = "openspec/config.yaml";
@@ -24,20 +25,21 @@ async function fixture(t) {
   const controlDirectory = p("control");
   const protectedFile = p("synthetic-grant");
   await Promise.all([role.home, role.xdg, role.codexHome, registry, attemptDirectory, controlDirectory,
-    path.dirname(path.join(workspace, relativeTask))].map((name) => mkdir(name, { recursive: true, mode: 0o700 })));
+    path.dirname(path.join(checkout, relativeTask))].map((name) => mkdir(name, { recursive: true, mode: 0o700 })));
   await Promise.all([
-    writeFile(path.join(workspace, relativeTask), "- [ ] 1.1 fixture\n"), writeFile(path.join(workspace, relativeConfig), "fixture config\n"),
-    writeFile(path.join(workspace, "ok.txt"), "fixture source\n"), writeFile(protectedFile, "synthetic data\n"),
+    writeFile(path.join(checkout, relativeTask), "- [ ] 1.1 fixture\n"), writeFile(path.join(checkout, relativeConfig), "fixture config\n"),
+    writeFile(path.join(checkout, "ok.txt"), "fixture source\n"), writeFile(protectedFile, "synthetic data\n"),
     writeFile(path.join(attemptDirectory, "request.md"), "synthetic request\n"),
     writeFile(role.executable.path, "#!/bin/sh\nif [ \"$1\" = --version ]; then echo 'codex-cli 0.171.0'; exit 0; fi\nexit 1\n", { mode: 0o700 }),
   ]);
   const git = (...args) => execFileSync("/usr/bin/git", ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", ...args],
-    { cwd: workspace, env: { PATH: "/usr/bin:/bin", HOME: "/nonexistent", GIT_CONFIG_NOSYSTEM: "1" }, stdio: "ignore" });
+    { cwd: checkout, env: { PATH: "/usr/bin:/bin", HOME: "/nonexistent", GIT_CONFIG_NOSYSTEM: "1" }, stdio: "ignore" });
   git("init", "-q");
   git("add", ".");
   git("commit", "-qm", "synthetic fixture");
+  if (linked) git("worktree", "add", "-q", "--detach", workspace);
   const request = { identity: { workspace, change }, mutablePaths: ["ok.txt"], evidenceRoots: [attemptDirectory], outcome: "Synthetic prompt only" };
-  return { root, p, request, role, registry, attemptDirectory, controlDirectory, protectedFile, workspace, relativeTask };
+  return { root, p, request, role, registry, attemptDirectory, controlDirectory, protectedFile, checkout, workspace, relativeTask };
 }
 
 test("native launch sends only request stdin, a named exact scope and isolated process environment", async (t) => {
@@ -64,6 +66,28 @@ test("native launch sends only request stdin, a named exact scope and isolated p
   for (const name of [f.role.codexHome, f.role.home, f.role.xdg, f.registry, f.attemptDirectory, path.join(f.workspace, ".git")]) {
     assert.ok(fs.includes(JSON.stringify(name) + ' = "deny"'), name);
   }
+});
+
+test("a linked worktree denies the Git marker and common dir without a nested Git deny", async (t) => {
+  const f = await fixture(t, { linked: true });
+  const marker = path.join(f.workspace, ".git");
+  const commonDir = path.join(f.checkout, ".git");
+  const worktreeDir = path.join(commonDir, "worktrees", path.basename(f.workspace));
+  const adjacentRegistry = commonDir + "-registry";
+  assert.ok((await lstat(marker)).isFile());
+  assert.ok((await lstat(path.join(worktreeDir, "HEAD"))).isFile());
+  await mkdir(adjacentRegistry);
+
+  const launch = await buildCodexLaunch(f.request, f.role, adjacentRegistry, f.controlDirectory, "fixture-nonce");
+  assert.ok(launch.args.includes('default_permissions="worker"'));
+  const fs = launch.args.find((item) => item.startsWith("permissions.worker.filesystem="));
+  for (const name of [marker, commonDir, adjacentRegistry, f.attemptDirectory, f.role.home, f.role.xdg, f.role.codexHome]) {
+    assert.ok(fs.includes(JSON.stringify(name) + ' = "deny"'), name);
+  }
+  assert.ok(!fs.includes(JSON.stringify(worktreeDir)), worktreeDir);
+  assert.ok(fs.includes(JSON.stringify(path.join(f.workspace, f.relativeTask)) + ' = "read"'));
+  assert.ok(fs.includes(JSON.stringify(path.join(f.workspace, "ok.txt")) + ' = "write"'));
+  assert.equal([...fs.matchAll(/ = "write"/g)].length, 1);
 });
 
 test("project discovery stops at the checkout marker and rejects project-local settings", async (t) => {
