@@ -1,0 +1,222 @@
+{
+  "schemaVersion": 1,
+  "mode": "goal-first",
+  "change": "ci-supply-chain-hardening-01m877dyscckvrfc4jvqxv5f01",
+  "issueUrl": "https://github.com/grewety/ai-coding-agent-skills/issues/32",
+  "base": "772150e7dfa6b5f1d7758c707d6b9ca39a44fc5a",
+  "head": "6df82e2c6013ff5239a80970f98e71d7ef4cf2d1",
+  "plan": "f798114d2a13dbf84eebaa783996d21b41bc0fae",
+  "planDigest": "69696b6bd1d2d96d3e81452150efb6ac125388ecb9dc6aacad31ee877b5c999a",
+  "integrated": "36605eaf550c1df7adf3e924da5e97aa19932eb0",
+  "verified": "36605eaf550c1df7adf3e924da5e97aa19932eb0",
+  "integrationReference": "https://github.com/grewety/ai-coding-agent-skills/pull/54",
+  "mergedAt": "2026-11-24T18:10:11Z",
+  "mergeReadback": "finish.BY7p5MGX/implementation-merged.json (SHA-256 6dcd8865a5ebf7c780c9d2c8af547d246162440f35aea0e1af6cb6309eed892f)",
+  "review": {
+    "schemaVersion": 1,
+    "change": "ci-supply-chain-hardening-01m877dyscckvrfc4jvqxv5f01",
+    "issueUrl": "https://github.com/grewety/ai-coding-agent-skills/issues/32",
+    "head": "6df82e2c6013ff5239a80970f98e71d7ef4cf2d1",
+    "planDigest": "69696b6bd1d2d96d3e81452150efb6ac125388ecb9dc6aacad31ee877b5c999a",
+    "verdict": "pass",
+    "findings": [],
+    "reviewer": "Claude Code 2.1.330 / claude-sonnet-4-6 / ac6a2c7b-327b-453f-85f9-30540d3adf8b",
+    "reference": "standalone.Oonvp6OB/final-candidate/review-output/status.json (SHA-256 1a0a54f75e4b3bf0044f144a2acacc96ea8929c54db66753ed1751dc24d4efe5)",
+    "nativeReport": "standalone.Oonvp6OB/final-candidate/review-output/native.txt (SHA-256 c4336278e0a61d896e6a6b78867a4712b4e286940c751b742377798bd26ab59b)",
+    "verifiedReview": "standalone.Oonvp6OB/final-candidate/review-verified.json (SHA-256 3057eab792cada742a4f8246dc4665b5c44bffeaf44fb7396dfa17ebda7df18b)",
+    "nativePlanningDigest": "493d60281f286d7327a51598afaa673e3c85711db28c9678bed79ed47d5e1cd6",
+    "coverageLimitations": [],
+    "wholeFileCoverage": "28 of 28 assigned files read",
+    "gates": [
+      {
+        "command": "npm test",
+        "commit": "6df82e2c6013ff5239a80970f98e71d7ef4cf2d1",
+        "exitCode": 0,
+        "evidence": "standalone.Oonvp6OB/final-candidate/disposable-gate-run.json (SHA-256 ab742da5b4402c203169fe3d637f849b0c77856acd8679b4b9fa28f1fb62db85)",
+        "stdoutSha256": "b25eef92dcf3755d509f05987ece8ccb570a87355f3782df17711d0a947875bf",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "npm run build",
+        "commit": "6df82e2c6013ff5239a80970f98e71d7ef4cf2d1",
+        "exitCode": 0,
+        "evidence": "standalone.Oonvp6OB/final-candidate/disposable-gate-run.json (SHA-256 ab742da5b4402c203169fe3d637f849b0c77856acd8679b4b9fa28f1fb62db85)",
+        "stdoutSha256": "e47b4adf25d1ea7334ea35d13e514ef5ce58084146c801da0078ba6ca3fd033b",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "openspec validate --strict --all",
+        "commit": "6df82e2c6013ff5239a80970f98e71d7ef4cf2d1",
+        "exitCode": 0,
+        "evidence": "standalone.Oonvp6OB/final-candidate/disposable-gate-run.json (SHA-256 ab742da5b4402c203169fe3d637f849b0c77856acd8679b4b9fa28f1fb62db85)",
+        "stdoutSha256": "9301da6e3402a8fd32839b83ff07de26917365941190e9078e64c1b8fae32ced",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "npm run validate:openspec",
+        "commit": "6df82e2c6013ff5239a80970f98e71d7ef4cf2d1",
+        "exitCode": 0,
+        "evidence": "standalone.Oonvp6OB/final-candidate/disposable-gate-run.json (SHA-256 ab742da5b4402c203169fe3d637f849b0c77856acd8679b4b9fa28f1fb62db85)",
+        "stdoutSha256": "0f08bae65c5867c0029981482c56e14ecea8a4e5f82db1c30a6aa5b253e54b02",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  "approachReview": {
+    "path": "approach-review.json",
+    "sha256": "451c5307d3619e872c92966e37297946b0e6cf789e6a083a4a90a2a934d00b0e",
+    "disposition": "freeze-ready"
+  },
+  "gates": [
+    {
+      "command": "npm test",
+      "commit": "36605eaf550c1df7adf3e924da5e97aa19932eb0",
+      "exitCode": 0,
+      "evidence": "finish.BY7p5MGX/integrated-gates-resume/04-npm-test.stdout.log (SHA-256 3537fb85c339da00f22cfb909163dff10263324bb9dc5bccebd5342103c716cf)",
+      "stderr": "finish.BY7p5MGX/integrated-gates-resume/04-npm-test.stderr.log (SHA-256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855)",
+      "startedAt": "2026-11-24T19:48:45Z",
+      "finishedAt": "2026-11-24T19:49:53Z"
+    },
+    {
+      "command": "npm run build",
+      "commit": "36605eaf550c1df7adf3e924da5e97aa19932eb0",
+      "exitCode": 0,
+      "evidence": "finish.BY7p5MGX/integrated-gates-resume/05-npm-run-build.stdout.log (SHA-256 8840486d20ecf2170e219afdad478fe40177f2d2666175b506782fc499d21c83)",
+      "stderr": "finish.BY7p5MGX/integrated-gates-resume/05-npm-run-build.stderr.log (SHA-256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855)",
+      "startedAt": "2026-11-24T19:49:53Z",
+      "finishedAt": "2026-11-24T19:49:54Z"
+    },
+    {
+      "command": "openspec validate --strict --all",
+      "commit": "36605eaf550c1df7adf3e924da5e97aa19932eb0",
+      "exitCode": 0,
+      "evidence": "finish.BY7p5MGX/integrated-gates-resume/06-openspec-validate-strict-all.stdout.log (SHA-256 9301da6e3402a8fd32839b83ff07de26917365941190e9078e64c1b8fae32ced)",
+      "stderr": "finish.BY7p5MGX/integrated-gates-resume/06-openspec-validate-strict-all.stderr.log (SHA-256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855)",
+      "startedAt": "2026-11-24T19:49:54Z",
+      "finishedAt": "2026-11-24T19:49:54Z"
+    },
+    {
+      "command": "npm run validate:openspec",
+      "commit": "36605eaf550c1df7adf3e924da5e97aa19932eb0",
+      "exitCode": 0,
+      "evidence": "finish.BY7p5MGX/integrated-gates-resume/07-npm-run-validate-openspec.stdout.log (SHA-256 0f08bae65c5867c0029981482c56e14ecea8a4e5f82db1c30a6aa5b253e54b02)",
+      "stderr": "finish.BY7p5MGX/integrated-gates-resume/07-npm-run-validate-openspec.stderr.log (SHA-256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855)",
+      "startedAt": "2026-11-24T19:49:55Z",
+      "finishedAt": "2026-11-24T19:49:55Z"
+    }
+  ],
+  "gateEnvironment": {
+    "node": "v24.21.0",
+    "npm": "11.19.0",
+    "openspec": "2.1.1",
+    "bootstrap": "npm ci --offline --no-audit --no-fund",
+    "commands": "finish.BY7p5MGX/integrated-gates-resume/gates.json (SHA-256 f12311d80f39c682660246736a1a02422734de139808f5e5d1de9b924b93fa5f)"
+  },
+  "testSummary": {
+    "tests": 497,
+    "pass": 497,
+    "fail": 0,
+    "skipped": 0
+  },
+  "interruptedIntegratedAttempt": "finish.BY7p5MGX/integrated-gates/operator-stop.txt (SHA-256 5092ea6458085b7bbfd1dad90902ddff2e54f1c58fc338247d52f300a87a7f27)",
+  "requiredVerification": {
+    "rulesetId": 26268609,
+    "context": "verify",
+    "head": "6df82e2c6013ff5239a80970f98e71d7ef4cf2d1",
+    "checks": [
+      {
+        "id": 138666190576,
+        "url": "https://github.com/grewety/ai-coding-agent-skills/actions/runs/45456202640/job/138666190576",
+        "completedAt": "2026-11-24T18:09:31Z",
+        "conclusion": "success"
+      },
+      {
+        "id": 138665897908,
+        "url": "https://github.com/grewety/ai-coding-agent-skills/actions/runs/45456120356/job/138665897908",
+        "completedAt": "2026-11-24T18:09:25Z",
+        "conclusion": "success"
+      }
+    ],
+    "premergeChecksReadback": "finish.BY7p5MGX/implementation-premerge-checks.json (SHA-256 cbc1a3a6aa5a791c962ea5fb4fbc4aae1b2e7ce57cf856c2e976cf887ef6d29b)",
+    "premergeThreadReadback": "finish.BY7p5MGX/implementation-premerge-threads.json (SHA-256 ee948d473f7a4956120ebd511c7a9e12fdef87ed82acd4b23da2776b4527e379)",
+    "observedAt": "2026-11-24T18:10:08Z"
+  },
+  "mainVerification": {
+    "url": "https://github.com/grewety/ai-coding-agent-skills/actions/runs/45456564633",
+    "conclusion": "success",
+    "readback": "finish.BY7p5MGX/integrated-verify-final.json (SHA-256 49ac59d7e0ce211d5dd16ae8a9fec0c7e3bcc4d242e33e2208a2aad1fce46114)"
+  },
+  "pages": {
+    "runId": 45456564795,
+    "url": "https://github.com/grewety/ai-coding-agent-skills/actions/runs/45456564795",
+    "head": "36605eaf550c1df7adf3e924da5e97aa19932eb0",
+    "conclusion": "success",
+    "deploymentId": 8036643092,
+    "deploymentStatusId": 23056547199,
+    "site": "https://grewety.github.io/ai-coding-agent-skills/",
+    "readback": "finish.BY7p5MGX/integrated-pages-final.json (SHA-256 abaa8c0890173a43c3c2af3f74335de7d7eeeebed13702ec81d2c82145780108)",
+    "deploymentReadback": "finish.BY7p5MGX/integrated-pages-deployments.json (SHA-256 33dd3edccfce834a70bb3832730b45fbbab632c740f39d7c8df21f0ae7860de6)",
+    "statusReadback": "finish.BY7p5MGX/integrated-pages-deployment-statuses.json (SHA-256 4549163bfb77fc48c1b5a5e26e18eae652332ebfa978985291f7c3ecbe5b0ec0)"
+  },
+  "aikido": {
+    "prChecks": [
+      {
+        "id": 138666198684,
+        "name": "Aikido Security: check code",
+        "conclusion": "success"
+      },
+      {
+        "id": 138666207401,
+        "name": "Aikido Security: Deep Review",
+        "conclusion": "success"
+      }
+    ],
+    "prChecksReadback": "finish.BY7p5MGX/implementation-aikido-after-merge.json (SHA-256 e973d37c3a308712c48fce54533346307cccdd41b3c55db666828dd968c79484)",
+    "optionalMainSuite": {
+      "id": 122999890730,
+      "statusAtStop": "queued",
+      "runsAtStop": 0,
+      "observedAt": "2026-11-24T18:13:19Z",
+      "readback": "finish.BY7p5MGX/integrated-aikido-three-minute-suite.json (SHA-256 e1f25b228d4158d563bf4b10b13eaeacd151b2a402311d147567bd0dc0c449d6)",
+      "runsReadback": "finish.BY7p5MGX/integrated-aikido-three-minute-runs.json (SHA-256 e83cfac35507982a40cfeb776ce85aa0367e7646f81fe857df4a6c841ea8a170)",
+      "operatorDisposition": "Continue under the explicit follow-up finish authorization using successful required CI, Pages deployment, Aikido PR checks, and live main feed readback."
+    },
+    "mainFeed": {
+      "branch": "main",
+      "sastCount": 0,
+      "observedAt": "2026-11-24T18:12:12Z",
+      "readback": "finish.BY7p5MGX/aikido-main-sast.json (SHA-256 805b286ff3bfcac5bca4d610e553703f20bed90093265aae477941aa64ca698d)",
+      "findings": [
+        {
+          "id": 1151570769,
+          "type": "sast",
+          "status": "absent from current main SAST feed; exact lookup returned 404",
+          "observedAt": "2026-11-24T18:11:58Z",
+          "source": "finish.BY7p5MGX/aikido-1151570769.json (SHA-256 dc488902766c7feaee23ce705052cbbb43aebc67ff85e12137b500422d02027e)"
+        },
+        {
+          "id": 1151570772,
+          "type": "sast",
+          "status": "absent from current main SAST feed; exact lookup returned 404",
+          "observedAt": "2026-11-24T18:12:02Z",
+          "source": "finish.BY7p5MGX/aikido-1151570772.json (SHA-256 dc488902766c7feaee23ce705052cbbb43aebc67ff85e12137b500422d02027e)"
+        },
+        {
+          "id": 1151615154,
+          "type": "ai_pentest",
+          "status": "present in main feed at readback; dashboard retest is pending",
+          "observedAt": "2026-11-24T18:12:05Z",
+          "source": "finish.BY7p5MGX/aikido-1151615154.json (SHA-256 5db3b4eeb659303a272f6ac0debd1d230ca4c509123c7970bd83c0c011503fa3)"
+        },
+        {
+          "id": 1151615165,
+          "type": "ai_pentest",
+          "status": "present in main feed at readback; dashboard retest is pending",
+          "observedAt": "2026-11-24T18:12:09Z",
+          "source": "finish.BY7p5MGX/aikido-1151615165.json (SHA-256 755a4433e5fc258ee2cbe76c4353ed28140d5635e24dd7e524a645d80b0c4d91)"
+        }
+      ],
+      "aiPentestFeedReadback": "finish.BY7p5MGX/aikido-main-ai-pentest.json (SHA-256 d0cfc7794c96e904f492aea4fd31f5745dd1f0a7a95598d3892e22e47629a60d)"
+    }
+  }
+}
