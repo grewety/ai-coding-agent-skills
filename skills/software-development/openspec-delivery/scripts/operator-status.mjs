@@ -134,7 +134,7 @@ export function operatorStatus(base, { policy, workspace, identity, preflight, c
   else if (code === "RECORD_NATIVE_PROGRESS") next = ["Record the verified native progress under the retained local grant"];
   else if (code === "WAIT_FOR_ORIGINAL_OPERATOR_INPUT") next = ["Answer the pending input in the original session"];
   else if (code === "RESOLVE_STOP") next = [inspect, `Supply verified evidence for ${base.stopPredicate ?? "the unresolved predicate"}`];
-  const canSwitch = checkpoint && checkpoint.safeBoundary === true;
+  const canSwitch = checkpoint?.safeBoundary === true && text(result.workspace);
   result.nextInput = code ? next : null;
   result.session = canSwitch && code ? {
     kind: "fresh-session",

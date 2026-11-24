@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { sha256 } from "../skills/software-development/openspec-delivery/scripts/evidence-cli.mjs";
 import { stableJson } from "../skills/software-development/openspec-delivery/scripts/evidence-retention.mjs";
 import { planningWorktree } from "../skills/software-development/openspec-delivery/scripts/change-guard.mjs";
+import { operatorStatus } from "../skills/software-development/openspec-delivery/scripts/operator-status.mjs";
 import { startConvergenceReview, convergencePacket, acceptConvergenceReview } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/orchestration-core.mjs";
 import { boundary, change, fixture, own, twoGroupGuidance } from "./delivery-runtime-setup.mjs";
 
@@ -313,6 +314,24 @@ test("a grounded changes reply refreezes the corrected native bytes and supersed
     inReplyTo: "second-display", id: "second-reply", at: cardTime(12),
   }));
   assert.equal(accepted.status, 0, accepted.stdout);
+});
+
+test("operator status keeps the next step when a safe checkpoint lacks a usable workspace", () => {
+  const base = { change, recommendedNextAction: { code: "RESUME_BOUNDED_ATTEMPT" } };
+  const checkpoint = { safeBoundary: true, file: "/records/checkpoint.json", sha256: "a".repeat(64),
+    records: "/records", evidence: { file: "/records/proof.json" } };
+  const nextInput = `$openspec-next ${change}`;
+  for (const workspace of [undefined, { workspace: null }, { workspace: "" }, { workspace: " " }]) {
+    const status = operatorStatus(base, { checkpoint, workspace });
+    assert.deepEqual(status.nextInput, [nextInput]);
+    assert.deepEqual(status.session, { kind: "same-session" });
+    assert.ok(status.footer.includes(`- ${nextInput}`));
+    assert.doesNotMatch(status.footer, /Fresh session:|change_worktree=|codex --approve-for-me/);
+  }
+  const status = operatorStatus(base, { checkpoint, workspace: { workspace: "/work/change" } });
+  assert.equal(status.session.kind, "fresh-session");
+  assert.match(status.session.setup, /^change_worktree='\/work\/change'/);
+  assert.ok(status.footer.includes(status.session.launch));
 });
 
 test("qualified checkpoint relay checks timer cancellation, exact successor and retained HANDOFF_ACK", async (t) => {
