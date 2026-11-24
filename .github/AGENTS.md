@@ -12,7 +12,9 @@ Verify skill packages and publish the tested static distribution site to GitHub 
 ## Local Contracts
 
 - Both workflows run `npm ci`, `npm test`, and `npm run build` on Node 22.
-- Default permissions are contents: read. Only the deployment job receives pages: write and id-token: write.
+- Pin each third-party action to a verified full 40-character lowercase hexadecimal commit SHA. Keep its corresponding major-version comment on the `uses` field and verify each new SHA against the upstream action before updating it.
+- Set `persist-credentials: false` explicitly on each `actions/checkout` step.
+- Workflow-level permissions are `contents: read`. Only the Pages deploy job receives `pages: write` and `id-token: write`.
 - Deploy only dist/ via the Pages artifact; include `.well-known/` dot-directory explicitly and retain `downloads/` ZIPs, HTML, and checksum inventory. The source marketplace is versioned in Git, not deployed as a Pages registry.
 - Pull requests do not deploy. Serialize Pages deployments; retain the previous successful deployment if build checks fail.
 
@@ -22,7 +24,7 @@ Keep local commands, root verification, and workflows aligned. No personal token
 
 ## Verification
 
-Validate YAML and run matching local checks. Verify deployment run and public endpoint before declaring publishing complete.
+Run `npm test` for offline checks of action pins, version comments, checkout settings, and the contents of the Pages archive. Verify the deployment run and public endpoint before declaring publishing complete.
 
 ## Child DOX Index
 
