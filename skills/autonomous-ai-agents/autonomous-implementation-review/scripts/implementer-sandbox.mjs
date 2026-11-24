@@ -3,8 +3,8 @@ import { lstat, mkdir, readdir, rmdir, unlink } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { runBoundedWorker } from "./bounded-worker.mjs";
 import { preparePromptTransport } from "./terminal-adapters.mjs";
-import { requestBytes, writeClosed } from "./worker-handoff.mjs";
-import { equal, need, within } from "./review-inputs.mjs";
+import { requestBytes, safePath, writeClosed } from "./worker-handoff.mjs";
+import { equal, need, relative, within } from "./review-inputs.mjs";
 import { checkoutProtectedPaths, checkoutStatus } from "./worker-runtime-policy.mjs";
 
 const bin = "/usr/bin/python3";
@@ -131,21 +131,32 @@ async function filesystemPolicy(request, role, registry, writable) {
 }
 
 export async function buildCodexLaunch(request, role, registry, captureDir, launchNonce) {
-  await ensureDedicatedConfiguration(role, request.identity.workspace);
+  const { workspace } = request.identity;
+  await ensureDedicatedConfiguration(role, workspace);
+  // Codex mounts .git protections beneath write roots, which must be directories.
+  // The request and post-worker output checks still use the exact file paths.
+  const writable = new Set();
+  for (const name of request.mutablePaths) {
+    need(relative(name), "Unsafe mutable path for native Codex write root");
+    const filename = path.join(workspace, name);
+    const directory = path.dirname(filename);
+    need(within(workspace, directory), "Native Codex write root escapes workspace");
+    await safePath(filename, true);
+    writable.add(directory);
+  }
+  const filesystem = await filesystemPolicy(request, role, registry, writable);
   const transport = preparePromptTransport({
     client: "codex", version: role.version, role: "implementer", session: launchNonce,
-    workspace: request.identity.workspace, prompt: requestBytes(request).toString("utf8"),
+    workspace, prompt: requestBytes(request).toString("utf8"),
     captureDir, preferredRoute: "stdin",
   });
   need(transport.action === "ready" && transport.argv[0] === "exec" && transport.argv[1] === "-",
     "Codex non-argv prompt adapter changed");
-  const paths = request.mutablePaths.map((name) => path.join(request.identity.workspace, name));
-  const filesystem = await filesystemPolicy(request, role, registry, paths);
   return {
-    command: role.executable.path, input: transport.stdinBytes, cwd: request.identity.workspace,
+    command: role.executable.path, input: transport.stdinBytes, cwd: workspace,
     env: workerEnvironment(role),
     args: ["exec", "--json", "--ephemeral", "--ignore-user-config", "--ignore-rules", "--color", "never",
-      "-C", request.identity.workspace, ...commonSettings(filesystem), "-m", role.model, "-"],
+      "-C", workspace, ...commonSettings(filesystem), "-m", role.model, "-"],
   };
 }
 
@@ -178,7 +189,6 @@ export async function smokeCheck({ request, role, registry, attemptDirectory, pr
     for (const mode of ["read-only", "workspace-write"]) {
       const writable = mode === "read-only" ? [] : [scratchDirectory];
       const filesystem = await filesystemPolicy(request, role, registry, writable);
-      // The probe may replace a disposable file. Product edits use the exact grant paths.
       const args = ["sandbox", "-P", "worker", "-C", workspace, ...commonSettings(filesystem), "--", bin, "-I", "-B",
         "-c", shellProbe, mode, readOnly, scratch, tasks, secret, evidence, head, protectedFile];
       settled = false;

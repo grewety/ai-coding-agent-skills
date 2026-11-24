@@ -42,7 +42,7 @@ async function fixture(t, { linked = false } = {}) {
   return { root, p, request, role, registry, attemptDirectory, controlDirectory, protectedFile, checkout, workspace, relativeTask };
 }
 
-test("native launch sends only request stdin, a named exact scope and isolated process environment", async (t) => {
+test("native launch keeps the root file in request stdin and grants its workspace directory in the named profile", async (t) => {
   const f = await fixture(t);
   const launch = await buildCodexLaunch(f.request, f.role, f.registry, f.controlDirectory, "fixture-nonce");
   assert.deepEqual(launch.input, requestBytes(f.request));
@@ -50,7 +50,7 @@ test("native launch sends only request stdin, a named exact scope and isolated p
   for (const flag of ["--json", "--ephemeral", "--ignore-user-config", "--ignore-rules", "skip_host_skill_discovery",
     'default_permissions="worker"', 'project_root_markers=[".git"]', "permissions.worker.network.enabled=false",
     "approval_policy=\"never\"", "mcp_servers={}"]) assert.ok(launch.args.includes(flag), flag);
-  for (const value of ["-s", "--sandbox", "--add-dir", "--trust", "--dangerously-bypass-approvals-and-sandbox"]) assert.ok(!launch.args.includes(value), value);
+  for (const value of ["-s", "--sandbox", "workspace-write", "--add-dir", "--trust", "--dangerously-bypass-approvals-and-sandbox"]) assert.ok(!launch.args.includes(value), value);
   assert.equal(launch.env.CODEX_HOME, f.role.codexHome);
   assert.equal(launch.env.HOME, f.role.home);
   assert.equal(launch.env.XDG_CONFIG_HOME, f.role.xdg);
@@ -60,12 +60,43 @@ test("native launch sends only request stdin, a named exact scope and isolated p
   const fs = launch.args.find((item) => item.startsWith("permissions.worker.filesystem="));
   assert.ok(fs.includes('":minimal" = "read"'));
   assert.ok(fs.includes(JSON.stringify(f.role.executable.path) + ' = "read"'));
-  assert.ok(fs.includes(JSON.stringify(path.join(f.workspace, "ok.txt")) + ' = "write"'));
+  assert.ok(fs.includes(JSON.stringify(f.workspace) + ' = "write"'));
+  assert.ok(!fs.includes(JSON.stringify(path.join(f.workspace, "ok.txt"))));
   assert.equal([...fs.matchAll(/ = "write"/g)].length, 1);
   assert.ok(fs.includes(JSON.stringify(path.join(f.workspace, f.relativeTask)) + ' = "read"'));
   for (const name of [f.role.codexHome, f.role.home, f.role.xdg, f.registry, f.attemptDirectory, path.join(f.workspace, ".git")]) {
     assert.ok(fs.includes(JSON.stringify(name) + ' = "deny"'), name);
   }
+});
+
+test("native launch maps existing and future files to deduplicated containing directories", async (t) => {
+  const f = await fixture(t);
+  const source = path.join(f.workspace, "src");
+  const tests = path.join(f.workspace, "tests");
+  await Promise.all([mkdir(source), mkdir(tests)]);
+  await writeFile(path.join(source, "existing.mjs"), "// Synthetic fixture\n");
+  const request = { ...f.request, mutablePaths: ["src/existing.mjs", "src/future.mjs", "tests/future.mjs"] };
+  const input = requestBytes(request);
+
+  const launch = await buildCodexLaunch(request, f.role, f.registry, f.controlDirectory, "fixture-nonce");
+  assert.deepEqual(launch.input, input);
+  assert.deepEqual(requestBytes(request), input);
+  const fs = launch.args.find((item) => item.startsWith("permissions.worker.filesystem="));
+  assert.ok(fs.includes(JSON.stringify(f.workspace) + ' = "read"'));
+  for (const directory of [source, tests]) assert.ok(fs.includes(JSON.stringify(directory) + ' = "write"'), directory);
+  for (const file of request.mutablePaths) assert.ok(!fs.includes(JSON.stringify(path.join(f.workspace, file))), file);
+  assert.equal([...fs.matchAll(/ = "write"/g)].length, 2);
+});
+
+test("native launch rejects paths that escape the workspace", async (t) => {
+  const f = await fixture(t);
+  const launch = (file) => buildCodexLaunch({ ...f.request, mutablePaths: ["ok.txt", file] },
+    f.role, f.registry, f.controlDirectory, "fixture-nonce");
+  for (const file of ["../outside.txt", f.p("outside.txt")]) {
+    await assert.rejects(launch(file), /Unsafe mutable path for native Codex write root/, file);
+  }
+  await symlink(f.controlDirectory, path.join(f.workspace, "linked"));
+  await assert.rejects(launch("linked/future.txt"), /Unsafe symlink artifact path/);
 });
 
 test("a linked worktree denies the Git marker and common dir without a nested Git deny", async (t) => {
@@ -86,7 +117,7 @@ test("a linked worktree denies the Git marker and common dir without a nested Gi
   }
   assert.ok(!fs.includes(JSON.stringify(worktreeDir)), worktreeDir);
   assert.ok(fs.includes(JSON.stringify(path.join(f.workspace, f.relativeTask)) + ' = "read"'));
-  assert.ok(fs.includes(JSON.stringify(path.join(f.workspace, "ok.txt")) + ' = "write"'));
+  assert.ok(fs.includes(JSON.stringify(f.workspace) + ' = "write"'));
   assert.equal([...fs.matchAll(/ = "write"/g)].length, 1);
 });
 
