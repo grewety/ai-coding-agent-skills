@@ -1,5 +1,5 @@
 import path from "node:path";
-import { lstat, mkdir, rmdir, unlink } from "node:fs/promises";
+import { lstat, mkdir, readdir, rmdir, unlink } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { runBoundedWorker } from "./bounded-worker.mjs";
 import { preparePromptTransport } from "./terminal-adapters.mjs";
@@ -40,7 +40,7 @@ def no_write(name):
 with open(readable, "rb") as source:
     if not source.read(1):
         raise RuntimeError("benign read returned no data")
-for name in [protected, secret, evidence, *sys.argv[7:]]:
+for name in [readable, protected, secret, evidence, *sys.argv[7:]]:
     no_write(name)
 for name in (secret, evidence):
     no_read(name)
@@ -65,23 +65,37 @@ export function workerEnvironment(role) {
 }
 
 async function ensureDedicatedConfiguration(role, workspace) {
-  // The exec option suppresses user configuration. Reject project-layer entry
-  // points separately so local settings cannot introduce hooks or connectors.
+  // The launch fixes Codex's project marker to .git. Both a regular checkout
+  // and a linked worktree stop discovery at this checkout's marker.
+  const marker = await lstat(path.join(workspace, ".git"));
+  need(marker.isDirectory() || marker.isFile(), "Expected a Git project marker at the worker checkout");
   const forbidden = [".codex/config.toml", ".codex/rules", ".codex/agents", ".mcp.json"];
-  for (let directory = workspace; directory !== path.dirname(directory); directory = path.dirname(directory)) {
-    for (const name of forbidden) {
-      try {
-        await lstat(path.join(directory, name));
-        throw new Error("Workspace ancestry has ambient Codex settings, agents, rules or MCP");
-      } catch (error) { if (error.code !== "ENOENT") throw error; }
-    }
-  }
-  for (const name of ["config.toml", "rules", "skills", "AGENTS.md"]) {
+  for (const name of forbidden) {
     try {
-      await lstat(path.join(role.codexHome, name));
-      throw new Error("Dedicated Codex home has ambient configuration or discoverable skills");
+      await lstat(path.join(workspace, name));
+      throw new Error("Worker checkout has project-local Codex settings, agents, rules or MCP");
     } catch (error) { if (error.code !== "ENOENT") throw error; }
   }
+  const ambientConfiguration = "Dedicated Codex home has ambient configuration or discoverable skills";
+  for (const name of ["config.toml", "rules", "AGENTS.md"]) {
+    try {
+      await lstat(path.join(role.codexHome, name));
+      throw new Error(ambientConfiguration);
+    } catch (error) { if (error.code !== "ENOENT") throw error; }
+  }
+
+  const skills = path.join(role.codexHome, "skills");
+  let skillsStat;
+  try { skillsStat = await lstat(skills); }
+  catch (error) {
+    if (error.code === "ENOENT") return;
+    throw error;
+  }
+  // Codex may populate .system with built-in skills in a dedicated home.
+  need(skillsStat.isDirectory(), ambientConfiguration);
+  const entries = await readdir(skills);
+  need(entries.length === 1 && entries[0] === ".system", ambientConfiguration);
+  need((await lstat(path.join(skills, ".system"))).isDirectory(), ambientConfiguration);
 }
 
 function tomlTable(settings) {
@@ -89,22 +103,24 @@ function tomlTable(settings) {
     JSON.stringify(key) + " = " + JSON.stringify(value)).join(", ") + " }";
 }
 
-function commonSettings(role, filesystem) {
+function commonSettings(filesystem) {
   return [...features, "-c", "default_permissions=\"worker\"",
+    "-c", 'project_root_markers=[".git"]',
     "-c", "permissions.worker.filesystem=" + tomlTable(filesystem),
     "-c", "permissions.worker.network.enabled=false",
     "-c", "approval_policy=\"never\"", "-c", "model_provider=\"openai\"",
     "-c", "cli_auth_credentials_store=\"file\"", "-c", "mcp_servers={}",
-    "-c", "shell_environment_policy.inherit=\"none\"", "-c", "allow_login_shell=false",
-    "-m", role.model];
+    "-c", "shell_environment_policy.inherit=\"none\"", "-c", "allow_login_shell=false"];
 }
 
 async function filesystemPolicy(request, role, registry, writable) {
   const { workspace, change } = request.identity;
   const git = await checkoutProtectedPaths(workspace);
-  const paths = { ":minimal": "read", [workspace]: "read" };
+  // The Linux sandbox re-execs Codex inside Bubblewrap. Allow it to read the
+  // pinned native file alongside the standard system runtime.
+  const paths = { ":minimal": "read", [role.executable.path]: "read", [workspace]: "read" };
   for (const name of writable) paths[name] = "write";
-  for (const name of [role.codexHome, role.home, role.xdg, registry, ...request.evidenceRoots, ...git]) paths[name] = "none";
+  for (const name of [role.codexHome, role.home, role.xdg, registry, ...request.evidenceRoots, ...git]) paths[name] = "deny";
   paths[path.join(workspace, "openspec/changes", change, "tasks.md")] = "read";
   return paths;
 }
@@ -124,7 +140,7 @@ export async function buildCodexLaunch(request, role, registry, captureDir, laun
     command: role.executable.path, input: transport.stdinBytes, cwd: request.identity.workspace,
     env: workerEnvironment(role),
     args: ["exec", "--json", "--ephemeral", "--ignore-user-config", "--ignore-rules", "--color", "never",
-      "-C", request.identity.workspace, ...commonSettings(role, filesystem), "-"],
+      "-C", request.identity.workspace, ...commonSettings(filesystem), "-m", role.model, "-"],
   };
 }
 
@@ -158,7 +174,7 @@ export async function smokeCheck({ request, role, registry, attemptDirectory, pr
       const writable = mode === "read-only" ? [] : [scratchDirectory];
       const filesystem = await filesystemPolicy(request, role, registry, writable);
       // The probe may replace a disposable file. Product edits use the exact grant paths.
-      const args = [...commonSettings(role, filesystem), "sandbox", "linux", "--", bin, "-I", "-B",
+      const args = ["sandbox", "-P", "worker", "-C", workspace, ...commonSettings(filesystem), "--", bin, "-I", "-B",
         "-c", shellProbe, mode, readOnly, scratch, tasks, secret, evidence, head, protectedFile];
       settled = false;
       const result = await run(command, args, { cwd: workspace, env, timeoutMs: 12000, stdoutLimit: 4096, stderrLimit: 16384 });

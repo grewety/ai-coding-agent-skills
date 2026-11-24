@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -13,7 +13,7 @@ async function fixture(t) {
   const root = await mkdtemp(path.join(tmpdir(), "sandbox-"));
   t.after(() => rm(root, { recursive: true, force: true }));
   const p = (...names) => path.join(root, ...names);
-  const workspace = p("checkout");
+  const workspace = p("operator-home", "src", "checkout");
   const change = "fixture-sandbox";
   const relativeTask = "openspec/changes/" + change + "/tasks.md";
   const relativeConfig = "openspec/config.yaml";
@@ -46,7 +46,8 @@ test("native launch sends only request stdin, a named exact scope and isolated p
   assert.deepEqual(launch.input, requestBytes(f.request));
   assert.ok(!launch.args.join("\n").includes(f.request.outcome));
   for (const flag of ["--json", "--ephemeral", "--ignore-user-config", "--ignore-rules", "skip_host_skill_discovery",
-    "permissions.worker.network.enabled=false", "approval_policy=\"never\"", "mcp_servers={}"]) assert.ok(launch.args.includes(flag), flag);
+    'default_permissions="worker"', 'project_root_markers=[".git"]', "permissions.worker.network.enabled=false",
+    "approval_policy=\"never\"", "mcp_servers={}"]) assert.ok(launch.args.includes(flag), flag);
   for (const value of ["-s", "--sandbox", "--add-dir", "--trust", "--dangerously-bypass-approvals-and-sandbox"]) assert.ok(!launch.args.includes(value), value);
   assert.equal(launch.env.CODEX_HOME, f.role.codexHome);
   assert.equal(launch.env.HOME, f.role.home);
@@ -55,14 +56,88 @@ test("native launch sends only request stdin, a named exact scope and isolated p
     assert.equal(launch.env[variable], undefined, variable);
   }
   const fs = launch.args.find((item) => item.startsWith("permissions.worker.filesystem="));
+  assert.ok(fs.includes('":minimal" = "read"'));
+  assert.ok(fs.includes(JSON.stringify(f.role.executable.path) + ' = "read"'));
   assert.ok(fs.includes(JSON.stringify(path.join(f.workspace, "ok.txt")) + ' = "write"'));
+  assert.equal([...fs.matchAll(/ = "write"/g)].length, 1);
   assert.ok(fs.includes(JSON.stringify(path.join(f.workspace, f.relativeTask)) + ' = "read"'));
-  for (const name of [f.role.codexHome, f.registry, f.attemptDirectory, path.join(f.workspace, ".git")]) {
-    assert.ok(fs.includes(JSON.stringify(name) + ' = "none"'), name);
+  for (const name of [f.role.codexHome, f.role.home, f.role.xdg, f.registry, f.attemptDirectory, path.join(f.workspace, ".git")]) {
+    assert.ok(fs.includes(JSON.stringify(name) + ' = "deny"'), name);
   }
-  await mkdir(path.join(f.workspace, ".codex"), { mode: 0o700 });
-  await writeFile(path.join(f.workspace, ".codex", "config.toml"), "synthetic project config");
-  await assert.rejects(buildCodexLaunch(f.request, f.role, f.registry, f.controlDirectory, "fixture-nonce"), /ambient Codex settings/);
+});
+
+test("project discovery stops at the checkout marker and rejects project-local settings", async (t) => {
+  const f = await fixture(t);
+  const launch = () => buildCodexLaunch(f.request, f.role, f.registry, f.controlDirectory, "fixture-nonce");
+  const entryPoints = [".codex/config.toml", ".codex/rules", ".codex/agents", ".mcp.json"];
+  for (const dir of [f.p("operator-home"), f.p("operator-home", "src"), f.workspace]) {
+    await mkdir(path.join(dir, ".codex"), { mode: 0o700 });
+  }
+  for (const entry of entryPoints) await writeFile(f.p("operator-home", entry), "synthetic host setting");
+  await writeFile(f.p("operator-home", "src", ".codex", "config.toml"), "synthetic ancestor setting");
+  await launch();
+  for (const entry of entryPoints) {
+    const file = path.join(f.workspace, entry);
+    if (entry.endsWith(".toml") || entry.endsWith(".json")) await writeFile(file, "synthetic project setting");
+    else await mkdir(file, { mode: 0o700 });
+    await assert.rejects(launch(), /project-local Codex settings/);
+    await rm(file, { recursive: true });
+  }
+});
+
+test("the isolated profile allows only built-in skills and still rejects dedicated configuration", async (t) => {
+  const f = await fixture(t);
+  const launch = () => buildCodexLaunch(f.request, f.role, f.registry, f.controlDirectory, "fixture-nonce");
+  await launch();
+
+  const builtin = path.join(f.role.codexHome, "skills", ".system", "fixture-builtin");
+  await mkdir(builtin, { recursive: true });
+  await writeFile(path.join(builtin, "SKILL.md"), "Synthetic built-in skill\n");
+  await launch();
+
+  for (const name of ["config.toml", "rules", "AGENTS.md"]) {
+    const entry = path.join(f.role.codexHome, name);
+    if (name === "rules") await mkdir(entry);
+    else await writeFile(entry, "synthetic dedicated profile setting");
+    await assert.rejects(launch(), /Dedicated Codex home has ambient configuration/, name);
+    await rm(entry, { recursive: true });
+  }
+});
+
+test("the isolated profile rejects other skills directory layouts", async (t) => {
+  const f = await fixture(t);
+  const launch = () => buildCodexLaunch(f.request, f.role, f.registry, f.controlDirectory, "fixture-nonce");
+  const skills = path.join(f.role.codexHome, "skills");
+  const builtin = path.join(skills, ".system");
+  const user = path.join(skills, "user-skill");
+  const target = f.p("external-skills");
+  await mkdir(path.join(target, ".system"), { recursive: true });
+
+  for (const [name, setup] of [
+    ["empty skills directory", () => mkdir(skills)],
+    ["only a user-created skill", () => mkdir(user, { recursive: true })],
+    ["a user-created skill alongside .system", async () => {
+      await mkdir(builtin, { recursive: true });
+      await mkdir(user);
+    }],
+    ["skills is a file", () => writeFile(skills, "synthetic file")],
+    ["skills is a symlink", () => symlink(target, skills)],
+    ["skills is a dangling symlink", () => symlink(f.p("missing-skills"), skills)],
+    [".system is a file", async () => {
+      await mkdir(skills);
+      await writeFile(builtin, "synthetic file");
+    }],
+    [".system is a symlink", async () => {
+      await mkdir(skills);
+      await symlink(path.join(target, ".system"), builtin);
+    }],
+  ]) {
+    await t.test(name, async (t) => {
+      t.after(() => rm(skills, { recursive: true }));
+      await setup();
+      await assert.rejects(launch(), /Dedicated Codex home has ambient configuration or discoverable skills/);
+    });
+  }
 });
 
 test("the read-only then workspace-write smoke probes keep the checkout clean and refuse an uncontained route", async (t) => {
@@ -73,11 +148,19 @@ test("the read-only then workspace-write smoke probes keep the checkout clean an
     const perform = smokeCheck({ ...f, run: async (command, args, options) => {
       if (args[0] === "--version") return runBoundedWorker(command, args, options);
       const separator = args.indexOf("--");
-      assert.ok(separator >= 0);
-      assert.deepEqual(args.slice(separator - 2, separator), ["sandbox", "linux"]);
+      assert.ok(separator > 5);
+      assert.deepEqual(args.slice(0, 5), ["sandbox", "-P", "worker", "-C", f.workspace]);
+      assert.ok(args.includes('project_root_markers=[".git"]'));
+      assert.ok(args.includes("permissions.worker.network.enabled=false"));
+      assert.ok(!args.includes("-s"));
+      assert.ok(!args.includes("-m"));
       const [python, ...code] = args.slice(separator + 1);
       const [mode, config, scratch, tasks, secret, evidence, git, grant] = code.slice(4);
       modes.push(mode);
+      const fs = args.find((item) => item.startsWith("permissions.worker.filesystem="));
+      assert.ok(fs.includes(JSON.stringify(command) + ' = "read"'));
+      assert.equal([...fs.matchAll(/ = "write"/g)].length, mode === "read-only" ? 0 : 1);
+      if (mode === "workspace-write") assert.ok(fs.includes(JSON.stringify(path.dirname(scratch)) + ' = "write"'));
       assert.equal(tasks, path.join(f.workspace, f.relativeTask));
       assert.equal(grant, f.protectedFile);
       assert.equal(git, path.join(f.workspace, ".git/HEAD"));

@@ -135,6 +135,7 @@ test("distribution builds complete skill and plugin ZIPs from canonical bytes", 
     "references/run-implementer.md",
     "references/worker-runtime.md",
     "scripts/implementer-runtime.mjs",
+    "scripts/implementer-sandbox.mjs",
     "scripts/worker-runtime-policy.mjs",
     "scripts/run-implementer.mjs",
     "scripts/review-candidate.mjs",
@@ -153,13 +154,15 @@ test("distribution builds complete skill and plugin ZIPs from canonical bytes", 
     assert.deepEqual(Buffer.from(reviewArchive[key]), canonical, key);
     assert.deepEqual(Buffer.from(orchestrationArchive[`skills/${key}`]), canonical, key);
   }
-  for (const file of ["README.md", "docs/claude-installation.md", "docs/openspec-installation.md", "docs/openspec-workflow.md"]) {
+  for (const file of ["README.md", "docs/claude-installation.md", "docs/openspec-installation.md", "docs/openspec-workflow.md",
+    "docs/worker-runtime.md"]) {
     const guide = await readFile(path.join(root, file), "utf8");
     const reviewerLink = file === "README.md" ? "(docs/claude-reviewer.md)" : "(claude-reviewer.md)";
     assert.ok(guide.includes(reviewerLink), `${file} links to reviewer setup`);
     assert.ok(guide.includes("0.20.0") && guide.includes("1.10.0"), `${file} lists paired versions`);
   }
   const reviewerGuide = await readFile(path.join(root, "docs/claude-reviewer.md"), "utf8");
+  assert.ok(reviewerGuide.includes("0.20.0") && reviewerGuide.includes("1.10.0"), "reviewer guide lists paired versions");
   const reviewerReference = await readFile(path.join(reviewPackage.directory, "references/review-candidate.md"), "utf8");
   const commandForms = (guide) => guide.split("\n")
     .filter((line) => /^(NODE REVIEW_CLI|node review-candidate\.mjs) --/.test(line))
