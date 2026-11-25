@@ -1,0 +1,198 @@
+{
+  "schemaVersion": 1,
+  "change": "streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej",
+  "issueUrl": "https://github.com/grewety/ai-coding-agent-skills/issues/56",
+  "mode": "task-guided",
+  "base": "eb4a23c6735e0f930a7ab5faab175f984a8d8ebf",
+  "head": "dbe966a0de509e897331a8e6cf4d766ac8c5b593",
+  "plan": "ef6f9562139397832828c743132f2c4600641683",
+  "planDigest": "92d39a7b3e669e7538cf95f1375f71f9002e6d547de140b2dbfa3db87e4203f1",
+  "integrated": "c5345161668c2d55282cfb9f50d758519b264143",
+  "verified": "c5345161668c2d55282cfb9f50d758519b264143",
+  "review": {
+    "schemaVersion": 1,
+    "change": "streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej",
+    "issueUrl": "https://github.com/grewety/ai-coding-agent-skills/issues/56",
+    "head": "dbe966a0de509e897331a8e6cf4d766ac8c5b593",
+    "planDigest": "92d39a7b3e669e7538cf95f1375f71f9002e6d547de140b2dbfa3db87e4203f1",
+    "verdict": "pass",
+    "findings": [],
+    "reviewer": "Claude Code 2.1.330 / claude-sonnet-4-6 / 10635899-d736-44ff-9699-398c2d7347a1",
+    "reference": "ai-coding-agent-skills/streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej/execution/group-2.1/final-candidate-r5/review-output/status.json (SHA-256 288168d0a3271a5cf990fa4212a8038793c9a0de97b2424cd16ae380d8040bdb)",
+    "gates": [
+      {
+        "command": "npm test",
+        "commit": "dbe966a0de509e897331a8e6cf4d766ac8c5b593",
+        "exitCode": 0,
+        "evidence": "ai-coding-agent-skills/streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej/execution/group-2.1/final-candidate-r5/disposable-gate-run.json (SHA-256 50172d5f74a536bd80716c48a3391a12a04685d3fc092ca4014397763d0cc3b2) command 2"
+      },
+      {
+        "command": "npm run build",
+        "commit": "dbe966a0de509e897331a8e6cf4d766ac8c5b593",
+        "exitCode": 0,
+        "evidence": "ai-coding-agent-skills/streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej/execution/group-2.1/final-candidate-r5/disposable-gate-run.json (SHA-256 50172d5f74a536bd80716c48a3391a12a04685d3fc092ca4014397763d0cc3b2) command 3"
+      },
+      {
+        "command": "openspec validate --all --strict",
+        "commit": "dbe966a0de509e897331a8e6cf4d766ac8c5b593",
+        "exitCode": 0,
+        "evidence": "ai-coding-agent-skills/streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej/execution/group-2.1/final-candidate-r5/disposable-gate-run.json (SHA-256 50172d5f74a536bd80716c48a3391a12a04685d3fc092ca4014397763d0cc3b2) command 4"
+      },
+      {
+        "command": "npm run validate:openspec -- --require-issue",
+        "commit": "dbe966a0de509e897331a8e6cf4d766ac8c5b593",
+        "exitCode": 0,
+        "evidence": "ai-coding-agent-skills/streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej/execution/group-2.1/final-candidate-r5/disposable-gate-run.json (SHA-256 50172d5f74a536bd80716c48a3391a12a04685d3fc092ca4014397763d0cc3b2) command 5"
+      },
+      {
+        "command": "git diff --check ef6f9562139397832828c743132f2c4600641683 HEAD --",
+        "commit": "dbe966a0de509e897331a8e6cf4d766ac8c5b593",
+        "exitCode": 0,
+        "evidence": "ai-coding-agent-skills/streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej/execution/group-2.1/final-candidate-r5/disposable-gate-run.json (SHA-256 50172d5f74a536bd80716c48a3391a12a04685d3fc092ca4014397763d0cc3b2) command 6"
+      }
+    ],
+    "coverageLimitations": [],
+    "exportSha256": "dd927e73bebbf5adbe4ed11751ebb4e0f2e2ab192e7e1e53cddf56384ea3dbc8",
+    "requestSha256": "add981cde6cdaeafcd4d878775180840d51bfef075f2cc689724a91d1c02e410",
+    "gateBinding": "gate-run:3f5d86ec0a402c230aad585a38b3fbef0786e79c38579ff94990a6216f4bc045"
+  },
+  "integrationReference": "https://github.com/grewety/ai-coding-agent-skills/pull/57",
+  "gates": [
+    {
+      "command": "npm test",
+      "commit": "c5345161668c2d55282cfb9f50d758519b264143",
+      "exitCode": 0,
+      "evidence": "ai-coding-agent-skills/streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej/execution/group-2.1/final-candidate-r5/integrated-disposable-gate-run.json (SHA-256 630b1b9d2ea5238d5ba645d39b5d1ee68055dacbfe8cabc2c96bd7f1cfb454fe) command 2"
+    },
+    {
+      "command": "npm run build",
+      "commit": "c5345161668c2d55282cfb9f50d758519b264143",
+      "exitCode": 0,
+      "evidence": "ai-coding-agent-skills/streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej/execution/group-2.1/final-candidate-r5/integrated-disposable-gate-run.json (SHA-256 630b1b9d2ea5238d5ba645d39b5d1ee68055dacbfe8cabc2c96bd7f1cfb454fe) command 3"
+    },
+    {
+      "command": "openspec validate --all --strict",
+      "commit": "c5345161668c2d55282cfb9f50d758519b264143",
+      "exitCode": 0,
+      "evidence": "ai-coding-agent-skills/streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej/execution/group-2.1/final-candidate-r5/integrated-disposable-gate-run.json (SHA-256 630b1b9d2ea5238d5ba645d39b5d1ee68055dacbfe8cabc2c96bd7f1cfb454fe) command 4"
+    },
+    {
+      "command": "npm run validate:openspec",
+      "commit": "c5345161668c2d55282cfb9f50d758519b264143",
+      "exitCode": 0,
+      "evidence": "ai-coding-agent-skills/streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej/execution/group-2.1/final-candidate-r5/integrated-disposable-gate-run.json (SHA-256 630b1b9d2ea5238d5ba645d39b5d1ee68055dacbfe8cabc2c96bd7f1cfb454fe) command 5"
+    }
+  ],
+  "mergedAt": "2026-11-25T05:06:07Z",
+  "mergeReadback": "ai-coding-agent-skills/streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej/execution/group-2.1/final-candidate-r5/implementation-merged-pr.json (SHA-256 35801afbe5234ab6939ef0fed187122d9e5c2f30ddf2f20529ec5a7281fd428f)",
+  "nativeReviewReadback": "ai-coding-agent-skills/streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej/execution/group-2.1/final-candidate-r5/review-verified.json (SHA-256 d02214cb8c6408fcf5db2d05e1fe62e54a4454ec48bb3937f6abb1a1b49a8048)",
+  "reviewDisposition": "ai-coding-agent-skills/streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej/execution/group-2.1/final-candidate-r5/r5-review-disposition.json (SHA-256 370a2f8d2001ce843a981c8899dfdd3064dd627b348a481224e10310d4f014a3)",
+  "promotedCurrentSpecs": [
+    {
+      "capability": "openspec-integration",
+      "requirements": 7
+    }
+  ],
+  "protectedReadbackAssertion": "ai-coding-agent-skills/streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej/execution/group-2.1/final-candidate-r5/implementation-closeout-assertion.json (SHA-256 2cef2b1d969651209d780be16ee2fb84b3acfd43b58f54fd1829ab1b546da4d3)",
+  "integratedToolVersions": "ai-coding-agent-skills/streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej/execution/group-2.1/final-candidate-r5/integrated-tool-versions.txt (SHA-256 9ee6672d419b675a621c29971e3017d7515d3e411db6661238027835ae7bcc94)",
+  "priorReview": {
+    "statusSha256": "85b0fbc6963edf2dbd653cb65122284930aac93aeb9abba0bbf937e6ad7e6c3b",
+    "state": "R4 review accepted before the subsequent Aikido result-handover finding and correction"
+  },
+  "requiredVerification": {
+    "rulesetId": 26268609,
+    "appId": 15368,
+    "context": "verify",
+    "head": "dbe966a0de509e897331a8e6cf4d766ac8c5b593",
+    "checks": [
+      {
+        "id": 138990997241,
+        "name": "verify",
+        "app": "github-actions",
+        "status": "completed",
+        "conclusion": "success",
+        "detailsUrl": "https://github.com/grewety/ai-coding-agent-skills/actions/runs/45550729557/job/138990997241"
+      },
+      {
+        "id": 138990973116,
+        "name": "verify",
+        "app": "github-actions",
+        "status": "completed",
+        "conclusion": "success",
+        "detailsUrl": "https://github.com/grewety/ai-coding-agent-skills/actions/runs/45550722053/job/138990973116"
+      }
+    ],
+    "premergeReadback": "ai-coding-agent-skills/streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej/execution/group-2.1/final-candidate-r5/r5-pr57-20261125T050549.555110Z/assessment.json (SHA-256 996979c2cc28ce2b61d73af1657a638f7caba46414f8938422380383c0183af0)",
+    "officialRules": "ai-coding-agent-skills/streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej/execution/group-2.1/final-candidate-r5/r5-pr57-20261125T050549.555110Z/rules.json (SHA-256 2c27b55c756598526694a3536c4060669584c778d914394594387aab0187138c)",
+    "checkRunsReadback": "ai-coding-agent-skills/streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej/execution/group-2.1/final-candidate-r5/r5-pr57-20261125T050549.555110Z/checks.json (SHA-256 f1bca6e7dd03a92f91d3c6afbc821e8acc738ebc5394bed7f8cc011f565c6cea)",
+    "threadReadback": "ai-coding-agent-skills/streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej/execution/group-2.1/final-candidate-r5/r5-pr57-20261125T050549.555110Z/threads.json (SHA-256 8da99955783e07aabdccb8a29b1c33711beca2833a18358c3fbf7138ee552e20)"
+  },
+  "aikido": {
+    "head": "dbe966a0de509e897331a8e6cf4d766ac8c5b593",
+    "checks": [
+      {
+        "id": 138990999660,
+        "name": "Aikido Security: Deep Review",
+        "app": "aikido-pr-checks",
+        "status": "completed",
+        "conclusion": "success",
+        "detailsUrl": "https://app.aikido.dev/featurebranch/scan/271419223?groupId=179324"
+      },
+      {
+        "id": 138990993497,
+        "name": "Aikido Security: check code",
+        "app": "aikido-pr-checks",
+        "status": "completed",
+        "conclusion": "success",
+        "detailsUrl": "https://app.aikido.dev/featurebranch/scan/271419223?groupId=179324"
+      }
+    ],
+    "deepReviewSummary": "Aikido completed the Deep Review and did not find new issues. \ud83c\udf89",
+    "checkCodeSummary": ":white_check_mark: Aikido Security check OK. 2 new MEDIUM issues and 1 new LOW issue were introduced, but it was below HIGH. No issues were solved. [View details](https://app.aikido.dev/featurebranch/scan/271419223?groupId=179324)\n<sub>*Scan results for commit: dbe966a0de509e897331a8e6cf4d766ac8c5b593*</sub>",
+    "operatorAcceptedOpenSyncThreadComments": [
+      4690053710,
+      4690053826
+    ],
+    "inlineReviewReadback": "ai-coding-agent-skills/streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej/execution/group-2.1/final-candidate-r5/r5-pr57-20261125T050549.555110Z/inline.json (SHA-256 86e2e83e59569dc54bbfd6d4978d008b261edb94e2d1709758afc86f04a11b93)",
+    "mainSuiteObservation": [
+      {
+        "id": 123251193532,
+        "status": "queued",
+        "conclusion": null
+      }
+    ],
+    "operatorDisposition": "Successful Check Code with the known Medium openSync findings and unannotated Low accepted. High/Critical and new Deep Review findings block merge."
+  },
+  "integratedVerification": {
+    "workflow": {
+      "id": 45551231922,
+      "html_url": "https://github.com/grewety/ai-coding-agent-skills/actions/runs/45551231922",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "c5345161668c2d55282cfb9f50d758519b264143"
+    },
+    "gateRun": "ai-coding-agent-skills/streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej/execution/group-2.1/final-candidate-r5/integrated-disposable-gate-run.json (SHA-256 630b1b9d2ea5238d5ba645d39b5d1ee68055dacbfe8cabc2c96bd7f1cfb454fe)",
+    "binding": "gate-run:4f7e15a9f94bdb98058f3eee9ad8680d8aeec86a7eb454af9e3b70b36780f5e8"
+  },
+  "pages": {
+    "run": {
+      "id": 45551231873,
+      "html_url": "https://github.com/grewety/ai-coding-agent-skills/actions/runs/45551231873",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "c5345161668c2d55282cfb9f50d758519b264143"
+    },
+    "deployment": {
+      "id": 8048957198,
+      "statusId": 23099082112,
+      "url": "https://grewety.github.io/ai-coding-agent-skills/"
+    },
+    "liveIndexUrl": "https://grewety.github.io/ai-coding-agent-skills/.well-known/skills/index.json",
+    "indexSha256": "1f31df23caf114971cf8af43353a5ee7b910512dece5b1cab197e01b0e3b084d",
+    "indexBytes": 4087,
+    "liveIndexMatchesBuild": true,
+    "readback": "ai-coding-agent-skills/streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej/execution/group-2.1/final-candidate-r5/integrated-observation-20261125T050808.152988Z/assessment.json (SHA-256 bc955df1d7a22984c1b3866846be09d640029174d5bae5f8cdebbfd775c4f0e7)",
+    "buildIndex": "ai-coding-agent-skills/streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej/execution/group-2.1/final-candidate-r5/integrated-gate-checkout/dist/.well-known/skills/index.json (SHA-256 1f31df23caf114971cf8af43353a5ee7b910512dece5b1cab197e01b0e3b084d)",
+    "liveIndex": "ai-coding-agent-skills/streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej/execution/group-2.1/final-candidate-r5/integrated-observation-20261125T050808.152988Z/live-index.json (SHA-256 1f31df23caf114971cf8af43353a5ee7b910512dece5b1cab197e01b0e3b084d)"
+  }
+}
