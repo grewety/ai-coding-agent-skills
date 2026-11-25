@@ -133,6 +133,34 @@ test("contributor grant binds all declared or changed contracts to exact pre-fre
   assert.throws(() => api.contractChangePaths({ declared: ["../AGENTS.md"], changed: [], designations: [] }), /path/);
 });
 
+test("contributor grants validate only the explicitly selected planning inventory mode", async () => {
+  const { bindContractGrant, verifyContractGrant } = await policy();
+  const change = "fixture-change";
+  const customInputs = { ...inputs, [`openspec/changes/${change}/analysis/requirements.md`]: "b".repeat(64) };
+  const paths = ["AGENTS.md"];
+  const grant = { stage: "pre-freeze", change, inputs: customInputs, paths, reference: "retained:grant", customPlanning: true };
+  const request = { change, inputs: customInputs, paths, grant, plan, planDigest };
+  const custom = { ...request, customPlanning: true };
+  const binding = bindContractGrant(custom);
+  assert.deepEqual(binding.inputs, customInputs);
+  assert.equal(verifyContractGrant({ ...custom, binding }), true);
+  for (const standard of [request, { ...request, customPlanning: false }]) {
+    assert.throws(() => bindContractGrant(standard), /Invalid planning inventory inputs/);
+    assert.throws(() => verifyContractGrant({ ...standard, binding }), /Invalid planning inventory inputs/);
+  }
+
+  const failure = new Error("Unexpected inventory read failure");
+  let reads = 0;
+  const unreadableInputs = new Proxy(inputs, {
+    ownKeys() {
+      reads++;
+      throw failure;
+    },
+  });
+  assert.throws(() => bindContractGrant({ ...request, inputs: unreadableInputs }), (error) => error === failure);
+  assert.equal(reads, 1, "an unexpected validation error must not cause a second inventory read");
+});
+
 test('convergence is an integrated-parent opt-in with strict fallback', async () => {
   const api = await policy();
   const base = { phase: 'freeze', context: context(), selection: { ...selection(), preExecutionReview: true }, contractPaths: [], orchestrationAvailable: true, reviewAcceptance: { action: 'freeze-ready', reference: 'receipt', inputs } };

@@ -24,18 +24,18 @@ export function contractChangePaths({ declared, changed, designations }) {
   return [...candidates].filter((name) => nativeContract(name) || known.has(name)).sort();
 }
 
-function checkGrant({ change, inputs, paths, grant }) {
+function checkGrant({ change, inputs, paths, grant, customPlanning }) {
   const declared = canonicalPaths(paths);
-  try { validatePlanningInputs(change, inputs); }
-  catch { validatePlanningInputs(change, inputs, undefined, true); }
+  validatePlanningInputs(change, inputs, undefined, customPlanning === true);
   requireThat(grant?.stage === "pre-freeze" && grant.change === change && text(grant.reference), "Missing separate pre-freeze contributor grant");
   requireThat(sameInputs(inputs, grant.inputs) && JSON.stringify(declared) === JSON.stringify(canonicalPaths(grant.paths)), "Contributor grant input/path mismatch");
   return declared;
 }
 
-export function bindContractGrant({ change, inputs, paths, grant, plan, planDigest }) {
+// Callers select customPlanning from the verified integrated policy.
+export function bindContractGrant({ change, inputs, paths, grant, plan, planDigest, customPlanning }) {
   requireThat(sha(plan) && digest(planDigest), "Invalid grant freeze identity");
-  const declared = checkGrant({ change, inputs, paths, grant });
+  const declared = checkGrant({ change, inputs, paths, grant, customPlanning });
   return structuredClone({ change, plan, planDigest, inputs, paths: declared, grantReference: grant.reference });
 }
 
