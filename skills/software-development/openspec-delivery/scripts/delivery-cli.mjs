@@ -469,6 +469,7 @@ async function deliveryEvaluation(input, options) {
           delegation.request.budget.unit === "minutes" && delegation.request.budget.limit <= minutes &&
           runtime.stop === held.stop && (!runtime.commits || held.commits && !noCommits),
         "Delegated runtime grant expands the short-approved local grant");
+        input = { ...input, approval: delegation.verifiedApproval, grant: delegation.verifiedGrant };
       }
       if (input.deliveryPhase === "dispatch") await inspectPredecessor(input, delegation, implementation, groups, options);
     } catch (error) {

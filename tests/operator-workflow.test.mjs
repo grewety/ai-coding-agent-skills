@@ -9,7 +9,7 @@ import { planningWorktree } from "../skills/software-development/openspec-delive
 import { operatorStatus } from "../skills/software-development/openspec-delivery/scripts/operator-status.mjs";
 import { startConvergenceReview, convergencePacket, acceptConvergenceReview } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/orchestration-core.mjs";
 import { boundary, change, fixture, own, twoGroupGuidance } from "./delivery-runtime-setup.mjs";
-import { buildExclusiveFixture, workerRequest } from "./delivery-runtime-fixtures.mjs";
+import { buildExclusiveFixture, containedHandover, gateFixture, workerRequest } from "./delivery-runtime-fixtures.mjs";
 import { roleQualificationBinding } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-bindings.mjs";
 
 const cardEpoch = Date.now() - 30 * 60_000;
@@ -77,7 +77,7 @@ async function operatorFixture(t, optedIn = true, inspectDraft, staged = false, 
   const request = { ...f.request, approval: undefined, grant: undefined, freeze, roleBindings,
     repositoryObservation, cardSummary, operator,
     ...(staged && { cardScope: { verified: true, reference: "retained:task-guidance", planDigest: f.planDigest, summary: cardSummary } }) };
-  const runtime = exclusive ? await buildExclusiveFixture(f, { workerRequest }) : null;
+  const runtime = exclusive ? await buildExclusiveFixture(f, { workerRequest, containedHandover }) : null;
   return { ...f, records, request, operator, proposalRequest, runtime };
 }
 
@@ -303,38 +303,41 @@ test("settled short dispatch checks live expiry without requiring frozen HEAD on
   assert.equal(observed.value.state, "local-ready", observed.stdout);
 });
 
+async function pinShortRuntime(f, { input, entry }, variant, field, value, route) {
+  const records = path.join(f.root, variant);
+  await mkdir(records, { mode: 0o700 });
+  const operator = { ...f.operator, records };
+  const roleBindings = {};
+  const roles = {};
+  for (const role of ["implementer", "reviewer"]) {
+    const runtimeRole = f.runtime.pair[role];
+    const observation = { verified: true, reference: runtimeRole.qualification.path, role, readOnly: role === "reviewer",
+      route: role === "reviewer" && route ? route : runtimeRole.route };
+    if (role === "implementer") observation.runtimeBindingSha256 = roleQualificationBinding(runtimeRole);
+    else if (field) observation[field] = value;
+    roleBindings[role] = await sealedFixture(records, role, observation);
+    roles[role] = { ...observation, bindingSha256: roleBindings[role].sha256 };
+  }
+  const cardSummary = { ...f.request.cardSummary, local: { ...f.request.cardSummary.local, roles } };
+  const request = { ...f.request, operator, roleBindings, cardSummary,
+    ...(f.request.cardScope && { cardScope: { ...f.request.cardScope, summary: cardSummary } }) };
+  const scoped = { ...f, operator, request };
+  const card = await displayCard(scoped);
+  const reply = await f.run("approval-reply", shortReply(scoped, card));
+  assert.equal(reply.status, 0, reply.stdout);
+  return { ...request, preflight: input.preflight, delegation: input.delegation,
+    shortDecision: { ...operator, at: cardTime(4), replySha256: reply.value.sha256 },
+    runtimeAuthority: { verified: true, reference: "retained:runtime-authority-link",
+      approvalReference: reply.value.entry.approval.reference, grantReference: reply.value.entry.grant.reference,
+      approval: entry.approval, grant: entry.grant } };
+}
+
 test("exclusive short dispatch binds the sealed runtime authority and independent qualification pair", { skip: process.platform !== "linux" }, async (t) => {
   const f = await operatorFixture(t, true, undefined, false, true);
   const runtime = f.runtime;
-  const { input, entry } = await runtime.assignment("short-dispatch", { noCommits: true });
+  const assignment = await runtime.assignment("short-dispatch", { noCommits: true });
   const widening = await runtime.assignment("widening-dispatch");
-  const pin = async (variant, field, value, route) => {
-    const records = path.join(f.root, variant);
-    await mkdir(records, { mode: 0o700 });
-    const operator = { ...f.operator, records };
-    const roleBindings = {};
-    const roles = {};
-    for (const role of ["implementer", "reviewer"]) {
-      const runtimeRole = runtime.pair[role];
-      const observation = { verified: true, reference: runtimeRole.qualification.path, role, readOnly: role === "reviewer",
-        route: role === "reviewer" && route ? route : runtimeRole.route };
-      if (role === "implementer") observation.runtimeBindingSha256 = roleQualificationBinding(runtimeRole);
-      else if (field) observation[field] = value;
-      roleBindings[role] = await sealedFixture(records, role, observation);
-      roles[role] = { ...observation, bindingSha256: roleBindings[role].sha256 };
-    }
-    const cardSummary = { ...f.request.cardSummary, local: { ...f.request.cardSummary.local, roles } };
-    const request = { ...f.request, operator, roleBindings, cardSummary };
-    const scoped = { ...f, operator, request };
-    const card = await displayCard(scoped);
-    const reply = await f.run("approval-reply", shortReply(scoped, card));
-    assert.equal(reply.status, 0, reply.stdout);
-    return { ...request, preflight: input.preflight, delegation: input.delegation,
-      shortDecision: { ...operator, at: cardTime(4), replySha256: reply.value.sha256 },
-      runtimeAuthority: { verified: true, reference: "retained:runtime-authority-link",
-        approvalReference: reply.value.entry.approval.reference, grantReference: reply.value.entry.grant.reference,
-        approval: entry.approval, grant: entry.grant } };
-  };
+  const pin = (...args) => pinShortRuntime(f, assignment, ...args);
   const reviewerBinding = roleQualificationBinding(runtime.pair.reviewer);
   const request = await pin("matching-pair", "bindingSha256", reviewerBinding);
   const dispatched = await runtime.decide(request);
@@ -363,6 +366,25 @@ test("exclusive short dispatch binds the sealed runtime authority and independen
     await pin("missing-runtime-pin"),
     await pin("crossed-route", "bindingSha256", reviewerBinding, runtime.pair.implementer.route),
   ]) await deny(variant, "DELEGATED_RUNTIME_UNVERIFIED", /different pair/);
+});
+
+test("exclusive short result accepts a sealed reviewer handover without top-level authority", { skip: process.platform !== "linux" }, async (t) => {
+  const f = await operatorFixture(t, true, undefined, true, true);
+  const { runtime } = f;
+  const assignment = await runtime.assignment("short-result", { noCommits: true });
+  const reviewerBinding = roleQualificationBinding(runtime.pair.reviewer);
+  const { approval, grant, ...request } = await pinShortRuntime(f, assignment, "result-pair", "bindingSha256", reviewerBinding);
+  const taskGuidance = twoGroupGuidance(f.planDigest);
+  const settled = await runtime.settled(assignment);
+  assert.equal(settled.phase, "completed", settled.reason);
+  const head = f.commit(f.workspace, "Synthetic short-delegated candidate");
+  const gates = await gateFixture(f, head, "short-result");
+  assert.equal(gates.captured.status, 0, gates.captured.stdout);
+  const review = "short-result-review";
+  const handover = await runtime.review(assignment, settled, head, gates, review);
+  const result = await runtime.decide({ ...request, taskGuidance, deliveryPhase: "result", head, gateRun: gates.gateRun,
+    handover, attempt: { id: review } });
+  assert.equal(result.action, "accept-result", JSON.stringify(result));
 });
 
 test("approval-only waits for independent local authority and checkpoint fresh-session is file-backed", async (t) => {

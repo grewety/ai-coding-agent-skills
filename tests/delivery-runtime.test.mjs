@@ -9,27 +9,12 @@ import { sha256 } from "../skills/software-development/openspec-delivery/scripts
 import { readDelegation } from "../skills/software-development/openspec-delivery/scripts/delegated-delivery.mjs";
 import { createAttempt, publishResult } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/worker-handoff.mjs";
 import { runtimeIdentity } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-runtime.mjs";
-import { runReview } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-candidate.mjs";
-import { buildExport, jsonBytes, prepareExport } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-inputs.mjs";
-import { bubblewrapVersion, claudeVersion } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-runtime.mjs";
-import { buildExclusiveFixture, workerRequest } from "./delivery-runtime-fixtures.mjs";
-import { change, current, currentSpec, exec, fixture, gateArgv, own, twoGroupGuidance } from "./delivery-runtime-setup.mjs";
+import { jsonBytes } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-inputs.mjs";
+import { buildExclusiveFixture, containedHandover, gateFixture, workerRequest } from "./delivery-runtime-fixtures.mjs";
+import { change, current, currentSpec, fixture, own, twoGroupGuidance } from "./delivery-runtime-setup.mjs";
 
 const evidence = fileURLToPath(new URL("../skills/software-development/openspec-delivery/scripts/evidence-cli.mjs", import.meta.url));
 const verifier = fileURLToPath(new URL("../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/worker-handoff.mjs", import.meta.url));
-const containedVerifier = path.join(path.dirname(verifier), "review-candidate.mjs");
-
-async function gateFixture(f, head, label, gates = [gateArgv]) {
-  const checkout = path.join(f.root, `gate-${label}`);
-  const output = path.join(f.root, `capture-${label}.json`);
-  f.git(f.repo, "worktree", "add", "--detach", checkout, head);
-  const request = { output, checkout, implementation: f.workspace, head, base: f.base, plan: f.plan, change,
-    mode: f.policy.mode, target: f.base, planDigest: f.planDigest, generated: ["dist"],
-    bootstrap: [{ argv: [process.execPath, "-e", "require('node:fs').mkdirSync('dist')"], timeoutMs: 5_000 }],
-    gates: gates.map((argv) => ({ argv, timeoutMs: 5_000 })) };
-  const captured = await f.run("gate-capture", request, evidence);
-  return { captured, checkout, request, gateRun: { file: output, sha256: captured.value.fileSha256 } };
-}
 
 async function createHandover(f, head, gateReference, attempt, role = "reviewer", active = false, identity = {}) {
   const directory = path.join(f.root, attempt);
@@ -60,78 +45,6 @@ async function createHandover(f, head, gateReference, attempt, role = "reviewer"
     reportKind: "native", evidence: [descriptor("native.txt"), descriptor("lifecycle.jsonl")], outputs: {}, completion, nativeReport: descriptor("native.txt") };
   await publishResult({ expected, runtime, result, files });
   return { kind: "portable-role", verifier, verifierSha256, expected, runtime };
-}
-
-async function containedHandover(f, workspace, head, gates, attempt, {
-  base = f.plan, identity = {}, gateReference = gates.captured.value.wrapperSha256, coverageLimitations = [], findings = [],
-  authority = {}, session = randomUUID(), configurationSha256 = sha256("synthetic contained runtime"), goalDigest, work,
-} = {}) {
-  const root = path.join(f.root, attempt);
-  await mkdir(root, { mode: 0o700 });
-  const output = path.join(root, "output");
-  const exportDirectory = path.join(root, "export");
-  const request = path.join(root, "request.json");
-  const expect = path.join(root, "expect.json");
-  const evidence = "fixture-gate-evidence.json";
-  const evidenceBytes = await readFile(gates.gateRun.file);
-  await writeFile(path.join(workspace, evidence), evidenceBytes);
-  const diff = exec("git", ["-C", workspace, "diff", "--no-color", "--no-ext-diff", "--no-textconv", "--no-relative",
-    "--find-renames=50%", "--diff-algorithm=myers", "--no-indent-heuristic", "--patch", "--text", "--full-index", "--unified=3",
-    "--src-prefix=a/", "--dst-prefix=b/", base, head, "--"]);
-  assert.equal(diff.status, 0, diff.stderr);
-  const worker = workerRequest(f, head, gateReference, attempt, output);
-  if (gateReference === null) worker.acceptance = ["Widget loads"];
-  if (goalDigest) worker.acceptance.push(`goal-contract:${goalDigest}`);
-  if (work) {
-    worker.outcome = work.outcome;
-    worker.scope = work.scope;
-    worker.nonGoals = work.nonGoals;
-    worker.acceptance = [...new Set([...worker.acceptance, ...work.acceptance])];
-  }
-  Object.assign(worker.authority, authority);
-  const planDigest = f.evaluated.context.planDigest;
-  Object.assign(worker.identity, { workspace, planDigest, ...identity });
-  const record = { schemaVersion: 1, mode: "candidate", session, worker,
-    snapshot: { base, target: head, plan: f.plan, planDigest, diffSha256: sha256(diff.stdout),
-      gates: [{ command: "Check widget", commit: head, exitCode: 0, evidence }] },
-    attachments: { [evidence]: sha256(evidenceBytes) }, limits: { diffBytes: 65_536 } };
-  const bytes = jsonBytes(record);
-  await writeFile(request, bytes, { mode: 0o400 });
-  const prepared = await buildExport(record);
-  const binding = { schemaVersion: 1, requestSha256: sha256(bytes), exportSha256: await prepareExport(exportDirectory, record, null),
-    configurationSha256, model: "claude-fixture" };
-  const replay = await runReview({ request: record, expect: binding, prepared, directory: output, excluded: [exportDirectory],
-    run: async ({ files, prompt, session }) => {
-      const events = [];
-      const emit = (event) => events.push({ ...event, session_id: session });
-      const runtime = { session, model: binding.model, version: claudeVersion, bubblewrapVersion, maxTurns: 4, maxBudgetUsd: 1,
-        configurationSha256: binding.configurationSha256, route: "same-uid-key" };
-      emit({ type: "system", subtype: "init", model: runtime.model, claude_code_version: runtime.version, cwd: "/review",
-        tools: ["Read"], permissionMode: "dontAsk", mcp_servers: [], skills: [], slash_commands: [], plugins: [] });
-      for (const [name, data] of files) {
-        const id = `read-${events.length}`;
-        const file_path = `/review/${name}`;
-        const content = data.toString("utf8");
-        const numLines = content ? content.split("\n").length : 0;
-        emit({ type: "assistant", message: { content: [{ type: "tool_use", id, name: "Read", input: { file_path } }] } });
-        emit({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: id, content }] },
-          tool_use_result: { type: "text", file: { filePath: file_path, content, startLine: 1, numLines, totalLines: numLines } } });
-      }
-      const packet = Number(/^Packet: (\d+) of/m.exec(prompt)?.[1]);
-      const verdict = findings.length ? "Verdict: Findings" : "Verdict: No findings";
-      const report = files.size ? [verdict, `Target: ${head}`, JSON.stringify({ target: head, packet,
-        findings, coverageLimitations })].join("\n") : "REVIEW_PROBE_OK";
-      emit({ type: "assistant", message: { content: [{ type: "text", text: report }] } });
-      emit({ type: "result", subtype: "success", is_error: false, num_turns: 1, total_cost_usd: 0, permission_denials: [], result: report });
-      return { runtime, proc: { code: 0, signal: null, outcome: "exit", quiescent: true,
-        stdout: Buffer.from(events.map(JSON.stringify).join("\n") + "\n"), stderr: Buffer.alloc(0) } };
-    },
-  });
-  assert.equal(replay.phase, "complete");
-  const expectationBytes = jsonBytes({ ...binding, statusSha256: replay.statusSha256 });
-  await writeFile(expect, expectationBytes, { mode: 0o400 });
-  return { kind: "review-candidate", verifier: containedVerifier, verifierSha256: sha256(await readFile(containedVerifier)),
-    request, requestFileSha256: sha256(bytes), expect, expectFileSha256: sha256(expectationBytes), exportDirectory, output };
 }
 
 test("read-only runtime preflights P1–P8, reconciles dedicated worktrees and checks sealed handover", async (t) => {
