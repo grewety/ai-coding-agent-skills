@@ -18,6 +18,7 @@ import { proposalInput, charterObservation, proposalFreeze } from "./operator-pl
 import { cardDisplay, currentCard, narrowRestrictions, observed, recordCard, recordReply,
   readPlanningFeedback, readSeparateGrant, readShortAuthority, same, sealedObservation, verifyShortRoles } from "./operator-records.mjs";
 import { checkpointObservation, operatorStatus, relayCheckpoint, resumeCheckpoint } from "./operator-status.mjs";
+import { protectedFinish } from "./protected-finish.mjs";
 
 const need = (condition, message) => { if (!condition) throw new Error(message); };
 const digest = (value) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
@@ -575,6 +576,44 @@ function decorateStatus(base, input, evaluation, extras = {}) {
 
 export async function deliveryCommand(command, input, options) {
   switch (command) {
+    case "finish":
+    case "sync-skills":
+    case "continue": {
+      let closeout;
+      try {
+        let readiness;
+        if (command === "finish" && input.plan) {
+          const e = await deliveryEvaluation(input, { ...options, observationsOnly: true });
+          if (e.candidateRequest) {
+            readiness = { ...finishReadiness(e.candidateRequest, e.decision), plan: e.context.plan,
+              planDigest: e.identity.planDigest, mode: e.policy.mode, policyRevision: e.policy.policyRevision,
+              workspace: e.implementation?.workspace, branch: e.implementation?.branch, targetRevision: e.context.target,
+              keepWorktree: e.restrictions?.keepWorktree, gateReference: e.decision.gateReference,
+              reviewReference: e.handoff?.result?.report?.sha256 };
+          }
+        }
+        closeout = await protectedFinish({ ...input, resume: command === "continue" ? "continue" : null }, readiness);
+        if (command === "sync-skills") {
+          closeout = closeout.sync ? { ...closeout, cleanupAction: closeout.action, action: "sync-assessment", reason: null } :
+            { ...closeout, action: "pause", reason: "SYNC_RELEASE_OR_CLOSEOUT_PENDING" };
+        }
+      } catch (error) {
+        closeout = { schemaVersion: 1, action: "pause", reason: "FINISH_OBSERVATIONS_UNVERIFIED", detail: error.message,
+          checkpoint: input.finishCheckpoint?.file ?? null, readback: input.finishRemote?.file ?? null,
+          remoteWrites: false, profileWrites: false };
+      }
+      const id = closeout.identity;
+      const next = !["closed", "sync-assessment"].includes(closeout.action) || closeout.sync && closeout.sync.action !== "sync-verified";
+      const base = { ...deliveryStatus({ change: input.change }), state: closeout.archiveAccepted ?
+        ((closeout.cleanupAction ?? closeout.action) === "closed" ? "closed" : "cleanup-pending") : "protected-closeout",
+      mode: id?.mode ?? null, candidateSha: id?.candidate ?? null, planDigest: id?.planDigest ?? null,
+      stopPredicate: closeout.reason ?? closeout.sync?.reason ?? null,
+      recommendedNextAction: next ? { code: "PROTECTED_CLOSEOUT_NEXT", subject: input.change } : null };
+      return { ...closeout, status: decorateStatus(base, input, { policy: id, identity: id,
+        implementation: id ? { workspace: id.workspace, branch: id.branch, head: id.candidate } : null },
+      { closeout, evidence: closeout.readback, detail: closeout.detail,
+        restrictions: { ...input.restrictions, keepWorktree: closeout.keepWorktree === true || input.restrictions?.keepWorktree === true } }) };
+    }
     case "proposal": {
       try {
         const result = await assessProposal(input);
@@ -625,6 +664,9 @@ export async function deliveryCommand(command, input, options) {
     case "init":
     case "status": {
       const statusCommand = command === "status" || command === "init";
+      if (statusCommand && input.finishCheckpoint) {
+        return (await deliveryCommand("finish", input, options)).status;
+      }
       if (statusCommand && !input.plan) {
         if (input.proposal) return (await deliveryCommand("proposal", input, options)).status;
         return decorateStatus(deliveryStatus({ change: input.change }), input);

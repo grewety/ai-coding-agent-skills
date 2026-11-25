@@ -376,7 +376,8 @@ function evidence(file) {
   } finally { closeSync(descriptor); }
 }
 function identity(value, o) {
-  requireThat(/^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/issues\/[1-9][0-9]*$/.test(o.issue ?? ""), "Expected a canonical GitHub issue URL");
+  requireThat(o.allowIssueAbsent === true && o.issue === null ||
+    /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/issues\/[1-9][0-9]*$/.test(o.issue ?? ""), "Expected a canonical GitHub issue URL");
   requireThat(value.change === o.change && value.issueUrl === o.issue, "Evidence change/issue identity mismatch");
 }
 function gates(value, ref) {
@@ -446,6 +447,26 @@ function fresh(repo, verified, target, change, limit) {
   requireThat(archives.length <= 1, "Duplicate canonical change archives");
   if (archives.length) requireThat(![...after.keys()].some((file) => file.startsWith(root(change))), "Both active and archived canonical change exist");
 }
+export function verifyArchive({ repo, change, verified, head, archive, receiptSha256, receiptFile, committedReceiptPath,
+  issue, policyTarget, integrationReference }) {
+  repository(repo);
+  root(change);
+  requireThat(archivePattern(change).test(archive + "/"), "Archive identity mismatch");
+  ancestor(repo, commit(repo, verified), commit(repo, head));
+  const tree = entries(repo, head);
+  requireThat(archivesIn(tree, change)[0] === archive + "/", "Expected the exact containing archive");
+  requireThat(typeof committedReceiptPath === "string" && committedReceiptPath.startsWith(archive + "/evidence/"),
+    "Committed archive receipt path mismatch");
+  const entry = tree.get(receiptPath(committedReceiptPath, change));
+  requireThat(isRegular(entry) && sha256(gitBytes(repo, "show", `${head}:${committedReceiptPath}`)) === receiptSha256,
+    "Committed archive receipt identity mismatch");
+  return receipt({ repo, change, target: head, receipt: receiptFile, issue, allowIssueAbsent: true,
+    "receipt-path": committedReceiptPath, limit: MAX_CLOSURE_COMMITS, policyTarget, integrationReference }, false);
+}
+export function exactTree(repo, head) {
+  repository(repo);
+  return git(repo, "rev-parse", `${commit(repo, head)}^{tree}`).trim();
+}
 function receiptPath(value, change) {
   requireThat(text(value), "Receipt path must name a committed evidence JSON file");
   requireThat(!path.isAbsolute(value) && !value.includes("\\"), "Receipt path must be a repository-relative POSIX path");
@@ -457,11 +478,11 @@ function receiptPath(value, change) {
   requireThat(relative.startsWith("evidence/") && relative.endsWith(".json"), "Receipt path must name a committed evidence JSON file");
   return value;
 }
-function receipt(o) {
+function receipt(o, requireCheckout = true) {
   const record = evidence(o.receipt);
   identity(record.value, o);
   const mode = record.value.mode ?? "task-guided";
-  const snapshot = candidate({ ...o, mode, base: record.value.base, head: record.value.head, plan: record.value.plan,
+  const snapshot = candidate({ ...o, target: o.policyTarget ?? o.target, mode, base: record.value.base, head: record.value.head, plan: record.value.plan,
     "expect-plan": record.value.planDigest }, false);
   requireThat(snapshot.tasksComplete, "Incomplete implementation tasks cannot complete a change");
   review(record.value.review, snapshot, o);
@@ -471,8 +492,11 @@ function receipt(o) {
   ancestor(o.repo, snapshot.head, integrated);
   ancestor(o.repo, integrated, verified);
   ancestor(o.repo, verified, target);
-  const prPrefix = o.issue.split("/issues/")[0] + "/pull/";
-  requireThat(typeof record.value.integrationReference === "string" && record.value.integrationReference.startsWith(prPrefix) && /^[1-9][0-9]*$/.test(record.value.integrationReference.slice(prPrefix.length)), "Missing canonical integration PR reference");
+  const prPrefix = o.issue === null ? null : o.issue.split("/issues/")[0] + "/pull/";
+  requireThat((o.integrationReference === undefined || record.value.integrationReference === o.integrationReference) &&
+    (prPrefix === null ? text(o.integrationReference) : typeof record.value.integrationReference === "string" &&
+      record.value.integrationReference.startsWith(prPrefix) && /^[1-9][0-9]*$/.test(record.value.integrationReference.slice(prPrefix.length))),
+  "Missing canonical integration PR reference");
   for (const ref of [integrated, verified]) {
     const current = planning(o.repo, ref, o.change);
     const digest = mode === "goal-first" ? goalSnapshot(o.repo, ref, o.change, snapshot.base, current).digest : current.digest;
@@ -488,7 +512,7 @@ function receipt(o) {
   }
   // Integrated verification may run detached at this exact target SHA. Candidate
   // and review checks still require an attached implementation branch.
-  clean(o.repo, target, false);
+  if (requireCheckout) clean(o.repo, target, false);
   return { ...snapshot, integrated, verified, target, receiptSha256: record.sha256 };
 }
 export function integratedPolicyContext(repo, parent, target, allowUnintegratedParent = false) {

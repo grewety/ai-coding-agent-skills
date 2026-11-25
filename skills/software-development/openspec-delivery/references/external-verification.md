@@ -36,10 +36,14 @@ Describe each external check before approval. The card binds the exact
 `{amount, unit}`, `kind`, `runs: 1`, `artifact`, `trigger`, and
 `retryOf`. Use synthetic fixtures, approved built artifacts, or public test
 metadata. Raw source, credentials, live data and account actions remain
-outside the exposure. A tunnel or deploy preview requires an isolated
-`artifact` with canonical `root`, SHA-256 inventory identity, candidate and
-verified exposure boundaries. Other kinds use `artifact: null`. An app
+outside the exposure. A tunnel or deploy preview requires a built artifact.
+Whenever a card includes a built artifact, identify its isolated canonical
+`root`, SHA-256 inventory, candidate and verified exposure boundary.
+Cards using only synthetic fixtures or public test metadata use `artifact: null`. An app
 trigger names its stable `trigger`; other kinds use `trigger: null`.
+Use `displayCard: true` on the read-only `external` request to return the
+validated card with the decision. In the footer name the target, cases,
+artifact/data exposure, expected cost or credits, and one-run scope.
 
 Supply a verified v1 `grant` of kind `external-single-run`, with the exact
 `card`, distinct `reference`, `localOnly: false` and a fixed absolute
@@ -70,6 +74,8 @@ with `matchedBy: "accessible-name"`. A declared deploy preview requires
 its own single-run authority, artifact-only exposure and matched preview
 readback. Preserve the review pause and separately retain the operator's
 preview decision before merge.
+The protected finish route requires an HTTPS preview URL and matching
+`reviewedUrl` with passed deployment. Surface the URL at the human pause.
 
 Check declared local UI gates during local exact-candidate verification. Evaluate
 the separately declared deploy-preview gate at the protected pre-merge boundary.

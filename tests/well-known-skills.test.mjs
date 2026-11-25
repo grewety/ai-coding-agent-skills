@@ -125,6 +125,7 @@ test("well-known build publishes every skill and all advertised files", async ()
       "references/integration.md",
       "references/naming.md",
       "references/operator-workflow.md",
+      "references/protected-finish.md",
       "references/recovery.md",
       "references/task-authoring.md",
       "references/ticket.md",
@@ -146,6 +147,7 @@ test("well-known build publishes every skill and all advertised files", async ()
       "scripts/operator-records.mjs",
       "scripts/operator-status.mjs",
       "scripts/planning-inventory.mjs",
+      "scripts/protected-finish.mjs",
       "SKILL.md",
     ]);
     // Independent of dynamic package discovery: both representation files are required.

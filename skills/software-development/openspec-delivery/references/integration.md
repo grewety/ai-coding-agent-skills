@@ -4,6 +4,8 @@ This procedure is operator-controlled; the package supplies no GitHub writer,
 merge queue, distributed fencing or default mutation authority.
 Use [evidence-retention.md](evidence-retention.md) for byte-preserving named-gate
 output, factual readback provenance, and limits on historical claims.
+Use the [protected finish checkpoint](protected-finish.md) for the ordered
+decision, bounded wait, and same-head resume under the retained finish grant.
 
 ## Before any publication
 
@@ -72,8 +74,9 @@ CLI help and select its no-spec-update path only when the deltas were already
 incorporated and current specs are correct. If current specs differ, stop for
 explicit reconciliation and new verification; never overwrite newer requirements.
 
-Run the required local closure gates on the exact closure SHA, including receipt
-structure and exact archive-path validation. Then obtain a fresh independent
+Run the required local closure gates on the exact closure SHA, including full
+project tests on the actual archived tree, receipt structure and exact
+archive-path validation. Then obtain a fresh independent
 factual closure review bound to that exact closure SHA. Only after those gates
 and review may separately authorized publication/integration proceed; verify the
 exact closure merge and any authorized cleanup. A changed closure SHA requires

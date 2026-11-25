@@ -307,6 +307,9 @@ start a fresh session:
 codex --approve-for-me -C "$change_worktree" --add-dir "$change_records"
 ```
 
+The [operator runbook](openspec-operator-runbook.md) covers the exact short
+inputs, bounded protected waits, partial cleanup, and optional profile sync.
+
 The flag selects workspace-write with automatic approval review. The starter
 points to an exact sealed checkpoint and keeps the original restrictions,
 budgets and role bindings. Sending `$openspec-next <full-name>` authorizes only
@@ -921,8 +924,8 @@ Orchestration is optional. It requires the workflow plugin, explicit role and
 model configuration, and a supported host. Package installation does not create
 those roles.
 
-Current source versions are delivery 1.5.0 and `openspec-next` 0.6.0 in
-`openspec-development` 1.5.0, and core skill 0.20.0 in
+Current source versions are delivery 1.6.0 and `openspec-next` 0.7.0 in
+`openspec-development` 1.6.0, and core skill 0.20.0 in
 `autonomous-orchestration` 1.10.0.
 Representation support adds no upstream workflow, runtime dependency or
 installation route. Package availability/byte checks do not establish account

@@ -768,8 +768,8 @@ no generated skill copies are committed. Its explicit skill lists separate the
 OpenSpec companion workflow from opt-in orchestration. Bump every affected plugin's version when
 its bundled content changes. See the [Claude release checks](docs/claude-installation.md#maintainer-verification).
 
-Current source versions are delivery 1.5.0 and its affected
-`openspec-development` plugin 1.5.0; `openspec-next` is 0.6.0 and
+Current source versions are delivery 1.6.0 and its affected
+`openspec-development` plugin 1.6.0; `openspec-next` is 0.7.0 and
 `autonomous-orchestration` is 1.10.0 (core skill 0.20.0). Complete well-known output,
 skill ZIPs, workflow plugin ZIP and isolated native copies must retain all support
 files byte-for-byte, including delivery's runtime and evidence commands and next's
@@ -816,6 +816,10 @@ undecodable/binary content needing manual review, or a non-safe verdict fails th
 gate. No network, package installation, credentials, or profile writes are used.
 This is a stricter local release check, not a promise of approval by other scanner
 versions. Ordinary `npm test` and CI remain independent of a Hermes checkout.
+
+The [operator runbook](docs/openspec-operator-runbook.md) covers prospective
+short proposals, same-head protected finish, cleanup recovery and the optional
+post-release skill sync selection.
 
 Publication and profile updates need separate operator authorization. After
 publication, verify the live files and normal hub installation in an isolated

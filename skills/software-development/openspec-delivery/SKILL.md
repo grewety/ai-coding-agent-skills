@@ -1,7 +1,7 @@
 ---
 name: openspec-delivery
 description: Automate setup, execution and closeout of OpenSpec changes.
-version: 1.5.0
+version: 1.6.0
 author: Raphael (forgegod), Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -173,6 +173,7 @@ The Hermes/direct forms show the available verbs:
 /openspec-delivery prepare <name>
 /openspec-delivery finish <name>
 /openspec-delivery document <name>
+/openspec-delivery sync-skills <name>
 ```
 
 `<name>` may be the full name or an unambiguous short slug. With no name, or
@@ -198,6 +199,13 @@ a ULID or remember a worktree path. Load [references/continuation.md](references
   and removal of clean dedicated worktrees. No direct target push, bypass,
   force-push, release, branch deletion or next change. Require exact candidate acceptance and current-spec
   promotion through `finish-readiness` first; do not implement missing groups under `finish`.
+  Use [protected finish checkpoints](references/protected-finish.md) to watch
+  required checks within a deadline and resume the same exact PR after a
+  contextual `continue`. Reconcile every proven registration after closure.
+- `sync-skills`: identify the immutable release source, client or profile and
+  desired packages. Use the separately authorized operator-controlled update
+  route in [protected finish checkpoints](references/protected-finish.md).
+  The packaged helper only assesses the offer and retained verification.
 - `document`: load `references/ticket.md`, create/reuse one issue, read it back,
   bind its verified URL, then stop. No implementation, commits or PR. Reuse
   does not authorize rewriting an existing issue. No second task list.

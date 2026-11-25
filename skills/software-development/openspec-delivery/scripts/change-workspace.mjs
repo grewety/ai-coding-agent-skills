@@ -83,6 +83,64 @@ function inspectSource(repo) {
   requireThat(realpathSync(git(repo, "rev-parse", "--show-toplevel")) === repo, "Expected the canonical repository root");
   topology(repo);
 }
+
+export function retirementInventory({ repo, repository, change, target, ownership, writers, keepWorktree }) {
+  inspectSource(repo);
+  commit(repo, target);
+  requireThat(Array.isArray(ownership) && new Set(ownership.map(({ workspace }) => workspace)).size === ownership.length,
+    "Duplicate or missing retained worktree ownership inventory");
+  const entries = inventory(repo);
+  const proofs = new Map(ownership.map((proof) => [proof.workspace, proof]));
+  const byPath = new Map(entries.map((entry) => [entry.worktree, entry]));
+  const result = [];
+  for (const workspace of new Set([...byPath.keys(), ...proofs.keys()])) {
+    const entry = byPath.get(workspace);
+    const proof = proofs.get(workspace);
+    const report = (state, reason, extras) => result.push({ workspace, state, reason, ...extras });
+    if (workspace === entries[0]?.worktree || workspace === repo) {
+      report("retained", "PRIMARY_OR_CALLER");
+      continue;
+    }
+    if (!proof && ![ `refs/heads/change/${change}`, `refs/heads/closure/${change}` ].includes(entry?.branch)) {
+      report(entry?.detached ? "blocked" : "retained", "OWNERSHIP_UNVERIFIED");
+      continue;
+    }
+    try {
+      canonical(workspace);
+      requireThat(proof?.verified === true && typeof proof.reference === "string" && proof.reference.trim() &&
+        proof.repository === repository && proof.change === change && proof.commonDirectory === common(repo),
+      "Ownership provenance differs");
+      const { role, ref, head } = proof;
+      const attached = ["implementation", "closure"].includes(role);
+      requireThat(attached ? typeof ref === "string" && ref.startsWith("refs/heads/") &&
+        git(repo, "check-ref-format", ref) === "" && git(repo, "rev-parse", "--verify", ref) === head :
+        role === "verification" && ref === null, "Role, ref or retained branch head differs");
+      commit(repo, head);
+      ancestor(repo, head, target);
+      if (!entry) {
+        requireThat(!lstatSync(workspace, { throwIfNoEntry: false }), "Unregistered path still exists");
+        report("removed", null, { ref, head });
+        continue;
+      }
+      if (keepWorktree) {
+        report("retained", "OPERATOR_KEEP_WORKTREE");
+        continue;
+      }
+      requireThat(!entry.locked && !entry.prunable && !entry.bare && entry.HEAD === head &&
+        (attached ? entry.branch === ref : entry.detached === true), "Registration, lock or HEAD differs");
+      requireThat(writers?.verified === true && typeof writers.reference === "string" && writers.reference.trim() &&
+        Array.isArray(writers.idle) && writers.idle.includes(workspace), "Writer settlement is unverified");
+      inspectSource(workspace);
+      requireThat(common(workspace) === common(repo) && git(workspace, "rev-parse", "HEAD") === head &&
+        git(workspace, "rev-parse", "--symbolic-full-name", "HEAD") === (ref ?? "HEAD"), "Live checkout identity differs");
+      requireThat(!dirty(repo) && !dirty(workspace) && !git(workspace, "ls-files", "--others", "--ignored", "--exclude-standard", "-z") &&
+        !git(workspace, "ls-files", "--stage").split("\n").some((line) => line.startsWith("160000 ")),
+      "Tracked, untracked, ignored or submodule content requires preservation");
+      report("eligible", null, { ref, head, argv: ["git", "-C", repo, "worktree", "remove", "--", workspace] });
+    } catch (error) { report("blocked", error.message); }
+  }
+  return result;
+}
 export function sourceObservation({ repo, targetBranch, remote }) {
   inspectSource(repo);
   requireThat(typeof targetBranch === "string" && !targetBranch.startsWith("-") &&

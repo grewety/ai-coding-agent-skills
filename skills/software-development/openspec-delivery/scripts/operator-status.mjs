@@ -96,24 +96,61 @@ function singleLine(value) {
   return String(value ?? "pending").replaceAll(/[\u0000-\u001f\u007f]/g, " ");
 }
 
+function finishInputs(closeout, change, inspect) {
+  const next = {
+    "publish-ready": "Publish the named exact candidate through the retained protected finish grant and verify remote readback",
+    "merge-ready": "Use the verified protected merge route for the displayed PR and exact head",
+    watch: "Read the same PR head and protection again at " + closeout.pollAt,
+    "verify-integrated": "Run the declared gates on the isolated containing revision",
+    "prepare-closure": "Prepare the receipt and record-only archive candidate under the retained finish grant",
+    "verify-closure": "Run the complete declared gates including npm test on the exact archived tree",
+    "review-closure": "Obtain the separately authorized fresh factual closure review on the exact archived tree",
+    "close-issue": "Close the bound issue against the verified archive acceptance and read it back",
+    "retire-worktrees": "Recheck eligible dedicated worktrees, remove without force and verify registrations, paths and retained refs",
+  }[closeout.action];
+  if (next) return [next];
+  if (closeout.reason === "PREVIEW_REVIEW_PENDING") return [
+    "Review the exact-candidate preview at " + closeout.previewUrl + ", then reply continue",
+  ];
+  if (closeout.reason === "OPTIONAL_CHECK_DISPOSITION_PENDING") return [
+    "Record a proceed-without decision for the stalled optional checks, then reply continue",
+    "Request a separately authorized single-run retry",
+  ];
+  if (closeout.sync?.action === "operator-sync-ready") {
+    return ["Use the authorized " + closeout.sync.client + " update in the selected profile from " +
+      closeout.sync.source.revision + ", then record complete bytes, versions and fresh-session readback"];
+  }
+  if (["closed", "sync-assessment"].includes(closeout.action) && closeout.sync) {
+    return ["$openspec-delivery sync-skills " + change + " (name client or profile, immutable source and update scope)",
+      "Keep the current installed packages"];
+  }
+  return [inspect, "Resolve " + closeout.reason + " using the retained readback"];
+}
+
 export function operatorStatus(base, { policy, workspace, identity, preflight, checkpoint, restrictions, alignment, pullRequest,
-  detail, evidence, shortCard, proposal } = {}) {
+  detail, evidence, shortCard, proposal, closeout } = {}) {
   const result = {
     ...base, operatorSchemaVersion: 1, policyRevision: policy?.policyRevision ?? null,
     plan: identity?.plan ?? null, workspace: workspace?.workspace ?? null, branch: workspace?.branch ?? null,
-    head: workspace?.head ?? null, checkpoint: checkpoint?.file ?? null, evidence: evidence ?? null,
+    head: workspace?.head ?? null, checkpoint: checkpoint?.file ?? closeout?.checkpoint ?? null, evidence: evidence ?? null,
     pullRequest: observed(pullRequest) && pullRequest.change === base.change && pullRequest.head === workspace?.head && workspace?.head ? {
       reference: pullRequest.reference, state: pullRequest.state ?? null, checks: pullRequest.checks ?? null,
     } : null,
     preflight: preflight ?? null, restrictions: restrictions ?? null,
     invariantState: alignment ?? null, detail: detail ?? null,
   };
+  if (closeout) {
+    result.closeout = closeout;
+    result.pullRequest = closeout.pr ? { reference: closeout.pr, head: closeout.head ?? null,
+      state: closeout.prState ?? closeout.action, checks: closeout.required ?? null, optional: closeout.optional ?? null } : null;
+  }
   const change = base.change;
   const inspect = change ? `$openspec-next inspect ${change}` : "$openspec-next inspect";
   const code = base.recommendedNextAction?.code;
   const proposalFreeze = proposal?.action === "freeze-ready";
   let next = [inspect];
-  if (proposalFreeze) next = ["Freeze the validated native planning files under the retained local grant"];
+  if (closeout) next = finishInputs(closeout, change, inspect);
+  else if (proposalFreeze) next = ["Freeze the validated native planning files under the retained local grant"];
   else if (proposal?.action === "prepare-native-draft") next = ["Prepare the verified workspace, then scaffold the native proposal"];
   else if (proposal?.action === "apply-validate-review") next = ["Apply the retained correction, revalidate and review the complete native artifact set"];
   else if (proposal?.action === "retry-launch") next = ["Obtain the separately authorized review retry for the retained route"];
@@ -134,13 +171,16 @@ export function operatorStatus(base, { policy, workspace, identity, preflight, c
   else if (code === "RECORD_NATIVE_PROGRESS") next = ["Record the verified native progress under the retained local grant"];
   else if (code === "WAIT_FOR_ORIGINAL_OPERATOR_INPUT") next = ["Answer the pending input in the original session"];
   else if (code === "RESOLVE_STOP") next = [inspect, `Supply verified evidence for ${base.stopPredicate ?? "the unresolved predicate"}`];
-  const canSwitch = checkpoint?.safeBoundary === true && text(result.workspace);
+  const finishHandoff = Boolean(closeout?.records && closeout?.checkpoint && closeout?.readback);
+  const canSwitch = checkpoint?.safeBoundary === true && text(result.workspace) || finishHandoff;
   result.nextInput = code ? next : null;
   result.session = canSwitch && code ? {
     kind: "fresh-session",
-    starter: `${inspect}. Read checkpoint ${checkpoint.file} (SHA-256 ${checkpoint.sha256}) and evidence ${checkpoint.evidence.file}; verify HEAD ${result.head}, digest ${base.planDigest}, ownership and retained authority before continuing.`,
+    starter: finishHandoff ?
+      `${inspect}. Read finish checkpoint ${closeout.checkpoint} (SHA-256 ${closeout.checkpointSha256}) and ${closeout.readback}; verify candidate ${result.head}, plan digest ${base.planDigest}, deadline ${closeout.deadline}, PR and grant ${closeout.grantReference}. Serialize the handoff and read the current remote state before continuing.` :
+      `${inspect}. Read checkpoint ${checkpoint.file} (SHA-256 ${checkpoint.sha256}) and evidence ${checkpoint.evidence.file}; verify HEAD ${result.head}, digest ${base.planDigest}, ownership and retained authority before continuing.`,
     launch,
-    setup: `change_worktree=${shellQuote(result.workspace)}\nchange_records=${shellQuote(checkpoint.records)}`,
+    setup: `change_worktree=${shellQuote(finishHandoff ? closeout.identity.repo : result.workspace)}\nchange_records=${shellQuote(finishHandoff ? closeout.records : checkpoint.records)}`,
   } : code ? { kind: "same-session" } : null;
   const show = singleLine;
   result.footer = code ? [
@@ -151,6 +191,7 @@ export function operatorStatus(base, { policy, workspace, identity, preflight, c
     `P1–P8 ${preflight?.items?.map(({ id, state }) => `${id} ${state}`).join(", ") ?? "pending"} · first unresolved ${show(preflight?.followUp ?? (preflight?.ready ? "none" : null))}`,
     `Stop ${show(base.stopPredicate ?? (proposalFreeze ? "none" : null))}${detail ? ` (${show(detail)})` : ""}`,
     `Restrictions ${show(restrictions ? JSON.stringify(restrictions) : null)} · invariants ${show(alignment ? JSON.stringify(alignment) : null)}`,
+    ...(closeout?.archiveAccepted ? [`Archive accepted · issue ${show(closeout.issueState)} · worktrees ${show(closeout.worktrees?.map(({ workspace, state }) => workspace + " " + state).join(", "))}`] : []),
     ...next.map((item) => `- ${show(item)}`),
     ...(canSwitch ? [`\nFresh session: ${show(result.session.starter)}`, `\n\`\`\`sh\n${result.session.setup}\n${launch}\n\`\`\``] : []),
   ].join("\n") : null;

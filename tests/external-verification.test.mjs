@@ -35,6 +35,9 @@ test("external authority for a synthetic paid check is single-run and a retry ha
   const input = { card, grant, history: [] };
   const offer = await run("external", input);
   assert.equal(offer.result.action, "reserve");
+  const displayed = await run("external", { card, displayCard: true });
+  assert.equal(displayed.result.reason, "EXTERNAL_AUTHORITY_PENDING");
+  assert.deepEqual(displayed.result.card, card);
   await assert.rejects(stat(grant.reservation), { code: "ENOENT" });
   assert.equal((await run("external", { ...input, grant: { ...grant, kind: "local-execution-grant" } })).result.reason,
     "EXTERNAL_AUTHORITY_PENDING");
@@ -66,6 +69,11 @@ test("artifact-only tunnels and app triggers require their own bounded reservati
   const approved = await run("reserve-external", { card, grant, history: [], observed: signal });
   assert.equal(approved.result.serveOnly, artifact.root);
   assert.equal(approved.result.cleanup, "immediate-on-success-or-failure");
+  const builtCheck = makeCard({ data: ["built-artifact"], artifact });
+  assert.equal((await run("external", { card: { ...builtCheck, artifact: null }, displayCard: true })).result.reason,
+    "EXTERNAL_SCOPE_UNVERIFIED");
+  const builtGrant = grantFor(root, builtCheck, "retained:built-check");
+  assert.equal((await run("external", { card: builtCheck, grant: builtGrant, history: [], observed: signal })).result.action, "reserve");
   const trigger = "preview-vendor";
   const triggerCard = makeCard({ kind: "app-trigger", trigger });
   const pushGrant = { verified: true, candidate, target: triggerCard.target, reference: "retained:push" };
