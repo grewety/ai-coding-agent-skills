@@ -179,8 +179,8 @@ files plus their generated plugin metadata, README, and license.
 
 Bump the affected plugin version in the catalog whenever its selected skills or
 support files change; skill versions alone do not update the enclosing plugin.
-The source catalog's `openspec-development` 1.6.0 includes `openspec-delivery`
-1.6.0 with its shared `scripts/git-environment.mjs` and
+The source catalog's `openspec-development` 1.7.0 includes `openspec-delivery`
+1.7.0 with its shared `scripts/git-environment.mjs` and
 `references/git-environment.md` for the Git guard/workspace helpers. Also preserve
 `references/evidence-retention.md`, `scripts/evidence-retention.mjs`,
 `scripts/evidence-cli.mjs`, `scripts/delivery-cli.mjs` and
@@ -189,7 +189,7 @@ skill/plugin ZIP exports. The evidence command supports authorized exact-SHA gat
 capture and offline readback. Keep next's `references/routing.md` and
 `scripts/next.mjs` with that skill. If direct packages load from different scopes,
 use the router's explicit trusted runtime path. The optional
-`autonomous-orchestration` is 1.10.0 (core skill 0.20.0) and `openspec-next` is 0.7.0. These
+`autonomous-orchestration` is 1.11.0 (core skill 0.21.0) and `openspec-next` is 0.7.0. These
 source versions do not assert that the public marketplace/downloads are updated.
 Preserve delivery's policy/task-authoring references and `delivery-policy.mjs`,
 and orchestration's `references/portable-core.md`, `scripts/orchestration-core.mjs`,

@@ -1,7 +1,7 @@
 ---
 name: autonomous-implementation-review
 description: Implement changes with an independent review loop.
-version: 0.20.0
+version: 0.21.0
 author: Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -35,6 +35,9 @@ execution or remote writes.
 
 The pinned [Linux runtime](references/worker-runtime.md) passed sealed trials.
 [Contained review](references/review-candidate.md) needs separate launch authority.
+The contained runner supports bounded offline packet preflight and inherited
+or integrated review authority. Keep host pins, spend reservations and
+private relay diagnostics outside the reviewer sandbox.
 
 ## Legacy host execution
 

@@ -1,4 +1,4 @@
-import { candidate, committedDocument, planning } from "./change-guard.mjs";
+import { candidate, committedDocument, planning, proveTaskCompletion } from "./change-guard.mjs";
 import { planningLayout } from "./planning-inventory.mjs";
 
 const need = (condition, message) => { if (!condition) throw new Error(message); };
@@ -103,16 +103,25 @@ export function checkPromotion({ capability, delta, current, previous }) {
   return changes.length;
 }
 
-export function finishReadiness(input, result) {
+export function finishReadiness(input, result, completion) {
   const { repo, change, head } = input;
   const report = (predicate, issue, promoted = []) => ({ schemaVersion: 1, change, head, ready: false, predicate, issue, promoted });
-  if (result?.action !== "accept-result" || result.head !== head) return report("EXACT_RESULT_UNVERIFIED", null);
+  if (result?.action !== "accept-result" || result.head !== (completion?.reviewedParent ?? head))
+    return report("EXACT_RESULT_UNVERIFIED", null);
   let snapshot;
-  try { snapshot = candidate(input); }
+  let taskCompletion;
+  try {
+    snapshot = candidate(input);
+    if (completion) {
+      need(result.independentZeroWaiver === true && input["gate-run"] && input["gate-run-sha256"],
+        "Task completion requires sealed independent review and fresh exact child gates");
+      taskCompletion = proveTaskCompletion(input, result.head, result.acceptedTaskIds);
+    }
+  }
   catch (error) { return report("CANDIDATE_UNVERIFIED", error.message); }
   if (!snapshot.tasksComplete) return report("NATIVE_OUTCOME_PENDING", null);
   const layout = planningLayout(change);
-  const { inputs } = planning(repo, head, change);
+  const { inputs } = planning(repo, head, change, snapshot.customPlanning);
   const promoted = [];
   for (const file of Object.keys(inputs).filter((name) => name.startsWith(`${layout.specs}/`) && name.endsWith("/spec.md"))) {
     const capability = file.slice(layout.specs.length + 1, -"/spec.md".length);
@@ -127,5 +136,5 @@ export function finishReadiness(input, result) {
     }
   }
   return { schemaVersion: 1, change, head, ready: true, predicate: null, issue: null, promoted,
-    authority: "separate-finish-grant-required" };
+    ...(taskCompletion ? { taskCompletion } : {}), authority: "separate-finish-grant-required" };
 }

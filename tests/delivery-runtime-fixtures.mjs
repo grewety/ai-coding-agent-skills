@@ -63,6 +63,7 @@ export async function containedHandover(f, workspace, head, gates, attempt, {
   const planDigest = f.evaluated.context.planDigest;
   Object.assign(worker.identity, { workspace, planDigest, ...identity });
   const record = { schemaVersion: 1, mode: "candidate", session, worker,
+    ...(f.evaluated.context.lowTouch ? { policy: { parent: f.base, target: f.base } } : {}),
     snapshot: { base, target: head, plan: f.plan, planDigest, diffSha256: sha256(diff.stdout),
       gates: [{ command: "Check widget", commit: head, exitCode: 0, evidence }] },
     attachments: { [evidence]: sha256(evidenceBytes) }, limits: { diffBytes: 65_536 } };
@@ -75,7 +76,7 @@ export async function containedHandover(f, workspace, head, gates, attempt, {
     run: async ({ files, prompt, session }) => {
       const events = [];
       const emit = (event) => events.push({ ...event, session_id: session });
-      const runtime = { session, model: binding.model, version: claudeVersion, bubblewrapVersion, maxTurns: 4, maxBudgetUsd: 1,
+      const runtime = { session, model: binding.model, version: claudeVersion, bubblewrapVersion, maxTurns: f.evaluated.context.lowTouch ? 64 : 4, maxBudgetUsd: 1,
         configurationSha256: binding.configurationSha256, route: "same-uid-key" };
       emit({ type: "system", subtype: "init", model: runtime.model, claude_code_version: runtime.version, cwd: "/review",
         tools: ["Read"], permissionMode: "dontAsk", mcp_servers: [], skills: [], slash_commands: [], plugins: [] });
@@ -158,7 +159,7 @@ export async function buildExclusiveFixture(f, { workerRequest, containedHandove
   const reviewerConfiguration = await retain("review-configuration.json", {
     schemaVersion: 1, bwrap: binary, claude: binary, node: binary, libraries: [], model: "claude-fixture",
     relay: { route: "same-uid-key", keyFile: path.join(f.root, "synthetic-relay-pin"), keyFormat: "raw" },
-    timeoutMs: 2000, maxTurns: 4, maxBudgetUsd: 1, requirePreExposureAttestation: false,
+    timeoutMs: 2000, maxTurns: f.evaluated.context.lowTouch ? 64 : 4, maxBudgetUsd: 1, requirePreExposureAttestation: false,
   });
   const inventory = async (name) => [await pin(name + "-skill.md", "Synthetic skill"), await pin(name + "-helper.mjs", "Synthetic helper")];
   const pair = {

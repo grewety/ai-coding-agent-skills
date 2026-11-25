@@ -27,14 +27,14 @@ This adds no upstream skill or runtime dependency. Package installation/validati
 does not establish native Git behavior; missing native macOS/Windows results remain
 hardening completion blockers, and WSL or case simulations do not replace them.
 
-Delivery 1.6.0 (in `openspec-development` 1.6.0) also includes
+Delivery 1.7.0 (in `openspec-development` 1.7.0) also includes
 `references/evidence-retention.md`, `scripts/evidence-retention.mjs`,
 `scripts/evidence-cli.mjs`, `scripts/delivery-cli.mjs` and
 `scripts/delegated-delivery.mjs`. Keep the complete
 evidence and runtime support in companion copies and ZIPs. `openspec-next` is 0.7.0
 and ships `references/routing.md` and `scripts/next.mjs` for read-only routing to
 delivery. Install both complete packages in the intended host. The separate optional
-`autonomous-orchestration` plugin is 1.10.0 (core skill 0.20.0). Installation, account sync and
+`autonomous-orchestration` plugin is 1.11.0 (core skill 0.21.0). Installation, account sync and
 host execution verification remain separate; package byte checks establish none
 of native client discovery, Desktop acceptance or scanner approval.
 

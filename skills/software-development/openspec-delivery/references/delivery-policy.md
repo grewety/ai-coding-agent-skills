@@ -315,3 +315,8 @@ observation defaults to false for legacy and recovery plans. Planning may
 assess its draft mode before review. Only a complete matching review under the
 selected policy can satisfy a required review gate at freeze or execution.
 See [short proposal and operator checkpoints](operator-workflow.md).
+
+A root `openspec-low-touch` marker is interpreted only at the verified
+integrated parent. Follow [integrated low-touch delivery](low-touch.md) for
+its schema inventory, paid-review, harness, exact task-completion and
+protected event policies. Frozen legacy approvals keep their original hashes.

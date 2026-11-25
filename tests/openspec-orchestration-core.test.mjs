@@ -249,7 +249,10 @@ test("portable outcome packet bounds one worker without client tools or a second
   const inherited = group();
   delete inherited.budget;
   assert.deepEqual(outcomePacket({ ...input, group: inherited, authority: { ...authority(), budget: group().budget } }).outcome.budget, group().budget);
-  const result = spawnSync(process.execPath, ["--input-type=module", "-e", `const {outcomePacket}=await import(${JSON.stringify(coreUrl.href)}); console.log(outcomePacket(${JSON.stringify(input)}).progressWriter)`], { env: {}, encoding: "utf8" });
+  const result = spawnSync(process.execPath, ["--input-type=module", "-e",
+    `import { writeSync } from "node:fs"; const {outcomePacket}=await import(${JSON.stringify(coreUrl.href)}); writeSync(1, outcomePacket(${JSON.stringify(input)}).progressWriter)`],
+  { env: {}, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  assert.ifError(result.error);
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stdout.trim(), "owner-session");
 });

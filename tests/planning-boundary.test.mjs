@@ -90,7 +90,7 @@ const limitCases = [
 ];
 
 for (const [label, reason, expand] of limitCases) {
-  test(`Aikido 1151615147 refuses partial planning inventory at the ${label} limit`, async (t) => {
+  test(`Planning inventory refuses partial planning inventory at the ${label} limit`, async (t) => {
     const fixture = await planningFixture(t);
     const { base, git, invoke } = fixture;
     const normal = invoke("planning-worktree");

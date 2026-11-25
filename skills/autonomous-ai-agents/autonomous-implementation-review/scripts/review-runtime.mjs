@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { runBoundedWorker } from "./bounded-worker.mjs";
 import { allocateReviewScratch, checkSocketLength, defaultReviewScratchRoot } from "./review-runtime-scratch.mjs";
+import { validateHarnessBinding } from "./harness-result.mjs";
+import { upstreamClasses } from "./review-upstream-status.mjs";
 import { safePath, writeClosed } from "./worker-handoff.mjs";
 import { absolute, digest, fields, hash, jsonBytes, need, relative, separate } from "./review-inputs.mjs";
 
@@ -23,7 +25,12 @@ const pluginSettings = JSON.stringify({ enabledPlugins: {
 
 export function validateHostConfig(config) {
   fields(config, ["schemaVersion", "bwrap", "claude", "node", "libraries", "model", "relay",
-    "timeoutMs", "maxTurns", "maxBudgetUsd", "requirePreExposureAttestation"], "trusted host configuration");
+    "timeoutMs", "maxTurns", "maxBudgetUsd", "requirePreExposureAttestation"], "trusted host configuration", ["interPacketDelayMs", "runTimeoutMs", "localHarness"]);
+  if (config.localHarness !== undefined && config.localHarness !== null) validateHarnessBinding(config.localHarness);
+  for (const [name, min, max] of [["interPacketDelayMs", 0, 30000], ["runTimeoutMs", 1000, 3600000]]) {
+    need(config[name] === undefined || Number.isSafeInteger(config[name]) && config[name] >= min && config[name] <= max,
+      "Invalid host pacing or run deadline");
+  }
   need(config.schemaVersion === 1 && /^claude-[a-z0-9-]{2,100}$/.test(config.model) &&
     config.requirePreExposureAttestation === false, "Unsupported host configuration or required pre-exposure attestation");
   for (const [name, pin] of Object.entries({ bwrap: config.bwrap, claude: config.claude, node: config.node })) {
@@ -103,10 +110,10 @@ export async function verifyRuntimePins(config, excluded) {
   await Promise.all([config.bwrap, config.node, config.claude, ...config.libraries].map((pin) => verifyPin(pin, excluded)));
 }
 
-export function runtimeBinding(config, session) {
+export function runtimeBinding(config, session, configurationSha256 = hash(jsonBytes(config))) {
   return { session, model: config.model, version: claudeVersion, bubblewrapVersion,
     maxTurns: config.maxTurns, maxBudgetUsd: config.maxBudgetUsd,
-    configurationSha256: hash(jsonBytes(config)), route: config.relay.route };
+    configurationSha256, route: config.relay.route };
 }
 
 async function brokerSocket(relay, excluded) {
@@ -174,10 +181,29 @@ async function sameUidRelay(config, scratch, requestLimit) {
     try { await close(); } catch (closeError) { closeError.relayUnsettled = true; throw closeError; }
     throw error;
   }
-  return { socket, close };
+  let classification;
+  let sequence = 0;
+  child.on("message", (event) => {
+    if (upstreamClasses.includes(event?.upstreamStatus)) classification ??= event.upstreamStatus;
+  });
+  const diagnostic = () => new Promise((resolve, reject) => {
+    const token = ++sequence;
+    const done = () => { child.off("message", received); clearTimeout(timeout); };
+    const received = (event) => {
+      if (event?.barrier !== token) return;
+      done();
+      const status = classification;
+      classification = undefined;
+      resolve(status);
+    };
+    const timeout = setTimeout(() => { done(); reject(new Error("Host relay diagnostic settlement failed")); }, 1000);
+    child.on("message", received);
+    child.send({ barrier: token }, (error) => { if (error) { done(); reject(new Error("Host relay unavailable")); } });
+  });
+  return { socket, close, diagnostic };
 }
 
-export async function withReviewRuntime(config, { parent, excluded, packetCount, scratchRoot }, callback, startRelay = sameUidRelay) {
+export async function withReviewRuntime(config, { parent, excluded, packetCount, scratchRoot, configurationSha256 }, callback, startRelay = sameUidRelay) {
   validateHostConfig(config);
   need(process.platform === "linux", "Linux namespaces and pidfds required");
   await verifyRuntimePins(config, excluded);
@@ -196,8 +222,9 @@ export async function withReviewRuntime(config, { parent, excluded, packetCount,
       relay = await startRelay(config, scratch, Math.min((config.maxTurns + 8) * (packetCount + 1), 4096));
     } else relay = { socket: await brokerSocket(config.relay, excluded), close: async () => {} };
     checkSocketLength(relay.socket);
-    return await callback(async ({ files, session = randomUUID(), prompt }) => {
+    return await callback(async ({ files, session = randomUUID(), prompt, timeoutMs = config.timeoutMs }) => {
       need(workersSettled, "Previous reviewer process has no quiescence proof");
+      need(timeoutMs > 0, "Review deadline expired before launch");
       await owned.verify();
       const packet = await mkdtemp(path.join(scratch, "packet-"));
       for (const [name, bytes] of files) {
@@ -207,15 +234,16 @@ export async function withReviewRuntime(config, { parent, excluded, packetCount,
         await writeClosed(filename, bytes, true);
       }
 
-      const runtime = runtimeBinding(config, session);
+      const runtime = runtimeBinding(config, session, configurationSha256);
       workersSettled = false;
       const proc = await runBoundedWorker(config.bwrap.path, containmentArgs(config, packet, relay.socket, runtime), {
-        cwd: scratch, env: launcherEnv, input: Buffer.from(prompt), timeoutMs: config.timeoutMs,
+        cwd: scratch, env: launcherEnv, input: Buffer.from(prompt), timeoutMs: Math.min(timeoutMs, config.timeoutMs),
         postLeaderGraceMs: 250, // Bubblewrap's namespace reaper can outlive its status-reporting launcher.
         stdoutLimit: 8 * 1024 * 1024, stderrLimit: 128 * 1024,
       });
       workersSettled = proc.quiescent;
-      return { runtime, proc };
+      const upstreamStatus = await relay.diagnostic?.();
+      return { runtime, proc, ...(upstreamStatus ? { upstreamStatus } : {}) };
     });
   } catch (error) {
     if (error.relayUnsettled) workersSettled = false;

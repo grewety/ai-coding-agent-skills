@@ -1,7 +1,9 @@
+import { customPlanningPath, planningBudget, planningLayout, validatePlanningInputs } from "./planning-inventory.mjs";
+import { readLowTouchPolicy } from "./low-touch-policy.mjs";
 import { relocatedPlan } from "./review-archive.mjs";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { chmod, lstat, mkdir, readdir } from "node:fs/promises";
+import { chmod, lstat, mkdir, opendir, readdir } from "node:fs/promises";
 import path from "node:path";
 import { readClosed, safePath, validateRequest, writeClosed } from "./worker-handoff.mjs";
 
@@ -145,17 +147,18 @@ export async function verifiedGitRoot(workspace) {
 }
 
 export const planningPrefix = (change) => `openspec/changes/${change}/`;
-const requiredPlanning = (change) => ["openspec/config.yaml", ...[".openspec.yaml", "proposal.md", "tasks.md"].map((name) => planningPrefix(change) + name)];
-const isPlanning = (name, change) => requiredPlanning(change).includes(name) ||
-  name === planningPrefix(change) + "design.md" || name.startsWith(planningPrefix(change) + "specs/");
+
 
 export function tree(workspace, ref, paths = []) {
   const entries = utf8(git(workspace, "ls-tree", "-r", "-z", "--full-tree", ref, "--", ...paths)).split("\0").filter(Boolean);
-  return new Map(entries.map((entry) => {
+  const result = new Map();
+  for (const entry of entries) {
     const match = /^(\d{6}) (blob|commit) ([a-f0-9]+)\t([^\n]+)$/.exec(entry);
     need(match && sha(match[3]), "Invalid Git tree entry");
-    return [match[4], { mode: match[1], oid: match[3] }];
-  }));
+    need(!result.has(match[4]), "Duplicate Git review path");
+    result.set(match[4], { mode: match[1], oid: match[3] });
+  }
+  return result;
 }
 
 function blob(workspace, entry, name) {
@@ -168,9 +171,23 @@ function blob(workspace, entry, name) {
   return bytes;
 }
 
-function changedEntries(workspace, base, target, oldTree, newTree) {
+function exportable(name, change) {
+  if (name.startsWith(planningPrefix(change))) return customPlanningPath(name.slice(planningPrefix(change).length));
+  const archive = /^openspec\/changes\/archive\/\d{4}-\d{2}-\d{2}-([^/]+)\/(.+)$/.exec(name);
+  return !archive || archive[1] !== change || customPlanningPath(archive[2]);
+}
+
+export function changedEntries(workspace, base, target, oldTree, newTree, change) {
   const options = ["--no-color", "--no-ext-diff", "--no-textconv", "--no-relative", "--find-renames=50%", "--diff-algorithm=myers", "--no-indent-heuristic"];
-  const raw = utf8(git(workspace, "diff", ...options, "--raw", "-z", base, target, "--")).split("\0");
+  const excluded = change ? [...new Set([...oldTree.keys(), ...newTree.keys()])].filter((name) => {
+    const left = oldTree.get(name);
+    const right = newTree.get(name);
+    return (left?.oid !== right?.oid || left?.mode !== right?.mode) && !exportable(name, change);
+  }) : [];
+  need(excluded.length <= 512 && excluded.reduce((n, name) => n + Buffer.byteLength(name) + 20, 0) <= 64 * 1024,
+    "Excluded review diff inventory exceeds the bound");
+  const filters = excluded.length ? [".", ...excluded.map((name) => ":(exclude,literal)" + name)] : [];
+  const raw = utf8(git(workspace, "diff", ...options, "--raw", "-z", base, target, "--", ...filters)).split("\0");
   const entries = [];
   for (let i = 0; i < raw.length - 1;) {
     const header = /^:[0-7]{6} [0-7]{6} [a-f0-9]+ [a-f0-9]+ ([AMDRT])\d*$/.exec(raw[i++]);
@@ -186,7 +203,7 @@ function changedEntries(workspace, base, target, oldTree, newTree) {
     need((status === "A" || oldTree.has(before)) && (status === "D" || newTree.has(after)), "Diff tree mismatch");
   }
   const diff = utf8(git(workspace, "diff", ...options, "--patch", "--text", "--full-index", "--unified=3",
-    "--src-prefix=a/", "--dst-prefix=b/", base, target, "--"));
+    "--src-prefix=a/", "--dst-prefix=b/", base, target, "--", ...filters));
   return { diff, entries };
 }
 
@@ -196,7 +213,7 @@ function inventory(value) {
 }
 
 export function validateReviewRequest(request) {
-  fields(request, ["schemaVersion", "mode", "session", "worker", "snapshot", "attachments", "limits"], "review request");
+  fields(request, ["schemaVersion", "mode", "session", "worker", "snapshot", "attachments", "limits"], "review request", ["policy", "fileAcceptance"]);
   need(request.schemaVersion === 1 && ["candidate", "approach"].includes(request.mode) && uuid(request.session), "Invalid review request version, mode or session");
   const w = request.worker;
   validateRequest(w);
@@ -204,15 +221,32 @@ export function validateReviewRequest(request) {
     absolute(w.identity.workspace) && plain(w.authority) && w.identity.role === (request.mode === "candidate" ? "reviewer" : "approach-reviewer") &&
     ![w.identity.implementerSession, w.authority.authorSession, w.authority.orchestrator].includes(request.session), "Invalid independent worker binding");
   inventory(w.identity.inputs);
-  need(requiredPlanning(w.identity.change).every((name) => Object.hasOwn(w.identity.inputs, name)) &&
-    Object.keys(w.identity.inputs).every((name) => isPlanning(name, w.identity.change)), "Invalid planning inventory");
+  validatePlanningInputs(w.identity.change, w.identity.inputs, undefined, Boolean(request.policy));
+  if (request.policy !== undefined) {
+    fields(request.policy, ["parent", "target"], "integrated policy binding", ["planningModes", "finishReference"]);
+    need(sha(request.policy.parent) && sha(request.policy.target) &&
+      (request.policy.finishReference === undefined || request.mode === "candidate" && text(request.policy.finishReference)),
+    "Invalid integrated policy binding");
+  }
+  if (request.fileAcceptance !== undefined) {
+    need(Array.isArray(request.fileAcceptance) && request.fileAcceptance.length > 0 && request.fileAcceptance.length <= 256,
+      "Invalid file-specific acceptance list");
+    for (const entry of request.fileAcceptance) {
+      fields(entry, ["packet", "path", "criterion"], "file-specific acceptance");
+      need(Number.isSafeInteger(entry.packet) && entry.packet > 0 && relative(entry.path) && text(entry.criterion) &&
+        !w.acceptance.includes(entry.criterion), "File-specific acceptance requires a packet and canonical path");
+    }
+    need(new Set(request.fileAcceptance.map(canonical)).size === request.fileAcceptance.length, "Duplicate file-specific acceptance");
+  }
   inventory(request.attachments);
   fields(request.limits, ["diffBytes"], "packet limits");
   need(Number.isSafeInteger(request.limits.diffBytes) && request.limits.diffBytes >= 256 &&
     request.limits.diffBytes <= fileLimit, "Invalid diff packet limit");
   const s = request.snapshot;
   if (request.mode === "candidate") {
-    fields(s, ["base", "target", "plan", "planDigest", "diffSha256", "gates"], "candidate snapshot");
+    fields(s, ["base", "target", "plan", "planDigest", "diffSha256", "gates"], "candidate snapshot", ["archiveEvidence", "harness"]);
+    if (s.archiveEvidence !== undefined) inventory(s.archiveEvidence);
+    if (s.harness !== undefined) need(relative(s.harness) && Object.hasOwn(request.attachments, s.harness), "Missing harness attachment");
     need([s.base, s.target, s.plan].every(sha) && [s.planDigest, s.diffSha256].every(digest) &&
       s.target === w.identity.candidate && s.plan === w.identity.plan && s.planDigest === w.identity.planDigest, "Candidate identity mismatch");
     need(Array.isArray(s.gates) && s.gates.length > 0, "Missing retained gates");
@@ -302,14 +336,101 @@ export function normalizeTasks(source, onTask = () => {}) {
   return Buffer.from(bom + normalized);
 }
 
-export function planFiles(w, entries, frozen, expectedDigest = w.identity.planDigest) {
-  const planning = [...entries.keys()].filter((name) => isPlanning(name, w.identity.change)).sort();
+// Re-read committed policy from the single frozen plan parent. A draft must
+// supply its independent integrated target binding and exact draft predecessor.
+export async function reviewPolicy(request) {
+  const { workspace } = request.worker.identity;
+  const binding = request.policy;
+  if (request.mode === "approach" && !binding) return null;
+  await verifiedGitRoot(workspace);
+  const ref = request.mode === "candidate" ? request.snapshot.plan : binding.parent;
+  if (request.mode === "candidate") need(sha(ref) &&
+    utf8(git(workspace, "rev-parse", "--verify", ref + "^{commit}")).trim() === ref, "Expected exact plan commit");
+  const [head, ...parents] = utf8(git(workspace, "rev-list", "-n", "1", "--parents", ref)).trim().split(" ");
+  need(head === ref, "Invalid policy commit");
+  if (request.mode === "candidate" && parents.length !== 1) {
+    need(!binding, "Expected one integrated plan parent");
+    return null;
+  }
+  const parent = request.mode === "candidate" ? parents[0] : binding.parent;
+  const contracts = tree(workspace, parent, ["AGENTS.md", "CLAUDE.md"]);
+  const name = contracts.has("AGENTS.md") ? "AGENTS.md" : "CLAUDE.md";
+  const entry = contracts.get(name);
+  if (!entry) { need(!binding, "Missing integrated root policy"); return null; }
+  need(["100644", "100755"].includes(entry.mode), "Expected regular root policy");
+  const size = Number(utf8(git(workspace, "cat-file", "-s", entry.oid)).trim());
+  need(Number.isSafeInteger(size) && size <= 4 * 1024 * 1024, "Root policy exceeds planning bounds");
+  const policy = readLowTouchPolicy(utf8(git(workspace, "cat-file", "blob", entry.oid)));
+  if (!policy) { need(!binding, "Integrated parent has not adopted low-touch policy"); return null; }
+  need(binding?.parent === parent && utf8(git(workspace, "rev-parse", "--verify", binding.target + "^{commit}")).trim() === binding.target,
+    "Missing exact integrated policy binding");
+  git(workspace, "merge-base", "--is-ancestor", parent, binding.target);
+  if (request.mode === "approach") {
+    const [draft, ...draftParents] = utf8(git(workspace, "rev-list", "--parents", "-n", "1", "HEAD")).trim().split(" ");
+    need(draft === parent || draftParents.length === 1 && draftParents[0] === parent,
+      "Draft is not at the integrated parent or its frozen predecessor");
+  }
+  return policy;
+}
+
+function chargePlan(budget, file, size, directories) {
+  const parts = file.split("/");
+  for (let i = file.startsWith("openspec/changes/") ? 3 : parts.length; i < parts.length; i++) {
+    const directory = parts.slice(0, i).join("/");
+    if (directories.has(directory)) continue;
+    budget.add(directory, null);
+    directories.add(directory);
+  }
+  budget.add(file, size);
+}
+
+async function customDraftFiles(workspace, layout) {
+  const budget = planningBudget(true);
+  const paths = [];
+  const directories = new Set();
+  const add = async (name) => {
+    await safePath(path.join(workspace, name));
+    const info = await lstat(path.join(workspace, name));
+    need(info.isFile(), "Expected a regular planning input");
+    chargePlan(budget, name, info.size, directories);
+    paths.push(name);
+  };
+  const walk = async (directory) => {
+    const location = path.join(workspace, directory);
+    await safePath(location);
+    budget.add(directory, null);
+    directories.add(directory);
+    const handle = await opendir(location, { encoding: "buffer" });
+    try {
+      for (let entry; (entry = await handle.read());) {
+        budget.visit();
+        const name = directory + "/" + utf8(entry.name);
+        if (!layout.includes(name)) {
+          need(utf8(entry.name) !== ".git", "Nested Git repository in planning inventory");
+          continue;
+        }
+        if (entry.isDirectory() && !layout.required.includes(name)) await walk(name);
+        else await add(name);
+      }
+    } finally { await handle.close(); }
+  };
+  await add("openspec/config.yaml");
+  await walk(layout.directory);
+  return paths;
+}
+
+export function planFiles(w, entries, frozen, expectedDigest = w.identity.planDigest, custom = false) {
+  const layout = planningLayout(w.identity.change, custom);
+  const planning = [...entries.keys()].filter(layout.includes).sort();
   need(equal(planning, Object.keys(w.identity.inputs).sort()), "Git planning inventory mismatch");
   const hasher = createHash("sha256");
   const files = new Map();
+  const budget = planningBudget(custom);
+  const directories = new Set();
   for (const name of planning) {
     const entry = entries.get(name);
     const raw = blob(w.identity.workspace, entry, name);
+    if (custom) chargePlan(budget, name, raw.length, directories);
     if (frozen) need(hash(raw) === w.identity.inputs[name], "Frozen planning byte mismatch");
     files.set(name, raw);
     const bytes = name === planningPrefix(w.identity.change) + "tasks.md" ? normalizeTasks(utf8(raw)) : raw;
@@ -324,6 +445,11 @@ export async function buildExport(request) {
   const w = request.worker;
   const { workspace, change, inputs } = w.identity;
   await safePath(workspace);
+  const custom = Boolean(await reviewPolicy(request));
+  const layout = planningLayout(change, custom);
+  validatePlanningInputs(change, inputs, undefined, custom);
+  if (custom) need(Object.keys(request.attachments).every((name) => exportable(name, change)),
+    "Excluded planning paths cannot be attached to reviewer exports");
   const files = new Map();
   const common = [];
   const remember = (name, bytes) => {
@@ -347,7 +473,7 @@ export async function buildExport(request) {
     const oldTree = tree(workspace, s.base);
     const newTree = tree(workspace, s.target);
     const frozenTree = tree(workspace, s.plan);
-    for (const [name, bytes] of planFiles(w, frozenTree, true)) common.push(remember("plan/" + name, bytes));
+    for (const [name, bytes] of planFiles(w, frozenTree, true, undefined, custom)) common.push(remember("plan/" + name, bytes));
     const logicalTree = relocatedPlan({ change, targetTree: newTree, baseTree: oldTree, frozenTree,
       predecessor: () => {
         const [target, ...parents] = utf8(git(workspace, "rev-list", "--parents", "-n", "1", s.target)).trim().split(" ");
@@ -355,14 +481,16 @@ export async function buildExport(request) {
         git(workspace, "merge-base", "--is-ancestor", s.plan, parents[0]);
         git(workspace, "merge-base", "--is-ancestor", s.base, parents[0]);
         const parentTree = tree(workspace, parents[0]);
-        planFiles(w, parentTree, false);
+        planFiles(w, parentTree, false, undefined, custom);
         return parentTree;
       },
-      additions: (name, entry) => Object.hasOwn(request.attachments, name) &&
-        request.attachments[name] === hash(blob(workspace, entry, name)),
+      additions: (name, entry) => {
+        const expected = custom ? s.archiveEvidence : request.attachments;
+        return expected && Object.hasOwn(expected, name) && expected[name] === hash(blob(workspace, entry, name));
+      },
     });
-    planFiles(w, logicalTree, false);
-    const { diff, entries } = changedEntries(workspace, s.base, s.target, oldTree, newTree);
+    planFiles(w, logicalTree, false, undefined, custom);
+    const { diff, entries } = changedEntries(workspace, s.base, s.target, oldTree, newTree, custom ? change : undefined);
     need(hash(diff) === s.diffSha256, "Approved diff hash mismatch");
     for (const entry of entries) for (const name of entry.paths) {
       const file = name.slice(name.indexOf("/") + 1);
@@ -381,8 +509,8 @@ export async function buildExport(request) {
     }));
   } else {
     const prefix = planningPrefix(change);
-    const planning = requiredPlanning(change);
-    for (const optional of [prefix + "design.md", prefix + "specs"]) {
+    const planning = custom ? await customDraftFiles(workspace, layout) : [...layout.required];
+    for (const optional of custom ? [] : [prefix + "design.md", prefix + "specs"]) {
       try {
         await safePath(path.join(workspace, optional));
         if (optional.endsWith("/specs")) planning.push(...await walk(workspace, optional));
@@ -390,10 +518,26 @@ export async function buildExport(request) {
       } catch (error) { if (error.code !== "ENOENT") throw error; }
     }
     need(equal(Object.keys(inputs).sort(), planning.sort()), "Planning worktree inventory drift");
-    for (const name of planning) common.push(remember("plan/" + name, await readApproved(workspace, name, inputs[name])));
+    const modes = {};
+    for (const name of planning) {
+      common.push(remember("plan/" + name, await readApproved(workspace, name, inputs[name])));
+      if (custom) modes[name] = (await lstat(path.join(workspace, name))).mode & 0o100 ? "100755" : "100644";
+    }
+    if (custom) need(equal(modes, request.policy.planningModes), "Planning worktree file mode drift");
     const { charter, ledger, goal, binding, budget, cumulativeCycles } = request.snapshot.record;
     common.push(remember("review-context.json", jsonBytes({ charter, ledger, goal, binding, budget, cumulativeCycles })));
     packets = [{ paths: common.sort(), units: [] }];
+  }
+  for (const entry of request.fileAcceptance ?? []) {
+    need(packets[entry.packet - 1]?.paths.some((name) =>
+      ["base/", "target/", "plan/"].some((prefix) => name === prefix + entry.path)),
+    "File-specific acceptance is outside its packet");
+  }
+  if (packets.length > 1 && (custom || request.fileAcceptance)) {
+    const reviewedPaths = new Set(packets.flatMap(({ paths }) => paths.filter((name) => /^(?:base|target|plan)\//.test(name))
+      .map((name) => name.slice(name.indexOf("/") + 1))));
+    need(w.acceptance.every((criterion) => criterion.split(/[^a-zA-Z0-9_./@+-]+/).every((token) => !reviewedPaths.has(token))),
+      "File-specific acceptance must name an applicable packet, not global acceptance");
   }
   const manifest = { schemaVersion: 1, mode: request.mode, requestSha256: hash(jsonBytes(request)),
     files: [...files].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
@@ -424,8 +568,9 @@ export async function checkSealedDirectory(directory) {
   need(st.isDirectory() && st.uid === process.getuid() && (st.mode & 0o7777) === 0o500, "Directory is not sealed");
 }
 
-export async function prepareExport(directory, request, expectedExport) {
+export async function prepareExport(directory, request, expectedExport, inspect = () => {}) {
   const prepared = await buildExport(request);
+  inspect(prepared);
   const manifestHash = hash(jsonBytes(prepared.manifest));
   if (expectedExport !== null) need(expectedExport === manifestHash, "Prepared manifest differs from retained identity");
   await newProtectedDirectory(directory, [request.worker.identity.workspace, ...request.worker.evidenceRoots]);

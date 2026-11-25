@@ -313,7 +313,7 @@ test("relay timeout configuration requires a bounded safe integer", () => {
   }
 });
 
-function relayStreams(t, timeoutMs = 240000, blocked = false) {
+function relayStreams(t, timeoutMs = 240000, blocked = false, observe) {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const upstream = Object.assign(new EventEmitter(), { end() {},
     destroy() { this.destroyed = true; this.emit("close"); } });
@@ -327,10 +327,23 @@ function relayStreams(t, timeoutMs = 240000, blocked = false) {
     end() { this.ended = true; },
     destroy() { this.destroyed = true; this.emit("close"); },
   });
-  relay.forwardInference(upstream, res, Buffer.from("{}"), timeoutMs);
+  relay.forwardInference(upstream, res, Buffer.from("{}"), timeoutMs, observe);
   return { upstream, response, res, chunks, accept: () => upstream.emit("response", response),
     send: (chunk) => response.emit("data", Buffer.from(chunk)), tick: (ms) => t.mock.timers.tick(ms) };
 }
+
+test("rate-limit classification stays host-side while upstream headers and body are refused", (t) => {
+  const statuses = [];
+  const { response, res, chunks, accept, send } = relayStreams(t, 1000, false, (value) => statuses.push(value));
+  response.statusCode = 429;
+  response.headers = { "content-type": "application/json", "retry-after": "private timing", "authorization": "synthetic secret" };
+  accept();
+  send("private upstream response");
+  assert.deepEqual(statuses, ["upstream-rate-limited"]);
+  assert.equal(res.status, 403);
+  assert.deepEqual(chunks, []);
+  assert.equal(response.destroyed, true);
+});
 
 test("relay timeout allows healthy streaming past 90 seconds and cleans up after end", (t) => {
   const { upstream, response, res, chunks, accept, send, tick } = relayStreams(t, 240000, true);

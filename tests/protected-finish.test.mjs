@@ -17,7 +17,7 @@ const git = (cwd, ...argv) => execFileSync("git", argv, { cwd, encoding: "utf8",
 const verified = (reference, fields = {}) => ({ verified: true, reference, ...fields });
 const iso = (time) => new Date(time).toISOString();
 
-function fixture(t) {
+function fixture(t, standingTriggers) {
   const root = realpathSync(mkdtempSync(path.join(os.tmpdir(), "protected-finish-")));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const repo = path.join(root, "repo");
@@ -35,7 +35,8 @@ function fixture(t) {
   git(repo, "init", "-b", "main");
   git(repo, "config", "user.name", "Fixture");
   git(repo, "config", "user.email", "fixture@example.invalid");
-  writeFileSync(path.join(repo, "AGENTS.md"), "# Fixture\n");
+  writeFileSync(path.join(repo, "AGENTS.md"), "# Fixture\n" +
+    (standingTriggers ? `<!-- openspec-low-touch: ${JSON.stringify({ standingTriggers })} -->\n` : ""));
   writeFileSync(path.join(repo, ".gitignore"), "*.ignored\n");
   mkdirSync(path.join(repo, "openspec"));
   writeFileSync(path.join(repo, "openspec", "config.yaml"), "schema: spec-driven\n");
@@ -94,7 +95,7 @@ function fixture(t) {
   };
   const implementationGate = gate(head, "implementation-gate");
   const anchor = save("anchor", bound("ready", { kind: "finish-readiness-readback", ready: true, keepWorktree: false,
-    implementationReview: verified("review-1", { session: "implementation-reviewer" }),
+    implementationReview: verified("review-1", { session: "implementation-reviewer", head }),
     implementationGate: implementationGate.ref, implementationGateSha256: implementationGate.wrapperSha256 }));
   const protection = (pullRequest, revision) => {
     const observation = (reference, fields) => verified(reference, { pullRequest, head: revision, observedAt, complete: true, ...fields });
@@ -140,6 +141,33 @@ function fixture(t) {
   const call = (verb, args) => deliveryCommand(verb === "inspect" ? "status" : verb, request(args));
   return { root, repo, workspace, records, change, active, head, identity, request, call, pr, gate, save, bound, url, issue, now };
 }
+
+test("protected finish checks adoption, exact current per-event inventory and standing cost before merge", async (t) => {
+  const repository = "example/sample";
+  const target = "main";
+  const policy = { id: "app:42:main-check", repository, event: "push", target, kind: "repository-check",
+    configurationSha256: "b".repeat(64), exposure: "existing public diff", costUsd: 0 };
+  const f = fixture(t, [policy]);
+  const pr = f.pr(1, f.head, "OPEN");
+  const decision = () => f.call("finish", { remote: { implementation: pr } });
+  assert.equal((await decision()).reason, "PUSH_AUTHORITY_PENDING");
+  const inventory = (event, triggers) => ({
+    pushGrant: verified("event-" + event, { target: repository, candidate: f.head, event,
+      targetRef: target, finishReference: "finish-1" }),
+    observed: verified("inventory-" + event, { complete: true, candidate: f.head, repository, event, target,
+      observedAt: pr.observedAt, triggers }),
+  });
+  pr.eventInventories = { merge: inventory("merge", []),
+    push: inventory("push", [{ ...policy, verified: true }]) };
+  const result = await decision();
+  assert.equal(result.action, "merge-ready", JSON.stringify(result));
+  assert.deepEqual(result.triggerInventories[1].standing, [policy.id]);
+  pr.eventInventories.push.observed.triggers[0].costUsd = 1;
+  assert.equal((await decision()).reason, "PUSH_TRIGGER_AUTHORITY_PENDING");
+  pr.eventInventories.push.observed.triggers[0].costUsd = 0;
+  pr.eventInventories.push.observed.observedAt = iso(f.now - 61_000);
+  assert.equal((await decision()).reason, "TRIGGER_INVENTORY_UNVERIFIED");
+});
 
 test("packaged finish status distinguishes optional suites and contextual continue preserves the exact head", async (t) => {
   const f = fixture(t);

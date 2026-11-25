@@ -151,3 +151,53 @@ referenced once with a fresh session and predecessor on the same binding,
 subject to the existing convergence decision. The retry consumes zero
 correction cycles. A packet-gap decision remains the charter's separate
 packet repair path.
+
+## Adopting integrated parents
+
+The runner re-reads the verified frozen plan parent. Supply `request.policy`
+with `parent` and independently verified integrated `target`. Draft
+requests also supply `policy.planningModes` as the exact map of inventory
+paths to Git modes and run in the verified draft or frozen predecessor.
+Candidate requests exporting a record-only closure may list approved receipt
+hashes in `snapshot.archiveEvidence` to verify closure without including
+reserved evidence files in provider exports. Keep original sealed attempts
+under their legacy schema and bindings.
+
+For adopted policy, add `--host-config HOST` to both `--prepare` and
+`--check`. The offline commands do not read keys or invoke a probe. They
+verify the exact raw-byte `configurationSha256` and report a failing packet
+if its manifest requires more than `maxTurns - 10` whole-file reads.
+Retain all changed preimages, postimages and hunks within the selected
+coverage. Recheck the same manifest and configuration at live entry.
+A configured local harness requires its candidate-bound sealed attachment
+name in `snapshot.harness`. The prepared export checks the canonical
+repo-relative `fileAcceptance` entries `{packet, path, criterion}` against
+their actual one-based packet. Keep common criteria in `worker.acceptance`.
+Each prompt includes only its scoped criteria and requires canonical
+repository-relative finding paths.
+
+Use `--admission ADMISSION` with the live mode command under adopting
+policy. The private external JSON contains `schemaVersion: 1`, the raw
+`configurationSha256`, the stable private host-owned `ledger` directory,
+`phase` and its verified `phaseGrant`. The grant binds change, phase,
+policyRevision, canonical request hash and the separate phase authority
+reference. Use `policy.finishReference` to bind a finish-phase request to
+its named protected finish grant. The default is `auto-approved` within
+the integrated phase list and cap ceilings. The host can lower `caps`
+(`maxReviews`, `maxTotalUsd`) or select the `explicit` per-run override
+with an `explicitGrant`. The automatic upper bound counts the per-launch
+`maxBudgetUsd` for the probe and every applicable packet. A stable
+per-change ledger record is committed before runtime or inference and
+holds the count and full amount across phases and resumes. In `explicit`
+mode grant one exact target, scope, export, config and cost. Retrying an
+attempt needs its own `retryGrant`. Use the original single-run authority
+procedure for legacy parents and for the standalone diagnostic probe.
+A refused automatic claim grants no fallback.
+
+Optional `interPacketDelayMs` (0–30000) and `runTimeoutMs` (1000–3600000)
+are part of the host pin. The bounded delay applies only before a successive
+packet and consumes the same run deadline. Same-UID relay HTTP 429, 529
+and 401/403 map to allowlisted private failure classes; the sandbox receives
+the same generic refusal. Classification alone supplies no retry or
+acceptance. The separately operated dedicated broker interface needs its
+own qualification and private diagnostic evidence.

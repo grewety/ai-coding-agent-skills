@@ -6,6 +6,7 @@ import { closeSync, constants, fstatSync, lstatSync, openSync, readFileSync, ope
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { gitEnvironment } from "./git-environment.mjs";
+import { readLowTouchPolicy } from "./low-touch-policy.mjs";
 import { planningBudget, planningLayout, planningLimits, safePlanningPath } from "./planning-inventory.mjs";
 import { readBounded, sha256, verifyGateRun } from "./evidence-retention.mjs";
 import { goalContractIdentity, readGoalContract, withinScope } from "./delivery-control.mjs";
@@ -45,24 +46,47 @@ export function ancestor(repo, older, newer) {
   try { git(repo, "merge-base", "--is-ancestor", older, newer); }
   catch { throw new Error("Required commit ancestry is absent; preserve work"); }
 }
-function entries(repo, ref, paths) {
+function entries(repo, ref, paths, shallow = false) {
   let output;
   try {
     output = paths ? decode(runGit(repo, planningLimits.outputBytes,
-      ["ls-tree", "-r", "-t", "-z", "--full-tree", ref, "--", ...paths]), "Git output is not valid UTF-8")
+      ["ls-tree", ...(shallow ? [] : ["-r", "-t"]), "-z", "--full-tree", ref, "--", ...paths]), "Git output is not valid UTF-8")
       : git(repo, "ls-tree", "-r", "-z", "--full-tree", ref);
   } catch (error) {
     if (paths && error.code === "ENOBUFS") throw new Error("Planning inventory output limit exceeded");
     throw error;
   }
-  return new Map(output.split("\0").filter(Boolean).map((line) => {
+  const tree = new Map();
+  for (const line of output.split("\0").filter(Boolean)) {
     const separator = line.indexOf("\t");
     requireThat(separator > 0, "Malformed tree entry");
     const [mode, type, oid] = line.slice(0, separator).split(" ");
     requireThat(/^[0-7]{6}$/.test(mode ?? "") && /^[a-f0-9]{40,64}$/.test(oid ?? ""), "Malformed tree entry");
-    return [line.slice(separator + 1), { mode, type, oid }];
-  }));
+    const file = line.slice(separator + 1);
+    requireThat(!tree.has(file), "Duplicate Git planning path");
+    tree.set(file, { mode, type, oid });
+  }
+  return tree;
 }
+function customPlanningTree(repo, ref, layout, budget) {
+  const tree = entries(repo, ref, ["openspec/config.yaml", layout.directory], true);
+  function visit(prefix, entry) {
+    requireThat(entry?.type === "tree", `Planning directory is not regular: ${prefix}`);
+    budget.add(prefix, null);
+    for (const [basename, child] of entries(repo, entry.oid, [], true)) {
+      budget.visit();
+      requireThat(!basename.includes("/") && safePlanningPath(basename), "Unsafe Git planning tree entry");
+      const file = prefix + "/" + basename;
+      if (!layout.includes(file)) continue;
+      requireThat(!tree.has(file), "Duplicate Git planning path");
+      tree.set(file, child);
+      if (child.type === "tree" && !layout.required.includes(file)) visit(file, child);
+    }
+  }
+  visit(layout.directory, tree.get(layout.directory));
+  return tree;
+}
+
 function root(change) {
   return `${planningLayout(change).directory}/`;
 }
@@ -82,7 +106,10 @@ function taskLines(source) {
   const tasks = [];
   let fence = null;
   let comment = false;
+  let offset = bom.length;
   const normalized = (source.match(/[^\n]*\n|[^\n]+$/g) ?? []).map((line) => {
+    const start = offset;
+    offset += line.length;
     const body = line.replace(/\r?\n$/, "");
     const eol = line.slice(body.length);
     const quote = /^(?: {0,3}> ?)*/.exec(body)[0];
@@ -108,7 +135,7 @@ function taskLines(source) {
     }
     requireThat(rest === "" || /^[ \t]/.test(rest), "Task text requires whitespace after the checkbox");
     const id = /^[ \t]+(\d+\.\d+)(?:[ \t]|$)/.exec(rest)?.[1] ?? null;
-    tasks.push({ id, checked: state.toLowerCase() === "x" });
+    tasks.push({ id, checked: state.toLowerCase() === "x", state, offset: start + quote.length + task[1].length + task[2].length + task[3].length + 1 });
     return `${quote}${task[1]}${task[2]}${task[3]}[ ]${rest}${eol}`;
   }).join("");
   requireThat(!fence, "Unclosed Markdown fence in task file");
@@ -116,15 +143,17 @@ function taskLines(source) {
   requireThat(tasks.length > 0, "Expected at least one real OpenSpec task");
   return { normalized: bom + normalized, complete: tasks.every(({ checked }) => checked), count: tasks.length, states: tasks };
 }
-export function planning(repo, ref, change) {
-  const layout = planningLayout(change);
+export function planning(repo, ref, change, custom = false) {
+  const layout = planningLayout(change, custom);
   const taskPath = `${layout.directory}/tasks.md`;
-  const tree = entries(repo, ref, [...layout.required, layout.design, layout.specs]);
-  const budget = planningBudget();
+  const budget = planningBudget(custom);
+  const tree = custom ? customPlanningTree(repo, ref, layout, budget) :
+    entries(repo, ref, [...layout.required, layout.design, layout.specs]);
   for (const file of layout.required) requireThat(tree.has(file), `Missing planning file: ${file}`);
   const sizes = new Map();
   for (const [file, entry] of tree) {
-    if (file === layout.specs || (file.startsWith(`${layout.specs}/`) && entry.type === "tree")) {
+    if (custom && entry.type === "tree" && !layout.required.includes(file)) continue; // Charged during traversal.
+    if (!custom && (file === layout.specs || entry.type === "tree" && file.startsWith(`${layout.specs}/`))) {
       requireThat(entry.type === "tree", `Planning specs must be a directory: ${file}`);
       budget.add(file, null);
     } else if (layout.includes(file)) {
@@ -137,13 +166,15 @@ export function planning(repo, ref, change) {
   // Preserve the original normalized Task-Guided digest framing.
   const hash = createHash("sha256");
   const inputs = {};
+  const modes = {};
   let tasks;
   for (const file of [...sizes.keys()].sort()) {
     const entry = tree.get(file);
     let bytes = runGit(repo, sizes.get(file) + 1, ["cat-file", "blob", entry.oid]);
     requireThat(bytes.length === sizes.get(file), `Incomplete planning input: ${file}`);
+    modes[file] = entry.mode;
     inputs[file] = createHash("sha256").update(bytes).digest("hex");
-    const source = decode(bytes, `Planning input is not valid UTF-8: ${file}`);
+    const source = !custom || file === taskPath ? decode(bytes, `Planning input is not valid UTF-8: ${file}`) : null;
     if (file === taskPath) {
       tasks = taskLines(source);
       bytes = Buffer.from(tasks.normalized, "utf8");
@@ -153,15 +184,20 @@ export function planning(repo, ref, change) {
     hash.update(bytes);
     hash.update(Buffer.from([0]));
   }
-  return { digest: hash.digest("hex"), complete: tasks.complete, taskCount: tasks.count, taskStates: tasks.states,
-    normalizedTasksSha256: createHash("sha256").update(tasks.normalized).digest("hex"), inputs, inventory: budget.totals() };
+  return { digest: hash.digest("hex"), complete: tasks.complete, taskCount: tasks.count, taskStates: tasks.states.map(({ id, checked }) => ({ id, checked })),
+    normalizedTasksSha256: createHash("sha256").update(tasks.normalized).digest("hex"), inputs, inventory: budget.totals(), ...(custom ? { customPlanning: true, modes } : {}) };
 }
 
-export function planningWorktree(repo, change) {
+function lstatOptional(file) {
+  try { return lstatSync(file); }
+  catch (error) { if (error.code === "ENOENT") return null; throw error; }
+}
+
+export function planningWorktree(repo, change, custom = false) {
   repository(repo);
-  const layout = planningLayout(change);
+  const layout = planningLayout(change, custom);
   const prefix = `${layout.directory}/`;
-  const budget = planningBudget();
+  const budget = planningBudget(custom);
   const dirs = new Map();
   const recordDirectory = (file, info) => {
     const old = dirs.get(file);
@@ -188,30 +224,43 @@ export function planningWorktree(repo, change) {
   };
   const files = new Map();
   const add = (file, info) => {
-    requireThat(info.isFile(), `Planning input must be a bounded regular file: ${file}`);
+    requireThat(info.isFile() && (!custom || info.nlink === 1), `Planning input must be a bounded regular file: ${file}`);
     budget.add(file, info.size);
     files.set(file, info);
   };
   for (const file of layout.required) add(file, inspect(file));
-  const design = optional(layout.design);
+  const design = custom ? null : optional(layout.design);
   if (design) add(layout.design, design);
   const walk = (relative) => {
+    if (custom && relative !== layout.directory && !layout.includes(relative)) return;
     const info = inspect(relative);
-    if (!info.isDirectory()) return add(relative, info);
+    if (!info.isDirectory()) {
+      if (!files.has(relative)) add(relative, info);
+      return;
+    }
+    requireThat(!layout.required.includes(relative), "Expected regular native planning file");
+    requireThat(!custom || !lstatOptional(path.join(repo, relative, ".git")), "Nested Git repositories are unsupported planning inputs");
     budget.add(relative, null);
     recordDirectory(path.join(repo, relative), info);
     const handle = opendirSync(path.join(repo, relative), { encoding: "buffer" });
     try {
-      for (let entry; (entry = handle.readSync());) walk(`${relative}/${decode(entry.name, "Planning path is not valid UTF-8")}`);
+      for (let entry; (entry = handle.readSync());) {
+        if (custom) budget.visit();
+        walk(`${relative}/${decode(entry.name, "Planning path is not valid UTF-8")}`);
+      }
     } finally { handle.closeSync(); }
   };
-  const specs = optional(layout.specs);
-  if (specs) {
+  const specs = custom ? null : optional(layout.specs);
+  if (custom) {
+    walk(layout.directory);
+  } else if (specs) {
     requireThat(specs.isDirectory(), "Planning specs must be a directory");
     walk(layout.specs);
   }
   const inputs = {};
+  const modes = {};
   let taskCount;
+  let normalizedTasksSha256;
   for (const file of [...files.keys()].sort()) {
     const before = files.get(file);
     const descriptor = openSync(path.join(repo, file),
@@ -230,8 +279,15 @@ export function planningWorktree(repo, change) {
       const after = fstatSync(descriptor);
       requireThat(total === info.size && after.mtimeMs === info.mtimeMs && after.ctimeMs === info.ctimeMs, `Planning input changed during read: ${file}`);
       const bytes = buffer.subarray(0, total);
-      const source = decode(bytes, `Planning input is not valid UTF-8: ${file}`);
-      if (file === `${prefix}tasks.md`) taskCount = taskLines(source).count;
+      if (!custom || file === `${prefix}tasks.md`) {
+        const source = decode(bytes, `Planning input is not valid UTF-8: ${file}`);
+        if (file === `${prefix}tasks.md`) {
+          const tasks = taskLines(source);
+          taskCount = tasks.count;
+          normalizedTasksSha256 = sha256(tasks.normalized);
+        }
+      }
+      modes[file] = info.mode & 0o100 ? "100755" : "100644";
       inputs[file] = createHash("sha256").update(bytes).digest("hex");
     } finally { closeSync(descriptor); }
   }
@@ -241,7 +297,7 @@ export function planningWorktree(repo, change) {
       after.mtimeMs === before.mtimeMs && after.ctimeMs === before.ctimeMs, `Planning input changed during inventory: ${relative}`);
   }
   for (const dir of dirs.keys()) recordDirectory(dir, lstatSync(dir));
-  return { ok: true, change, inputs, inventory: budget.totals(), taskCount };
+  return { ok: true, change, inputs, inventory: budget.totals(), taskCount, ...(custom ? { customPlanning: true, modes, normalizedTasksSha256 } : {}) };
 }
 export function repository(repo) {
   requireThat(path.isAbsolute(repo) && realpathSync(repo) === repo &&
@@ -276,10 +332,11 @@ function clean(repo, head, requireBranch = true) {
   const detached = git(repo, "rev-parse", "--symbolic-full-name", "HEAD").trim() === "HEAD";
   checkoutObservation(repo, head, { detached: !requireBranch && detached });
 }
-export function goalSnapshot(repo, ref, change, policyRevision, snapshot = planning(repo, ref, change)) {
+export function goalSnapshot(repo, ref, change, policyRevision, snapshot = planning(repo, ref, change, Boolean(integratedPolicyContext(repo, policyRevision, policyRevision).lowTouch))) {
   const proposal = `${root(change)}proposal.md`;
   const contract = readGoalContract(committedDocument(repo, ref, proposal));
-  const inputs = { contract, inputs: snapshot.inputs, taskCount: snapshot.taskCount };
+  const { inputs: hashes, taskCount, customPlanning, modes, normalizedTasksSha256 } = snapshot;
+  const inputs = { contract, inputs: hashes, taskCount, ...(customPlanning ? { customPlanning, modes, normalizedTasksSha256 } : {}) };
   return { ...inputs, digest: goalContractIdentity({ change, policyRevision, ...inputs }) };
 }
 export function committedDocument(repo, ref, file) {
@@ -316,13 +373,22 @@ export function candidate(o, requireCheckout = true) {
   root(o.change);
   ancestor(o.repo, base, head);
   ancestor(o.repo, plan, head);
-  const approved = planning(o.repo, plan, o.change);
-  const current = planning(o.repo, head, o.change);
+  const parents = o.target ? commitParents(o.repo, plan) : [];
+  const context = mode === "goal-first" || o.target && parents.length === 1
+    ? policyContext({ repo: o.repo, change: o.change, plan, target: o.target }) : null;
+  const custom = Boolean(context?.lowTouch);
+  if (custom) {
+    requireThat(context.parent === base, "Candidate base differs from the adopting plan parent");
+    const prefix = root(o.change);
+    requireThat(changedFiles(o.repo, plan, head).every((file) => !file.startsWith(prefix) || file === prefix + "tasks.md"),
+      "Candidate changed the frozen planning package outside native task progress");
+  }
+  const approved = planning(o.repo, plan, o.change, custom);
+  const current = planning(o.repo, head, o.change, custom);
   let planDigest = current.digest;
   let gates;
   if (mode === "goal-first") {
-    const context = policyContext({ repo: o.repo, change: o.change, plan, target: o.target });
-    requireThat(context.goalFirstOptIn && context.parent === base, "Candidate lacks integrated Goal-First policy");
+    requireThat(context?.goalFirstOptIn && context.parent === base, "Candidate lacks integrated Goal-First policy");
     const goal = goalSnapshot(o.repo, head, o.change, context.parent, current);
     const frozen = goalSnapshot(o.repo, plan, o.change, context.parent, approved);
     requireThat(goal.digest === frozen.digest, "Goal Contract changed after approval");
@@ -345,8 +411,40 @@ export function candidate(o, requireCheckout = true) {
     const attested = verifyGateRun(JSON.parse(decode(bytes, "Gate evidence is not valid UTF-8")), options);
     requireThat(attested.passed, "Failed exact-SHA disposable gate evidence");
   }
-  return { base, head, plan, planDigest, tree, tasksComplete: current.complete };
+  return { base, head, plan, planDigest, tree, tasksComplete: current.complete, ...(custom ? { customPlanning: true } : {}) };
 }
+export function proveTaskCompletion(input, reviewedParent, acceptedTaskIds) {
+  const { repo, head, change } = input;
+  const child = candidate(input, false);
+  const parent = candidate({ ...input, head: reviewedParent, "gate-run": undefined, "gate-run-sha256": undefined }, false);
+  requireThat(child.customPlanning && parent.planDigest === child.planDigest, "Task completion exception lacks integrated authority or matching plan");
+  const parents = commitParents(repo, head);
+  requireThat(parents.length === 1 && parents[0] === reviewedParent, "Task completion requires the exact reviewed direct parent");
+  const file = root(change) + "tasks.md";
+  requireThat(JSON.stringify(changedFiles(repo, reviewedParent, head)) === JSON.stringify([file]),
+    "Task completion may change only the native tasks.md");
+  requireThat(entries(repo, reviewedParent, [file]).get(file).mode === entries(repo, head, [file]).get(file).mode,
+    "Task completion changed the task file mode");
+  requireThat(Array.isArray(acceptedTaskIds) && acceptedTaskIds.length && new Set(acceptedTaskIds).size === acceptedTaskIds.length &&
+    acceptedTaskIds.every((id) => /^\d+\.\d+$/.test(id)), "Missing or ambiguous accepted native task IDs");
+  const before = committedDocument(repo, reviewedParent, file);
+  const after = committedDocument(repo, head, file);
+  const { states } = taskLines(before);
+  requireThat(states.every(({ id }) => id) && new Set(states.map(({ id }) => id)).size === states.length &&
+    acceptedTaskIds.every((id) => states.some((task) => task.id === id)), "Ambiguous or unknown native task ID");
+  const expected = before.split("");
+  const taskIds = [];
+  for (const { id, state, offset } of states) {
+    if (before[offset] === after[offset]) continue;
+    requireThat(state === " " && after[offset] === "x" && acceptedTaskIds.includes(id),
+      "Task completion requires a lowercase unchecked-to-checked edit on an accepted native task");
+    expected[offset] = "x";
+    taskIds.push(id);
+  }
+  requireThat(taskIds.length && expected.join("") === after, "Task completion contains other byte changes");
+  return { reviewedParent, acceptanceChild: head, taskIds };
+}
+
 function evidence(file) {
   const absolute = path.resolve(file);
   const before = lstatSync(absolute);
@@ -485,7 +583,14 @@ function receipt(o, requireCheckout = true) {
   const snapshot = candidate({ ...o, target: o.policyTarget ?? o.target, mode, base: record.value.base, head: record.value.head, plan: record.value.plan,
     "expect-plan": record.value.planDigest }, false);
   requireThat(snapshot.tasksComplete, "Incomplete implementation tasks cannot complete a change");
-  review(record.value.review, snapshot, o);
+  const completion = record.value.taskCompletion;
+  if (completion) {
+    const proof = proveTaskCompletion({ repo: o.repo, change: o.change, head: snapshot.head, base: snapshot.base, plan: snapshot.plan,
+      mode, target: o.policyTarget ?? o.target, "expect-plan": snapshot.planDigest }, completion.reviewedParent, completion.taskIds);
+    requireThat(proof.acceptanceChild === completion.acceptanceChild && JSON.stringify(proof.taskIds) === JSON.stringify(completion.taskIds),
+      "Receipt task completion differs from Git proof");
+  }
+  review(record.value.review, completion ? { ...snapshot, head: completion.reviewedParent } : snapshot, o);
   const integrated = commit(o.repo, record.value.integrated);
   const verified = commit(o.repo, record.value.verified);
   const target = commit(o.repo, o.target);
@@ -498,7 +603,7 @@ function receipt(o, requireCheckout = true) {
       record.value.integrationReference.startsWith(prPrefix) && /^[1-9][0-9]*$/.test(record.value.integrationReference.slice(prPrefix.length))),
   "Missing canonical integration PR reference");
   for (const ref of [integrated, verified]) {
-    const current = planning(o.repo, ref, o.change);
+    const current = planning(o.repo, ref, o.change, snapshot.customPlanning);
     const digest = mode === "goal-first" ? goalSnapshot(o.repo, ref, o.change, snapshot.base, current).digest : current.digest;
     requireThat(digest === snapshot.planDigest && current.complete, "Integrated planning content changed or tasks incomplete");
   }
@@ -513,7 +618,7 @@ function receipt(o, requireCheckout = true) {
   // Integrated verification may run detached at this exact target SHA. Candidate
   // and review checks still require an attached implementation branch.
   if (requireCheckout) clean(o.repo, target, false);
-  return { ...snapshot, integrated, verified, target, receiptSha256: record.sha256 };
+  return { ...snapshot, integrated, verified, target, receiptSha256: record.sha256, ...(completion ? { taskCompletion: completion } : {}) };
 }
 export function integratedPolicyContext(repo, parent, target, allowUnintegratedParent = false) {
   repository(repo);
@@ -548,17 +653,22 @@ export function integratedPolicyContext(repo, parent, target, allowUnintegratedP
   const delegatedRuntime = integrated && workers.length === 1;
   const proposals = [...source.matchAll(/^<!-- openspec-proposal: ([^\r\n]*?) -->\r?$/gm)];
   const proposeToFreeze = integrated && proposals.length === 1 && proposals[0][1] === "propose-to-freeze";
-  return { ok: integrated, parent, target, contractInputs, goalFirstOptIn: integrated && goalFirstOptIn, delegatedRuntime, proposeToFreeze };
+  const lowTouch = integrated ? readLowTouchPolicy(rootContractSource) : null;
+  return { ok: integrated, parent, target, contractInputs, ...(lowTouch ? { lowTouch } : {}), goalFirstOptIn: integrated && goalFirstOptIn, delegatedRuntime, proposeToFreeze };
+}
+
+function commitParents(repo, ref) {
+  return git(repo, "rev-list", "--parents", "-n", "1", ref).trim().split(/\s+/).slice(1);
 }
 
 export function policyContext(o, { allowUnintegratedParent = false } = {}) {
   repository(o.repo);
   const plan = commit(o.repo, o.plan);
-  const parents = git(o.repo, "rev-list", "--parents", "-n", "1", plan).trim().split(/\s+/).slice(1);
+  const parents = commitParents(o.repo, plan);
   requireThat(parents.length === 1, "Plan must have one integrated parent");
   const context = integratedPolicyContext(o.repo, parents[0], o.target, allowUnintegratedParent);
-  const result = planning(o.repo, plan, o.change);
-  return { ...context, change: o.change, plan, planDigest: result.digest, inputs: result.inputs,
+  const result = planning(o.repo, plan, o.change, Boolean(context.lowTouch));
+  return { ...context, change: o.change, plan, planDigest: result.digest, inputs: result.inputs, ...(context.lowTouch ? { modes: result.modes } : {}),
     inventory: result.inventory, changedPaths: changedFiles(o.repo, context.parent, plan) };
 }
 export function draftPolicyContext(o) {
@@ -567,7 +677,7 @@ export function draftPolicyContext(o) {
   requireThat(git(o.repo, "rev-parse", "HEAD").trim() === draftHead, "Draft checkout is not at the declared integrated parent or predecessor");
   if (o.draftHead) requireThat(policyContext({ ...o, plan: draftHead }).parent === context.parent,
     "Superseded plan does not share the integrated draft parent");
-  const draft = planningWorktree(o.repo, o.change);
+  const draft = planningWorktree(o.repo, o.change, Boolean(context.lowTouch));
   const changes = git(o.repo, "diff", "--name-only", "-z", "--no-renames", "--ignore-submodules=none", context.parent, "--");
   const untracked = git(o.repo, "ls-files", "--others", "--exclude-standard", "-z");
   const staged = git(o.repo, "diff", "--cached", "--name-only", "-z", "--no-renames", context.parent, "--");
@@ -580,7 +690,7 @@ function main() {
   const command = process.argv[2];
   requireThat(["planning", "planning-worktree", "policy-context", "candidate", "review", "receipt"].includes(command), "Expected planning, planning-worktree, policy-context, candidate, review or receipt command");
   const args = process.argv.slice(3);
-  const names = ["repo", "change", ...(command === "planning-worktree" ? [] : command === "policy-context" ? ["plan", "target"] : command === "planning" ? ["head"] : command === "receipt" ? ["target", "receipt", "issue", "receipt-path", "max-closure-commits"] : ["base", "head", "plan", "expect-plan", "gate-run", "gate-run-sha256", "mode", "target", ...(command === "review" ? ["issue", "review"] : [])])];
+  const names = ["repo", "change", ...(command === "planning-worktree" ? ["parent", "target"] : command === "policy-context" ? ["plan", "target"] : command === "planning" ? ["head", "plan", "target"] : command === "receipt" ? ["target", "receipt", "issue", "receipt-path", "max-closure-commits"] : ["base", "head", "plan", "expect-plan", "gate-run", "gate-run-sha256", "mode", "target", ...(command === "review" ? ["issue", "review"] : [])])];
   const seen = new Set();
   for (const arg of args) {
     const match = /^--([A-Za-z][A-Za-z-]*)(?:=|$)/.exec(arg);
@@ -589,14 +699,21 @@ function main() {
     seen.add(match[1]);
   }
   const { values: o } = parseArgs({ args, options: Object.fromEntries(names.map((key) => [key, { type: "string" }])), strict: true, allowPositionals: false });
-  for (const key of names.filter((key) => !["expect-plan", "gate-run", "gate-run-sha256", "mode", "target", "receipt-path", "max-closure-commits"].includes(key))) requireThat(text(o[key]), `Missing --${key}`);
+  for (const key of names.filter((key) => !["parent", ...(command === "planning" ? ["plan"] : []), "expect-plan", "gate-run", "gate-run-sha256", "mode", "target", "receipt-path", "max-closure-commits"].includes(key))) requireThat(text(o[key]), `Missing --${key}`);
   if (o["expect-plan"] !== undefined) requireThat(/^[a-f0-9]{64}$/.test(o["expect-plan"]), "Expected a full plan digest");
   repository(o.repo);
-  if (command === "planning-worktree") return writeFileSync(1, `${JSON.stringify(planningWorktree(o.repo, o.change))}\n`);
+  if (command === "planning-worktree") {
+    requireThat(Boolean(o.parent) === Boolean(o.target), "Provide both draft parent and integrated target");
+    const custom = o.parent && integratedPolicyContext(o.repo, o.parent, o.target).lowTouch;
+    return writeFileSync(1, `${JSON.stringify(planningWorktree(o.repo, o.change, Boolean(custom)))}\n`);
+  }
   if (command === "policy-context") return writeFileSync(1, `${JSON.stringify(policyContext(o))}\n`);
   if (command === "planning") {
     const head = commit(o.repo, o.head);
-    const result = planning(o.repo, head, o.change);
+    requireThat(Boolean(o.plan) === Boolean(o.target), "Provide both exact plan and integrated target");
+    const context = o.plan && policyContext(o);
+    if (context) ancestor(o.repo, context.plan, head);
+    const result = planning(o.repo, head, o.change, Boolean(context?.lowTouch));
     return writeFileSync(1, `${JSON.stringify({ ok: true, head, change: o.change, planDigest: result.digest, inputs: result.inputs, inventory: result.inventory })}\n`);
   }
   if (command === "candidate") return writeFileSync(1, `${JSON.stringify({ ok: true, ...candidate(o) })}\n`);

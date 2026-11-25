@@ -23,6 +23,8 @@ Own optional, versioned agent playbooks that contributors can install and reuse 
 - Delivery owns protected finish checkpoints, bounded check disposition, per-worktree retirement previews and advisory post-release sync. Next forwards read-only observations and contextual replies to delivery.
 - A skill installed in a shared agent profile must not remove or modify its installed package while operating on a target project.
 
+- The two independently installable delivery and orchestration packages ship matching portable planning inventory, low-touch policy, and harness result contracts. Delivery owns planning and protected finish admission. Orchestration owns contained review preflight, durable spend and private runtime diagnostics.
+
 ## Work Guidance
 
 Add a skill only when it provides a reusable, checkable procedure beyond this repository's local contracts. Do not add a second specification or progress tracker beside OpenSpec.

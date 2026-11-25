@@ -101,8 +101,18 @@ This checklist is an orchestrator procedure. Structural guard checks and textual
 or synthetic procedure tests do not authenticate a real reviewer or implement
 lifecycle-order enforcement; they do not grant publication authority.
 If cleanup is blocked, state that honestly without erasing accepted source evidence.
-Close a documentation issue only when its declared acceptance boundary is
-satisfied and that write is authorized. Closing it is not archival.
+Close the documentation issue explicitly after authorized integrated
+verification, protected closure merge and archive readback. The closure PR
+body should explain the timing.
+
+```text
+Change <full-change>
+Records <verified implementation PR> and <verified documentation issue>.
+This PR archives the change and records the integrated gate evidence.
+This PR uses a plain issue link so the issue stays open until finish closes
+it explicitly after the protected merge and archive acceptance are read back.
+```
+
 
 The receipt is evidence for the named integrated verification, not a prediction
 about its own publication. Closure CI checks the closure diff; remote readback

@@ -34,11 +34,9 @@ remain unchanged; native `tasks.md` stays the sole mutable progress authority.
 Apply [delivery policy](../skills/software-development/openspec-delivery/references/delivery-policy.md)
 before freeze and execution. Read it from the verified integrated plan parent.
 Review declared contributor-contract edits for alignment at the exact candidate.
-The Goal-First marker in this repository applies to eligible later plans only
-after its integration. The introducing change
-`goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc` retains its inherited
-Task-Guided policy and exact approval. All existing frozen approvals retain
-their original boundaries.
+Goal-First and low-touch markers apply through a verified adopting integrated
+parent. Existing frozen approvals retain their original boundaries.
+[Operator tutorial](openspec-operator-tutorial.md).
 
 | Mode | Select when | Local approval and execution |
 | --- | --- | --- |
@@ -101,8 +99,8 @@ replay merged work. A changed head, failed required check, or missing
 protection is the exception: report it, then resume the same finish after it
 is cleared. `/git-commit-message` does not push. Implementation commits do
 not use a closing keyword. The next push does not close the issue or the pull
-request. After acceptance, the receipt commit carries the closeout trailer.
-The pull request is merged by the protected route, not by a commit keyword.
+request. Use the protected route and explicit issue closure after the verified
+receipt and archive readback.
 
 A direction change needs only the exception, for example
 `/openspec-delivery pin-note group 1 no commits` or
@@ -175,8 +173,8 @@ flowchart TB
     reviewWait{"Protected checks, human review<br/>and any declared preview satisfied?"}
     pause["Report that open PR and stop<br/>Waiting is normal, not a new authority"]
     verify["Read back the integrated revision<br/>Verify the final revision and current specs"]
-    closure["Commit receipt with Fixes #issue<br/>Native archive and the closure PR"]
-    cleanup["Read back the close after default-branch merge<br/>Authorized issue close if needed; retire clean worktrees"]
+    closure["Commit factual receipt<br/>Native archive and the closure PR"]
+    cleanup["Read back closure and archive<br/>Explicitly close issue and retire clean worktrees"]
     done(["Change complete<br/>Stop; no next change"])
   end
 
@@ -234,20 +232,13 @@ replay implementation, or merge under `next`. The same pause and same-finish
 resume apply to the record-only closure pull request; do not open a second
 one while that pull request is waiting.
 
-A local commit is not a close, and `/git-commit-message` does not push.
-Implementation commits and the implementation pull-request body do not use
-`Fixes`, `Closes` or `Resolves` while later acceptance is still required. The
-next push does not close the documentation issue or the pull request. After
-acceptance is verified, the receipt commit carries `Fixes #<issue>` for the
-verified documentation issue and `Closes #<pull-request>` only for a pull
-request already read back as merged. An open pull request is named without a
-closing keyword, because that keyword would close it without merging once the
-commit reaches the default branch. The closure pull-request body repeats
-`Fixes #<issue>`. GitHub applies the keyword only when that commit is merged
-into the repository default branch. If the closure pull request targets
-another branch, or readback shows the issue still open, finish performs the
-authorized documentation close and reads it back. Archival does not close the
-issue, and closing it does not archive the change.
+Implementation and closure commits and PR bodies use factual issue
+references. Under protected explicit closure, omit a closing keyword such as
+`Fixes #<issue>`. The next push does not close a documentation issue. A
+keyword on the default branch could close it before finish reads back the
+actual integrated gates, record-only merge and archive receipt. Finish verifies
+those records, explicitly closes the issue under the named grant, and reads the
+result back. [Protected finish](../skills/software-development/openspec-delivery/references/protected-finish.md).
 
 Parallel changes are two of these pictures at once, in separate checkouts.
 They share neither an index nor a `tasks.md`. A parent issue may list both
@@ -445,92 +436,27 @@ revision.
 
 ### Specify `pin-note`
 
-The operator asks to explore the pin interaction, then to propose it.
+Start with `/openspec-explore` if needed, then send
+`/openspec-propose pin-note`. Use the full generated name for later commands
+and records. The orchestrator prepares the isolated checkout before native
+scaffolding and tracks the proposal, delta, design and native tasks.
+For a primary human-facing surface, use `/capability-wireframes` and keep
+proposal HTML/PNG in the change package. Maintain current product visuals
+under their stable capability and screen keys. Update and verify their
+current-spec links before the candidate is frozen for review. For this synthetic
+screen the stable generated paths are
+`docs/product/wireframes/notes/html/note-screen.html` and
+`docs/product/wireframes/notes/exports/note-screen.png`.
+[Wireframe procedures](../skills/software-development/capability-wireframes/SKILL.md).
 
-```text
-/openspec-explore
-/openspec-propose pin-note
-```
-
-These use the direct-directory Claude Code/Hermes spelling; on Codex select the
-same skills through `/skills` or use `$openspec-explore` and `$openspec-propose pin-note`.
-The selected project policy generates the suffix first. The
-propose workflow creates change `pin-note-01arz3ndektsv4rrffq69g5fav` and writes
-its proposal, delta spec, design, and `tasks.md`. The selected proposal policy includes one
-documentation issue; without that bounded authority the link remains pending.
-The agent prepares its isolated workspace before scaffolding. Planning does not
-authorize implementation, a commit, or a pull request.
-
-The note screen is a primary human-facing surface. The operator asks for a
-wireframe with a prompt, which loads `/capability-wireframes`:
-
-```text
-/capability-wireframes
-Draft a proposal wireframe for the note screen of change pin-note-01arz3ndektsv4rrffq69g5fav.
-Keep it in the change package. Do not update the product manifest.
-```
-
-The proposal visual belongs to `pin-note-01arz3ndektsv4rrffq69g5fav`, outside the
-current-product manifest. Its local HTML/PNG links move with that package. Refer
-to it elsewhere by the full change name and screen key, not its current directory.
-
-For this example, the capability key is `notes` and the screen key is
-`note-screen`. They describe the long-lived product surface, not a change or a
-directory. When the project selects the companion's default layout, the concrete
-current files are:
-
-| Artifact | Project-root-relative location |
-| --- | --- |
-| Editable current-screen definition | `docs/product/wireframes/generate.mjs` |
-| Generated current inventory | `docs/product/wireframes/manifest.json` |
-| Generated current index | `docs/product/wireframes/index.html` |
-| Generated HTML for this screen | `docs/product/wireframes/notes/html/note-screen.html` |
-| PNG rendered from that HTML | `docs/product/wireframes/notes/exports/note-screen.png` |
-| Current capability spec | `openspec/specs/notes/spec.md` |
-
-These current-product paths do not move when a change is archived. They are not
-proposal destinations and are not claimed to exist in this distribution. During
-implementation, update the generator and render its outputs; do not promote a
-proposal by moving it into the product directory. Link the actual HTML/PNG from
-the current spec, relative to that spec, and validate the resolved targets.
-A directory is not an HTML page, and a manifest key is not automatically a
-clickable URL. A later change to this screen reuses the same stable keys.
-
-The selected proposal policy creates or reuses one documentation issue during
-the authorized proposal, then records its verified URL in proposal frontmatter
-before approval. The operator does not repeat the ticket rules. For an existing
-draft with a pending link, this separately authorized invocation completes only
-the documentation step:
-
-```text
-/openspec-delivery document pin-note-01arz3ndektsv4rrffq69g5fav
-```
-
-`/openspec-delivery` applies the proposal-time risk-focused body and
-identifies `pin-note-01arz3ndektsv4rrffq69g5fav` by its full name. It reads back
-the issue and binds its verified URL in the proposal when authorized, then stops. It does not
-generate another suffix, copy `tasks.md`, implement, commit, open a pull request, or
-assign the issue to lock the work.
-
-The body is the packaged [ticket template](../skills/software-development/openspec-delivery/references/ticket.md)
-(this link points to distribution source, not a file expected in field-notes).
-It records request, blast radius, confidentiality, integrity, availability,
-authorization and recovery. That supports change-control evidence. It does not
-establish ISO/IEC 27001 conformity. Do not label the issue compliant.
-
-The full OpenSpec change name is the identity. It correlates the issue, the pull
-request and the evidence. Reuse it exactly. If `export-notes` is a
-different request, it gets its own change name in its own checkout. If another
-clone is already editing `openspec/specs/notes/spec.md`, stop and reconcile. A
-new name is not permission to continue.
-
-Do not paste the task list into the issue. A second session that sees the
-issue unassigned has not acquired a lock.
-
-`export-notes` is specified the same way in another checkout, with
-`openspec-propose` and its own `tasks.md`. It does not edit the pin-note
-working tree. If both changes are documented, a parent issue may link the two
-child issues. The parent is a group label, not a third plan.
+The authorized proposal policy includes one documentation issue. An existing
+draft with a pending link can use
+`/openspec-delivery document pin-note-01arz3ndektsv4rrffq69g5fav`
+with separate permission. The risk-focused issue body covers the scope,
+authorization, exposure and recovery. It does not establish ISO/IEC 27001
+conformity. Bind the verified issue URL before approval and keep task
+progress in `tasks.md`.
+[Ticket template](../skills/software-development/openspec-delivery/references/ticket.md).
 
 ### Implement one Task-Guided group
 
@@ -610,8 +536,7 @@ The pull request is the review record of `abc1111`. It is not a copy of
 `tasks.md`. If the candidate becomes `def2222`, the previous review does not
 count. Do not put a closing keyword in an implementation commit or in the
 implementation pull-request body while later acceptance is still required.
-The next push does not close the issue or the pull request. The receipt
-commit, after acceptance, carries the closeout trailer.
+Use factual receipt links and retain the acceptance readback for explicit issue closure.
 
 `/openspec-delivery` then uses its read-only guard. The review record
 cites issue 40 because the operator already created that documentation issue.
@@ -692,7 +617,7 @@ two files is not combined-system evidence.
 | Technical approach | Change-owned `design.md` where needed |
 | Implementation progress | Change-owned `tasks.md`, written only by the orchestrator |
 | Specification actions | OpenSpec propose, apply, sync and archive |
-| Commits | `/git-commit-message`; no push. No closing keyword before acceptance. The receipt commit carries the closeout trailer. |
+| Commits | `/git-commit-message`; no push. Use factual receipt links. Explicit close follows accepted archive readback. |
 | Human-facing visuals | `/capability-wireframes` |
 | Independent review before merge | `/autonomous-implementation-review` |
 | Workspace lifecycle, candidate identity, recovery and integrated evidence | `/openspec-delivery` |
@@ -709,39 +634,12 @@ own identity, scope, gates and acceptance boundary.
 
 ## What each skill adds
 
-OpenSpec does not commit, isolate writers, bind review to an exact candidate,
-or keep a visual identity across archival. Its collaboration rules are
-convention, not enforcement.
-
-- `/openspec-delivery` is the orchestrator boundary: one writer, an
-  isolated checkout, candidate and plan identity, recovery, and Git-tracked
-  evidence after integrated verification. It is not a scheduler and not a
-  GitHub client. Its short invocation owns setup/bootstrap, local execution and
-  bounded finish; the operator supplies exceptions, not a Git recipe.
-  Its local evidence CLI captures authorized exact-SHA gates, retains streams
-  and hashes, verifies seals and asserts offline readback claims. Distinct
-  rejected records and successor dispositions carry the inherited two-cycle
-  limit; missing cycle evidence blocks continuation. Closure orders local closure
-  gates, fresh independent factual review at the exact closure SHA, then separately
-  authorized publication; implementation/integrated/closure evidence stays distinct.
-- `/openspec-next` finds the approved local outcome or first eligible ordered
-  group and routes it under the selected policy. Inspect mode reads state only.
-- `/git-commit-message` keeps logical batches, a preview, exact staging and
-  separate commit authority. It does not push. Implementation commits omit
-  closing keywords. The receipt commit, after acceptance, carries
-  `Fixes #<issue>` and names already-merged pull requests with `Closes`. A project-selected execution invocation explicitly
-  enables autonomous local commits; the orchestrator role alone does not.
-- `/capability-wireframes` keeps a stable screen key and a generated HTML/PNG
-  review. Proposal images stay change-owned. They are not current behavior.
-- `/autonomous-implementation-review` is the independent reviewer. It must be a
-  different session and model from the implementer. Its verdict on the exact
-  SHA is required before that pull request is merged and before the branch is
-  deleted. It does not select the next change, accept risk, or approve the
-  GitHub review.
-
-No skill in this set replaces OpenSpec propose, apply or archive. Stock apply
-may tick checkboxes; the orchestrator mediates that write. The implementer
-reports evidence and does not edit `tasks.md`.
+The [companion skills table](../README.md#sdlc) identifies each package's
+boundary. Keep Git and native task writes with one orchestrator. After
+exact gate and review evidence, update native progress in the same change.
+Use the delivery runtime for policy, worktree reconciliation and status, and
+independently recheck actual candidate, integrated and closure evidence at
+the applicable boundary. Package installation supplies no project authority.
 
 ## Parallel specification
 
@@ -871,17 +769,9 @@ gate, execute tests, call GitHub, acquire a lock or authorize a write. Full
 object IDs must already be local. Independent clones are supported. Preserve
 dirty work and uncertain API outcomes. Read back before retrying a write.
 
-The Git evidence-guard and workspace helpers share the packaged
-[Git child environment contract](../skills/software-development/openspec-delivery/references/git-environment.md).
-Only explicit runtime locations and `GIT_CONFIG_GLOBAL`, `GIT_CONFIG_SYSTEM` and
-`GIT_CONFIG_NOSYSTEM` selectors are forwarded. Absent selectors remain absent;
-present values, including empty values, retain Git's interpretation. Forbidden
-overrides fail before value reads or Git execution. Fixed replacement/locking/locale
-controls and fsmonitor neutralization remain in force. On Windows, helper-controlled
-empty baseline names prevent Node's process launcher from leaking inherited system
-identity values, and Git-returned worktree paths are normalized before canonical
-checks. This is not a sandbox:
-PATH, home/config locations and repository/selected configuration remain trusted.
+The packaged Git environment contract governs allowlisted paths, explicit
+config selectors, protected object topology and Windows path handling.
+[Git child environment](../skills/software-development/openspec-delivery/references/git-environment.md).
 
 The separate `references/evidence-retention.md` and
 `scripts/evidence-retention.mjs` pair is local representation support, not a Git
@@ -907,11 +797,10 @@ exact-SHA executable gates and independent review with a sealed single-run
 session binding. A Task-Guided successor
 needs the predecessor's accepted evidence. Goal-First uses its exact Goal
 Contract and single outcome. Missing qualification, uncertain ownership or
-stale evidence keeps the boundary closed. The sealed trials at repair SHA
-`9b909f9467ddea6b12f7ca77f959f39ef01e2702` cover this behavior for synthetic
-changes on the pinned Linux pair. Exact approval and the bounded local grant
-govern delivery. Each provider run requires separate authority, and finish
-requires its own authorized invocation. [Qualification, setup and operator recovery](worker-runtime.md).
+stale evidence keeps the boundary closed. Exact approval and the bounded
+local grant govern delivery. A verified adopting parent can select bounded
+contained reviews. Finish requires its own authorized invocation.
+[Qualification, setup and operator recovery](worker-runtime.md).
 
 ## Packages
 
@@ -924,18 +813,19 @@ Orchestration is optional. It requires the workflow plugin, explicit role and
 model configuration, and a supported host. Package installation does not create
 those roles.
 
-Current source versions are delivery 1.6.0 and `openspec-next` 0.7.0 in
-`openspec-development` 1.6.0, and core skill 0.20.0 in
-`autonomous-orchestration` 1.10.0.
+Current source versions are delivery 1.7.0 and `openspec-next` 0.7.0 in
+`openspec-development` 1.7.0, and core skill 0.21.0 in
+`autonomous-orchestration` 1.11.0.
 Representation support adds no upstream workflow, runtime dependency or
 installation route. Package availability/byte checks do not establish account
 sync, host execution, native client discovery, Desktop acceptance or scanner approval.
 
 The [contained Claude reviewer](claude-reviewer.md) is an opt-in transport for exact candidate
-and charter-v1 approach review. A separate grant must cover export and paid inference. Replay
-the original request-bound output offline before applying the existing candidate or charter
-admission rules. The guide records the limited packaged live qualification. Apply the
-project's approved reviewer procedure when selecting a route.
+and charter-v1 approach review. Check the exact approved export and applicable
+review authority before paid inference. A verified low-touch parent selects
+the per-change defaults and the explicit override. Replay the original
+request-bound output offline before applying candidate or charter admission.
+[Review authority and configured harness](openspec-review-configuration.md).
 
 Complete copies and generated packages preserve delivery's policy/task-authoring
 references, `scripts/delivery-policy.mjs` and `scripts/delegated-delivery.mjs`, plus orchestration's

@@ -1,3 +1,4 @@
+import { validatePlanningInputs } from "./planning-inventory.mjs";
 import { CANDIDATE_RECORDS, isRecordQualified } from "./terminal-adapters.mjs";
 // Pure packet/evidence checks plus re-exported adapter handoff/supervision helpers.
 // Pure core functions do no client launch or process control; adapter execution lives in terminal-adapters.mjs.
@@ -29,15 +30,8 @@ const sha = (value) => typeof value === "string" && /^(?:[a-f0-9]{40}|[a-f0-9]{6
 const digest = (value) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
 
 function inventory(change, inputs) {
-  requireThat(typeof change === "string" && /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(change), "Invalid inventory change");
-  requireThat(inputs && typeof inputs === "object" && !Array.isArray(inputs), "Missing planning inventory");
-  const prefix = `openspec/changes/${change}/`;
-  const required = ["openspec/config.yaml", ...[".openspec.yaml", "proposal.md", "tasks.md"].map((name) => prefix + name)];
-  requireThat(required.every((name) => Object.hasOwn(inputs, name)), "Incomplete planning inventory");
-  for (const [name, hash] of Object.entries(inputs)) {
-    requireThat(!name.includes("\\") && name.split("/").every((part) => part && part !== "." && part !== "..") &&
-      (required.includes(name) || name === `${prefix}design.md` || name.startsWith(`${prefix}specs/`)) && digest(hash), "Invalid planning inventory input");
-  }
+  try { validatePlanningInputs(change, inputs); }
+  catch { validatePlanningInputs(change, inputs, undefined, true); }
 }
 const sameInputs = (a, b) => a && b && JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
 const resolvedFinding = (finding) => finding?.blocking === false && (

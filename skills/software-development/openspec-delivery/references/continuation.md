@@ -156,18 +156,15 @@ corrections. Never reapply a delta over newer accepted behavior. Use native arch
 with the verified no-spec-update path only when current specs are already correct;
 validate byte-identical movement, metadata and upstream strict checks.
 
-Commit receipt/archive as separate factual batches. The receipt message carries
-the closeout trailer from `git-commit-message`: `Fixes #<issue>` for the
-verified documentation issue, and `Closes #<pull-request>` only when that pull
-request is already merged. Repeat `Fixes #<issue>` in the closure pull-request
-body. Do not put a closing keyword on an open pull request. Obtain independent
-factual review, publish and merge the closure through the same protected route,
-and read back the published receipt bytes. A closure PR is not a prediction
-about its own merge. The trailer closes nothing until that commit is merged
-into the repository default branch. If it does not target the default branch,
-or the issue is still open after readback, perform the authorized documentation
-close. No extra PR attests the previous receipt. Then perform `workspace.md`
-cleanup.
+Commit receipt/archive as separate factual batches. Keep the factual issue
+reference in the closure PR and explain that explicit issue closure follows
+verified integrated gates, protected closure merge and archive readback. An
+automatic keyword can close an issue before the record is verified. Obtain
+independent factual review, publish and merge the closure through the same
+protected route and verify the published receipt bytes. Close the issue
+explicitly under the named finish grant and verify the final state. Preserve
+the inherited interpretation of original closure records. Then perform
+`workspace.md` cleanup.
 
 Closure ordering is local closure gates, then fresh independent factual closure
 review at the exact closure SHA, then separately authorized publication. Retain

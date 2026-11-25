@@ -24,7 +24,7 @@ export function exec(executable, args) {
   return result;
 }
 export async function fixture(t, { integratedOptIn = true, staged = false, exclusive = false, continuous = false,
-  proposeToFreeze = false, beforeFreeze } = {}) {
+  proposeToFreeze = false, lowTouch = false, beforeFreeze } = {}) {
   const root = await realpath(await mkdtemp(path.join(os.tmpdir(), "delivery-runtime-")));
   t.after(async () => {
     // The contained reviewer seals export and output directories at 0500.
@@ -57,7 +57,8 @@ export async function fixture(t, { integratedOptIn = true, staged = false, exclu
   git(repo, "init", "-b", "main");
   await write(repo, "AGENTS.md", `# Fixtures\n${integratedOptIn ? "<!-- openspec-delivery-mode: goal-first -->\n" : ""}` +
     (proposeToFreeze ? "<!-- openspec-proposal: propose-to-freeze -->\n" : "") +
-    (exclusive ? "<!-- openspec-worker-runtime: exclusive -->\n" : ""));
+    (exclusive ? "<!-- openspec-worker-runtime: exclusive -->\n" : "") +
+    (lowTouch ? "<!-- openspec-low-touch: {} -->\n" : ""));
   await write(repo, ".gitignore", "/dist/\n/ignored-input\n");
   await write(repo, "widget.txt", "old");
   const base = commit(repo, "Integrated policy and product");

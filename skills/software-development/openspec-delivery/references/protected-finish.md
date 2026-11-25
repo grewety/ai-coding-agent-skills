@@ -158,3 +158,11 @@ upstream packages and keep its native provenance. Retain a sealed
 provenance, `installedPackages` inventory and `freshSession` readback.
 Preserve installed packages on blocked scanner or collisions. Use isolated
 scratch homes and profiles for tests.
+
+For a verified adopting parent, apply the [low-touch guard](low-touch.md)
+to the actual finish head and its retained checkpoint. Replay the parent
+review and verify the independent child gate for the exact task-completion
+exception. Recheck the applicable harness and current complete per-event
+trigger inventories before activation. Keep the trigger matches in finish
+evidence. Use the [record-only closure body](integration.md#record-only-closure-and-stop-boundary)
+and explicitly close the issue only after verified acceptance readback.

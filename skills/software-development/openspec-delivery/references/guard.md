@@ -185,12 +185,10 @@ components and 128 KiB of path/output accounting. The guard refuses the
 entire inventory on overflow, an unsafe path or an inconsistent read.
 Existing normalized Task-Guided digests retain their framing. The
 `inventory` observation carries counts and total bytes alongside raw hashes.
-Aikido 1151615147 is exercised by oversized synthetic inventories at the
-count, byte, depth and output boundaries.
+Synthetic inventories exercise the count, byte, depth and output boundaries.
 
 Candidate, review and receipt checkout checks include ignored files and
-hidden Git index flags. Aikido 1151615165 is exercised by ignored-input,
-stale SHA and same-checkout rejection fixtures. Start applicable gates in a
+hidden Git index flags. Fixtures cover ignored inputs, stale SHAs and reused gate checkouts. Start applicable gates in a
 separate disposable, detached checkout at the exact candidate commit with a
 clean input inventory. Apply authorized bootstrap only after that initial
 observation. Permit only explicitly declared ignored output roots generated

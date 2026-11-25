@@ -62,18 +62,18 @@ test("exclusive runtime guides document the observed qualification limits and re
   for (const [file, qualification] of [
     ["README.md", /Sealed synthetic trials on one\s+Linux host qualified/],
     ["docs/openspec-installation.md", /Sealed synthetic trials on one Linux host qualified the dedicated pinned Codex\s+implementer and read-only Claude reviewer/],
-    ["docs/openspec-workflow.md", /sealed trials at repair SHA\s+`[a-f0-9]{40}` cover this behavior for synthetic\s+changes on the pinned Linux pair/],
+    ["docs/openspec-workflow.md", /Qualification, setup and operator recovery\]\(worker-runtime\.md\)/],
     ["docs/claude-installation.md", /sealed\s+synthetic trials qualify a dedicated Codex[\s\S]*?bound to the recorded host and runtime/],
-    ["docs/claude-reviewer.md", /exclusive worker pair\]\(worker-runtime\.md\) has separate live evidence\s+from synthetic trials on one Linux host/],
+    ["docs/claude-reviewer.md", /Qualification follows the exact published role and host settings/],
   ]) {
     const source = await readFile(new URL(file, root), "utf8");
     assert.ok(source.includes(file === "README.md" ? "(docs/worker-runtime.md)" : "(worker-runtime.md)"), file);
     assert.match(source, qualification, file);
   }
-  assert.match(guide, /covers synthetic local changes on the recorded pinned pair/);
-  assert.match(guide, /Other hosts, clients, versions and provider routes require their own\s+qualification/);
-  for (const field of ["Codex 0.171.0", "Claude Code 2.1.330", "Bubblewrap 0.9.0", "CODEX_HOME",
-    "--ignore-user-config", "--enable skip_host_skill_discovery", "no new privileges", "profile_routes", "Group 3.1"]) {
+  assert.match(guide, /recorded synthetic qualification on one Linux host/);
+  assert.match(guide, /different host, client, model,\s+version or provider route requires its own qualified binding/);
+  for (const field of ["Codex **0.171.0**", "Claude Code **2.1.330**", "Bubblewrap **0.9.0**", "CODEX_HOME",
+    "--ignore-user-config", "--enable skip_host_skill_discovery", "no new privileges", "profile_routes", "exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m"]) {
     assert.ok(guide.includes(field), field);
   }
   for (const guard of ["curator lock", "skills.write_approval = true", "skills.creation_nudge_interval = 0",
@@ -113,7 +113,8 @@ test("next and delivery spellings preserve authority across native host routes",
   const contract = await readFile(new URL("AGENTS.md", root), "utf8");
   assert.equal(contract.match(/^<!-- openspec-delivery-mode: goal-first -->$/gm)?.length, 1);
   assert.match(contract, /verified integrated plan parent contains this contract/);
-  assert.match(contract, /retains its inherited Task-Guided policy/);
+  assert.match(contract, /Existing frozen approvals and authority stay bound to their integrated parent/);
+  assert.match(contract, /^<!-- openspec-low-touch: \{\} -->$/m);
 });
 
 test("all launch examples carry the same bounded operator authorization", async () => {
@@ -409,4 +410,24 @@ test("operator configuration documentation covers every advertised client and ex
   assert.equal(removedOverride.action, "bound");
   assert.equal(removedOverride.configurationSource, "project-default");
   assert.equal(removedOverride.model, "claude-sonnet-4-6");
+});
+
+test("active guides cover prospective review authority, host bindings and factual issue closure", async () => {
+  const root = new URL("../", import.meta.url);
+  const read = (file) => readFile(new URL(file, root), "utf8");
+  const [readme, tutorial, configuration, integration] = await Promise.all([
+    read("README.md"), read("docs/openspec-operator-tutorial.md"), read("docs/openspec-review-configuration.md"),
+    read("skills/software-development/openspec-delivery/references/integration.md"),
+  ]);
+  for (const guide of ["openspec-operator-tutorial", "openspec-review-configuration", "openspec-operator-runbook",
+    "openspec-workflow", "openspec-metadata", "openspec-installation", "worker-runtime", "claude-reviewer", "claude-installation"]) {
+    assert.match(readme.split("## SDLC")[0], new RegExp(`docs/${guide}\\.md`));
+  }
+  for (const pattern of [/flowchart TB/, /sequenceDiagram/, /approve and run/, /fresh-session/, /openers\.codex\.args/,
+    /Role 1/, /Role 2/, /Role 3/, /intent-driven/, /instructions apply/]) assert.match(tutorial, pattern);
+  for (const pattern of [/"maxReviews":10/, /"maxTotalUsd":25/, /"planning","execution","finish"/, /explicit/,
+    /configurationSha256/, /Deep Review/, /Local Scanner/, /"standingTriggers":/, /"costUsd": 0/]) {
+    assert.match(configuration, pattern);
+  }
+  assert.match(integration, /plain issue link so the issue stays open until finish closes/);
 });

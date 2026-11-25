@@ -4,7 +4,10 @@ The [workflow](openspec-workflow.md) defines repository authority. Read the
 integrated parent of the selected plan to determine the applicable policy.
 The root `openspec-proposal: propose-to-freeze` marker applies prospectively
 after integration. Retained plans keep their existing mode, policy and
-approval. Installation does not select the workflow in another repository.
+approval. Installation does not select the workflow in another repository. Use the
+[visual tutorial](openspec-operator-tutorial.md) for exact replies and the
+[review configuration](openspec-review-configuration.md) for integrated policy,
+review budgets, host pins and harness bindings.
 
 ## Prepare, approve and deliver
 
@@ -53,8 +56,10 @@ authority. From another host use the equivalent activation syntax above.
 
 1. Capture current target, exact reviewed PR head, official protection and
    rulesets, mergeability and review status. Inspect external trigger
-   inventory before an authorized push. An external/paid test, retry,
-   preview or tunnel needs its own single-run card and permission. See target,
+   inventory immediately before each authorized push, PR event or merge.
+   Only an exact verified $0 standing match under the integrated policy can
+   proceed without another trigger grant. A paid or unknown trigger, external
+   test, retry, preview or tunnel needs its own single-run card and permission. See target,
    cases, approved built-artifact exposure, cost or credits, and one run
    before approving. Use loopback for local try-out. For an authorized
    tunnel, expose the built artifact only and verify immediate teardown.
@@ -74,8 +79,11 @@ authority. From another host use the equivalent activation syntax above.
    the actual containing revision. Prepare the receipt and record-only
    archive. Run full `npm test` on the exact archived tree using the packaged
    disposable gate procedure and obtain a fresh independent factual review
-   bound to its SHA and gates before publishing the closure PR. Verify its
-   protected merge, archive and issue acceptance. A failure pauses for
+   bound to its SHA and gates before publishing the closure PR. Use a factual
+   issue link and explain that the issue will be closed explicitly after
+   protected merge and archive readback. Automatic closure could precede that
+   evidence. Verify the accepted receipt, close explicitly, and read back the
+   issue state. A failure pauses for
    evidence, repair or revert within its own authority.
 5. Reconcile all verified dedicated worktrees from this and earlier runs.
    Remove individually without force only when the fresh preview permits it.

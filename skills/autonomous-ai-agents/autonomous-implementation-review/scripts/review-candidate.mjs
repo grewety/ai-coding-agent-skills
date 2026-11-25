@@ -1,14 +1,18 @@
 #!/usr/bin/env node
 import { randomUUID } from "node:crypto";
 import { writeSync } from "node:fs";
-import { mkdir, readdir } from "node:fs/promises";
+import { lstat, mkdir, readdir } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { convergenceDecision } from "./orchestration-core.mjs";
 import { admitReceipt, candidateResult, describeFile, receiptContext, reviewPrompt } from "./review-admission.mjs";
 import { absolute, checkExport, checkSealedDirectory, digest, equal, fields, fileLimit, hash, jsonBytes, need, newProtectedDirectory,
-  prepareExport, protectedParent, readJson, sealDirectories, separate, totalLimit, uuid, validateReviewRequest } from "./review-inputs.mjs";
+  prepareExport, protectedParent, readJson, reviewPolicy, sealDirectories, separate, totalLimit, uuid, validateReviewRequest } from "./review-inputs.mjs";
 import { bubblewrapVersion, claudeVersion, runtimeBinding, validateHostConfig, withReviewRuntime } from "./review-runtime.mjs";
+import { checkPacketTurns, offlineHostBinding, reviewClock } from "./review-preflight.mjs";
+import { checkReviewSpend, claimReviewRun } from "./review-spend.mjs";
+import { checkHarnessSeal } from "./harness-result.mjs";
+import { upstreamClasses } from "./review-upstream-status.mjs";
 import { auditClaudeStream } from "./review-stream.mjs";
 import { createAttempt, publishResult, readClosed, readHandoff, requestBytes as workerRequestBytes, writeClosed } from "./worker-handoff.mjs";
 
@@ -55,7 +59,10 @@ async function capture(dir, index, observation) {
   const [out, err, metadata] = attemptNames(index);
   const { runtime, proc } = observation;
   const supervisor = Object.fromEntries(supervisorFields.map((name) => [name, proc[name]]));
-  const captures = { [out]: proc.stdout, [err]: proc.stderr, [metadata]: jsonBytes({ runtime, supervisor }) };
+  const { upstreamStatus } = observation;
+  need(upstreamStatus === undefined || upstreamClasses.includes(upstreamStatus), "Invalid private upstream status");
+  const captures = { [out]: proc.stdout, [err]: proc.stderr, [metadata]: jsonBytes({ runtime, supervisor,
+    ...(upstreamStatus ? { upstreamStatus } : {}) }) };
   for (const [name, bytes] of Object.entries(captures)) await writeClosed(path.join(dir, name), bytes, true);
 }
 
@@ -65,14 +72,16 @@ async function replayCapture(directory, index, expect) {
     readSealed(directory, metadata, 4096)]);
   const value = await readJson(path.join(directory, metadata), 4096, true);
   need(files[2].equals(jsonBytes(value)), "Noncanonical capture metadata");
-  fields(value, ["runtime", "supervisor"], "capture metadata");
+  fields(value, ["runtime", "supervisor"], "capture metadata", ["upstreamStatus"]);
+  need(value.upstreamStatus === undefined || upstreamClasses.includes(value.upstreamStatus), "Invalid private upstream status");
   fields(value.supervisor, supervisorFields, "supervisor observation");
   validateRuntime(value.runtime, expect);
-  return { runtime: value.runtime, proc: { ...value.supervisor, stdout: files[0], stderr: files[1] },
+  return { runtime: value.runtime, upstreamStatus: value.upstreamStatus, proc: { ...value.supervisor, stdout: files[0], stderr: files[1] },
     descriptors: [out, err, metadata].map((name, i) => describeFile(directory, name, files[i])) };
 }
 
 function audit(observation, paths, probe) {
+  if (observation.upstreamStatus) return null;
   try { return auditClaudeStream(observation.proc, observation.runtime, paths, probe); }
   catch { return null; }
 }
@@ -89,6 +98,7 @@ async function replay(directory, request, expect, prepared, count) {
     request.worker.authority.orchestrator].includes(probe.runtime.session), "Probe session reused");
   const { session: probeSession, ...pin } = probe.runtime;
   const captures = [...probe.descriptors];
+  const upstream = probe.upstreamStatus ? [{ packet: 0, classification: probe.upstreamStatus }] : [];
   const receipts = [];
   const reports = [];
   const sessions = [probeSession];
@@ -103,6 +113,7 @@ async function replay(directory, request, expect, prepared, count) {
         request.worker.authority.authorSession, request.worker.authority.orchestrator].includes(session)), "Packet runtime identity mismatch");
     sessions.push(session);
     captures.push(...observation.descriptors);
+    if (observation.upstreamStatus) upstream.push({ packet: index, classification: observation.upstreamStatus });
     const packet = prepared.manifest.packets[index - 1];
     const report = audit(observation, packet.paths, false);
     if (report === null) { phase = "runtime-failed"; continue; }
@@ -116,11 +127,11 @@ async function replay(directory, request, expect, prepared, count) {
       }
     }
   }
-  if (phase === "complete") need(count === packetCount + 1, "Missing packet results");
+  if (phase === "complete" && count !== packetCount + 1) phase = "incomplete-packets";
   const native = reports.length
     ? Buffer.from(reports.map((report, index) => reports.length === 1 ? report : `Packet ${index + 1}\n${report}`).join("\n\n") + "\n")
     : Buffer.from("No extracted native report. See the retained raw captures.\n");
-  return { phase, rejection, sessions, captures, receipts, native, runtime: attemptRuntime({ ...probe.runtime, session: request.session }) };
+  return { phase, rejection, sessions, captures, upstream, receipts, native, runtime: attemptRuntime({ ...probe.runtime, session: request.session }) };
 }
 
 async function outcome(directory, request, expect, prepared, count, expected) {
@@ -151,6 +162,7 @@ function statusFor(directory, expect, count, outcome, resultBytes, requestBytes)
     schemaVersion: 1, requestSha256: expect.requestSha256, exportSha256: expect.exportSha256,
     configurationSha256: expect.configurationSha256, model: expect.model, phase: outcome.observed.phase, count,
     ...(outcome.observed.rejection ? { rejection: outcome.observed.rejection } : {}),
+    ...(outcome.observed.upstream.length ? { upstream: outcome.observed.upstream } : {}),
     sessions: outcome.observed.sessions, captures: outcome.observed.captures, deliveryAccepted: false,
     files: [...Object.entries(outcome.files), ["request.md", requestBytes], ["result.json", resultBytes]]
       .map(([name, bytes]) => describeFile(directory, name, bytes)),
@@ -219,7 +231,7 @@ async function checkPrior(request, expect, prepared) {
   need(decision.action === "retry-launch", "Existing convergence decision stopped the retry");
 }
 
-export async function runReview({ request, expect, prepared, directory, excluded, run }) {
+export async function runReview({ request, expect, prepared, directory, excluded, run, clock }) {
   const context = receiptContext(request, prepared);
   need(separate(directory, request.worker.identity.workspace) && excluded.every((root) => separate(directory, root)),
     "Output overlaps review inputs or host authority");
@@ -229,7 +241,7 @@ export async function runReview({ request, expect, prepared, directory, excluded
   await mkdir(raw, { mode: 0o700 });
   let count = 0;
   const probeSession = randomUUID();
-  const probe = await run({ files: new Map(), prompt: probePrompt, session: probeSession });
+  const probe = await run({ files: new Map(), prompt: probePrompt, session: probeSession, ...(clock ? { timeoutMs: clock.remaining() } : {}) });
   validateRuntime(probe.runtime, expect);
   need(probe.runtime.session === probeSession, "Probe runtime session mismatch");
   await capture(raw, count++, probe);
@@ -238,12 +250,14 @@ export async function runReview({ request, expect, prepared, directory, excluded
     const sessions = new Set([probe.runtime.session, request.worker.identity.implementerSession,
       request.worker.authority.authorSession, request.worker.authority.orchestrator]);
     for (const [index, packet] of prepared.manifest.packets.entries()) {
+      if (clock && !await clock.next(index)) break;
       const session = index === 0 ? request.session : randomUUID();
       need(!sessions.has(session), "Packet session reused");
       sessions.add(session);
       const reference = path.join(directory, "report.md");
       const observation = await run({ session, files: new Map(packet.paths.map((name) => [name, prepared.files.get(name)])),
-        prompt: reviewPrompt(request, context, packet, index, prepared.manifest.packets.length, reference) });
+        prompt: reviewPrompt(request, context, packet, index, prepared.manifest.packets.length, reference),
+        ...(clock ? { timeoutMs: clock.remaining() } : {}) });
       await capture(raw, count++, observation);
       const { session: observedSession, ...pin } = observation.runtime;
       need(observedSession === session && equal(pin, probePin), "Packet runtime differs from probe");
@@ -281,6 +295,10 @@ const commands = {
 function cli(argv) {
   const [command, ...arguments_] = argv;
   need(Object.hasOwn(commands, command), "Invalid CLI option");
+  const optional = {
+    "--prepare": ["host-config"], "--check": ["host-config", "admission"],
+    "--mode": ["admission"], "--verify": [], "--probe": [],
+  }[command];
   const args = arguments_.slice();
   const mode = command === "--mode" ? args.shift() : null;
   need(command !== "--mode" || ["candidate", "approach"].includes(mode), "Invalid CLI mode");
@@ -289,7 +307,7 @@ function cli(argv) {
     const flag = args.shift();
     const key = flag.startsWith("--") ? flag.slice(2) : "";
     const value = args.shift();
-    need(commands[command].includes(key) && !Object.hasOwn(options, key) && absolute(value), "Invalid CLI option or path");
+    need([...commands[command], ...optional].includes(key) && !Object.hasOwn(options, key) && absolute(value), "Invalid CLI option or path");
     options[key] = value;
   }
   need(commands[command].every((key) => Object.hasOwn(options, key)), "Missing CLI option");
@@ -328,24 +346,59 @@ export async function reviewCommand(argv, openRuntime = withReviewRuntime) {
   const exportDirectory = options.export;
   need([options.request, options.expect, ...request.worker.evidenceRoots]
     .every((root) => separate(exportDirectory, root)), "Export overlaps retained inputs or evidence");
-  if (command === "--prepare") return { exportSha256: await prepareExport(exportDirectory, request, expect.exportSha256) };
+  const policy = await reviewPolicy(request);
+  const trustExcluded = [request.worker.identity.workspace, exportDirectory, options.request, options.expect, ...request.worker.evidenceRoots];
+  const checking = ["--prepare", "--check", "--mode"].includes(command);
+  if (policy && checking) need(options["host-config"], "An adopting parent requires a pinned offline host configuration");
+  const host = options["host-config"] ? await offlineHostBinding(options["host-config"], expect, trustExcluded,
+    Boolean(policy)) : null;
+  const { config } = host ?? {};
+  const preflight = (prepared) => {
+    if (config && (policy || command !== "--mode")) checkPacketTurns(prepared, config.maxTurns);
+    if (!policy || !config || request.mode !== "candidate") return;
+    if (config.localHarness) {
+      const binding = config.localHarness;
+      const evidence = prepared.files.get("context/" + request.snapshot.harness);
+      need(evidence, "Missing exact local harness result before candidate review");
+      checkHarnessSeal(evidence, { configurationSha256: host.configurationSha256, harnessId: binding.id,
+        candidate: request.snapshot.target, maxAgeMs: binding.maxAgeMs });
+    } else need(request.snapshot.harness === undefined, "Unexpected harness result without a host binding");
+  };
+  if (command === "--prepare") return { exportSha256: await prepareExport(exportDirectory, request, expect.exportSha256, preflight) };
   const prepared = await checkExport(exportDirectory, expect.exportSha256, request);
+  preflight(prepared);
+  if (options.admission) need(policy && config, "Admission file requires adopting policy and pinned host.json");
+  const spend = options.admission ? await checkReviewSpend({ file: options.admission, policy, request, expect, prepared,
+    config, excluded: [...trustExcluded, options["host-config"]].filter(Boolean) }) : null;
   receiptContext(request, prepared);
   await checkPrior(request, expect, prepared);
-  if (command === "--check") return { exportSha256: expect.exportSha256, packets: prepared.manifest.packets.length };
+  if (command === "--check") return { exportSha256: expect.exportSha256, packets: prepared.manifest.packets.length,
+    ...(config ? { maxTurns: config.maxTurns } : {}), ...(spend ? { admission: spend.policy.mode, scope: spend.scope } : {}) };
   const directory = options.output;
   need([exportDirectory, options.request, options.expect].every((root) => separate(directory, root)), "Output overlaps retained inputs");
   if (command === "--verify") return verify(directory, request, expect, prepared);
   need(expect.statusSha256 === undefined, "Use a fresh output for a new review");
-  const config = await hostConfig(options["host-config"]);
-  validateRuntime(runtimeBinding(config, request.session), expect);
+  need(!policy || spend, "Missing trusted admission and durable reservation before review launch");
+  validateRuntime(runtimeBinding(config, request.session, expect.configurationSha256), expect);
   need(request.worker.evidenceRoots.includes(directory) &&
     [request.worker.identity.workspace, options["host-config"], ...hostPaths(config)]
       .every((root) => separate(directory, root)), "Output overlaps protected host or review paths");
   const excluded = [exportDirectory, options["host-config"], ...hostPaths(config)];
   const parent = await protectedParent(directory);
+  await newAttemptPath(directory);
+  if (options.admission) excluded.push(options.admission);
+  if (spend) await claimReviewRun(spend);
+  const packetCount = prepared.manifest.packets.length;
+  const clock = policy || config.interPacketDelayMs || config.runTimeoutMs ? reviewClock(config, packetCount) : undefined;
   return openRuntime(config, { parent, excluded: [request.worker.identity.workspace, exportDirectory, directory],
-    packetCount: prepared.manifest.packets.length }, (run) => runReview({ request, expect, prepared, directory, excluded, run }));
+    packetCount, configurationSha256: expect.configurationSha256 },
+  (run) => runReview({ request, expect, prepared, directory, excluded, run, clock }));
+}
+
+async function newAttemptPath(directory) {
+  try { await lstat(directory); }
+  catch (error) { if (error.code === "ENOENT") return; throw error; }
+  throw new Error("Expected an unused review output path");
 }
 
 function hostPaths(config) {
@@ -358,7 +411,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   try {
     const result = await reviewCommand(process.argv.slice(2));
     writeSync(1, JSON.stringify(result) + "\n");
-    if (result.phase?.endsWith("-failed") || ["invalid-receipt", "receipt-invalid"].includes(result.phase)) process.exitCode = 1;
+    if (result.phase?.endsWith("-failed") || ["invalid-receipt", "receipt-invalid", "incomplete-packets"].includes(result.phase)) process.exitCode = 1;
   } catch (error) {
     writeSync(2, `Review stopped: ${error.code ? "unsafe, missing or existing local artifact (" + error.code + ")" : error.message}\n`);
     process.exitCode = 1;

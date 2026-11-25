@@ -25,9 +25,9 @@ export function readGoalContract(proposal) {
   return JSON.parse(blocks[0][1]);
 }
 
-export function goalContractIdentity({ change, policyRevision, contract, inputs, taskCount }) {
+export function goalContractIdentity({ change, policyRevision, contract, inputs, taskCount, customPlanning, modes, normalizedTasksSha256 }) {
   const layout = planningLayout(change);
-  validatePlanningInputs(change, inputs);
+  validatePlanningInputs(change, inputs, undefined, customPlanning);
   requireThat(sha(policyRevision) && taskCount === 1, "Goal-First requires an integrated policy and one native outcome task");
   requireThat(exactKeys(contract, keywords) && contract.schemaVersion === 1 && text(contract.outcome), "Incomplete Goal Contract");
   requireThat(distinctList(contract.scope, (file) => safePlanningPath(file) && !file.split("/").some((part) =>
@@ -42,6 +42,14 @@ export function goalContractIdentity({ change, policyRevision, contract, inputs,
     text(contract.localAuthority.stop) && finiteBudget(contract.budgets), "Invalid Goal Contract local authority or budgets");
   const specs = Object.fromEntries(Object.entries(inputs).filter(([file]) => file.startsWith(`${layout.specs}/`)));
   requireThat(Object.keys(specs).some((file) => file.endsWith("/spec.md")), "Goal Contract requires a native spec delta");
+  if (customPlanning) {
+    const task = `${layout.directory}/tasks.md`;
+    requireThat(digest(normalizedTasksSha256) && modes && Object.keys(modes).length === Object.keys(inputs).length &&
+      Object.keys(inputs).every((file) => ["100644", "100755"].includes(modes[file])), "Unverified planning file modes or native task identity");
+    const normalized = Object.fromEntries(Object.entries(inputs).map(([file, hash]) =>
+      [file, { mode: modes[file], sha256: file === task ? normalizedTasksSha256 : hash }]));
+    return sha256(stableJson({ change, policyRevision, contract, inputs: normalized }));
+  }
   const boundInputs = { ...specs, "openspec/config.yaml": inputs["openspec/config.yaml"],
     [`${layout.directory}/.openspec.yaml`]: inputs[`${layout.directory}/.openspec.yaml`] };
   return sha256(stableJson({ change, policyRevision, contract, inputs: boundInputs }));
@@ -58,8 +66,10 @@ function reviewMatches(handoff, candidate, gateReference, active, group, delegat
   const id = result?.identity;
   return result?.status === "completed" && id?.role === "reviewer" &&
     id.candidate === candidate.head && id.change === candidate.change &&
-    id.plan === candidate.plan && (id.planDigest === candidate.planDigest || delegated && handoff.goalContractDigest === candidate.planDigest) &&
-    (delegated ? id.task === delegated.id.task : handoff.reviewSnapshot ? id.group === group?.id && id.group === active?.group && group.taskIds.includes(id.task) :
+    id.plan === candidate.plan && (id.planDigest === candidate.planDigest || handoff.goalContractDigest === candidate.planDigest) &&
+    (delegated ? id.task === delegated.id.task : handoff.reviewSnapshot ? (group
+      ? id.group === group.id && id.group === active?.group && group.taskIds.includes(id.task)
+      : active?.group === id.group || active?.group === id.task) :
       id.workspace === candidate.workspace && (active?.group === id.group || active?.group === id.task)) &&
     candidate.taskIds?.includes(id.task) &&
     id.implementerSession === active?.implementerSession && text(active?.implementerSession) &&
@@ -225,5 +235,7 @@ export function deliveryDecision({ phase, policy, identity, contract, approval, 
   }
   if (phase === "correction") return state("stop", "CORRECTION_UNVERIFIED");
   return state("accept-result", null, { group: group?.id ?? null, head: candidate.head, commits, eligibleForTaskUpdate: true,
-    ...(delegated ? { gateReference: gates.reference } : {}) });
+    ...(delegated || candidate.customPlanning ? { gateReference: gates.reference } : {}),
+    ...(candidate.customPlanning ? { acceptedTaskIds: goal ? candidate.taskIds : group.taskIds,
+      independentZeroWaiver: Boolean(handoff.reviewSnapshot) && review.waivers === undefined } : {}) });
 }
