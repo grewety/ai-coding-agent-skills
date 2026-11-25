@@ -14,7 +14,7 @@ candidate acceptance, task state and publication.
 ```text
 node review-candidate.mjs --prepare --request REQUEST --expect EXPECT --export EXPORT
 node review-candidate.mjs --check --request REQUEST --expect EXPECT --export EXPORT
-node review-candidate.mjs --probe --host-config HOST --output PROBE_OUTPUT
+node review-candidate.mjs --probe --host-config HOST --admission PROBE_GRANT --output PROBE_OUTPUT
 node review-candidate.mjs --mode candidate --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --output OUTPUT
 node review-candidate.mjs --mode approach --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --output OUTPUT
 node review-candidate.mjs --verify --request REQUEST --expect EXPECT --export EXPORT --output OUTPUT
@@ -31,6 +31,35 @@ path bound to that run's request. Verify reads the complete sealed handover
 and replays the native stream and receipt checks offline. Obtain a separate
 explicit grant for the approved export and paid inference before either
 live mode or a standalone probe.
+
+For standalone `--probe`, `PROBE_GRANT` is the separately authorized
+host-owned JSON record for one synthetic invocation. Keep it outside the
+checkout and separate from the host config, runtime inputs, ledger and
+output. The host operator must verify the authorization before recording
+`verified: true`. Use the raw SHA-256 of the exact host file bytes and
+`upperUsdMicros` equal to the configured `maxBudgetUsd` in integer
+millionths of a dollar. This example authorizes one invocation at $1.
+
+```json
+{
+  "schemaVersion": 1,
+  "kind": "standalone-review-probe",
+  "reference": "<unique independent probe approval reference>",
+  "verified": true,
+  "runs": 1,
+  "configurationSha256": "<raw host.json SHA-256>",
+  "upperUsdMicros": 1000000,
+  "ledger": "/var/lib/operator/review-ledger/project"
+}
+```
+
+Use the existing private mode-0700 host-owned ledger if one is configured
+for review. Otherwise provision a stable private host ledger before issuing
+the grant. The CLI consumes the approval reference in the grant's ledger
+before opening runtime or accessing credentials. Retain the reservation
+even if launch fails. Each new standalone probe needs a fresh independent
+approval reference. Candidate and approach launches include their own
+synthetic probe under their review authority.
 
 Standalone probe and both launch modes can incur charges. The historical
 standalone trial at `4eddbade12fab2a032755a446f9176005b7b04a1` qualified
@@ -151,3 +180,63 @@ referenced once with a fresh session and predecessor on the same binding,
 subject to the existing convergence decision. The retry consumes zero
 correction cycles. A packet-gap decision remains the charter's separate
 packet repair path.
+
+## Adopting integrated parents
+
+The runner re-reads the verified frozen plan parent. Supply `request.policy`
+with `parent` and independently verified integrated `target`. Draft
+requests also supply `policy.planningModes` as the exact map of inventory
+paths to Git modes and run in the verified draft or frozen predecessor.
+Candidate requests exporting a record-only closure may list approved receipt
+hashes in `snapshot.archiveEvidence` to verify closure without including
+reserved evidence files in provider exports. Keep original sealed attempts
+under their legacy schema and bindings.
+
+For adopted policy, add `--host-config HOST` to both `--prepare` and
+`--check`. The offline commands do not read keys or invoke a probe. They
+verify the exact raw-byte `configurationSha256` and report a failing packet
+if its manifest requires more than `maxTurns - 10` whole-file reads. Packet
+feasibility requires `maxTurns >= 11` to preserve the ten-turn reserve.
+Retain all changed preimages, postimages and hunks within the selected
+coverage. Recheck the same manifest and configuration at live entry.
+A configured local harness requires a candidate-bound attachment named in
+`snapshot.harness` and an independent `expect.harness: {file, sha256}`
+reference in the private host expectation. Keep the original seal in a
+private host-owned directory and keep its path out of requests, exports and
+worker evidence. Preparation, offline checks and live admission compare
+the attachment bytes with the retained seal and verify its
+schema-version-2 harness ID, candidate, configuration digest, executable
+digest, result digest and freshness. The executable must still match the
+pin in the exact host configuration.
+
+The prepared export checks the canonical repo-relative `fileAcceptance` entries `{packet, path, criterion}` against
+their actual one-based packet. Keep common criteria in `worker.acceptance`.
+Each prompt includes only its scoped criteria and requires canonical
+repository-relative finding paths.
+
+Use `--admission ADMISSION` with the live mode command under adopting
+policy. The private external JSON contains `schemaVersion: 1`, the raw
+`configurationSha256`, the stable private host-owned `ledger` directory,
+`phase` and its verified `phaseGrant`. The grant binds change, phase,
+policyRevision, canonical request hash and the separate phase authority
+reference. Use `policy.finishReference` to bind a finish-phase request to
+its named protected finish grant. The default is `auto-approved` within
+the integrated phase list and cap ceilings. The host can lower `caps`
+(`maxReviews`, `maxTotalUsd`) or select the `explicit` per-run override
+with an `explicitGrant`. The automatic upper bound counts the per-launch
+`maxBudgetUsd` for the probe and every applicable packet. A stable
+per-change ledger record is committed before runtime or inference and
+holds the count and full amount across phases and resumes. In `explicit`
+mode grant one exact target, scope, export, config and cost. Retrying an
+attempt needs its own `retryGrant`. Use the original single-run authority
+procedure for legacy parents. Standalone diagnostic probes use the separate
+probe grant above.
+A refused automatic claim grants no fallback.
+
+Optional `interPacketDelayMs` (0–30000) and `runTimeoutMs` (1000–3600000)
+are part of the host pin. The bounded delay applies only before a successive
+packet and consumes the same run deadline. Same-UID relay HTTP 429, 529
+and 401/403 map to allowlisted private failure classes; the sandbox receives
+the same generic refusal. Classification alone supplies no retry or
+acceptance. The separately operated dedicated broker interface needs its
+own qualification and private diagnostic evidence.

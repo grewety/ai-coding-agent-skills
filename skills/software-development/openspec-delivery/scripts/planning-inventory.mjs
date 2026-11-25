@@ -8,26 +8,44 @@ export function safePlanningPath(file) {
     part && part !== "." && part !== ".." && !/[\\:\u0000-\u001f\u007f]/.test(part));
 }
 
-export function planningLayout(change) {
+export function customPlanningPath(relative) {
+  const parts = relative.split("/");
+  return relative === ".openspec.yaml" ||
+    (parts[0].toLowerCase() !== "evidence" && parts.every((part) => !part.startsWith(".")));
+}
+
+export function planningLayout(change, custom = false) {
   if (typeof change !== "string" || change.length > 200 || change === "archive" ||
       !/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(change)) throw new Error("Expected a literal OpenSpec change name");
   const directory = `openspec/changes/${change}`;
   const required = ["openspec/config.yaml", ...[".openspec.yaml", "proposal.md", "tasks.md"].map((file) => `${directory}/${file}`)];
   const specs = `${directory}/specs`;
   return { directory, required, specs, design: `${directory}/design.md`,
-    includes: (file) => required.includes(file) || file === `${directory}/design.md` || file.startsWith(`${specs}/`) };
+    includes: (file) => required.includes(file) || (custom
+      ? file.startsWith(`${directory}/`) && customPlanningPath(file.slice(directory.length + 1))
+      : file === `${directory}/design.md` || file.startsWith(`${specs}/`)) };
 }
 
-export function planningBudget() {
+export function planningBudget(custom = false) {
   let files = 0;
   let entries = 0;
+  let visited = 0;
   let bytes = 0;
   let outputBytes = 0;
   const seen = new Set();
   return {
+    visit() {
+      if (++visited > planningLimits.entries) throw new Error("Planning inventory traversal entry limit exceeded");
+    },
     add(file, size) {
       if (!safePlanningPath(file) || seen.has(file)) throw new Error(`Unsafe or duplicate planning path: ${file}`);
-      seen.add(file);
+      if (custom) {
+        const alias = file.toLowerCase();
+        if (!file.split("/").every((part) => /^[a-zA-Z0-9_.@+-]+$/.test(part) &&
+            !part.endsWith(".") && !/^(?:con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(part)) ||
+            seen.has(alias)) throw new Error(`Unsafe or aliased planning path: ${file}`);
+        seen.add(alias);
+      } else seen.add(file);
       if (file.split("/").length > planningLimits.depth) throw new Error(`Planning inventory depth limit exceeded: ${file}`);
       if (++entries > planningLimits.entries) throw new Error("Planning inventory entry limit exceeded");
       // Charge each path plus a ceiling for Git entry framing or its JSON hash.
@@ -43,11 +61,11 @@ export function planningBudget() {
   };
 }
 
-export function validatePlanningInputs(change, inputs, totals) {
-  const layout = planningLayout(change);
+export function validatePlanningInputs(change, inputs, totals, custom = false) {
+  const layout = planningLayout(change, custom);
   if (!inputs || typeof inputs !== "object" || Array.isArray(inputs) ||
       !layout.required.every((file) => Object.hasOwn(inputs, file))) throw new Error("Incomplete planning inventory inputs");
-  const budget = planningBudget();
+  const budget = planningBudget(custom);
   for (const [file, hash] of Object.entries(inputs)) {
     if (!layout.includes(file) || typeof hash !== "string" || !/^[a-f0-9]{64}$/.test(hash)) throw new Error("Invalid planning inventory inputs");
     budget.add(file, 0);

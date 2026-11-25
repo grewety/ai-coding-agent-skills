@@ -38,6 +38,9 @@ export function reviewPrompt(request, context, packet, index, count, reference) 
     ...packet.paths.map((name) => "/review/" + name),
     "The JSON object in your final response must be on one line and follow this schema: " + schema,
     `Packet: ${packetNumber} of ${count}`, "Native reference: " + reference, JSON.stringify(context),
+    "Use canonical repository-relative finding paths from this packet, without /review/, plan/, base/ or target/ prefixes.",
+    ...(request.fileAcceptance ?? []).filter(({ packet }) => packet === packetNumber)
+      .map(({ path, criterion }) => "File acceptance " + JSON.stringify({ path, criterion })),
     "The template shows the clean result. If you find genuine issues, use the literal Verdict: Findings on the first line inside the block and populate the findings array in the JSON. Use the literal Verdict: No findings only when findings is empty.",
     ...(candidate ? [
       "Inherent read-only, no-shell, no-network constraints and future groups are not coverageLimitations. Use [] for coverageLimitations when all assigned files were read. Report any actual gaps in reading the assigned files.",

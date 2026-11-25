@@ -24,17 +24,18 @@ export function contractChangePaths({ declared, changed, designations }) {
   return [...candidates].filter((name) => nativeContract(name) || known.has(name)).sort();
 }
 
-function checkGrant({ change, inputs, paths, grant }) {
+function checkGrant({ change, inputs, paths, grant, customPlanning }) {
   const declared = canonicalPaths(paths);
-  validatePlanningInputs(change, inputs);
+  validatePlanningInputs(change, inputs, undefined, customPlanning === true);
   requireThat(grant?.stage === "pre-freeze" && grant.change === change && text(grant.reference), "Missing separate pre-freeze contributor grant");
   requireThat(sameInputs(inputs, grant.inputs) && JSON.stringify(declared) === JSON.stringify(canonicalPaths(grant.paths)), "Contributor grant input/path mismatch");
   return declared;
 }
 
-export function bindContractGrant({ change, inputs, paths, grant, plan, planDigest }) {
+// Callers select customPlanning from the verified integrated policy.
+export function bindContractGrant({ change, inputs, paths, grant, plan, planDigest, customPlanning }) {
   requireThat(sha(plan) && digest(planDigest), "Invalid grant freeze identity");
-  const declared = checkGrant({ change, inputs, paths, grant });
+  const declared = checkGrant({ change, inputs, paths, grant, customPlanning });
   return structuredClone({ change, plan, planDigest, inputs, paths: declared, grantReference: grant.reference });
 }
 
@@ -50,7 +51,7 @@ export function verifyContractGrant(request) {
 export function resolveDeliveryPolicy({ phase, context, selection, contractPaths, declaredContractPaths, legacy, recovery, orchestrationAvailable, reviewAcceptance, deliveryBoundary }) {
   requireThat(["draft", "freeze", "execute"].includes(phase), "Unknown delivery policy phase");
   requireThat(context && sha(context.parent) && sha(context.target), "Missing integrated parent identity");
-  validatePlanningInputs(context.change, context.inputs, context.inventory);
+  validatePlanningInputs(context.change, context.inputs, context.inventory, Boolean(context.lowTouch));
   if (phase === "execute") requireThat(sha(context.plan) && digest(context.planDigest), "Missing frozen plan identity");
   const exempt = phase === "execute" && legacy?.verified === true && legacy.predatesIntegrityGuards === true &&
     legacy.plan === context.plan && legacy.planDigest === context.planDigest && text(legacy.reference);
@@ -85,6 +86,7 @@ export function resolveDeliveryPolicy({ phase, context, selection, contractPaths
   if (selection.preExecutionReview || selection.continuousGoal) requireThat(orchestrationAvailable === true, "Selected policy requires the orchestration package");
   if (selection.preExecutionReview && phase !== "draft") requireThat(reviewAcceptance?.action === "freeze-ready" && text(reviewAcceptance.reference) &&
     sameInputs(reviewAcceptance.inputs, context.inputs) &&
+    (!context.lowTouch || sameInputs(reviewAcceptance.planningModes, context.modes)) &&
     (selection.approachConvergence === true ? reviewAcceptance.policy === "charter-v1" : reviewAcceptance.policy === undefined || reviewAcceptance.policy === "strict"), "Missing matching complete approach-review acceptance");
   requireThat(selection.goalFirst === undefined || typeof selection.goalFirst === "boolean", "Invalid Goal-First selection");
   const boundary = deliveryBoundary;

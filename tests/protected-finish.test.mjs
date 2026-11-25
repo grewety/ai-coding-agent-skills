@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile, execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, chmodSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -17,7 +17,7 @@ const git = (cwd, ...argv) => execFileSync("git", argv, { cwd, encoding: "utf8",
 const verified = (reference, fields = {}) => ({ verified: true, reference, ...fields });
 const iso = (time) => new Date(time).toISOString();
 
-function fixture(t) {
+function fixture(t, standingTriggers, localHarness) {
   const root = realpathSync(mkdtempSync(path.join(os.tmpdir(), "protected-finish-")));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const repo = path.join(root, "repo");
@@ -35,7 +35,8 @@ function fixture(t) {
   git(repo, "init", "-b", "main");
   git(repo, "config", "user.name", "Fixture");
   git(repo, "config", "user.email", "fixture@example.invalid");
-  writeFileSync(path.join(repo, "AGENTS.md"), "# Fixture\n");
+  writeFileSync(path.join(repo, "AGENTS.md"), "# Fixture\n" +
+    (standingTriggers ? `<!-- openspec-low-touch: ${JSON.stringify({ standingTriggers })} -->\n` : ""));
   writeFileSync(path.join(repo, ".gitignore"), "*.ignored\n");
   mkdirSync(path.join(repo, "openspec"));
   writeFileSync(path.join(repo, "openspec", "config.yaml"), "schema: spec-driven\n");
@@ -92,9 +93,11 @@ function fixture(t) {
     const wrapperSha256 = sha256(stableJson(payload));
     return { ref: save(label, { ...payload, wrapperSha256 }), wrapperSha256 };
   };
+  const hostConfiguration = localHarness === undefined ? undefined : save("host", { schemaVersion: 1, localHarness });
   const implementationGate = gate(head, "implementation-gate");
   const anchor = save("anchor", bound("ready", { kind: "finish-readiness-readback", ready: true, keepWorktree: false,
-    implementationReview: verified("review-1", { session: "implementation-reviewer" }),
+    implementationReview: verified("review-1", { session: "implementation-reviewer", head }),
+    ...(hostConfiguration ? { hostConfigurationSha256: hostConfiguration.sha256 } : {}),
     implementationGate: implementationGate.ref, implementationGateSha256: implementationGate.wrapperSha256 }));
   const protection = (pullRequest, revision) => {
     const observation = (reference, fields) => verified(reference, { pullRequest, head: revision, observedAt, complete: true, ...fields });
@@ -135,11 +138,38 @@ function fixture(t) {
     const finishRemote = save("remote", bound("remote", remote));
     const finishReply = save("reply", bound("continue", { kind: "finish-reply", reply: "continue",
       checkpointSha256: finishCheckpoint.sha256, pullRequest: reply, observedAt: iso(now - 500) }));
-    return { repo, change, head, finishCheckpoint, finishRemote, finishReply, skillSync };
+    return { repo, change, head, finishCheckpoint, finishRemote, finishReply, skillSync, hostConfiguration };
   }
   const call = (verb, args) => deliveryCommand(verb === "inspect" ? "status" : verb, request(args));
-  return { root, repo, workspace, records, change, active, head, identity, request, call, pr, gate, save, bound, url, issue, now };
+  return { root, repo, workspace, records, change, active, head, identity, request, call, pr, gate, save, bound, url, issue, now, hostConfiguration };
 }
+
+test("protected finish checks adoption, exact current per-event inventory and standing cost before merge", async (t) => {
+  const repository = "example/sample";
+  const target = "main";
+  const policy = { id: "app:42:main-check", repository, event: "push", target, kind: "repository-check",
+    configurationSha256: "b".repeat(64), exposure: "existing public diff", costUsd: 0 };
+  const f = fixture(t, [policy]);
+  const pr = f.pr(1, f.head, "OPEN");
+  const decision = () => f.call("finish", { remote: { implementation: pr } });
+  assert.equal((await decision()).reason, "PUSH_AUTHORITY_PENDING");
+  const inventory = (event, triggers) => ({
+    pushGrant: verified("event-" + event, { target: repository, candidate: f.head, event,
+      targetRef: target, finishReference: "finish-1" }),
+    observed: verified("inventory-" + event, { complete: true, candidate: f.head, repository, event, target,
+      observedAt: pr.observedAt, triggers }),
+  });
+  pr.eventInventories = { merge: inventory("merge", []),
+    push: inventory("push", [{ ...policy, verified: true }]) };
+  const result = await decision();
+  assert.equal(result.action, "merge-ready", JSON.stringify(result));
+  assert.deepEqual(result.triggerInventories[1].standing, [policy.id]);
+  pr.eventInventories.push.observed.triggers[0].costUsd = 1;
+  assert.equal((await decision()).reason, "PUSH_TRIGGER_AUTHORITY_PENDING");
+  pr.eventInventories.push.observed.triggers[0].costUsd = 0;
+  pr.eventInventories.push.observed.observedAt = iso(f.now - 61_000);
+  assert.equal((await decision()).reason, "TRIGGER_INVENTORY_UNVERIFIED");
+});
 
 test("packaged finish status distinguishes optional suites and contextual continue preserves the exact head", async (t) => {
   const f = fixture(t);
@@ -197,8 +227,19 @@ test("next CLI routes contextual resume, and a declared preview pauses for revie
   assert.equal((await f.call("finish", { remote: { implementation, preview: { ...reviewed, deployment: "failed" } }, grantChanges })).reason, "PREVIEW_FAILED");
 });
 
-test("finish advances verified closure in order and reconciles partial multi-worktree retirement", async (t) => {
-  const f = fixture(t);
+test("finish advances verified closure in order and reconciles partial multi-worktree retirement", (t) => closureFixture(t));
+
+test("adopted finish requires a fresh current harness for an OPEN closure PR", (t) => closureFixture(t, true));
+
+async function closureFixture(t, adopted = false) {
+  const adapterDir = realpathSync(mkdtempSync(path.join(os.tmpdir(), "finish-adapter-")));
+  t.after(() => rmSync(adapterDir, { recursive: true, force: true }));
+  const executable = path.join(adapterDir, "adapter");
+  const adapter = "#!/bin/sh\nexit 1\n";
+  writeFileSync(executable, adapter, { mode: 0o700 });
+  const binding = { id: "fixture", kind: "cli", executable, executableSha256: sha256(adapter), args: [],
+    timeoutMs: 1000, maxAgeMs: 60000, exposure: "local-only" };
+  const f = adopted ? fixture(t, [], binding) : fixture(t);
   const { repo, head, change, workspace, url } = f;
   const closureWorkspace = path.join(f.root, "closure");
   const detached = path.join(f.root, "old-verification");
@@ -241,6 +282,35 @@ test("finish advances verified closure in order and reconciles partial multi-wor
   assert.equal((await call({ integrated, closureCandidate })).action, "review-closure");
   const closureReview = f.bound("closure-review", { kind: "independent-closure-review", head: closureHead,
     gateSha256: closureCandidate.gate.sha256, session: "closure-reviewer", verdict: "pass", factual: true, findings: [] });
+  if (adopted) {
+    const closure = f.pr(2, closureHead, "OPEN", null);
+    closure.eventInventories = Object.fromEntries(["merge", "push"].map((event) => [event, {
+      pushGrant: verified("event-" + event, { target: f.identity.repository, candidate: closureHead, event,
+        targetRef: "main", finishReference: "finish-1" }),
+      observed: verified("inventory-" + event, { candidate: closureHead, repository: f.identity.repository,
+        event, target: "main", observedAt: closure.observedAt, complete: true, triggers: [] }),
+    }]));
+    const pinned = { prs: { implementation: url + "1", closure: url + "2" }, closureHead };
+    const check = () => call({ integrated, closureCandidate, closureReview, closure }, pinned);
+    assert.match((await check()).detail, /Missing independent host-retained harness seal/);
+    const harnessFor = (candidate, observedAt) => {
+      const result = { schemaVersion: 1, harnessId: binding.id, candidate, verdict: "pass", findings: [], observedAt };
+      const ref = f.save("harness", { schemaVersion: 2, harnessId: binding.id, candidate,
+        configurationSha256: f.hostConfiguration.sha256, executableSha256: binding.executableSha256,
+        resultSha256: sha256(JSON.stringify(result)), result });
+      chmodSync(ref.file, 0o400);
+      closureCandidate.harness = ref;
+      closureReview.harnessSha256 = ref.sha256;
+    };
+    harnessFor(head, iso(f.now - 500));
+    assert.match((await check()).detail, /candidate SHA mismatch/);
+    harnessFor(closureHead, iso(f.now - 61000));
+    assert.match((await check()).detail, /timestamp/);
+    harnessFor(closureHead, iso(f.now - 500));
+    const accepted = await check();
+    assert.equal(accepted.action, "merge-ready", JSON.stringify(accepted));
+    return;
+  }
   const unpublished = { ...closureAbsent, head: closureHead };
   assert.equal((await call({ integrated, closureCandidate, closureReview, closure: unpublished })).reason, "PUBLICATION_TARGET_UNVERIFIED");
   unpublished.beforePublication = f.bound("target", { head: closureHead, target: "main", targetRevision: head,
@@ -313,7 +383,7 @@ test("finish advances verified closure in order and reconciles partial multi-wor
   assert.equal(selected.action, "sync-assessment");
   assert.equal(selected.sync.action, "offer-sync");
   assert.equal(selected.profileWrites, false);
-});
+}
 
 test("post-release sync is advisory and strictly matches profile, installer scope, provenance and fresh session", (t) => {
   const f = fixture(t);

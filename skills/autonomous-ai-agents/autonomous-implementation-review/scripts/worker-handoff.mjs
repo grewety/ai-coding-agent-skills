@@ -1,3 +1,4 @@
+import { validatePlanningInputs } from "./planning-inventory.mjs";
 // Adapter-only local artifact I/O. No launch, task updates, cleanup or authority service.
 // Callers must provide independently retained bindings and protected publisher roots.
 import { createHash, randomUUID } from "node:crypto";
@@ -68,10 +69,8 @@ export function validateRequest(r) {
   need(id.role === "reviewer" ? sha(id.candidate) : id.candidate === null, "Invalid candidate identity");
   need(id.role === "reviewer" ? text(id.implementerSession) : id.implementerSession === null, "Missing or invalid explicit implementer session");
   inventory(id.inputs);
-  const prefix = `openspec/changes/${id.change}/`;
-  const required = ["openspec/config.yaml", ...[".openspec.yaml", "proposal.md", "tasks.md"].map((p) => prefix + p)];
-  need(required.every((p) => Object.hasOwn(id.inputs, p)), "Incomplete planning input inventory");
-  need(Object.keys(id.inputs).every((p) => required.includes(p) || p === `${prefix}design.md` || p.startsWith(`${prefix}specs/`)), "Unexpected planning input");
+  try { validatePlanningInputs(id.change, id.inputs); }
+  catch { validatePlanningInputs(id.change, id.inputs, undefined, true); }
   need(text(r.outcome) && text(r.stop), "Missing outcome/stop");
   for (const field of ["acceptance", "scope", "nonGoals", "restrictions", "evidenceRoots", "requiredEvidence"]) need(list(r[field]) && r[field].length > 0 && new Set(r[field]).size === r[field].length, `Missing or duplicate ${field}`);
   r.evidenceRoots.forEach(absolute);

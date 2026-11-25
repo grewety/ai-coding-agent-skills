@@ -54,8 +54,10 @@ commands read observations. These examples supply no authority by themselves.
    `convergenceDecision` over the retained ledger and authorized paths.
    Apply only an approved in-scope remedy, supply any newly required native
    artifacts, and repeat validation and independent review. Carry the same role
-   and consumed cycles. A granted retry uses the same binding. Provider exposure
-   and each paid launch or retry require their own existing single-run grant.
+   and consumed cycles. Use the integrated review authority for an eligible
+   adopting plan. Under the inherited or explicit mode, each paid launch
+   requires a separate single-run grant. A retry always needs distinct authority.
+   [Integrated review authority](low-touch.md#host-configuration-and-finish-triggers).
 4. Call `proposal` with `phase: "assess"`. Only `freeze-ready` permits
    proceeding to the authorized plan-only commit. Preview the exact inspected
    planning paths and bytes, commit only those inputs, re-read the committed

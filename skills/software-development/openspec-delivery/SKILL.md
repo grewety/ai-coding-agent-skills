@@ -1,7 +1,7 @@
 ---
 name: openspec-delivery
 description: Automate setup, execution and closeout of OpenSpec changes.
-version: 1.6.0
+version: 1.7.0
 author: Raphael (forgegod), Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -17,7 +17,10 @@ Preserve a reviewed committed candidate and truthful post-merge evidence for one
 OpenSpec change in a project that explicitly selects this workflow. This is an
 orchestrator procedure, not a scheduler, distributed lock, approval service or
 GitHub API client, and installing OpenSpec or this package never selects it.
-The agent handles the plumbing; the operator selects scope and exceptions.
+Read [integrated low-touch delivery](references/low-touch.md) for the
+prospective planning, result review, paid authority, local harness and finish
+contracts. Exact approval, bounded local execution and protected finish remain
+separate operator decisions.
 Use the local capture, seal and offline readback interfaces for byte-preserving
 gate, readback and review evidence. [Evidence retention](references/evidence-retention.md).
 
@@ -228,8 +231,10 @@ predecessor acceptance. Goal-First review binds the candidate and approved
 Goal Contract digest. Corrections retain authority, restrictions and consumed
 budgets. Missing or uncertain evidence stops the selected route. The pinned
 dedicated Codex and read-only Claude pair passed sealed synthetic qualification
-on one Linux host. Verify the exact runtime and role records and require separate
-authority for each provider run.
+on one Linux host. Verify the exact runtime and role records. Use the
+[integrated review authority](references/low-touch.md#host-configuration-and-finish-triggers)
+when selected at the verified parent. Apply the inherited single-run rules
+otherwise.
 
 1. If the request is `document <name>`, perform only the short invocation above.
    Read back the issue. Stop. Do not continue this procedure.
@@ -280,11 +285,13 @@ authority for each provider run.
    gate within this change, not a new change for every comment. Use orchestration's
    canonical correction loop: eight cumulative automatic cycles or a narrower
    inherited group/authority limit, never reset on refreeze or role change. A changed
-   candidate invalidates review; confirmed defects are not silently waived.
+   candidate invalidates its direct review. Apply the verified task-completion
+   exception only with its parent provenance and independent child gates.
+   Confirmed defects require disposition.
 8. Before an authorized publication, load `references/integration.md` and
    require positive exact-SHA `finish-readiness` with valid promoted current
    specs. Use the [external verification boundary](references/external-verification.md)
-   for trigger inventory, distinct single-run approval, reservation, artifact-only
+   for trigger inventory, applicable external reservations, artifact-only
    exposure and immediate teardown. Re-read the
    actual target and shared capability specs. Reconcile semantic overlap. Include
    implemented behavior, specs and current visuals in the review record. A clean
@@ -318,12 +325,10 @@ authority for each provider run.
   classify unambiguously; fix the input instead of relaxing the check.
 - OpenSpec verification is not a substitute for executable project gates,
   independent review or protected integration. Config guidance is not enforcement.
-- Do not commit prospective merge results or put closing keywords on an
-  intermediate implementation commit or pull request while later acceptance is
-  still required. After acceptance, the receipt or archive commit carries
-  `Fixes #<issue>` and `Closes #<pull-request>` only for an already merged pull
-  request. That trailer does not push. It takes effect only when the commit is
-  merged into the default branch.
+- Use factual issue and PR links during protected finish. Close the issue
+  explicitly after verified integration, protected closure merge and acceptance
+  readback. Keep closing keywords out of the protected closure commit and PR
+  body. Follow the inherited policy for existing closure records.
 - Preserve exact IDs, failures and rejected candidates. Never rename a conflicting run, unassign an operator or discard dirty work.
 - A shared-profile package must not update/remove its installed copy while
   operating in a project. Source adoption is not installed-profile permission.

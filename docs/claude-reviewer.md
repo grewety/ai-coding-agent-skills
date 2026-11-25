@@ -1,33 +1,22 @@
 # Contained Claude reviewer
 
-The optional `autonomous-implementation-review` 0.20.0 skill and
-`autonomous-orchestration` 1.10.0 bundle ship a standalone command for candidate
+The optional `autonomous-implementation-review` 0.21.0 skill and
+`autonomous-orchestration` 1.11.0 bundle ship a standalone command for candidate
 review and charter-v1 approach review. Use the complete package from a reviewed
 checkout or the [Claude installation guide](claude-installation.md). Resolve
 `scripts/review-candidate.mjs` inside that package. This command runs locally
 from a terminal and requires neither account skill sync nor a plugin loaded
 in the reviewer process.
 
-## Packaged live qualification
+## Supported binding
 
-The packaged live trial at source commit `4eddbade12fab2a032755a446f9176005b7b04a1`
-qualified the pinned Linux/WSL pairing of Bubblewrap 0.9.0, Claude Code
-2.1.330, `claude-sonnet-4-6`, and the `same-uid-key` relay. Candidate mode
-returned `No findings` with 13/13 whole-file coverage. Charter-v1 approach mode
-returned `freeze-ready` with 7/7 whole-file coverage. Both passed offline
-verification at their original request-bound output paths and returned
-`deliveryAccepted: false`.
-
-The standalone trial is historical and bound to that exact source and pairing.
-The 0.20.0 reviewer adds local regression coverage for short private relay
-scratch, sealed invalid candidate receipts and byte-identical OpenSpec archive
-moves. The [exclusive worker pair](worker-runtime.md) has separate live evidence
-from synthetic trials on one Linux host at repair SHA
-`9b909f9467ddea6b12f7ca77f959f39ef01e2702`. Four read-only review invocations
-produced three accepted sealed candidate reviews and one retained finding on
-the original Group 2 context. The separately approved corrected context used
-the same Group 2 candidate. Each live run requires its own explicit grant for
-approved export and paid inference, including any standalone probe.
+The recorded Linux/WSL qualification at
+`4eddbade12fab2a032755a446f9176005b7b04a1` used Bubblewrap **0.9.0**,
+Claude Code **2.1.330**, `claude-sonnet-4-6` and the `same-uid-key` relay.
+Qualification follows the exact published role and host settings.
+Use the [worker runtime](worker-runtime.md) for exclusive worker pairing
+and [review configuration](openspec-review-configuration.md) for policy,
+approved exposure and single-run exceptions.
 
 ## Host setup and credential routes
 
@@ -79,7 +68,9 @@ reviewer session and a declared publisher evidence root.
 
 Replace uppercase operands with absolute paths, including `REVIEW_CLI` for
 the packaged script and `NODE` for Node 22+. These examples describe the
-command's effects. Run the live forms only with the separate grant.
+command's effects. Run live forms only within the applicable exact review
+authority. For adopting plans add `--host-config HOST` to the two offline
+commands and `--admission ADMISSION` to the mode command.
 The mode lines are alternatives. For each run, `OUTPUT` is a fresh absolute
 path declared in that request's `worker.evidenceRoots`. Use the same request,
 sealed export and original `OUTPUT` path for `--verify`.
@@ -87,21 +78,28 @@ sealed export and original `OUTPUT` path for `--verify`.
 ```text
 NODE REVIEW_CLI --prepare --request REQUEST --expect EXPECT --export EXPORT
 NODE REVIEW_CLI --check --request REQUEST --expect EXPECT --export EXPORT
-NODE REVIEW_CLI --probe --host-config HOST --output PROBE_OUTPUT
+NODE REVIEW_CLI --probe --host-config HOST --admission PROBE_GRANT --output PROBE_OUTPUT
 NODE REVIEW_CLI --mode candidate --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --output OUTPUT
 NODE REVIEW_CLI --mode approach --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --output OUTPUT
 NODE REVIEW_CLI --verify --request REQUEST --expect EXPECT --export EXPORT --output OUTPUT
 ```
 
 1. Independently approve and pin the request and host configuration hashes.
-   Hash compact JSON with recursively sorted object keys and a final LF. For
+   The request digest is compact JSON with recursively sorted object keys
+   and a final LF. The host pin for adopting policy hashes raw file bytes.
+   Legacy review records keep their original configuration identity. For
    initial preparation, set `exportSha256` to null. Offline `--prepare` creates
    a sealed export and reports its manifest hash. Inspect the whole manifest,
    file bytes and packet scopes. Retain the approved hash in the independent
    expectation, then use offline `--check` to confirm the sealed inventory and
-   packet count.
-2. With live authority, `--probe` sends a synthetic prompt with an empty packet,
-   and records `probe-passed` or `probe-failed` with separate captures. For
+   packet count. Set `maxTurns >= 11` for low-touch packet feasibility.
+   Each packet can assign at most `maxTurns - 10` whole-file reads. The host
+   schema still accepts 1–128 for standalone probes and retained legacy runs. Configure optional `interPacketDelayMs`
+   from 0 to 30000 and `runTimeoutMs` from 1000 to 3600000 in the pinned host.
+2. With a separately authorized `PROBE_GRANT`, `--probe` first reserves the
+   approved host configuration and single-invocation cost in the host-owned
+   ledger. It then sends a synthetic prompt with an empty packet and records
+   `probe-passed` or `probe-failed` with separate captures. For
    each approved mode run, use a fresh output root and an expectation without
    `statusSha256`. The mode run performs its own separate probe before sending
    any packet. It checks the model and session, only `Read` in the tool
@@ -126,8 +124,8 @@ NODE REVIEW_CLI --verify --request REQUEST --expect EXPECT --export EXPORT --out
 
 - **Delivery reports a pending probe or result review.** Use the read-only
   delivery preflight for P4/P5 and P8 evidence, and reconcile the exact candidate,
-  configuration and handover bindings. Each paid launch or retry needs its own
-  grant, including during a local Goal-First or Task-Guided run.
+  configuration and handover bindings. A verified adopting parent can grant
+  bounded automatic mode. Every retry needs distinct authority.
   [Delivery runtime](../skills/software-development/openspec-delivery/references/delivery-runtime.md).
 - **Preparation or check rejects the export.** Check absolute path separation,
   private parent ownership, fresh directory names, exact Git and input
@@ -142,7 +140,9 @@ NODE REVIEW_CLI --verify --request REQUEST --expect EXPECT --export EXPORT --out
   route cannot run and seek separate authority for any successor launch.
 - **Runtime or receipt fails.** A failed probe, runtime failure or invalid
   receipt exits nonzero. Preserve the complete sealed output where available.
-  An interrupted or partial output without a verified status is inadmissible.
+  An interrupted or partial output cannot establish acceptance. The same-UID
+  relay retains only allowlisted upstream status classes in private evidence.
+  Provider response details stay outside the sandbox.
   A candidate receipt rejection records `receipt-invalid` and the offending
   packet with its captures. Offline verification reproduces the rejection.
   One verified malformed approach receipt can be retried under the existing

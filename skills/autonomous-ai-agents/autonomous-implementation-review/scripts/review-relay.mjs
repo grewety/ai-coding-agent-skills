@@ -1,3 +1,4 @@
+import { classifyUpstream } from "./review-upstream-status.mjs";
 import { createServer } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { constants } from "node:fs";
@@ -72,7 +73,7 @@ function refuse(res) {
 // Node can emit errors after forwarding has finished or a stream is destroyed.
 function ignoreLateError() {}
 
-export function forwardInference(upstream, res, body, timeoutMs) {
+export function forwardInference(upstream, res, body, timeoutMs, observe = () => {}) {
   const idleMs = Math.min(timeoutMs, 90000);
   let response;
   let idle;
@@ -128,6 +129,8 @@ export function forwardInference(upstream, res, body, timeoutMs) {
     const type = response.headers["content-type"];
     if (response.statusCode !== 200 || typeof type !== "string" ||
         !/^(?:text\/event-stream|application\/json)(?:;|$)/.test(type)) {
+      const classification = classifyUpstream(response.statusCode);
+      if (classification) observe(classification);
       fail();
       return;
     }
@@ -184,7 +187,9 @@ async function serve(config) {
       });
       upstreams.add(upstream);
       upstream.once("close", () => upstreams.delete(upstream));
-      forwardInference(upstream, res, body, config.timeoutMs);
+      forwardInference(upstream, res, body, config.timeoutMs, (upstreamStatus) => {
+        if (process.connected) process.send({ upstreamStatus }, () => {});
+      });
     } catch { refuse(res); }
   });
   server.maxConnections = 8;
@@ -209,6 +214,11 @@ async function serve(config) {
   process.once("SIGTERM", () => { void close(); });
   if (process.connected) {
     process.once("disconnect", () => { void close(); });
+    process.on("message", (event) => {
+      if (Number.isSafeInteger(event?.barrier) && event.barrier > 0 && process.connected) {
+        process.send({ barrier: event.barrier }, () => {});
+      }
+    });
     process.send({ ready: true });
   } else process.stdout.write("Inference relay ready\n");
 }

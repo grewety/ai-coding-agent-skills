@@ -225,7 +225,7 @@ exact `candidate`, `orchestrator`, the pair's `originalSession`, reviewer
 `expectFileSha256`, `reviewAuthority` and `maxRuns: 1`. The first review can
 bind the session pinned by the pair. Re-review uses a distinct session with a
 new binding, including when the candidate changes after recording progress.
-Readback can replay the same exact bound review. Obtain a separate paid-run
+Readback can replay the same exact bound review. For pre-adoption plans obtain a separate paid-run
 grant before launching each reviewer.
 Keep the native task pending while a scoped product correction may still
 be needed. A verified finding or failed gate requires a fresh bounded worker
@@ -274,3 +274,11 @@ renamed content, and remove declared removals. A mismatch reports the capability
 file and reason. The result requires separate finish authority. A `closeout`
 request may additionally prove the selected candidate's closure using the
 offline assertions in [evidence-retention.md](evidence-retention.md).
+
+Adopting projects use [integrated low-touch delivery](low-touch.md) for
+exact native inventory closure, the final candidate harness and the
+task-completion child path. The verified integrated parent selects the
+prospective rules. The `run-harness` command is the explicit local adapter
+invocation. Use the retained result on the applicable review and finish
+inputs. Read-only status and finish readiness verify observations without
+launching a harness or reviewer.

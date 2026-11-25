@@ -313,7 +313,7 @@ test("relay timeout configuration requires a bounded safe integer", () => {
   }
 });
 
-function relayStreams(t, timeoutMs = 240000, blocked = false) {
+function relayStreams(t, timeoutMs = 240000, blocked = false, observe) {
   t.mock.timers.enable({ apis: ["setTimeout"] });
   const upstream = Object.assign(new EventEmitter(), { end() {},
     destroy() { this.destroyed = true; this.emit("close"); } });
@@ -327,10 +327,23 @@ function relayStreams(t, timeoutMs = 240000, blocked = false) {
     end() { this.ended = true; },
     destroy() { this.destroyed = true; this.emit("close"); },
   });
-  relay.forwardInference(upstream, res, Buffer.from("{}"), timeoutMs);
+  relay.forwardInference(upstream, res, Buffer.from("{}"), timeoutMs, observe);
   return { upstream, response, res, chunks, accept: () => upstream.emit("response", response),
     send: (chunk) => response.emit("data", Buffer.from(chunk)), tick: (ms) => t.mock.timers.tick(ms) };
 }
+
+test("rate-limit classification stays host-side while upstream headers and body are refused", (t) => {
+  const statuses = [];
+  const { response, res, chunks, accept, send } = relayStreams(t, 1000, false, (value) => statuses.push(value));
+  response.statusCode = 429;
+  response.headers = { "content-type": "application/json", "retry-after": "private timing", "authorization": "synthetic secret" };
+  accept();
+  send("private upstream response");
+  assert.deepEqual(statuses, ["upstream-rate-limited"]);
+  assert.equal(res.status, 403);
+  assert.deepEqual(chunks, []);
+  assert.equal(response.destroyed, true);
+});
 
 test("relay timeout allows healthy streaming past 90 seconds and cleans up after end", (t) => {
   const { upstream, response, res, chunks, accept, send, tick } = relayStreams(t, 240000, true);
@@ -565,12 +578,71 @@ test("runtime rejects a group-writable Node pin", async (t) => {
 
 const cliPath = fileURLToPath(new URL("../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-candidate.mjs", import.meta.url));
 
+async function probeFixture(root, host, output) {
+  const admission = path.join(root, "probe-admission.json");
+  const ledger = path.join(root, "review-ledger");
+  await mkdir(ledger, { mode: 0o700 });
+  const grant = { schemaVersion: 1, kind: "standalone-review-probe", verified: true, runs: 1,
+    reference: "fixture-probe-approval", configurationSha256: hash(await readFile(host.filename)),
+    upperUsdMicros: 1_000_000, ledger };
+  await writeFile(admission, jsonBytes(grant), { mode: 0o600 });
+  return { admission, ledger, grant, args: ["--probe", "--host-config", host.filename, "--output", output] };
+}
+
+test("standalone probe denies absent, invalid and untrusted grants before runtime", async (t) => {
+  const root = await scratch(t);
+  const host = await fakeHost(root);
+  const output = path.join(root, "probe");
+  const { admission, ledger, grant, args } = await probeFixture(root, host, output);
+  const neverRuntime = () => assert.fail("Unauthorized probe reached runtime");
+  await assert.rejects(reviewCommand(args, neverRuntime), /Missing CLI option/);
+  const launch = [...args, "--admission", admission];
+  for (const overrides of [{ kind: "contained-review-single-run" }, { verified: false }, { runs: 2 },
+    { reference: "" }, { configurationSha256: "f".repeat(64) }, { upperUsdMicros: 1 }, { extra: true }]) {
+    await writeFile(admission, jsonBytes({ ...grant, ...overrides }));
+    await assert.rejects(reviewCommand(launch, neverRuntime), /standalone probe/);
+  }
+  await writeFile(admission, jsonBytes(grant));
+  await chmod(admission, 0o622);
+  await assert.rejects(reviewCommand(launch, neverRuntime), /Untrusted configuration ownership/);
+  await chmod(admission, 0o600);
+  await chmod(ledger, 0o755);
+  await assert.rejects(reviewCommand(launch, neverRuntime), /private host-owned review ledger/);
+  assert.deepEqual(await readdir(ledger), []);
+  await assert.rejects(stat(output), { code: "ENOENT" });
+});
+
+test("standalone probe consumes its grant once, before runtime, even when runtime fails", async (t) => {
+  const root = await scratch(t);
+  const host = await fakeHost(root);
+  host.config.maxTurns = 1;
+  await writeFile(host.filename, jsonBytes(host.config));
+  const { admission, ledger, grant, args } = await probeFixture(root, host, path.join(root, "probe"));
+  const expected = path.join(ledger, ".standalone-probes", hash(jsonBytes(grant.reference)) + ".json");
+  let opens = 0;
+  const runtime = async (config, options) => {
+    opens++;
+    assert.equal(config.maxTurns, 1);
+    assert.equal(options.configurationSha256, grant.configurationSha256);
+    const { reservedAt, ...record } = JSON.parse(await readFile(expected));
+    assert.ok(Date.parse(reservedAt));
+    assert.deepEqual(record, grant);
+    throw new Error("fixture runtime stopped");
+  };
+  const launches = await Promise.allSettled(["probe-a", "probe-b"].map((name) =>
+    reviewCommand([...args.slice(0, -1), path.join(root, name), "--admission", admission], runtime)));
+  assert.deepEqual(launches.map(({ reason }) => reason.message).sort(),
+    ["Standalone probe authority was already consumed", "fixture runtime stopped"]);
+  assert.equal(opens, 1);
+});
+
 test("real same-UID relay child leaves a sealed failed probe and no runtime scratch", async (t) => {
   const root = await scratch(t);
   const host = await fakeHost(root, "probe-fails");
   const output = path.join(root, "failed-probe");
+  const { args, admission } = await probeFixture(root, host, output);
   const run = await new Promise((resolve) => {
-    execFile(process.execPath, [cliPath, "--probe", "--host-config", host.filename, "--output", output],
+    execFile(process.execPath, [cliPath, ...args, "--admission", admission],
       { timeout: 12000 }, (error, stdout, stderr) => resolve({ error, stdout, stderr }));
   });
   assert.equal(run.error?.code, 1, run.stderr || run.stdout);
@@ -657,7 +729,8 @@ async function retain(f, launched) {
 test("probe, approach launch and offline replay exercise every CLI control path with fake processes", async (t) => {
   const f = await fixture(t);
   const standalone = path.join(f.root, "standalone-probe");
-  assert.equal((await launchFixture(["--probe", "--host-config", f.host.filename, "--output", standalone])).phase, "probe-passed");
+  const { args, admission } = await probeFixture(f.root, f.host, standalone);
+  assert.equal((await launchFixture([...args, "--admission", admission])).phase, "probe-passed");
   const a = await prepareFixture(f);
   assert.equal(invoke(["--check", ...a.flags]).packets, 1);
   const launched = await launchFixture(a.launch);

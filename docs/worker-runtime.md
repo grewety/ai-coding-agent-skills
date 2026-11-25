@@ -1,57 +1,26 @@
 # Exclusive OpenSpec worker runtime
 
-## Observed qualification
+## Supported binding
 
-The sealed Group 3.1 qualification batch for
-`exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m` passed on one Linux host
-at repair SHA `9b909f9467ddea6b12f7ca77f959f39ef01e2702` with runtime SHA-256
-`7357b3895ded46cf9b5a79824328d7573a8a763349c0541ef16f68d402c1799e`.
-The implementer was dedicated standalone Codex 0.171.0 with OpenAI GPT-6.2-sol
-(`gpt-6.2-sol`) and the native named workspace-write profile `worker`
-(`codex-native-named-workspace-write`). The fresh reviewer was read-only
-Claude Code 2.1.330 with Anthropic Claude Sonnet 4.6 (`claude-sonnet-4-6`),
-pinned Bubblewrap 0.9.0 and the `same-uid-key` relay
-(`claude-bubblewrap-read-only`). The reviewer used `dontAsk` with only `Read`
-and the contained inference route.
-
-| Synthetic trial | Codex starts | Accepted sealed reviews | Observed result |
-| --- | ---: | ---: | --- |
-| Positive Task-Guided | 2 | 2 | Two checkouts competed for the claim. After a foreground interruption, recovery read back the original worker and sealed handoff with one original Group 1 launch and zero replay launches. Group 2 started once after exact Group 1 gates and independent review were accepted. |
-| Negative Task-Guided | 1 | 0 | Withheld and stale predecessor review evidence blocked advancement. Group 2 started zero times. |
-| Goal-First | 1 | 1 | Bounded foreground execution produced one eligible local outcome with distinct orchestrator, implementer and reviewer sessions. The exact candidate and approved Goal Contract digest were verified in the review context. |
-
-The registry recorded four actual Codex worker starts. Four Claude review
-invocations each used a probe and a candidate packet. Three sealed independent
-reviews were accepted after offline verification. The original Positive Group 2
-review finding is retained as the fourth record. That review lacked the accepted
-predecessor context. A separate operator grant approved one corrected-context
-review on the unchanged Group 2 candidate, with no additional implementer
-launch or replay.
-
-The qualification included protected path, sealed handoff, Git/task and
-publisher denials. The negative controls also exercised a failed preflight
-before native launch, out-of-scope writes and synthetic credential and
-connectivity denials, with positive and wrong-credential controls for the
-synthetic service. The earlier ambient-settings preflight stop, native
-writable-root startup failure and startup-event admission failure are separate
-records. The offline parser replay checked the third failure with six rejection
-controls. Earlier approvals and standalone reviewer and bootstrap Codex trials
-retain their own scope.
-
-This evidence covers synthetic local changes on the recorded pinned pair.
-Production integration, publication, installed-profile changes and paid review
-of the exact final Group 3.1 delivery candidate are outside that evidence.
-Other hosts, clients, versions and provider routes require their own
-qualification. Hermes `advanced-delegation` with `profile_routes` remains an
-optional, unqualified implementer route. Its in-process depth-one behavior
-provides no OS isolation and is ineligible for the reviewer role.
+The recorded synthetic qualification on one Linux host covers native
+dedicated Codex **0.171.0** with `gpt-6.2-sol`, its named workspace-write
+profile `worker` (`codex-native-named-workspace-write`), and a fresh
+read-only Claude Code **2.1.330** reviewer with `claude-sonnet-4-6`,
+Bubblewrap **0.9.0** and the `same-uid-key` relay. Retrieve the evidence for
+`exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m` at the recorded repair
+SHA `9b909f9467ddea6b12f7ca77f959f39ef01e2702`. Qualification remains bound
+to the pinned host, runtime and role files. A different host, client, model,
+version or provider route requires its own qualified binding. Hermes
+`advanced-delegation` with `profile_routes` is an optional unqualified
+implementation route. Use the contained reviewer for its separate role.
+[Role configuration](openspec-operator-tutorial.md#configure-the-three-roles).
 
 ## Install and bind
 
 1. Follow the [OpenSpec prerequisites](openspec-installation.md). Install
-   complete delivery 1.6.0 and next 0.7.0 packages from the
-   `openspec-development` 1.6.0 bundle and the separately selected
-   orchestration 0.20.0 package from `autonomous-orchestration` 1.10.0.
+   complete delivery 1.7.0 and next 0.7.0 packages from the
+   `openspec-development` 1.7.0 bundle and the separately selected
+   orchestration 0.21.0 package from `autonomous-orchestration` 1.11.0.
    Check the exact CLI and supporting file bytes outside the workspace before
    enabling the project route. Use the normal collision, backup and fresh
    session checks when updating or removing a package.
@@ -119,10 +88,11 @@ Privileged, unconfined and unsandboxed routes are unsupported.
 attempt and delivery status. A project-authorized `/openspec-next` or
 `/openspec-delivery <full-name>` also requires exact approval and a separate
 bounded local execution grant. It preserves restrictions such as no commits
-or a named group. The separate one-run provider authority covers the exact
-route, export, cost, timeout and output. Each paid attempt, diagnostic with an
-external side effect or retry requires its own grant. Branch publication and
-closeout require an independently authorized finish invocation.
+or a named group. The applicable review authorization binds the exact export,
+configuration, upper cost and output. A verified adopting parent can select
+bounded automatic contained reviews. An external diagnostic or retry needs
+separate permission. Branch publication and closeout require a named finish
+grant. [Review and finish configuration](openspec-review-configuration.md).
 
 Use the pinned CLI with protected assignment and hash inputs.
 [Implementer command](../skills/autonomous-ai-agents/autonomous-implementation-review/references/run-implementer.md).

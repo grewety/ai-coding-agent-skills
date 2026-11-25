@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 // Read back the independently pinned exclusive worker runtime. No worker or
 // reviewer starts, recovery publication, registry creation or slot release.
 import { lstat, readdir } from "node:fs/promises";
@@ -26,9 +27,17 @@ const runtimeSources = [
   "run-implementer.mjs", "terminal-adapters.mjs", "worker-handoff.mjs", "worker-runtime-policy.mjs",
 ];
 
+const lowTouchRuntimeSources = [
+  "harness-result.mjs", "low-touch-policy.mjs", "planning-inventory.mjs", "review-preflight.mjs",
+  "review-spend.mjs", "review-upstream-status.mjs",
+];
+
 function verifyRuntimeInventory(selected, scripts) {
   need(digest(selected.verifierSha256) && digest(selected.runtimeSha256), "Independent implementer package pin is missing");
-  const inventory = Object.fromEntries(runtimeSources.map((name) => {
+  // An independently pinned legacy package has none of these support files.
+  // A partial newer inventory cannot fall back to the legacy runtime pin.
+  const additions = lowTouchRuntimeSources.some((name) => existsSync(path.join(scripts, name))) ? lowTouchRuntimeSources : [];
+  const inventory = Object.fromEntries([...runtimeSources, ...additions].map((name) => {
     const filename = path.join(scripts, name);
     return [name, sha256(readBounded(filename, 64 * 1024))];
   }));
@@ -194,7 +203,7 @@ async function readWorkingOutputs(observations, state, request, grant, attemptDi
   return observations.verifyPostWorker(request, grant, await state.readState(attemptDirectory, "git-state.json"));
 }
 
-export async function verifyWorkerScope(delegation, snapshot, implementation) {
+export async function verifyWorkerScope(delegation, snapshot, implementation, reviewedParent) {
   const { request, result, grant, id } = delegation;
   const files = Object.keys(result.outputs);
   need(files.every((file) => request.mutablePaths.includes(file)), "Sealed worker outputs exceed admitted paths");
@@ -202,17 +211,18 @@ export async function verifyWorkerScope(delegation, snapshot, implementation) {
     need(same(await delegation.checkWorkingOutputs(), result.outputs), "Worktree differs from sealed worker outputs");
     return;
   }
-  const { workspace, head } = implementation;
+  const { workspace } = implementation;
+  const head = reviewedParent ?? implementation.head;
   need(snapshot.head === head, "Candidate is stale");
-  checkoutObservation(workspace, head);
+  checkoutObservation(workspace, implementation.head);
   ancestor(workspace, grant.head, head);
   const tasksFile = planningLayout(id.change).directory + "/tasks.md";
   const changed = changedFiles(workspace, grant.head, head).filter((file) => file !== tasksFile);
   need(same(changed, files.sort()) &&
     same(committedOutputHashes(workspace, head, changed, 8 * 1024 * 1024), result.outputs),
   "Candidate diff or bytes differ from sealed worker outputs");
-  const launchTasks = planning(workspace, grant.head, id.change);
-  const current = planning(workspace, head, id.change);
+  const launchTasks = planning(workspace, grant.head, id.change, snapshot.customPlanning);
+  const current = planning(workspace, head, id.change, snapshot.customPlanning);
   need(launchTasks.digest === current.digest && current.taskStates.every(({ id: task, checked }, index) =>
     checked === launchTasks.taskStates[index]?.checked || task === id.task && checked),
   "Native progress exceeds the admitted action or changes planning");

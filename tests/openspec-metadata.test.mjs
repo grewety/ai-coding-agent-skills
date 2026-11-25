@@ -33,9 +33,7 @@ function invoke(repo, ...args) {
   }
 }
 
-test("exclusive worker runtime promotes the full native deltas with capability metadata", async () => {
-  const change = "exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m";
-  const capabilities = new Map([["contained-independent-review", 3], ["exclusive-worker-runtime", 5], ["openspec-integration", 1]]);
+async function deltaDirectory(change) {
   const { readdir } = await import("node:fs/promises");
   const changesRoot = path.join(root, "openspec", "changes");
   const archiveRoot = path.join(changesRoot, "archive");
@@ -49,14 +47,41 @@ test("exclusive worker runtime promotes the full native deltas with capability m
   assert.equal(matches.length, 1, `Expected exactly one active or archived copy of ${change}`);
   const [match] = matches;
   assert.ok(match.isDirectory(), `${match.name} must be a directory`);
-  const deltaRoot = path.join(match.name === change ? changesRoot : archiveRoot, match.name, "specs");
+  return path.join(match.name === change ? changesRoot : archiveRoot, match.name, "specs");
+}
+
+const adoptedDelivery = "low-touch-autonomous-delivery-01m88zpkktr16z02dh3wne3ppy";
+test("exclusive worker runtime requirements keep exact content until superseded by a current delta", async () => {
+  const deltaRoot = await deltaDirectory("exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m");
+  const capabilities = new Map([["contained-independent-review", 3], ["exclusive-worker-runtime", 5], ["openspec-integration", 1]]);
+  const newerDelta = await readFile(path.join(await deltaDirectory(adoptedDelivery), "contained-independent-review", "spec.md"), "utf8");
+  const superseded = /^### Requirement: Verified planning-path relocation for record-only closure\n[\s\S]*?(?=^### Requirement: |^## |(?![\s\S]))/m;
+  assert.match(newerDelta, superseded);
   for (const [capability, requirements] of capabilities) {
+    let [delta, current] = await Promise.all([
+      readFile(path.join(deltaRoot, capability, "spec.md"), "utf8"),
+      readFile(path.join(root, "openspec", "specs", capability, "spec.md"), "utf8"),
+    ]);
+    assert.ok(current.startsWith(header("spec", `capability: ${capability}\n`)));
+    let expected = requirements;
+    if (capability === "contained-independent-review") {
+      assert.match(delta, superseded);
+      delta = delta.replace(superseded, "");
+      expected--;
+    }
+    assert.equal(checkPromotion({ capability, delta, current }), expected, capability);
+  }
+});
+
+test("low-touch delivery promotes both full native deltas with capability metadata", async () => {
+  const deltaRoot = await deltaDirectory(adoptedDelivery);
+  for (const [capability, expected] of [["contained-independent-review", 5], ["openspec-integration", 10]]) {
     const [delta, current] = await Promise.all([
       readFile(path.join(deltaRoot, capability, "spec.md"), "utf8"),
       readFile(path.join(root, "openspec", "specs", capability, "spec.md"), "utf8"),
     ]);
     assert.ok(current.startsWith(header("spec", `capability: ${capability}\n`)));
-    assert.equal(checkPromotion({ capability, delta, current }), requirements, capability);
+    assert.equal(checkPromotion({ capability, delta, current }), expected, capability);
   }
 });
 async function fixture(t) {

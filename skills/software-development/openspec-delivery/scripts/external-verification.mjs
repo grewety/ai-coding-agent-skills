@@ -1,3 +1,4 @@
+import { zeroTrigger } from "./low-touch-policy.mjs";
 // Verification boundary decisions. No vendor calls, tunnel process or automation trigger.
 import { existsSync, lstatSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -122,6 +123,53 @@ export function pushTriggerDecision({ candidate, pushGrant, observed, external }
     return { action: "queue", reason: "PUSH_TRIGGER_AUTHORITY_PENDING" };
   }
   return { action: "proceed", reason: null };
+}
+
+// Call only with the context re-read from the exact frozen plan's integrated parent.
+export function standingTriggerDecision({ candidate, pushGrant, observed, external, policy, event, target, repository, finishReference,
+  notBefore, now = Date.now() }) {
+  const stop = (reason, action = "stop") => ({ action, reason });
+  if (!sha(candidate) || pushGrant?.verified !== true || pushGrant.candidate !== candidate ||
+      !text(pushGrant.reference) || pushGrant.target !== repository || pushGrant.finishReference !== finishReference ||
+      pushGrant.event !== event || pushGrant.targetRef !== target) return stop("PUSH_AUTHORITY_PENDING", "queue");
+  const observedAt = Date.parse(observed?.observedAt);
+  if (observed?.candidate !== candidate || observed.verified !== true || observed.complete !== true || !text(observed.reference) ||
+      observed.repository !== repository || observed.event !== event || observed.target !== target ||
+      !Number.isFinite(observedAt) || new Date(observedAt).toISOString() !== observed.observedAt ||
+      !(observedAt >= notBefore && observedAt <= now && now - observedAt <= 60_000) ||
+      !Array.isArray(observed.triggers) || observed.triggers.length > 128) return stop("TRIGGER_INVENTORY_UNVERIFIED");
+  const identities = new Set();
+  const standing = [];
+  for (const entry of observed.triggers) {
+    if (!entry || !text(entry.id) || identities.has(entry.id) || entry.repository !== repository ||
+        entry.event !== event || entry.target !== target || entry.verified !== true ||
+        !["repository-check", "app-trigger", "deploy-preview", "tunnel", "unknown"].includes(entry.kind) ||
+        !(entry.configurationSha256 === null || digest(entry.configurationSha256)) ||
+        !(entry.exposure === null || text(entry.exposure)) ||
+        !(entry.costUsd === null || Number.isFinite(entry.costUsd) && entry.costUsd >= 0)) return stop("TRIGGER_INVENTORY_UNVERIFIED");
+    identities.add(entry.id);
+    const { verified, ...live } = entry;
+    if (zeroTrigger(live) && policy.standingTriggers.some((allowed) => same(allowed, live))) {
+      standing.push(entry.id);
+      continue;
+    }
+    const scope = triggerScope(live);
+    const kind = ["deploy-preview", "tunnel"].includes(entry.kind) ? entry.kind : "app-trigger";
+    if (!Array.isArray(external) || !external.some((run) =>
+      retainedExternalReservation(run) && run.card.candidate === candidate && run.card.target === repository &&
+      run.card.kind === kind && run.card.scope === scope &&
+      (entry.costUsd === null || entry.costUsd === 0 ||
+        run.card.expectedCost.unit.toLowerCase() === "usd" && run.card.expectedCost.amount >= entry.costUsd) &&
+      (kind !== "app-trigger" || run.card.trigger === entry.id && run.pushReference === pushGrant.reference) &&
+      run.reference !== pushGrant.reference && run.reference !== finishReference)) {
+      return stop("PUSH_TRIGGER_AUTHORITY_PENDING", "queue");
+    }
+  }
+  return { action: "proceed", reason: null, inventoryReference: observed.reference, event, target, standing };
+}
+
+export function triggerScope({ id, repository, event, target, configurationSha256, exposure, costUsd, kind }) {
+  return "trigger:" + stableJson({ id, repository, event, target, configurationSha256, exposure, costUsd, kind });
 }
 
 const localUrl = (value) => {

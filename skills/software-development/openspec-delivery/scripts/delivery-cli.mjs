@@ -3,7 +3,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 import { writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
-import { ancestor, candidate, commit, draftPolicyContext, goalSnapshot, integratedPolicyContext, planning, planningWorktree, policyContext } from "./change-guard.mjs";
+import { ancestor, candidate, checkoutObservation, commit, draftPolicyContext, goalSnapshot, integratedPolicyContext, planning, planningWorktree, policyContext } from "./change-guard.mjs";
 import { reconcileWorkspace, sourceObservation, workspacePreview } from "./change-workspace.mjs";
 import { contractChangePaths, resolveDeliveryPolicy, workerContinuationDecision } from "./delivery-policy.mjs";
 import { deliveryDecision, goalContractIdentity, readGoalContract, withinScope } from "./delivery-control.mjs";
@@ -18,6 +18,7 @@ import { proposalInput, charterObservation, proposalFreeze } from "./operator-pl
 import { cardDisplay, currentCard, narrowRestrictions, observed, recordCard, recordReply,
   readPlanningFeedback, readSeparateGrant, readShortAuthority, same, sealedObservation, verifyShortRoles } from "./operator-records.mjs";
 import { checkpointObservation, operatorStatus, relayCheckpoint, resumeCheckpoint } from "./operator-status.mjs";
+import { runLocalHarness, verifyLocalHarness } from "./local-harness.mjs";
 import { protectedFinish } from "./protected-finish.mjs";
 
 const need = (condition, message) => { if (!condition) throw new Error(message); };
@@ -44,7 +45,8 @@ function inspectPolicy(input) {
       const relative = `${planningLayout(change).directory}/proposal.md`;
       const proposal = readBounded(path.join(repo, relative), 4 * 1024 * 1024);
       need(sha256(proposal) === context.inputs[relative], "Draft proposal changed after inventory");
-      const fields = { contract: readGoalContract(utf8.decode(proposal)), inputs: context.inputs, taskCount: context.taskCount };
+      const { inputs, taskCount, customPlanning, modes, normalizedTasksSha256 } = context;
+      const fields = { contract: readGoalContract(utf8.decode(proposal)), inputs, taskCount, customPlanning, modes, normalizedTasksSha256 };
       goal = { ...fields, digest: goalContractIdentity({ change, policyRevision: policy.policyRevision, ...fields }) };
     } else goal = goalSnapshot(repo, plan, change, policy.policyRevision);
   }
@@ -103,14 +105,14 @@ function approvalCardCommand(command, input) {
   const { implementation: workspace } = reconcileWorkspace({ ...input, base: context.parent });
   const identity = operatorIdentity(input, evaluation, workspace);
   need(!workspace.dirty && workspace.head === identity.plan, "Frozen checkout must be clean and at the exact plan SHA");
-  need(same(planningWorktree(workspace.workspace, identity.change).inputs, identity.inputs),
+  need(same(planningWorktree(workspace.workspace, identity.change, Boolean(context.lowTouch)).inputs, identity.inputs),
     "Working planning inputs differ from the complete frozen bytes");
   if (command === "approval-reply") return recordReply(input.operator, identity, workspace.head);
   const freeze = sealedObservation(input.freeze);
   need(freeze.action === "freeze-ready" && freeze.change === context.change && freeze.policyRevision === context.parent &&
     freeze.policy?.mode === policy.mode && freeze.workspace?.workspace === workspace.workspace &&
     freeze.workspace?.branch === workspace.branch && freeze.workspace?.head === (freeze.proposal?.revision?.plan ?? context.parent) &&
-    freeze.proposal?.draftOnly === false && same(freeze.inputs, context.inputs) &&
+    freeze.proposal?.draftOnly === false && same(freeze.inputs, context.inputs) && (!context.lowTouch || same(freeze.modes, context.modes)) &&
     context.changedPaths.length > 0 && context.changedPaths.every((file) => Object.hasOwn(context.inputs, file)),
   "Frozen commit differs from the validated plan-only freeze observation");
   const summary = input.cardSummary;
@@ -158,7 +160,11 @@ export async function verifyHandover(input, pinnedReviewCommand) {
       verified.result.runtime?.session === requestRecord.session && verified.sessions?.[1] === requestRecord.session &&
       readBounded(request, 1024 * 1024).equals(requestBytes) && readBounded(expect, 1024 * 1024).equals(expectBytes),
     "Reviewer request or runtime identity differs from its handover");
-    return { ...verified, request: requestRecord.worker, reviewSnapshot: requestRecord.snapshot };
+    return { ...verified, request: requestRecord.worker, reviewSnapshot: requestRecord.snapshot,
+      reviewPolicyBinding: requestRecord.policy, reviewConfigurationSha256: expectation.configurationSha256,
+      reviewAttachments: requestRecord.attachments,
+      reviewHarnessReferenceSha256: expectation.harness === undefined ? undefined : sha256(stableJson(expectation.harness)),
+      reviewStatusSha256: expectation.statusSha256 };
   }
   const { readClosed, readHandoff, requestBytes, validateRequest } = await companion(input, "worker-handoff.mjs");
   const { expected, runtime } = input;
@@ -192,9 +198,9 @@ function nativeGroups(input, evaluation, workspace) {
   need(record.verified === true && typeof record.reference === "string" && record.reference &&
     record.planDigest === evaluation.context.planDigest && Array.isArray(record.groups), "Unverified frozen task guidance");
   const { plan, change } = evaluation.context;
-  const { taskStates } = planning(input.repo, plan, change);
+  const { taskStates } = planning(input.repo, plan, change, Boolean(evaluation.context.lowTouch));
   const head = workspace?.head ?? plan;
-  const current = planning(workspace?.workspace ?? input.repo, head, change);
+  const current = planning(workspace?.workspace ?? input.repo, head, change, Boolean(evaluation.context.lowTouch));
   need(current.digest === record.planDigest && stableJson(taskStates.map((task) => task.id)) ===
     stableJson(record.groups.flatMap((group) => group.taskIds)) && taskStates.every((task) => task.id) &&
     new Set(taskStates.map((task) => task.id)).size === taskStates.length, "Frozen task guidance does not cover native tasks in order");
@@ -212,7 +218,7 @@ function nativeGroups(input, evaluation, workspace) {
       const reviewed = commit(repo, acceptance.candidateSha);
       ancestor(repo, plan, reviewed);
       ancestor(repo, reviewed, head);
-      const verified = planning(repo, reviewed, change);
+      const verified = planning(repo, reviewed, change, Boolean(evaluation.context.lowTouch));
       accepted = verified.digest === record.planDigest && taskIds.every((task) => verified.taskStates.some(({ id, checked }) => id === task && checked));
       need(accepted, "Accepted group evidence lacks reviewed native task progress");
     }
@@ -345,6 +351,10 @@ function verifyCapContinuation(input, delegated, prior, implementation) {
 
 async function readDeliveryHandover(input, { context, policy, identity, snapshot, current, delegation }) {
   const delegated = Boolean(delegation);
+  if (context.lowTouch && input.deliveryPhase !== "correction") {
+    need(input.handover.kind === "review-candidate" && digest(input.handover.expectFileSha256),
+      "Adopted result review requires an independently sealed contained review");
+  }
   if (delegated) need(input.handover.kind === "review-candidate" && digest(input.handover.expectFileSha256) &&
     input.handover.verifier === path.join(delegation.scripts, "review-candidate.mjs") &&
     input.handover.verifierSha256 === delegation.reviewVerifierSha256 && input.handover.reviewSessionBinding,
@@ -352,7 +362,7 @@ async function readDeliveryHandover(input, { context, policy, identity, snapshot
   const handoff = await verifyHandover(input.handover, delegation?.reviewCommand);
   const id = handoff.request.identity;
   need(id.change === identity.change && id.plan === identity.plan &&
-    id.planDigest === (delegated && policy.mode === "goal-first" ? context.planDigest : identity.planDigest) &&
+    id.planDigest === (handoff.reviewSnapshot && policy.mode === "goal-first" ? context.planDigest : identity.planDigest) &&
     id.attempt === input.attempt?.id &&
     handoff.request.authority.approvalReference === input.approval?.reference &&
     handoff.request.authority.executionReference === input.grant?.reference,
@@ -360,18 +370,32 @@ async function readDeliveryHandover(input, { context, policy, identity, snapshot
   if (handoff.reviewSnapshot) {
     const review = handoff.reviewSnapshot;
     need((input.deliveryPhase === "result" || delegated && input.deliveryPhase === "correction") &&
-      (policy.mode === "task-guided" || delegated) && snapshot &&
+      (policy.mode === "task-guided" || delegated || context.lowTouch) && snapshot &&
       id.candidate === snapshot.head && review.target === snapshot.head && review.base === context.plan &&
       review.plan === context.plan && review.planDigest === context.planDigest &&
       stableJson(id.inputs) === stableJson(context.inputs) &&
       separate(id.workspace, identity.workspace) && separate(id.workspace, input.repo),
     "Contained review does not cover the full approved candidate from an isolated checkout");
-    if (delegated) {
+    if (context.lowTouch) {
+      need(handoff.reviewPolicyBinding?.parent === context.parent && handoff.reviewPolicyBinding.target === context.target &&
+        handoff.reviewConfigurationSha256 === input.hostConfiguration?.sha256,
+      "Contained review differs from the integrated or host-owned binding");
+      const harness = verifyLocalHarness({ hostConfiguration: input.hostConfiguration, harness: input.harness,
+        candidate: snapshot.head, excluded: [input.repo, identity.workspace, id.workspace, input.handover.request,
+          input.handover.expect, input.handover.exportDirectory, input.handover.output, ...handoff.request.evidenceRoots,
+          delegation?.directory, ...(delegation?.request.evidenceRoots ?? [])].filter(Boolean) });
+      need(harness ? digest(input.handover.expectFileSha256) &&
+        sha256(stableJson(input.harness)) === handoff.reviewHarnessReferenceSha256 &&
+        handoff.reviewAttachments[review.harness] === harness.sha256 :
+        !review.harness && handoff.reviewHarnessReferenceSha256 === undefined,
+        "Contained review omitted the exact host candidate harness result");
+    }
+    if (delegated || context.lowTouch) {
       need([input.handover.request, input.handover.expect, input.handover.exportDirectory, input.handover.output]
-        .every((location) => [input.repo, identity.workspace, id.workspace, delegation.directory,
-          ...delegation.request.evidenceRoots].every((root) => separate(root, location))),
+        .every((location) => [input.repo, identity.workspace, id.workspace, delegation?.directory,
+          ...(delegation?.request.evidenceRoots ?? [])].filter(Boolean).every((root) => separate(root, location))),
       "Reviewer evidence overlaps mutable or protected assignment state");
-      await verifyPairedReview(delegation, handoff, input);
+      if (delegated) await verifyPairedReview(delegation, handoff, input);
       if (policy.mode === "goal-first") {
         need(handoff.request.acceptance.includes(`goal-contract:${identity.planDigest}`),
           "Contained review is missing the exact Goal Contract binding");
@@ -402,7 +426,7 @@ async function deliveryEvaluation(input, options) {
       need(policy.proposeToFreeze, "Integrated plan parent has not selected short approval cards");
       const bound = operatorIdentity(input, evaluation, implementation);
       if (input.deliveryPhase === "dispatch" && !input.shortDecision.resumeCheckpoint) {
-        need(same(planningWorktree(implementation.workspace, bound.change).inputs, bound.inputs),
+        need(same(planningWorktree(implementation.workspace, bound.change, Boolean(context.lowTouch)).inputs, bound.inputs),
           "Working planning inputs differ from the complete frozen bytes");
       }
       const authority = readShortAuthority(input.shortDecision, bound, implementation.head,
@@ -440,8 +464,10 @@ async function deliveryEvaluation(input, options) {
   let candidateFailure = null;
   try {
     if (candidateRequest) {
-      const verified = candidate(candidateRequest);
-      current = planning(implementation.workspace, verified.head, context.change);
+      const reviewedParent = options?.reviewedParent;
+      if (reviewedParent) checkoutObservation(candidateRequest.repo, candidateRequest.head);
+      const verified = reviewedParent ? candidate({ ...candidateRequest, head: reviewedParent }, false) : candidate(candidateRequest);
+      current = planning(implementation.workspace, verified.head, context.change, Boolean(context.lowTouch));
       snapshot = { ...verified, change: context.change, workspace: implementation.workspace, taskIds: current.taskStates.map(({ id }) => id) };
     }
   } catch (error) { candidateFailure = error.message; }
@@ -483,7 +509,7 @@ async function deliveryEvaluation(input, options) {
         delegationFailure = { action: "stop", reason: reasons[delegation.phase] ?? "OWNERSHIP_UNVERIFIED" };
       } else {
         try {
-          await verifyWorkerScope(delegation, snapshot, implementation);
+          await verifyWorkerScope(delegation, snapshot, implementation, options?.reviewedParent);
         } catch (error) { delegationFailure = { action: "stop", reason: "POST_WORKER_SCOPE_UNVERIFIED", detail: error.message }; }
         if (!delegationFailure && delegation.result.status !== "completed") delegationFailure = { action: "stop",
           reason: delegation.reason === "native-turn-cap" ? "NATIVE_TURN_CAP" : "DELEGATED_WORKER_STOPPED", detail: delegation.reason };
@@ -559,7 +585,7 @@ async function deliveryEvaluation(input, options) {
     if (delegated && input.handover && decision.reason === "EXACT_REVIEW_PENDING") {
       try {
         handoff = await readDeliveryHandover(input, reviewContext);
-        await verifyWorkerScope(delegation, snapshot, implementation);
+        await verifyWorkerScope(delegation, snapshot, implementation, options?.reviewedParent);
         decision = deliveryDecision({ ...decisionInput, handoff });
       } catch {
         invalidHandover = true;
@@ -570,6 +596,34 @@ async function deliveryEvaluation(input, options) {
   return { policy, context, identity, planDigest, snapshot, decision, handoff, invalidHandover, candidateRequest, delegation,
     implementation, authorityEvidence, restrictions: input.restrictions,
     grant: shortFailure ? null : input.shortDecision ? shortAuthority.grant : delegation?.verifiedGrant ?? input.grant };
+}
+
+async function evaluateFinishReadiness(input, options) {
+  const completion = input.taskCompletion;
+  if (completion) {
+    need(typeof completion.reviewedParent === "string" &&
+      completion.childGate && completion.reviewedParent !== input.head && input.handover?.kind === "review-candidate" &&
+      input.handover.waivers === undefined && digest(input.handover.expectFileSha256),
+      "A task-completion request requires an independently sealed parent review and exact child gate");
+  }
+  const e = await deliveryEvaluation(input, { ...options, observationsOnly: true, reviewedParent: completion?.reviewedParent });
+  if (!e.candidateRequest) return { e, readiness: null };
+  const request = completion ? { ...e.candidateRequest, "gate-run": completion.childGate.file,
+    "gate-run-sha256": completion.childGate.sha256 } : e.candidateRequest;
+  if (completion && e.decision.action === "accept-result") {
+    need(e.decision.commits === true, "The accepted local grant did not authorize the task completion commit");
+    const { bootstrapCount: parentBootstrap, commands: parentCommands } = retainedJson(input.gateRun);
+    const { bootstrapCount: childBootstrap, commands: childCommands } = retainedJson(completion.childGate);
+    need(same(parentCommands.slice(parentBootstrap).map(({ argv }) => argv), childCommands.slice(childBootstrap).map(({ argv }) => argv)),
+      "The exact child gates differ from the accepted parent's declared gates");
+  }
+  const checked = finishReadiness(request, e.decision, completion);
+  return { e, readiness: { ...checked, plan: e.context.plan, planDigest: e.identity.planDigest,
+    mode: e.policy.mode, policyRevision: e.policy.policyRevision, workspace: e.implementation?.workspace,
+    branch: e.implementation?.branch, targetRevision: e.context.target, keepWorktree: e.restrictions?.keepWorktree,
+    gateReference: completion && checked.ready ? retainedJson(completion.childGate).wrapperSha256 : e.decision.gateReference,
+    reviewReference: e.handoff?.result?.report?.sha256,
+    ...(checked.taskCompletion ? { reviewedGateReference: e.decision.gateReference, acceptedTaskIds: e.decision.acceptedTaskIds } : {}) } };
 }
 
 function decorateStatus(base, input, evaluation, extras = {}) {
@@ -589,16 +643,10 @@ export async function deliveryCommand(command, input, options) {
       try {
         let readiness;
         if (command === "finish" && input.plan) {
-          const e = await deliveryEvaluation(input, { ...options, observationsOnly: true });
-          if (e.candidateRequest) {
-            readiness = { ...finishReadiness(e.candidateRequest, e.decision), plan: e.context.plan,
-              planDigest: e.identity.planDigest, mode: e.policy.mode, policyRevision: e.policy.policyRevision,
-              workspace: e.implementation?.workspace, branch: e.implementation?.branch, targetRevision: e.context.target,
-              keepWorktree: e.restrictions?.keepWorktree, gateReference: e.decision.gateReference,
-              reviewReference: e.handoff?.result?.report?.sha256 };
-          }
+          ({ readiness } = await evaluateFinishReadiness(input, options));
         }
-        closeout = await protectedFinish({ ...input, resume: command === "continue" ? "continue" : null }, readiness);
+        closeout = await protectedFinish({ ...input, resume: command === "continue" ? "continue" : null },
+          readiness, Date.now(), verifyHandover);
         if (command === "sync-skills") {
           closeout = closeout.sync ? { ...closeout, cleanupAction: closeout.action, action: "sync-assessment", reason: null } :
             { ...closeout, action: "pause", reason: "SYNC_RELEASE_OR_CLOSEOUT_PENDING" };
@@ -660,6 +708,11 @@ export async function deliveryCommand(command, input, options) {
         verdict: verified.result?.verdict ?? null, deliveryAccepted: false };
     }
     case "discovery": return discovery(input);
+    case "run-harness": {
+      const policy = policyContext({ repo: input.repo, change: input.change, plan: input.plan, target: input.target });
+      ancestor(input.repo, policy.plan, commit(input.repo, input.candidate));
+      return runLocalHarness(input, policy);
+    }
     case "external": return externalVerificationDecision(input);
     case "reserve-external": return reserveExternalRun(input);
     case "push-triggers": return pushTriggerDecision(input);
@@ -677,9 +730,18 @@ export async function deliveryCommand(command, input, options) {
         if (input.proposal) return (await deliveryCommand("proposal", input, options)).status;
         return decorateStatus(deliveryStatus({ change: input.change }), input);
       }
+      if (command === "finish-readiness" && input.taskCompletion) {
+        const { readiness } = await evaluateFinishReadiness(input, options);
+        return readiness ?? { schemaVersion: 1, change: input.change, head: input.head, ready: false,
+          predicate: "CANDIDATE_IDENTITY_UNVERIFIED", issue: null, promoted: [] };
+      }
       let e;
+      let completionReadiness;
       try {
-        e = await deliveryEvaluation((statusCommand || command === "checkpoint-relay") && input.restrictions?.inspect === true ?
+        if (statusCommand && input.taskCompletion) {
+          ({ e, readiness: completionReadiness } = await evaluateFinishReadiness(input,
+            { ...options, observationsOnly: true }));
+        } else e = await deliveryEvaluation((statusCommand || command === "checkpoint-relay") && input.restrictions?.inspect === true ?
           { ...input, restrictions: { ...input.restrictions, inspect: false } } : input,
         { ...options, observationsOnly: statusCommand || command === "checkpoint-relay" });
       } catch (error) {
@@ -687,12 +749,14 @@ export async function deliveryCommand(command, input, options) {
         throw error;
       }
       if (command === "decision" && !e.policy.proposeToFreeze) return { schemaVersion: 1, identity: e.identity, ...e.decision };
-      const finish = e.candidateRequest && (command === "finish-readiness" || e.decision.action === "accept-result") ?
-        finishReadiness(e.candidateRequest, e.decision) : null;
+      const finish = completionReadiness ?? (e.candidateRequest &&
+        (command === "finish-readiness" || e.decision.action === "accept-result") ?
+        finishReadiness(e.candidateRequest, e.decision) : null);
       if (command === "finish-readiness") return finish ?? { schemaVersion: 1, change: e.identity.change, head: null,
         ready: false, predicate: "CANDIDATE_IDENTITY_UNVERIFIED", issue: null, promoted: [] };
       let closure;
-      let snapshot = e.snapshot;
+      let snapshot = completionReadiness?.ready && completionReadiness.taskCompletion ?
+        { ...e.snapshot, head: completionReadiness.head, tasksComplete: true } : e.snapshot;
       const closeout = input.closeout;
       if (closeout && closeout.expectedHead === input.head &&
           closeout.closureExpected?.archive?.endsWith(`-${e.identity.change}`)) {
@@ -726,7 +790,7 @@ export async function deliveryCommand(command, input, options) {
           checkpoint = checkpointObservation(input, e.identity, e.implementation, attempt?.id, e.grant);
         }
         if (e.policy.proposeToFreeze && input.operator && base.state === "approval-pending" && !e.implementation?.dirty) {
-          need(e.implementation && same(planningWorktree(e.implementation.workspace, e.identity.change).inputs, e.context.inputs),
+          need(e.implementation && same(planningWorktree(e.implementation.workspace, e.identity.change, Boolean(e.context.lowTouch)).inputs, e.context.inputs),
             "Working planning inputs differ from the complete frozen bytes");
           shortCard = currentCard(input.operator, operatorIdentity(input, e, e.implementation), e.implementation.head);
         }

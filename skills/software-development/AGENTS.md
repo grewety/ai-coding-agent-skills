@@ -33,6 +33,8 @@ Own the portable boundaries OpenSpec does not enforce: one orchestrator for Git 
 - A package installed in a shared profile must not update or remove its installed copy while operating in a project.
 - Launch examples state the exact operator-authorized local Git scope and stay identical in the README and `autonomous-implementation-review`. Displaying a template is not authorization.
 
+- Under the verified adopting parent, the planning inventory includes safe custom schema paths and preserves reserved exclusions. Delivery owns exact task-completion parent/child proof, separately sealed child gates, local harness invocation and protected standing trigger admission. Keep the inventory, low-touch policy and harness result contracts identical in both independently distributable packages.
+
 ## Work Guidance
 
 Use `openspec-delivery` for an authorized change. Use `git-commit-message` when committing. Use `capability-wireframes` when a primary human-facing surface changes. Do not reimplement OpenSpec propose, apply or archive.

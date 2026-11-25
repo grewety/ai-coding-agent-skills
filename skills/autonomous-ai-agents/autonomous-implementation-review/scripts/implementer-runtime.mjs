@@ -21,6 +21,8 @@ const runtimeSources = [
   "implementer-state.mjs", "implementer-supervisor.mjs", "implementer-supervisor.py", "orchestration-core.mjs",
   "review-admission.mjs", "review-archive.mjs", "review-candidate.mjs", "review-inputs.mjs", "review-relay.mjs",
   "review-runtime-scratch.mjs", "review-runtime.mjs", "review-sandbox-bridge.mjs", "review-stream.mjs",
+  "harness-result.mjs", "low-touch-policy.mjs", "planning-inventory.mjs", "review-preflight.mjs",
+  "review-spend.mjs", "review-upstream-status.mjs",
   "run-implementer.mjs", "terminal-adapters.mjs", "worker-handoff.mjs", "worker-runtime-policy.mjs",
 ];
 

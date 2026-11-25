@@ -49,9 +49,10 @@ export function deliveryStatus({ change, policy, identity, candidate, decision, 
   const mode = selected && ["goal-first", "task-guided"].includes(policy?.mode) && sha(policy.policyRevision) ? policy.mode : null;
   const pinned = candidate?.change === selected && sha(candidate?.head) ? candidate.head : null;
   const planDigest = mode && identity?.change === selected && digest(identity.planDigest) ? identity.planDigest : null;
+  const reviewed = finish?.taskCompletion?.acceptanceChild === pinned ? finish.taskCompletion.reviewedParent : pinned;
   const id = handoff?.result?.identity ?? handoff?.active?.identity;
   const boundAttempt = selected && id?.change === selected && (id.planDigest === planDigest || handoff.goalContractDigest === planDigest) &&
-    (id.role === "reviewer" ? pinned && id.candidate === pinned : id.candidate === null) ? id.attempt : null;
+    (id.role === "reviewer" ? reviewed && id.candidate === reviewed : id.candidate === null) ? id.attempt : null;
   const activeAttemptId = boundAttempt === attempt?.id && attemptId(boundAttempt) ? boundAttempt : null;
   const contextHint = activeAttemptId && ["same-session", "fresh-session"].includes(context) ? context : null;
 
@@ -86,7 +87,7 @@ export function deliveryStatus({ change, policy, identity, candidate, decision, 
       state = "blocked";
       stopPredicate = reasonPattern.test(decision.reason ?? "") ? decision.reason : "DELIVERY_OBSERVATIONS_UNVERIFIED";
       code = decision.reason === "LOCAL_AUTHORITY_PENDING" ? "RECORD_LOCAL_EXECUTION_GRANT" : "RESOLVE_STOP";
-    } else if (decision.action === "accept-result" && pinned === decision.head) {
+    } else if (decision.action === "accept-result" && reviewed === decision.head) {
       state = "local-verified";
       code = "ASSESS_FINISH_READINESS";
       if (finish?.ready === true && finish.head === pinned && candidate.tasksComplete) {

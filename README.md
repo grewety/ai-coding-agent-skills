@@ -2,6 +2,20 @@
 
 Portable engineering workflows for AI coding agents that use OpenSpec. This repository owns the companion skill sources and their static distribution endpoint. Adopting projects own their product behavior. OpenSpec owns specification and task progress.
 
+## Active guides
+
+| Guide | Use it for |
+| --- | --- |
+| [Operator tutorial](docs/openspec-operator-tutorial.md) | Lifecycle, exact replies, session handoff, Role 1/2/3 configuration and Intent-Driven planning. |
+| [Operator runbook](docs/openspec-operator-runbook.md) | Prepare, deliver, resume protected finish and recover. |
+| [OpenSpec workflow](docs/openspec-workflow.md) | Repository SDLC and governing authority. |
+| [Review and finish configuration](docs/openspec-review-configuration.md) | Paid review modes, host pins, local harness and standing triggers. |
+| [OpenSpec installation](docs/openspec-installation.md) | Upstream prerequisite and upgrade procedures. |
+| [Claude installation](docs/claude-installation.md) | Native marketplace, ZIP installation and host checks. |
+| [Contained Claude reviewer](docs/claude-reviewer.md) | Pinned host configuration, offline preparation and receipt replay. |
+| [Exclusive worker runtime](docs/worker-runtime.md) | Qualified worker setup, role bindings and recovery. |
+| [OpenSpec metadata](docs/openspec-metadata.md) | Native identity, issue links, validation and vault views. |
+
 ## SDLC
 
 The process is [OpenSpec plus these companion skills](docs/openspec-workflow.md).
@@ -54,10 +68,8 @@ binds immutable requests, complete native reports/captures and atomic adapter-on
 results. Execution completion never grants delivery acceptance. Routine corrections
 use the permitted writer and retained budget; one verified iteration-cap continuation
 is keyed to the native task, not a session or label. Unintegrated contract changes
-are inert for their own change through integration. This repository's future-policy
-selection becomes effective only for later plans after integration. The
-introducing change `goal-oriented-delivery-01m83rmrajvyr504ehszs5yrkc` retains
-its inherited Task-Guided policy and approval.
+are inert for their own change through integration. Each freeze keeps its
+original policy and approval.
 
 The optional [exclusive worker runtime](docs/worker-runtime.md) connects a
 host-wide claim and sealed, settled worker attempt to both delivery modes.
@@ -701,10 +713,8 @@ Users can opt out with `DISABLE_TELEMETRY=1` or `DO_NOT_TRACK=1`; opted-out inst
 should not be relied on to seed leaderboard visibility. A `--list` discovery check
 is not an installation and does not establish a directory entry.
 
-No public directory entry was confirmed for either repository slug during the
-[repository-transfer URL audit](docs/repository-transfer-url-audit.md).
-Indexing timing and ranking belong to skills.sh; CLI discovery does not establish
-a listing. The GitHub and well-known install routes remain available independently.
+Indexing and ranking belong to skills.sh. Use the GitHub or well-known
+installation routes independently of directory visibility.
 
 References: [skills.sh documentation](https://skills.sh/docs) and
 [upstream skills CLI](https://github.com/vercel-labs/skills#telemetry).
@@ -768,9 +778,9 @@ no generated skill copies are committed. Its explicit skill lists separate the
 OpenSpec companion workflow from opt-in orchestration. Bump every affected plugin's version when
 its bundled content changes. See the [Claude release checks](docs/claude-installation.md#maintainer-verification).
 
-Current source versions are delivery 1.6.0 and its affected
-`openspec-development` plugin 1.6.0; `openspec-next` is 0.7.0 and
-`autonomous-orchestration` is 1.10.0 (core skill 0.20.0). Complete well-known output,
+Current source versions are delivery 1.7.0 and its affected
+`openspec-development` plugin 1.7.0; `openspec-next` is 0.7.0 and
+`autonomous-orchestration` is 1.11.0 (core skill 0.21.0). Complete well-known output,
 skill ZIPs, workflow plugin ZIP and isolated native copies must retain all support
 files byte-for-byte, including delivery's runtime and evidence commands and next's
 read-only routing script and reference. Include `scripts/delegated-delivery.mjs`

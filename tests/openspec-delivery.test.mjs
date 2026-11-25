@@ -121,7 +121,7 @@ test("policy/textual plan self-comparison never manufactures approval, commit au
   for (const pattern of [/evidence-only additions from actual checkbox-only progress and\s+covered planning-text changes/, /evidence additions do not approve a plan/, /drift refuses continuation pending separately approved recovery of the exact new\s+plan identity/, /Missing actual approval or unresolved operator restrictions still stop execution/]) assert.match(continuation, pattern);
 });
 
-test("Aikido 1151615165 rejects ignored inputs and binds gates to a fresh disposable exact-SHA checkout", async (t) => {
+test("Candidate admission rejects ignored inputs and binds gates to a fresh disposable exact-SHA checkout", async (t) => {
   const root = await realpath(await mkdtemp(path.join(os.tmpdir(), "ignored-candidate-")));
   t.after(() => rm(root, { recursive: true, force: true }));
   const repo = path.join(root, "implementation");
