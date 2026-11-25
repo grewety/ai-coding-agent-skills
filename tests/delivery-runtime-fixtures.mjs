@@ -35,7 +35,7 @@ export async function gateFixture(f, head, label, gates = [gateArgv]) {
 
 export async function containedHandover(f, workspace, head, gates, attempt, {
   base = f.plan, identity = {}, gateReference = gates.captured.value.wrapperSha256, coverageLimitations = [], findings = [],
-  authority = {}, session = randomUUID(), configurationSha256 = sha256("synthetic contained runtime"), goalDigest, work,
+  authority = {}, session = randomUUID(), configurationSha256 = sha256("synthetic contained runtime"), goalDigest, work, harness,
 } = {}) {
   const root = path.join(f.root, attempt);
   await mkdir(root, { mode: 0o700 });
@@ -67,11 +67,17 @@ export async function containedHandover(f, workspace, head, gates, attempt, {
     snapshot: { base, target: head, plan: f.plan, planDigest, diffSha256: sha256(diff.stdout),
       gates: [{ command: "Check widget", commit: head, exitCode: 0, evidence }] },
     attachments: { [evidence]: sha256(evidenceBytes) }, limits: { diffBytes: 65_536 } };
+  if (harness) {
+    const name = "fixture-harness.json";
+    await writeFile(path.join(workspace, name), await readFile(harness.file));
+    record.snapshot.harness = name;
+    record.attachments[name] = harness.sha256;
+  }
   const bytes = jsonBytes(record);
   await writeFile(request, bytes, { mode: 0o400 });
   const prepared = await buildExport(record);
   const binding = { schemaVersion: 1, requestSha256: sha256(bytes), exportSha256: await prepareExport(exportDirectory, record, null),
-    configurationSha256, model: "claude-fixture" };
+    configurationSha256, model: "claude-fixture", ...(harness ? { harness } : {}) };
   const replay = await runReview({ request: record, expect: binding, prepared, directory: output, excluded: [exportDirectory],
     run: async ({ files, prompt, session }) => {
       const events = [];

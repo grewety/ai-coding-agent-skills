@@ -5,7 +5,7 @@ import { checkoutObservation, commit } from "./change-guard.mjs";
 import { readBounded, scopedPath, separate, sha256 } from "./evidence-retention.mjs";
 import { retainedExternalReservation } from "./external-verification.mjs";
 import { need, observed } from "./operator-records.mjs";
-import { checkHarnessResult, checkHarnessSeal, validateHarnessBinding } from "./harness-result.mjs";
+import { checkHarnessExecutable, checkHarnessResult, validateHarnessBinding, verifyHarnessSeal } from "./harness-result.mjs";
 
 const limit = 64 * 1024;
 function hostFile(ref, excluded) {
@@ -33,10 +33,9 @@ export function verifyLocalHarness({ hostConfiguration, harness, candidate, excl
     need(!harness, "Unexpected harness evidence without a host binding");
     return null;
   }
-  const bytes = hostFile(harness, excluded);
-  const result = checkHarnessSeal(bytes, { configurationSha256: hostConfiguration.sha256,
-    harnessId: binding.id, candidate, maxAgeMs: binding.maxAgeMs, now });
-  return { file: harness.file, sha256: harness.sha256, observedAt: result.observedAt };
+  const result = verifyHarnessSeal({ reference: harness, binding, configurationSha256: hostConfiguration.sha256,
+    candidate, excluded: [...excluded, hostConfiguration.file], now });
+  return { sha256: harness.sha256, observedAt: result.observedAt };
 }
 
 const mcpRequest = (id, method, params) => ({ jsonrpc: "2.0", ...(id === null ? {} : { id }), method, params });
@@ -132,11 +131,8 @@ export async function runLocalHarness(input, context) {
   checkoutObservation(checkout, candidate, { detached: true });
   const parent = lstatSync(scopedPath(path.dirname(output)));
   need(parent.isDirectory() && (parent.mode & 0o077) === 0 && parent.uid === process.getuid(), "Expected private harness evidence root");
-  const adapter = scopedPath(binding.executable);
-  const adapterStat = lstatSync(adapter);
-  need(excluded.every((root) => separate(root, adapter)) && (adapterStat.mode & 0o022) === 0 &&
-    [0, process.getuid()].includes(adapterStat.uid) &&
-    sha256(readBounded(adapter)) === binding.executableSha256, "Harness executable is not host-owned and pinned");
+  const pinExclusions = [...excluded, hostConfiguration.file, output];
+  checkHarnessExecutable(binding, pinExclusions);
   // Exclusive output creation claims this local run before invocation.
   const descriptor = openSync(scopedPath(output, true), constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o400);
   try {
@@ -144,7 +140,9 @@ export async function runLocalHarness(input, context) {
     const result = checkHarnessResult(await invoke(binding, checkout, candidate),
       { harnessId: binding.id, candidate, earliest });
     checkoutObservation(checkout, candidate, { detached: true });
-    const bytes = Buffer.from(JSON.stringify({ schemaVersion: 1, configurationSha256: hostConfiguration.sha256,
+    checkHarnessExecutable(binding, pinExclusions);
+    const bytes = Buffer.from(JSON.stringify({ schemaVersion: 2, configurationSha256: hostConfiguration.sha256,
+      executableSha256: binding.executableSha256, harnessId: binding.id, candidate,
       resultSha256: sha256(JSON.stringify(result)), result }) + "\n");
     need(bytes.length <= limit, "Harness seal exceeds evidence limit");
     writeFileSync(descriptor, bytes);

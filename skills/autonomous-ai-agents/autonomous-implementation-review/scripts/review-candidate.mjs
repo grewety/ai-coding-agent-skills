@@ -11,7 +11,7 @@ import { absolute, checkExport, checkSealedDirectory, digest, equal, fields, fil
 import { bubblewrapVersion, claudeVersion, runtimeBinding, validateHostConfig, withReviewRuntime } from "./review-runtime.mjs";
 import { checkPacketTurns, offlineHostBinding, reviewClock, trustedJson } from "./review-preflight.mjs";
 import { checkProbeSpend, checkReviewSpend, claimProbeRun, claimReviewRun } from "./review-spend.mjs";
-import { checkHarnessSeal } from "./harness-result.mjs";
+import { verifyHarnessSeal } from "./harness-result.mjs";
 import { upstreamClasses } from "./review-upstream-status.mjs";
 import { auditClaudeStream } from "./review-stream.mjs";
 import { createAttempt, publishResult, readClosed, readHandoff, requestBytes as workerRequestBytes, writeClosed } from "./worker-handoff.mjs";
@@ -36,7 +36,7 @@ async function loadInputs(requestFile, expectFile) {
   validateReviewRequest(request);
   const expect = await readJson(expectFile);
   fields(expect, ["schemaVersion", "requestSha256", "exportSha256", "configurationSha256", "model"],
-    "independent expectation", ["statusSha256"]);
+    "independent expectation", ["statusSha256", "harness"]);
   need(expect.schemaVersion === 1 && expect.requestSha256 === hash(jsonBytes(request)) &&
     (expect.exportSha256 === null || digest(expect.exportSha256)) && digest(expect.configurationSha256) &&
     typeof expect.model === "string" && /^claude-[a-z0-9-]{2,100}$/.test(expect.model) &&
@@ -356,16 +356,23 @@ export async function reviewCommand(argv, openRuntime = withReviewRuntime) {
   const host = options["host-config"] ? await offlineHostBinding(options["host-config"], expect, trustExcluded,
     Boolean(policy)) : null;
   const { config } = host ?? {};
+  const binding = policy && request.mode === "candidate" && config?.localHarness;
+  if (binding) {
+    const { value } = await trustedJson(options.expect, [...trustExcluded.filter((root) => root !== options.expect),
+      options["host-config"]], true);
+    need(equal(value, expect), "Host expectation changed during admission");
+  }
   const preflight = (prepared) => {
     if (config && (policy || command !== "--mode")) checkPacketTurns(prepared, config.maxTurns);
     if (!policy || !config || request.mode !== "candidate") return;
-    if (config.localHarness) {
-      const binding = config.localHarness;
-      const evidence = prepared.files.get("context/" + request.snapshot.harness);
-      need(evidence, "Missing exact local harness result before candidate review");
-      checkHarnessSeal(evidence, { configurationSha256: host.configurationSha256, harnessId: binding.id,
-        candidate: request.snapshot.target, maxAgeMs: binding.maxAgeMs });
-    } else need(request.snapshot.harness === undefined, "Unexpected harness result without a host binding");
+    if (binding) {
+      const attachment = prepared.files.get("context/" + request.snapshot.harness);
+      need(request.snapshot.harness && attachment, "Missing exact local harness result before candidate review");
+      verifyHarnessSeal({ reference: expect.harness, binding, configurationSha256: host.configurationSha256,
+        candidate: request.snapshot.target, attachment, excluded: [...trustExcluded, options["host-config"],
+          options.output, options.admission].filter(Boolean) });
+    } else need(request.snapshot.harness === undefined && expect.harness === undefined,
+      "Unexpected harness result without a host binding");
   };
   if (command === "--prepare") return { exportSha256: await prepareExport(exportDirectory, request, expect.exportSha256, preflight) };
   const prepared = await checkExport(exportDirectory, expect.exportSha256, request);
@@ -387,6 +394,7 @@ export async function reviewCommand(argv, openRuntime = withReviewRuntime) {
     [request.worker.identity.workspace, options["host-config"], ...hostPaths(config)]
       .every((root) => separate(directory, root)), "Output overlaps protected host or review paths");
   const excluded = [exportDirectory, options["host-config"], ...hostPaths(config)];
+  if (binding) excluded.push(expect.harness.file);
   const parent = await protectedParent(directory);
   await newAttemptPath(directory);
   if (options.admission) excluded.push(options.admission);

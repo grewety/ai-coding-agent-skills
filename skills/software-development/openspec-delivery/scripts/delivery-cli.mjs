@@ -162,7 +162,9 @@ export async function verifyHandover(input, pinnedReviewCommand) {
     "Reviewer request or runtime identity differs from its handover");
     return { ...verified, request: requestRecord.worker, reviewSnapshot: requestRecord.snapshot,
       reviewPolicyBinding: requestRecord.policy, reviewConfigurationSha256: expectation.configurationSha256,
-      reviewAttachments: requestRecord.attachments, reviewStatusSha256: expectation.statusSha256 };
+      reviewAttachments: requestRecord.attachments,
+      reviewHarnessReferenceSha256: expectation.harness === undefined ? undefined : sha256(stableJson(expectation.harness)),
+      reviewStatusSha256: expectation.statusSha256 };
   }
   const { readClosed, readHandoff, requestBytes, validateRequest } = await companion(input, "worker-handoff.mjs");
   const { expected, runtime } = input;
@@ -379,8 +381,13 @@ async function readDeliveryHandover(input, { context, policy, identity, snapshot
         handoff.reviewConfigurationSha256 === input.hostConfiguration?.sha256,
       "Contained review differs from the integrated or host-owned binding");
       const harness = verifyLocalHarness({ hostConfiguration: input.hostConfiguration, harness: input.harness,
-        candidate: snapshot.head, excluded: [input.repo, identity.workspace, id.workspace] });
-      need(harness ? handoff.reviewAttachments[review.harness] === harness.sha256 : !review.harness,
+        candidate: snapshot.head, excluded: [input.repo, identity.workspace, id.workspace, input.handover.request,
+          input.handover.expect, input.handover.exportDirectory, input.handover.output, ...handoff.request.evidenceRoots,
+          delegation?.directory, ...(delegation?.request.evidenceRoots ?? [])].filter(Boolean) });
+      need(harness ? digest(input.handover.expectFileSha256) &&
+        sha256(stableJson(input.harness)) === handoff.reviewHarnessReferenceSha256 &&
+        handoff.reviewAttachments[review.harness] === harness.sha256 :
+        !review.harness && handoff.reviewHarnessReferenceSha256 === undefined,
         "Contained review omitted the exact host candidate harness result");
     }
     if (delegated || context.lowTouch) {

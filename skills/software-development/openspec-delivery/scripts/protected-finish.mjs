@@ -365,7 +365,7 @@ export async function protectedFinish(input, readiness, now = Date.now(), verify
       !(time(remote.closureReview.observedAt) <= now)) {
     return observe(result("review-closure", "EXACT_CLOSURE_REVIEW_PENDING", { head: closure.head }));
   }
-  if (policy.lowTouch && remote.closure?.state === "ABSENT") {
+  if (policy.lowTouch && ["ABSENT", "OPEN"].includes(remote.closure?.state)) {
     const harness = verifyLocalHarness({ hostConfiguration: input.hostConfiguration, harness: closure.harness,
       candidate: closure.head, excluded: [repo, workspace], now });
     need(input.hostConfiguration.sha256 === anchor.hostConfigurationSha256 &&

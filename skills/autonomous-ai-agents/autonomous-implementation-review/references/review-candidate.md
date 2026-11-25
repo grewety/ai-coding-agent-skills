@@ -199,9 +199,17 @@ if its manifest requires more than `maxTurns - 10` whole-file reads. Packet
 feasibility requires `maxTurns >= 11` to preserve the ten-turn reserve.
 Retain all changed preimages, postimages and hunks within the selected
 coverage. Recheck the same manifest and configuration at live entry.
-A configured local harness requires its candidate-bound sealed attachment
-name in `snapshot.harness`. The prepared export checks the canonical
-repo-relative `fileAcceptance` entries `{packet, path, criterion}` against
+A configured local harness requires a candidate-bound attachment named in
+`snapshot.harness` and an independent `expect.harness: {file, sha256}`
+reference in the private host expectation. Keep the original seal in a
+private host-owned directory and keep its path out of requests, exports and
+worker evidence. Preparation, offline checks and live admission compare
+the attachment bytes with the retained seal and verify its
+schema-version-2 harness ID, candidate, configuration digest, executable
+digest, result digest and freshness. The executable must still match the
+pin in the exact host configuration.
+
+The prepared export checks the canonical repo-relative `fileAcceptance` entries `{packet, path, criterion}` against
 their actual one-based packet. Keep common criteria in `worker.acceptance`.
 Each prompt includes only its scoped criteria and requires canonical
 repository-relative finding paths.

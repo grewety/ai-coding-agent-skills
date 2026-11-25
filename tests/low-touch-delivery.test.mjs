@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { candidate, draftPolicyContext, planning, policyContext, proveTaskCompletion } from
@@ -24,7 +25,7 @@ const tasks = "# Tasks\r\n\r\n- [ ] 1.1 Réal outcome\r\n\r\n```md\r\n- [ ] 1.2 
 const gateArgv = ["/usr/bin/true"];
 
 function fixture(t, adopt = true) {
-  const root = mkdtempSync("/tmp/lt-");
+  const root = mkdtempSync(path.join(os.tmpdir(), "lt-"));
   t.after(() => {
     const entries = (dir) => {
       chmodSync(dir, 0o700);
@@ -219,6 +220,24 @@ test("standing authority matches exact repository event, target, cost, configura
   assert.equal(standingTriggerDecision({ ...request, observed: { ...request.observed, complete: false } }).action, "stop");
 });
 
+function harnessBinding(root) {
+  const executable = path.join(root, "adapter");
+  const bytes = "#!/bin/sh\nexit 1\n";
+  writeFileSync(executable, bytes, { mode: 0o700 });
+  return { id: "fixture", kind: "cli", executable, executableSha256: sha256(bytes), args: [],
+    timeoutMs: 1000, maxAgeMs: 60000, exposure: "local-only" };
+}
+
+function harnessSeal(root, binding, configurationSha256, candidate, overrides = {}) {
+  const file = path.join(root, "retained-harness.json");
+  const result = { schemaVersion: 1, harnessId: binding.id, candidate, verdict: "pass", findings: [],
+    observedAt: new Date().toISOString() };
+  const bytes = Buffer.from(JSON.stringify({ schemaVersion: 2, harnessId: binding.id, candidate, configurationSha256,
+    executableSha256: binding.executableSha256, resultSha256: sha256(JSON.stringify(result)), result, ...overrides }) + "\n");
+  writeFileSync(file, bytes, { mode: 0o400 });
+  return { file, sha256: sha256(bytes) };
+}
+
 test("host-owned CLI and MCP harnesses both seal the committed SHA and fail closed on mismatch", async (t) => {
   const f = fixture(t);
   const plan = f.save("Freeze plan");
@@ -257,12 +276,18 @@ def send(value):
     const params = { ...f, plan, checkout, candidate: plan, hostConfiguration, output, grant };
     const retained = await deliveryCommand("run-harness", params);
     assert.equal(retained.verdict, "pass");
+    const sealed = JSON.parse(readFileSync(retained.harness.file));
+    assert.deepEqual([sealed.schemaVersion, sealed.harnessId, sealed.candidate, sealed.configurationSha256, sealed.executableSha256],
+      [2, id, plan, hostConfiguration.sha256, binding.executableSha256]);
     const readback = { hostConfiguration, harness: retained.harness, candidate: plan, excluded: [f.repo, checkout] };
     assert.equal(verifyLocalHarness(readback).sha256, retained.harness.sha256);
     assert.throws(() => verifyLocalHarness({ ...readback, candidate: f.parent }), /SHA mismatch/);
     assert.throws(() => verifyLocalHarness({ ...readback, harness: { ...retained.harness, sha256: "0".repeat(64) } }), /SHA-256 mismatch/);
     assert.throws(() => verifyLocalHarness({ ...readback, now: Date.now() + 61000 }), /timestamp/);
     await assert.rejects(deliveryCommand("run-harness", params), /EEXIST/);
+    writeFileSync(adapter, "#!/bin/sh\nexit 0\n");
+    assert.throws(() => verifyLocalHarness(readback), /executable pin drift/);
+    await assert.rejects(deliveryCommand("run-harness", params), /executable pin drift/);
   }
 });
 
@@ -349,6 +374,75 @@ test("candidate export includes custom artifacts and omits reserved vault preima
   writeFileSync(paths.expect, jsonBytes(binding));
   await assert.rejects(reviewCommand(["--check", ...checkArguments], neverRuntime), /pin or model mismatch/);
 
+  await t.test("configured reviewer requires an independent seal before offline or live admission", async (t) => {
+    const adapter = harnessBinding(f.root);
+    const hostBytes = jsonBytes({ ...config, maxTurns: largest + 11, localHarness: adapter });
+    const configurationSha256 = sha256(hostBytes);
+    writeFileSync(paths.host, hostBytes);
+    const seal = harnessSeal(f.root, adapter, configurationSha256, target);
+    const attached = readFileSync(seal.file);
+    const name = "fixture-harness.json";
+    t.after(() => rmSync(path.join(f.repo, name), { force: true }));
+    const reviewed = { ...request, snapshot: { ...request.snapshot, harness: name },
+      attachments: { ...request.attachments, [name]: sha256(attached) } };
+    const exportPath = path.join(f.root, "harness-export");
+    const args = ["--request", paths.request, "--expect", paths.expect, "--export", exportPath, "--host-config", paths.host];
+    const live = ["--mode", "candidate", ...args, "--output", paths.output, "--admission", admissionFile];
+    const expect = { ...binding, configurationSha256, requestSha256: sha256(jsonBytes(reviewed)), exportSha256: null };
+    const retain = (harness) => writeFileSync(paths.expect, jsonBytes({ ...expect, harness }));
+    chmodSync(paths.expect, 0o600);
+    writeFileSync(paths.request, jsonBytes(reviewed));
+    f.write(name, attached);
+    retain(undefined);
+    await assert.rejects(reviewCommand(["--prepare", ...args], neverRuntime), /Missing independent host-retained/);
+
+    const copied = { file: path.join(f.repo, name), sha256: seal.sha256 };
+    retain(copied);
+    await assert.rejects(reviewCommand(["--prepare", ...args], neverRuntime), /private host-retained seal outside/);
+    retain(seal);
+    chmodSync(paths.expect, 0o644);
+    await assert.rejects(reviewCommand(["--prepare", ...args], neverRuntime), /Untrusted configuration ownership/);
+    chmodSync(paths.expect, 0o600);
+
+    retain({ ...seal, sha256: "0".repeat(64) });
+    await assert.rejects(reviewCommand(["--prepare", ...args], neverRuntime), /seal SHA-256 mismatch/);
+
+    const mismatched = harnessSeal(ledger, adapter, configurationSha256, target, { executableSha256: "0".repeat(64) });
+    retain(mismatched);
+    await assert.rejects(reviewCommand(["--prepare", ...args], neverRuntime), /attachment differs/);
+    const wrongBytes = readFileSync(mismatched.file);
+    const wrongRequest = { ...reviewed, attachments: { ...reviewed.attachments, [name]: sha256(wrongBytes) } };
+    f.write(name, wrongBytes);
+    writeFileSync(paths.request, jsonBytes(wrongRequest));
+    expect.requestSha256 = sha256(jsonBytes(wrongRequest));
+    retain(mismatched);
+    await assert.rejects(reviewCommand(["--prepare", ...args], neverRuntime), /seal provenance/);
+
+    f.write(name, attached);
+    writeFileSync(paths.request, jsonBytes(reviewed));
+    expect.requestSha256 = sha256(jsonBytes(reviewed));
+    retain(seal);
+    const prepared = await reviewCommand(["--prepare", ...args], neverRuntime);
+    expect.exportSha256 = prepared.exportSha256;
+    retain(seal);
+    assert.equal((await reviewCommand(["--check", ...args], neverRuntime)).exportSha256, prepared.exportSha256);
+    assert.ok(!readFileSync(path.join(exportPath, "files/context", name)).includes(seal.file));
+    retain(undefined);
+    await assert.rejects(reviewCommand(live, neverRuntime), /Missing independent host-retained/);
+    retain(seal);
+    const executableBytes = readFileSync(adapter.executable);
+    writeFileSync(adapter.executable, "#!/bin/sh\nexit 0\n");
+    await assert.rejects(reviewCommand(live, neverRuntime), /executable pin drift/);
+    writeFileSync(adapter.executable, executableBytes);
+    const configuredLedger = path.join(f.root, "configured-ledger");
+    mkdirSync(configuredLedger, { mode: 0o700 });
+    writeAdmission({ ...admission, ledger: configuredLedger, configurationSha256,
+      phaseGrant: { ...admission.phaseGrant, requestSha256: expect.requestSha256 } });
+    await assert.rejects(reviewCommand(live, () => {
+      throw new Error("Synthetic configured boundary before reviewer runtime");
+    }), /Synthetic configured boundary/);
+  });
+
   const archive = `openspec/changes/archive/2026-11-25-${change}`;
   mkdirSync(path.join(f.repo, "openspec/changes/archive"));
   renameSync(path.join(f.repo, dir), path.join(f.repo, archive));
@@ -372,7 +466,11 @@ test("candidate export includes custom artifacts and omits reserved vault preima
 });
 
 
-test("normal finish-readiness entry replays the original contained result and independently gates the change child", async (t) => {
+test("normal finish-readiness replays the original contained result and gates the change child", (t) => finishReadinessFixture(t));
+
+test("delivery admission requires the independent expectation to match the configured harness", (t) => finishReadinessFixture(t, true));
+
+async function finishReadinessFixture(t, configured = false) {
   const { fixture, own, current, currentSpec } = await import("./delivery-runtime-setup.mjs");
   const { gateFixture, containedHandover } = await import("./delivery-runtime-fixtures.mjs");
   const f = await fixture(t, { lowTouch: true });
@@ -383,17 +481,19 @@ test("normal finish-readiness entry replays the original contained result and in
   const reviewer = path.join(f.root, "isolated-review");
   f.git(f.repo, "worktree", "add", "--detach", reviewer, reviewedParent);
   const file = path.join(f.root, "host.json");
-  const config = JSON.stringify({ schemaVersion: 1, localHarness: null });
+  const localHarness = configured ? harnessBinding(f.root) : null;
+  const config = JSON.stringify({ schemaVersion: 1, localHarness });
   writeFileSync(file, config, { mode: 0o600 });
   const hostConfiguration = { file, sha256: sha256(config) };
+  const harness = configured ? harnessSeal(f.root, localHarness, hostConfiguration.sha256, reviewedParent) : undefined;
   const handover = await containedHandover(f, reviewer, reviewedParent, parentGates, "parent-review", {
-    configurationSha256: hostConfiguration.sha256, goalDigest: f.planDigest,
+    configurationSha256: hostConfiguration.sha256, goalDigest: f.planDigest, harness,
   });
   const tasksFile = path.join(f.workspace, own, "tasks.md");
   writeFileSync(tasksFile, readFileSync(tasksFile, "utf8").replace("[ ] 1.1", "[x] 1.1"));
   const head = f.commit(f.workspace, "Record accepted native task");
   const childGates = await gateFixture(f, head, "acceptance-child");
-  const run = { ...f.request, deliveryPhase: "result", head, handover, hostConfiguration,
+  const run = { ...f.request, deliveryPhase: "result", head, handover, hostConfiguration, harness,
     gateRun: parentGates.gateRun, attempt: { id: "parent-review" },
     taskCompletion: { reviewedParent, childGate: childGates.gateRun } };
   const accepted = (await f.run("finish-readiness", run)).value;
@@ -408,4 +508,15 @@ test("normal finish-readiness entry replays the original contained result and in
   assert.equal(wrong.ready, false);
   const stale = (await f.run("finish-readiness", { ...run, taskCompletion: undefined })).value;
   assert.equal(stale.ready, false);
-});
+  if (configured) {
+    const missing = (await f.run("finish-readiness", { ...run, harness: undefined })).value;
+    assert.equal(missing.ready, false);
+    const expect = JSON.parse(readFileSync(handover.expect));
+    delete expect.harness;
+    const bytes = jsonBytes(expect);
+    chmodSync(handover.expect, 0o600);
+    writeFileSync(handover.expect, bytes);
+    const unbound = (await f.run("finish-readiness", { ...run, handover: { ...handover, expectFileSha256: sha256(bytes) } })).value;
+    assert.equal(unbound.ready, false);
+  }
+}

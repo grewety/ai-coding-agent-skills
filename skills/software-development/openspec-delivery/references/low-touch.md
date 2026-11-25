@@ -97,9 +97,19 @@ Use `delivery-cli.mjs run-harness` only with the exact
 `local-candidate-harness` grant. A binding with external exposure also needs
 a distinct exact reservation. The adapter emits a generic schema-version-1
 result with `harnessId`, `candidate`, `verdict`, `findings` and `observedAt`.
-The host seals the result and rejects a changed candidate, bad schema,
-stale result, mismatched pin or failed check. Pass the seal as a bound
-candidate review attachment and recheck against the actual head before
-publication. When the task-only child becomes the head, seal a new result
-for that SHA before pushing. The harness supplies its own evidence while the
+The host writes a schema-version-2 seal binding the result and its digest,
+the exact host configuration digest, the pinned executable digest, the
+harness ID and the candidate SHA. Retain the original seal as a read-only
+file in a private host-owned directory outside the checkout, export,
+request and worker evidence. Give delivery the `harness: {file, sha256}`
+reference and independently pin the reviewer expectation with
+`handover.expectFileSha256`. The private reviewer expectation's
+`harness` must match delivery's reference. The reviewer gets a copy of the
+seal through the attachment named in `snapshot.harness`.
+
+When the task-only child becomes the head, seal a new result for that SHA
+before pushing. A configured closure needs a fresh seal for its current
+head in both absent and open PR states. Retain its reference in the host
+finish readback as `closureCandidate.harness` and bind the independent
+closure review to its digest in `closureReview.harnessSha256`. The
 contained independent result and executable gates remain separately required.

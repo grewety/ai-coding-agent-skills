@@ -5,11 +5,11 @@ import { digest, hash, jsonBytes, need, parseStrictJson, separate, absolute } fr
 import { validateHostConfig } from "./review-runtime.mjs";
 import { readClosed } from "./worker-handoff.mjs";
 
-export async function trustedJson(file, excluded) {
+export async function trustedJson(file, excluded, privateFile = false) {
   need(absolute(file) && excluded.every((root) => separate(file, root)), "Trusted configuration overlaps the checkout or review records");
   const bytes = await readClosed(file, 65536);
   const stat = await lstat(file);
-  need(stat.isFile() && stat.nlink === 1 && (stat.mode & 0o022) === 0 &&
+  need(stat.isFile() && stat.nlink === 1 && (stat.mode & (privateFile ? 0o077 : 0o022)) === 0 &&
     (process.getuid === undefined || [0, process.getuid()].includes(stat.uid)), "Untrusted configuration ownership");
   return { value: parseStrictJson(bytes), configurationSha256: hash(bytes) };
 }

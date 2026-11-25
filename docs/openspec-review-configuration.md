@@ -105,7 +105,10 @@ and SHA-256. CLI receives `--candidate SHA`. A local stdio MCP adapter
 receives `{ "candidate": "SHA", "checkout": "/absolute/path" }` on its
 configured tool. Both return JSON with `schemaVersion`, `harnessId`,
 `candidate`, `verdict`, `findings` and `observedAt`. A passing result has
-an empty findings list. The host seals it against the configuration hash.
+an empty findings list. The host writes a schema-version-2 seal with
+`configurationSha256`, `executableSha256`, `harnessId`, `candidate`,
+`resultSha256` and the schema-version-1 `result`. It checks the pinned
+executable before invocation and again before sealing.
 
 The fields below are the optional object in `host.json`. For a CLI adapter
 use `"kind":"cli"` and omit `tool`. For tools with external contact,
@@ -129,13 +132,25 @@ binding requires an independently verified local-only adapter.
 }
 ```
 
-Bind the sealed result as an approved attachment and name it in
-`snapshot.harness` before final review. Store the original result in host
-evidence and provide its file/digest pair for delivery admission. Recheck
-the applicable SHA, output, host pin and freshness before push. If the
-adopted checkbox-only finish route gives the final head a new SHA, run the
-harness for that head before push as well. Its result cannot substitute
-for the independent review or for exact disposable gates.
+Bind a byte-for-byte copy of the seal as an approved attachment and name
+it in `snapshot.harness`. Retain the original sealed file in a private
+host-owned directory. Record its absolute path and digest as
+`expect.harness: {file, sha256}` in the private host expectation supplied to
+reviewer preparation, offline checks and live admission. Pass that same
+reference as `harness` in the delivery input and independently pin the
+reviewer's expectation with `handover.expectFileSha256`. Keep the private
+seal and its path outside the checkout, request, export and worker evidence.
+Admission verifies the original seal against the exact host configuration,
+current executable pin, candidate and freshness window, and checks the
+exported copy against it before runtime.
+
+When an adopted checkbox-only finish route produces a new head, run the
+harness for that SHA before pushing. For the record-only closure, retain
+the seal reference as `closureCandidate.harness` and record its digest as
+`closureReview.harnessSha256` in the host finish readback. The same
+current-head and freshness checks apply while the closure PR is absent
+and while it is open. Independent review and exact disposable gates
+remain required.
 
 ## Repository binding examples
 
