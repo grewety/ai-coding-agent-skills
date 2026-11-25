@@ -81,7 +81,7 @@ Use `/goal`, not `/loop`. The operator controls pause/resume/clear and `/subgoal
 For earlier compression the operator runs `/goal pause`, `/compress here 2`,
 `/context`, then `/goal resume`.
 
-Reuse evidence and stop discovery once authority, ownership, bootstrap and gates resolve.
+Stop discovery once authority, ownership, bootstrap and gates resolve. Reuse evidence.
 
 ## Procedure
 
