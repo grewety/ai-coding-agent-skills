@@ -27,11 +27,11 @@ This adds no upstream skill or runtime dependency. Package installation/validati
 does not establish native Git behavior; missing native macOS/Windows results remain
 hardening completion blockers, and WSL or case simulations do not replace them.
 
-Delivery 1.5.0 (in `openspec-development` 1.5.0) also includes
+Delivery 1.6.0 (in `openspec-development` 1.6.0) also includes
 `references/evidence-retention.md`, `scripts/evidence-retention.mjs`,
 `scripts/evidence-cli.mjs`, `scripts/delivery-cli.mjs` and
 `scripts/delegated-delivery.mjs`. Keep the complete
-evidence and runtime support in companion copies and ZIPs. `openspec-next` is 0.6.0
+evidence and runtime support in companion copies and ZIPs. `openspec-next` is 0.7.0
 and ships `references/routing.md` and `scripts/next.mjs` for read-only routing to
 delivery. Install both complete packages in the intended host. The separate optional
 `autonomous-orchestration` plugin is 1.10.0 (core skill 0.20.0). Installation, account sync and
@@ -453,6 +453,11 @@ Sources: [Use skills in Claude](https://support.claude.com/en/articles/12512180-
 and [plugin/account platform boundaries](https://claude.com/docs/plugins/overview).
 
 ## Verification, updates and ownership
+
+The [operator runbook](openspec-operator-runbook.md#optional-profile-sync)
+describes the separately approved post-release Hermes scanner or reviewed
+native Codex route, complete-byte verification, backups and fresh-session
+readback. Keep upstream copies commit-pinned and preserve their provenance.
 
 Record CLI/client versions, upstream commit, source/installed inventories and
 byte comparisons. Verify all seven enabled names in the real host, then actual

@@ -73,6 +73,14 @@ details or secrets.
 
 ## Local decisions and status
 
+For prospective proposal assessment, durable short decisions and file-backed
+operator checkpoints, use [the operator workflow](operator-workflow.md).
+`init` is a read-only alias of `status`. The existing status fields remain
+available, and `operatorSchemaVersion: 1` identifies the additional footer
+facts and rendering. Only `record-approval-card` and `approval-reply` write
+operator records. The proposal, card preview, status and relay-decision routes
+perform read-only assessment.
+
 `decision`, `status` and `finish-readiness` take the policy inputs and use the
 registered implementation workspace. For `decision`, supply `deliveryPhase`
 of `dispatch`, `boundary`, `correction`, or `result`. They consume

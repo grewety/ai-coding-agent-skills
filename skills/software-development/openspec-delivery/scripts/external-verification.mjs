@@ -35,11 +35,11 @@ function validateCard(card) {
       !Number.isFinite(card.expectedCost?.amount) || card.expectedCost.amount < 0 || !text(card.expectedCost?.unit) ||
       !(card.retryOf === null || text(card.retryOf))) return false;
   if (card.kind === "app-trigger" ? !text(card.trigger) : card.trigger !== null) return false;
-  if (card.kind === "tunnel" || card.kind === "deploy-preview") {
-    return card.data.includes("built-artifact") && typeof card.artifact?.root === "string" &&
+  if (card.data.includes("built-artifact")) {
+    return typeof card.artifact?.root === "string" &&
       path.isAbsolute(card.artifact.root) && path.normalize(card.artifact.root) === card.artifact.root && digest(card.artifact.sha256);
   }
-  return card.artifact === null;
+  return !["tunnel", "deploy-preview"].includes(card.kind) && card.artifact === null;
 }
 
 function checkExternalRun({ card, grant, observed, history }) {
@@ -76,7 +76,7 @@ export function externalVerificationDecision(request) {
   if (decision.action === "reserve" && existsSync(canonicalFileIdentity(request.grant.reservation))) {
     return { action: "queue", reason: "EXTERNAL_GRANT_CONSUMED", automaticRetry: false };
   }
-  return decision;
+  return request.displayCard === true && validateCard(request.card) ? { ...decision, card: request.card } : decision;
 }
 
 export function reserveExternalRun(request) {
@@ -97,6 +97,17 @@ export function reserveExternalRun(request) {
     serveOnly: card.artifact?.root ?? null, cleanup: card.artifact === null ? null : "immediate-on-success-or-failure" };
 }
 
+export function retainedExternalReservation(run) {
+  try {
+    const { card, reference, reservation } = run;
+    return run.ok === true && run.action === "run-once" && text(reference) && validateCard(card) &&
+      path.basename(reservation.file) === `${sha256(reference)}.json` &&
+      reservation.reference === reference && reservation.cardSha256 === sha256(stableJson(card)) &&
+      reservation.schemaVersion === 1 && reservation.state === "reserved" &&
+      same(JSON.parse(readBounded(canonicalFileIdentity(reservation.file), 8192)), reservation);
+  } catch { return false; }
+}
+
 export function pushTriggerDecision({ candidate, pushGrant, observed, external }) {
   if (!sha(candidate) || pushGrant?.verified !== true || pushGrant.candidate !== candidate || !text(pushGrant.reference)) {
     return { action: "queue", reason: "PUSH_AUTHORITY_PENDING" };
@@ -105,9 +116,9 @@ export function pushTriggerDecision({ candidate, pushGrant, observed, external }
       !Array.isArray(observed.triggers) || !observed.triggers.every(text) ||
       new Set(observed.triggers).size !== observed.triggers.length) return { action: "stop", reason: "TRIGGER_INVENTORY_UNVERIFIED" };
   if (observed.triggers.some((trigger) => !Array.isArray(external) || !external.some((entry) =>
-      entry?.ok === true && entry.action === "run-once" && entry.card?.kind === "app-trigger" &&
+      retainedExternalReservation(entry) && entry.card.kind === "app-trigger" &&
       entry.card.candidate === candidate && entry.card.target === pushGrant.target && entry.card.trigger === trigger &&
-      entry.reference !== pushGrant.reference && entry.pushReference === pushGrant.reference && entry.reservation?.cardSha256 === sha256(stableJson(entry.card))))) {
+      entry.reference !== pushGrant.reference && entry.pushReference === pushGrant.reference))) {
     return { action: "queue", reason: "PUSH_TRIGGER_AUTHORITY_PENDING" };
   }
   return { action: "proceed", reason: null };
@@ -120,7 +131,13 @@ const localUrl = (value) => {
       !url.username && !url.password;
   } catch { return false; }
 };
-export function uiAcceptanceDecision({ declaration, local, preview, candidate }) {
+function previewUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password && !localUrl(value) ? url.href : null;
+  } catch { return null; }
+}
+export function uiAcceptanceDecision({ declaration, local, preview, candidate, requirePreviewUrl = false }) {
   if (declaration === null) return { action: "not-declared", reason: null };
   if (!sha(candidate) || typeof declaration?.localTryOut !== "boolean" || typeof declaration.deployPreview !== "boolean" ||
       !Array.isArray(declaration.interactions) || !declaration.interactions.every((item) => text(item?.role) && text(item?.name)) ||
@@ -138,8 +155,14 @@ export function uiAcceptanceDecision({ declaration, local, preview, candidate })
   if (declaration.deployPreview) {
     if (!text(preview?.authorityReference) || preview.candidate !== candidate || preview.verified !== true ||
         preview.separateGrant !== true || preview.artifactOnly !== true) return { action: "queue", reason: "PREVIEW_AUTHORITY_PENDING" };
-    if (preview.reviewed !== true || !text(preview.reviewReference) || preview.reviewReference === preview.authorityReference) {
-      return { action: "pause", reason: "PREVIEW_REVIEW_PENDING" };
+    const url = previewUrl(preview.url);
+    if (preview.deployment === "failed" || preview.rejected === true) {
+      return { action: "pause", reason: "PREVIEW_FAILED", ...(url ? { previewUrl: url } : {}) };
+    }
+    if (requirePreviewUrl && !url) return { action: "queue", reason: "PREVIEW_URL_UNVERIFIED" };
+    if (preview.reviewed !== true || !text(preview.reviewReference) || preview.reviewReference === preview.authorityReference ||
+        (requirePreviewUrl && (preview.deployment !== "passed" || preview.reviewedUrl !== url))) {
+      return { action: "pause", reason: "PREVIEW_REVIEW_PENDING", ...(url ? { previewUrl: url } : {}) };
     }
   }
   return { action: "accepted", reason: null };

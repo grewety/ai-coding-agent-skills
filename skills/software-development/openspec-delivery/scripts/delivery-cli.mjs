@@ -3,10 +3,10 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 import { writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
-import { ancestor, candidate, commit, draftPolicyContext, goalSnapshot, integratedPolicyContext, planning, policyContext } from "./change-guard.mjs";
-import { reconcileWorkspace, sourceObservation } from "./change-workspace.mjs";
+import { ancestor, candidate, commit, draftPolicyContext, goalSnapshot, integratedPolicyContext, planning, planningWorktree, policyContext } from "./change-guard.mjs";
+import { reconcileWorkspace, sourceObservation, workspacePreview } from "./change-workspace.mjs";
 import { contractChangePaths, resolveDeliveryPolicy, workerContinuationDecision } from "./delivery-policy.mjs";
-import { deliveryDecision, goalContractIdentity, readGoalContract } from "./delivery-control.mjs";
+import { deliveryDecision, goalContractIdentity, readGoalContract, withinScope } from "./delivery-control.mjs";
 import { deliveryStatus, preflight } from "./delivery-status.mjs";
 import { evidenceCommand } from "./evidence-cli.mjs";
 import { readBounded, readJson, scopedPath, separate, sha256, stableJson } from "./evidence-retention.mjs";
@@ -14,6 +14,11 @@ import { planningLayout } from "./planning-inventory.mjs";
 import { finishReadiness } from "./finish-readiness.mjs";
 import { discovery, externalVerificationDecision, pushTriggerDecision, reserveExternalRun, uiAcceptanceDecision } from "./external-verification.mjs";
 import { readDelegation, verifyPairedReview, verifyWorkerScope } from "./delegated-delivery.mjs";
+import { proposalInput, charterObservation, proposalFreeze } from "./operator-planning.mjs";
+import { cardDisplay, currentCard, narrowRestrictions, observed, recordCard, recordReply,
+  readPlanningFeedback, readSeparateGrant, readShortAuthority, same, sealedObservation, verifyShortRoles } from "./operator-records.mjs";
+import { checkpointObservation, operatorStatus, relayCheckpoint, resumeCheckpoint } from "./operator-status.mjs";
+import { protectedFinish } from "./protected-finish.mjs";
 
 const need = (condition, message) => { if (!condition) throw new Error(message); };
 const digest = (value) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
@@ -27,8 +32,8 @@ function retainedJson({ file, sha256: expected }) {
 function inspectPolicy(input) {
   const { repo, change, plan, parent, target, selection, declaredContractPaths, deliveryBoundary,
     contractDesignations = [], phase = "execute", legacy, recovery, orchestrationAvailable, reviewAcceptance } = input;
-  const draft = phase === "freeze" && !plan;
-  const context = draft ? draftPolicyContext({ repo, change, parent, target }) :
+  const draft = ["draft", "freeze"].includes(phase) && !plan;
+  const context = draft ? draftPolicyContext({ repo, change, parent, target, draftHead: input.draftHead }) :
     policyContext({ repo, change, plan, target }, { allowUnintegratedParent: phase === "execute" && Boolean(legacy || recovery) });
   const policy = resolveDeliveryPolicy({ phase, context, selection: { ...selection, goalFirst: context.goalFirstOptIn },
     contractPaths: contractChangePaths({ declared: [], changed: context.changedPaths, designations: contractDesignations }),
@@ -44,6 +49,85 @@ function inspectPolicy(input) {
     } else goal = goalSnapshot(repo, plan, change, policy.policyRevision);
   }
   return { policy, context, goal, planDigest: draft ? null : goal?.digest ?? context.planDigest };
+}
+
+function operatorIdentity(input, { context, policy, planDigest }, workspace) {
+  need(workspace && observed(input.repositoryObservation) && input.repositoryObservation.repo === input.repo &&
+    typeof input.repositoryObservation.repository === "string" && input.repositoryObservation.repository.trim(),
+  "Missing verified repository identity or registered dedicated workspace");
+  return { repo: input.repo, repository: input.repositoryObservation.repository, change: context.change,
+    mode: policy.mode, policyRevision: policy.policyRevision, workspace: workspace.workspace,
+    branch: workspace.branch, plan: context.plan, planDigest, inputs: context.inputs };
+}
+
+async function assessProposal(input) {
+  const parent = integratedPolicyContext(input.repo, input.parent, input.target);
+  const proposal = proposalInput(input, parent);
+  need(["prepare", "assess", "correct"].includes(input.proposal.phase), "Unknown proposal phase");
+  if (input.proposal.phase === "prepare") return { action: "prepare-native-draft", proposal,
+    workspace: workspacePreview("prepare", { ...input, base: parent.parent }) };
+  const { implementation: workspace } = reconcileWorkspace({ ...input, base: parent.parent });
+  need(workspace, "Prepare and verify the registered draft workspace before native scaffolding");
+  let revision;
+  if (input.revision) {
+    const previous = inspectPolicy({ ...input, reviewAcceptance: input.revision.reviewAcceptance,
+      plan: input.revision.plan, phase: "execute" });
+    need(previous.context.parent === parent.parent && previous.policy.proposeToFreeze, "Revision crosses the inherited integrated policy");
+    revision = { ...readPlanningFeedback(input.revision.operator, operatorIdentity(input, previous, workspace), workspace.head),
+      inputs: previous.context.inputs };
+  }
+  need(workspace.head === (revision?.plan ?? parent.parent), "Draft HEAD differs from the integrated parent or recorded predecessor");
+  const request = { ...input, repo: workspace.workspace, plan: undefined, phase: "draft", draftHead: revision?.plan };
+  const restrictions = revision ? narrowRestrictions(revision.restrictions, input.restrictions) : input.restrictions;
+  const revisionProposal = { ...proposal, revision, draftOnly: proposal.draftOnly || restrictions?.noCommits === true };
+  const evaluation = inspectPolicy(request);
+  const { context, policy } = evaluation;
+  const charterRequired = policy.approachPolicy === "charter-v1" && (policy.requireApproachReview || proposal.reviewRequested);
+  if (input.proposal.phase === "correct" || charterRequired && input.charter) {
+    need(charterRequired, "Charter corrections require selected charter-v1 policy");
+    const charter = await charterObservation(input, context, revisionProposal, workspace);
+    const after = inspectPolicy(request);
+    need(same(context.inputs, after.context.inputs), "Complete draft planning inventory changed during charter verification");
+    if (input.proposal.phase === "correct") return { ...charter, proposal, workspace, policy };
+    return proposalFreeze({ input, context: after.context, policy, proposal: revisionProposal, workspace, charter });
+  }
+  const result = proposalFreeze({ input: charterRequired ? { ...input, reviewAcceptance: null } : input,
+    context, policy, proposal: revisionProposal, workspace });
+  return result;
+}
+
+function approvalCardCommand(command, input) {
+  const evaluation = inspectPolicy({ ...input, phase: "execute" });
+  const { context, goal, policy } = evaluation;
+  need(policy.proposeToFreeze, "Integrated plan parent has not selected short approval cards");
+  const { implementation: workspace } = reconcileWorkspace({ ...input, base: context.parent });
+  const identity = operatorIdentity(input, evaluation, workspace);
+  need(!workspace.dirty && workspace.head === identity.plan, "Frozen checkout must be clean and at the exact plan SHA");
+  need(same(planningWorktree(workspace.workspace, identity.change).inputs, identity.inputs),
+    "Working planning inputs differ from the complete frozen bytes");
+  if (command === "approval-reply") return recordReply(input.operator, identity, workspace.head);
+  const freeze = sealedObservation(input.freeze);
+  need(freeze.action === "freeze-ready" && freeze.change === context.change && freeze.policyRevision === context.parent &&
+    freeze.policy?.mode === policy.mode && freeze.workspace?.workspace === workspace.workspace &&
+    freeze.workspace?.branch === workspace.branch && freeze.workspace?.head === (freeze.proposal?.revision?.plan ?? context.parent) &&
+    freeze.proposal?.draftOnly === false && same(freeze.inputs, context.inputs) &&
+    context.changedPaths.length > 0 && context.changedPaths.every((file) => Object.hasOwn(context.inputs, file)),
+  "Frozen commit differs from the validated plan-only freeze observation");
+  const summary = input.cardSummary;
+  if (goal) {
+    need(summary.outcome === goal.contract.outcome && same(summary.gates, goal.contract.gates) &&
+      same(summary.exclusions, goal.contract.nonGoals), "Displayed summary differs from the frozen Goal Contract");
+    if (summary.local) need(summary.local.budgets?.minutes <= goal.contract.budgets.minutes &&
+      summary.local.budgets?.corrections <= goal.contract.budgets.corrections &&
+      summary.local.stop === goal.contract.localAuthority.stop && (!summary.local.commits || goal.contract.localAuthority.commits),
+    "Displayed grant exceeds the frozen Goal Contract");
+  } else {
+    need(observed(input.cardScope) && input.cardScope.planDigest === identity.planDigest &&
+      same(input.cardScope.summary, summary), "Missing verified frozen Task-Guided scope and gate readback");
+  }
+  if (summary.local) verifyShortRoles(summary.local.roles, input.roleBindings);
+  return command === "approval-card" ? cardDisplay(input.operator, identity, summary) :
+    recordCard(input.operator, identity, summary, workspace.head, freeze.proposal?.revision?.plan);
 }
 
 async function companion(entry, filename) {
@@ -139,6 +223,12 @@ function nativeGroups(input, evaluation, workspace) {
 function checkedPreflight(input, policy, delegation) {
   const observations = input.preflight ?? {};
   const { branch, remote } = observations.live ?? {};
+  if (!policy && !input.plan && observed(observations.live) && observed(observations.checkpoint)) {
+    try {
+      const checkpoint = integratedPolicyContext(input.repo, observations.checkpoint.policyRevision, observations.live.head);
+      policy = { policyRevision: checkpoint.parent };
+    } catch { /* P7 reports blocked. */ }
+  }
   let source;
   if (typeof branch === "string" && typeof remote === "string") {
     try { source = sourceObservation({ repo: input.repo, targetBranch: branch, remote }); } catch { /* P3 reports blocked. */ }
@@ -163,7 +253,6 @@ async function inspectPredecessor(input, delegation, implementation, taskGroups,
   const cap = control.reason === "native-turn-cap";
   need(prior.deliveryPhase === (cap ? "boundary" : "result") && prior.repo === input.repo && prior.plan === id.plan &&
     prior.target === input.target && prior.change === id.change && prior.workspace === id.workspace &&
-    prior.approval?.reference === input.approval?.reference &&
     prior.delegation?.runtimeSha256 === input.delegation.runtimeSha256 &&
     prior.delegation?.verifier === input.delegation.verifier &&
     stableJson(prior.taskGuidance?.groups) === stableJson(input.taskGuidance?.groups) &&
@@ -173,7 +262,8 @@ async function inspectPredecessor(input, delegation, implementation, taskGroups,
   "Predecessor request differs from the retained delivery boundary");
   const evaluated = await deliveryEvaluation(prior, options);
   const previous = evaluated.delegation;
-  need(previous?.result && previous.id.attempt === id.predecessor && previous.owner.claimId === owner.claimId &&
+  need(previous?.result && previous.verifiedApproval.reference === delegation.verifiedApproval.reference &&
+    previous.id.attempt === id.predecessor && previous.owner.claimId === owner.claimId &&
     previous.resultSha256 === control.priorResultSha256 && previous.settlementSha256 === control.priorSettlementSha256,
   "Predecessor has no exact verified settlement and result");
   need(previous.release?.settlementSha256 === previous.settlementSha256 && digest(previous.release?.releaseSha256),
@@ -304,6 +394,45 @@ async function deliveryEvaluation(input, options) {
   const implementation = workspace.implementation;
   if (implementation) ancestor(implementation.workspace, context.plan, implementation.head);
   const identity = { change: context.change, plan: context.plan, planDigest, workspace: implementation?.workspace ?? null };
+  let shortFailure;
+  let shortAuthority;
+  let authorityEvidence;
+  if (input.shortDecision) {
+    try {
+      need(policy.proposeToFreeze, "Integrated plan parent has not selected short approval cards");
+      const bound = operatorIdentity(input, evaluation, implementation);
+      if (input.deliveryPhase === "dispatch" && !input.shortDecision.resumeCheckpoint) {
+        need(same(planningWorktree(implementation.workspace, bound.change).inputs, bound.inputs),
+          "Working planning inputs differ from the complete frozen bytes");
+      }
+      const authority = readShortAuthority(input.shortDecision, bound, implementation.head,
+        input.deliveryPhase, !options?.observationsOnly && input.restrictions?.inspect !== true);
+      authorityEvidence = authority.replyFile;
+      if (!authority.grant && input.shortDecision.localGrant) {
+        authority.grant = readSeparateGrant(input.shortDecision.localGrant, authority, bound);
+        authority.roles = authority.grant.roles;
+      }
+      const pair = authority.grant ? verifyShortRoles(authority.roles, input.roleBindings) : null;
+      let restrictions = narrowRestrictions(authority.restrictions, input.restrictions);
+      if (input.shortDecision.resumeCheckpoint) {
+        const checkpoint = resumeCheckpoint(input, identity, implementation, authority.grant);
+        restrictions = narrowRestrictions(checkpoint.restrictions, restrictions);
+      }
+      if (input.delegation && authority.grant) {
+        // The exclusive runtime consumes its own pinned file-backed authority
+        // format. It must retain the short transaction and stay within it.
+        need(input.runtimeAuthority?.approvalReference === authority.approval.reference &&
+          input.runtimeAuthority?.grantReference === authority.grant.reference &&
+          observed(input.runtimeAuthority), "Runtime authority is not bound to the short operator transaction");
+        input = { ...input, restrictions };
+      } else input = { ...input, approval: authority.approval, grant: authority.grant, restrictions };
+      shortAuthority = { ...authority, roles: pair };
+    } catch (error) {
+      shortFailure = { action: "stop", reason: "SHORT_AUTHORITY_UNVERIFIED", detail: error.message };
+    }
+  } else if ([input.approval, input.grant].some((item) => item?.reference?.startsWith("operator:"))) {
+    shortFailure = { action: "stop", reason: "SHORT_AUTHORITY_UNVERIFIED", detail: "Load the original short decision journal" };
+  }
   const candidateRequest = implementation && input.head ? { repo: implementation.workspace, base: context.parent,
     head: input.head, plan: context.plan, change: context.change, mode: policy.mode, target: context.target, "expect-plan": planDigest } : null;
   let snapshot = null;
@@ -322,12 +451,31 @@ async function deliveryEvaluation(input, options) {
   let delegationFailure = null;
   const delegated = context.delegatedRuntime || input.selection?.delegatedRuntime === true ||
     input.grant?.delegatedRuntime === true || input.delegation !== undefined;
+  const awaitingApproval = policy.proposeToFreeze && !input.approval && !input.shortDecision && !input.attempt?.id;
   const groups = implementation && nativeGroups(input, evaluation, implementation);
-  if (delegated && implementation && input.restrictions?.inspect !== true) {
+  if (delegated && implementation && !shortFailure && !awaitingApproval &&
+      input.restrictions?.inspect !== true && (!input.shortDecision || shortAuthority?.grant)) {
     try {
-      delegation = await readDelegation(input, { context, policy, identity, implementation, goal }, options?.registry);
+      delegation = await readDelegation(input, { context, policy, identity, implementation, goal, shortAuthority }, options?.registry);
+      if (shortAuthority) {
+        const held = shortAuthority.grant;
+        const runtime = delegation.verifiedGrant;
+        const { group, noCommits } = input.restrictions;
+        const scopeMatches = goal ? delegation.request.scope.every((file) => withinScope(file, goal.contract.scope)) :
+          delegation.grant.eligibleTasks.every((task) => groups?.some(({ id, taskIds, authority }) =>
+            authority === "local" && held.eligibleGroups.includes(id) && (group === null || group === id) && taskIds.includes(task)));
+        const minutes = Math.min(held.budgets.minutes, held.budget?.limit ?? Infinity);
+        need(scopeMatches && runtime.budgets.minutes <= minutes && runtime.budgets.corrections <= held.budgets.corrections &&
+          delegation.request.budget.unit === "minutes" && delegation.request.budget.limit <= minutes &&
+          runtime.stop === held.stop && (!runtime.commits || held.commits && !noCommits),
+        "Delegated runtime grant expands the short-approved local grant");
+        input = { ...input, approval: delegation.verifiedApproval, grant: delegation.verifiedGrant };
+      }
       if (input.deliveryPhase === "dispatch") await inspectPredecessor(input, delegation, implementation, groups, options);
-    } catch (error) { delegationFailure = { action: "stop", reason: "DELEGATED_RUNTIME_UNVERIFIED", detail: error.message }; }
+    } catch (error) {
+      delegation = null;
+      delegationFailure = { action: "stop", reason: "DELEGATED_RUNTIME_UNVERIFIED", detail: error.message };
+    }
     if (delegation && !delegationFailure && input.deliveryPhase !== "dispatch") {
       if (!delegation.result) {
         const reasons = { "operator-input": "HUMAN_INPUT_PENDING", running: "ORIGINAL_ATTEMPT_ACTIVE",
@@ -349,6 +497,9 @@ async function deliveryEvaluation(input, options) {
   }
   let decision;
   if (input.restrictions?.inspect === true) decision = { action: "inspect", reason: null };
+  else if (shortFailure) decision = shortFailure;
+  else if (awaitingApproval) decision = { action: "queue", reason: "EXACT_APPROVAL_PENDING" };
+  else if (input.shortDecision && !shortAuthority?.grant) decision = { action: "queue", reason: "LOCAL_AUTHORITY_PENDING" };
   else if (!implementation) decision = { action: "queue", reason: "DEDICATED_WORKSPACE_PENDING" };
   else if (input.deliveryPhase === "dispatch" && implementation.dirty) decision = { action: "stop", reason: "WORKSPACE_DIRTY" };
   else if (candidateFailure) {
@@ -416,11 +567,81 @@ async function deliveryEvaluation(input, options) {
       }
     }
   }
-  return { policy, context, identity, snapshot, decision, handoff, invalidHandover, candidateRequest, delegation };
+  return { policy, context, identity, planDigest, snapshot, decision, handoff, invalidHandover, candidateRequest, delegation,
+    implementation, authorityEvidence, restrictions: input.restrictions,
+    grant: shortFailure ? null : input.shortDecision ? shortAuthority.grant : delegation?.verifiedGrant ?? input.grant };
+}
+
+function decorateStatus(base, input, evaluation, extras = {}) {
+  const e = evaluation ?? {};
+  return operatorStatus(base, { policy: e.policy, workspace: e.implementation, identity: e.identity,
+    preflight: checkedPreflight(input, e.policy, e.delegation), restrictions: e.restrictions ?? input.restrictions,
+    alignment: input.observed?.alignment, pullRequest: input.pullRequest, detail: e.decision?.detail,
+    evidence: e.authorityEvidence, ...extras });
 }
 
 export async function deliveryCommand(command, input, options) {
   switch (command) {
+    case "finish":
+    case "sync-skills":
+    case "continue": {
+      let closeout;
+      try {
+        let readiness;
+        if (command === "finish" && input.plan) {
+          const e = await deliveryEvaluation(input, { ...options, observationsOnly: true });
+          if (e.candidateRequest) {
+            readiness = { ...finishReadiness(e.candidateRequest, e.decision), plan: e.context.plan,
+              planDigest: e.identity.planDigest, mode: e.policy.mode, policyRevision: e.policy.policyRevision,
+              workspace: e.implementation?.workspace, branch: e.implementation?.branch, targetRevision: e.context.target,
+              keepWorktree: e.restrictions?.keepWorktree, gateReference: e.decision.gateReference,
+              reviewReference: e.handoff?.result?.report?.sha256 };
+          }
+        }
+        closeout = await protectedFinish({ ...input, resume: command === "continue" ? "continue" : null }, readiness);
+        if (command === "sync-skills") {
+          closeout = closeout.sync ? { ...closeout, cleanupAction: closeout.action, action: "sync-assessment", reason: null } :
+            { ...closeout, action: "pause", reason: "SYNC_RELEASE_OR_CLOSEOUT_PENDING" };
+        }
+      } catch (error) {
+        closeout = { schemaVersion: 1, action: "pause", reason: "FINISH_OBSERVATIONS_UNVERIFIED", detail: error.message,
+          checkpoint: input.finishCheckpoint?.file ?? null, readback: input.finishRemote?.file ?? null,
+          remoteWrites: false, profileWrites: false };
+      }
+      const id = closeout.identity;
+      const next = !["closed", "sync-assessment"].includes(closeout.action) || closeout.sync && closeout.sync.action !== "sync-verified";
+      const base = { ...deliveryStatus({ change: input.change }), state: closeout.archiveAccepted ?
+        ((closeout.cleanupAction ?? closeout.action) === "closed" ? "closed" : "cleanup-pending") : "protected-closeout",
+      mode: id?.mode ?? null, candidateSha: id?.candidate ?? null, planDigest: id?.planDigest ?? null,
+      stopPredicate: closeout.reason ?? closeout.sync?.reason ?? null,
+      recommendedNextAction: next ? { code: "PROTECTED_CLOSEOUT_NEXT", subject: input.change } : null };
+      return { ...closeout, status: decorateStatus(base, input, { policy: id, identity: id,
+        implementation: id ? { workspace: id.workspace, branch: id.branch, head: id.candidate } : null },
+      { closeout, evidence: closeout.readback, detail: closeout.detail,
+        restrictions: { ...input.restrictions, keepWorktree: closeout.keepWorktree === true || input.restrictions?.keepWorktree === true } }) };
+    }
+    case "proposal": {
+      try {
+        const result = await assessProposal(input);
+        const base = deliveryStatus({ change: input.change });
+        if (result.policy) base.mode = result.policy.mode;
+        if (result.reason) base.stopPredicate = /^[A-Z_]+$/.test(result.reason) ? result.reason : "PLANNING_CONVERGENCE_STOPPED";
+        return { ...result, status: decorateStatus(base, input, { policy: result.policy, implementation: result.workspace },
+          { proposal: result, detail: result.reason }) };
+      } catch (error) {
+        return { action: "stop", reason: "PLANNING_OBSERVATIONS_UNVERIFIED", detail: error.message,
+          status: decorateStatus(deliveryStatus({ change: input.change, failure: true }), input, null, { detail: error.message }) };
+      }
+    }
+    case "approval-card":
+    case "record-approval-card":
+    case "approval-reply": {
+      try { return approvalCardCommand(command, input); }
+      catch (error) {
+        const status = decorateStatus(deliveryStatus({ change: input.change, failure: true }), input, null, { detail: error.message });
+        return { schemaVersion: 1, ok: false, error: error.message, status };
+      }
+    }
     case "policy": {
       const { context, policy, planDigest, goal } = inspectPolicy(input);
       return { schemaVersion: 1, context, policy, planDigest, goalContractDigest: goal?.digest ?? null };
@@ -430,10 +651,6 @@ export async function deliveryCommand(command, input, options) {
       let policy;
       try {
         if (input.plan) policy = inspectPolicy(input).policy;
-        else if (input.preflight?.live?.verified === true) {
-          const context = integratedPolicyContext(input.repo, input.preflight.checkpoint?.policyRevision, input.preflight.live.head);
-          policy = { policyRevision: context.parent };
-        }
       } catch { /* P7 reports blocked. */ }
       return checkedPreflight(input, policy);
     }
@@ -449,17 +666,27 @@ export async function deliveryCommand(command, input, options) {
     case "ui": return uiAcceptanceDecision(input);
     case "decision":
     case "finish-readiness":
+    case "checkpoint-relay":
+    case "init":
     case "status": {
-      if (command === "status" && !input.plan) return deliveryStatus({ change: input.change });
+      const statusCommand = command === "status" || command === "init";
+      if (statusCommand && input.finishCheckpoint) {
+        return (await deliveryCommand("finish", input, options)).status;
+      }
+      if (statusCommand && !input.plan) {
+        if (input.proposal) return (await deliveryCommand("proposal", input, options)).status;
+        return decorateStatus(deliveryStatus({ change: input.change }), input);
+      }
       let e;
       try {
-        e = await deliveryEvaluation(command === "status" && input.restrictions?.inspect === true ?
-          { ...input, restrictions: { ...input.restrictions, inspect: false } } : input, options);
+        e = await deliveryEvaluation((statusCommand || command === "checkpoint-relay") && input.restrictions?.inspect === true ?
+          { ...input, restrictions: { ...input.restrictions, inspect: false } } : input,
+        { ...options, observationsOnly: statusCommand || command === "checkpoint-relay" });
       } catch (error) {
-        if (command === "status") return deliveryStatus({ change: input.change, failure: true });
+        if (statusCommand) return decorateStatus(deliveryStatus({ change: input.change, failure: true }), input, null, { detail: error.message });
         throw error;
       }
-      if (command === "decision") return { schemaVersion: 1, identity: e.identity, ...e.decision };
+      if (command === "decision" && !e.policy.proposeToFreeze) return { schemaVersion: 1, identity: e.identity, ...e.decision };
       const finish = e.candidateRequest && (command === "finish-readiness" || e.decision.action === "accept-result") ?
         finishReadiness(e.candidateRequest, e.decision) : null;
       if (command === "finish-readiness") return finish ?? { schemaVersion: 1, change: e.identity.change, head: null,
@@ -484,8 +711,36 @@ export async function deliveryCommand(command, input, options) {
       const context = input.phaseBoundary?.verified === true && input.phaseBoundary.attempt === input.attempt?.id ?
         input.phaseBoundary.contextHint : null;
       const attempt = input.attempt ?? (e.delegation?.id ? { id: e.delegation.id.attempt } : null);
-      return deliveryStatus({ ...e, change: e.identity.change, candidate: snapshot, finish, closure, context,
+      let base = deliveryStatus({ ...e, change: e.identity.change, candidate: snapshot, finish, closure, context,
         handoff: e.handoff ?? e.delegation, attempt: { ...attempt, invalid: e.invalidHandover } });
+      let checkpoint;
+      let shortCard;
+      let detail = e.decision.detail;
+      try {
+        const pending = ["ORIGINAL_ATTEMPT_ACTIVE", "ORIGINAL_SETTLEMENT_PENDING", "ORIGINAL_RECOVERY_PENDING",
+          "HUMAN_INPUT_PENDING", "OWNERSHIP_UNVERIFIED", "HANDOVER_UNVERIFIED", "DELEGATED_RUNTIME_UNVERIFIED",
+          "SHORT_AUTHORITY_UNVERIFIED", "CANDIDATE_IDENTITY_UNVERIFIED", "DIRECTION_DRIFT_CHOICE"].includes(e.decision.reason);
+        if (input.checkpointFile) {
+          need(!pending && (!attempt?.id || base.activeAttemptId === attempt.id && !e.handoff?.active && !e.delegation?.active) &&
+            e.implementation && !e.implementation.dirty, "Checkpoint ownership or original settlement is unresolved");
+          checkpoint = checkpointObservation(input, e.identity, e.implementation, attempt?.id, e.grant);
+        }
+        if (e.policy.proposeToFreeze && input.operator && base.state === "approval-pending" && !e.implementation?.dirty) {
+          need(e.implementation && same(planningWorktree(e.implementation.workspace, e.identity.change).inputs, e.context.inputs),
+            "Working planning inputs differ from the complete frozen bytes");
+          shortCard = currentCard(input.operator, operatorIdentity(input, e, e.implementation), e.implementation.head);
+        }
+        if (command === "checkpoint-relay") return relayCheckpoint(input, checkpoint,
+          pending || e.handoff?.active || e.delegation?.active, e.grant);
+      } catch (error) {
+        if (command === "checkpoint-relay") return { action: "preserve-predecessor", reason: "CHECKPOINT_RELAY_UNVERIFIED", detail: error.message };
+        base = { ...base, state: "blocked", stopPredicate: "OPERATOR_EVIDENCE_UNVERIFIED",
+          recommendedNextAction: { code: "RESOLVE_STOP", subject: base.change } };
+        detail = error.message;
+      }
+      const status = decorateStatus(base, input, e, { checkpoint, shortCard, detail,
+        evidence: e.authorityEvidence ?? shortCard?.file ?? input.checkpointFile?.file });
+      return command === "decision" ? { schemaVersion: 1, identity: e.identity, ...e.decision, status } : status;
     }
     default: throw new Error("Unknown delivery command");
   }

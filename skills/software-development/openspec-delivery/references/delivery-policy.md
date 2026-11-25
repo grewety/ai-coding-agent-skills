@@ -305,3 +305,13 @@ also stop or queue the run. An actionable in-scope failure consumes the
 held correction budget. Retain its rejected evidence and successor; repin
 gates and independent result review every time the candidate SHA changes.
 See [delivery-runtime.md](delivery-runtime.md) for the runnable interfaces.
+## Prospective short proposal policy
+
+The verified integrated plan parent can select
+`<!-- openspec-proposal: propose-to-freeze -->` once in its root contributor
+contract. The packaged guard reads the committed parent. A missing or ambiguous
+marker leaves short planning on the uncommitted draft boundary. The policy
+observation defaults to false for legacy and recovery plans. Planning may
+assess its draft mode before review. Only a complete matching review under the
+selected policy can satisfy a required review gate at freeze or execution.
+See [short proposal and operator checkpoints](operator-workflow.md).

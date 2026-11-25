@@ -1,7 +1,7 @@
 ---
 name: openspec-next
 description: Inspect or advance an approved OpenSpec goal or task group.
-version: 0.6.0
+version: 0.7.0
 author: Raphael (forgegod), Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -96,6 +96,10 @@ and forbids continuation; idle or cap output alone is insufficient.
    For configured delegation, pass the original runtime assignment, retained
    attempt and restrictions through to delivery, including no commits and any
    fixed group. Let delivery reconcile settlement and exact predecessor evidence.
+   Render the returned Next-Step Footer at each nonterminal stop. For a current
+   approval card, route the immediate reply through delivery's durable card
+   checks. On a session change, read the named sealed checkpoint and replay
+   the original authority and ownership checks before resuming.
 6. For execution, load `openspec-delivery`. Goal-First uses the approved Goal
    Contract and its single native outcome. Task-Guided resumes incomplete
    checks/review first, then selects the first eligible unfinished approved group
@@ -108,8 +112,11 @@ and forbids continuation; idle or cap output alone is insufficient.
    results through delivery, and preserve the separate deploy-preview authority
    and review pause. Offer the protected finish invocation only on positive
    exact-candidate finish readiness. With an existing finish grant, resume the
-   observed PR or closeout boundary. A pending check or human review stays
-   pending. A verified closure ends the change.
+   observed PR or closeout boundary via the packaged `finish` decision. Forward
+   a contextual `continue` only with the same sealed finish checkpoint and new
+   remote evidence for the same reviewed PR head. Render required and optional
+   check state, preview URL, and pending cleanup from the returned status.
+   Optional post-release `sync-skills` carries a separate operator decision.
 
 ## Pitfalls
 

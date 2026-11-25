@@ -17,6 +17,7 @@ or an untrusted target checkout. Pass absolute paths for retained request files.
 
 ```sh
 node <next> inspect --input <request.json> --json
+node <next> init --input <request.json> --json
 node <next> next --input <request.json> --json
 node <next> ui --input <ui-observations.json> --json
 node <next> external --input <external-card.json> --json
@@ -31,6 +32,20 @@ The request and response schemas are those of delivery's
 The helper returns their JSON and exit status. Even an affirmative result is an
 observation. The helper creates no worktree, writes no tasks or reservations,
 launches no worker or gate, and performs no external operation.
+
+`init` uses the same read-only status assessment as `inspect`. Render its
+Next-Step Footer from the returned `footer` and keep the original JSON.
+Build requests and resolve companion paths from the installed skill and
+verified records. Supply `--runtime-sha256` from the selected package
+inventory to pin the runtime entry point. A missing or mismatched companion
+stops with its predicate. Keep using P8 for the complete package inventory.
+For a prospective short proposal assessment or a separately authorized
+checkpoint relay decision, the read-only `proposal` and `checkpoint-relay`
+routes use the same-named delivery commands. Card display and approval
+recording belong to delivery's operator workflow. Preserve the original
+`shortDecision`, role bindings and restrictions when routing its subsequent
+execution request. A fresh session first inspects the sealed checkpoint
+using the exact change name and path in the footer.
 
 When the project selects the exclusive runtime, pass the resolved full
 change and workspace, pinned `delegation` inputs and original restrictions

@@ -1,7 +1,7 @@
 ---
 name: openspec-delivery
 description: Automate setup, execution and closeout of OpenSpec changes.
-version: 1.5.0
+version: 1.6.0
 author: Raphael (forgegod), Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -30,6 +30,13 @@ gate, readback and review evidence. [Evidence retention](references/evidence-ret
   documentation or recovery. A planning-only request ends at
   proposal/spec/design/tasks plus a bounded issue write only when the project's
   explicitly selected proposal policy includes it.
+- For a short proposal, `/goal draft` or an immediate approval-card reply,
+  use [the operator workflow](references/operator-workflow.md). If the verified
+  integrated parent explicitly selects `propose-to-freeze`, run its packaged
+  planning assessment and plan-only freeze readback before displaying a card.
+  Under the inherited policy or a draft-only restriction, stop at the
+  uncommitted draft after applicable review. An approval reply uses the
+  original retained display; dispatch still requires the separate local grant.
 - Do not use to create a second task tracker, or to require a GitHub issue
   before local specification can begin. The selected policy requires the verified
   issue before plan approval, not before drafting.
@@ -166,6 +173,7 @@ The Hermes/direct forms show the available verbs:
 /openspec-delivery prepare <name>
 /openspec-delivery finish <name>
 /openspec-delivery document <name>
+/openspec-delivery sync-skills <name>
 ```
 
 `<name>` may be the full name or an unambiguous short slug. With no name, or
@@ -191,6 +199,13 @@ a ULID or remember a worktree path. Load [references/continuation.md](references
   and removal of clean dedicated worktrees. No direct target push, bypass,
   force-push, release, branch deletion or next change. Require exact candidate acceptance and current-spec
   promotion through `finish-readiness` first; do not implement missing groups under `finish`.
+  Use [protected finish checkpoints](references/protected-finish.md) to watch
+  required checks within a deadline and resume the same exact PR after a
+  contextual `continue`. Reconcile every proven registration after closure.
+- `sync-skills`: identify the immutable release source, client or profile and
+  desired packages. Use the separately authorized operator-controlled update
+  route in [protected finish checkpoints](references/protected-finish.md).
+  The packaged helper only assesses the offer and retained verification.
 - `document`: load `references/ticket.md`, create/reuse one issue, read it back,
   bind its verified URL, then stop. No implementation, commits or PR. Reuse
   does not authorize rewriting an existing issue. No second task list.
@@ -253,6 +268,9 @@ authority for each provider run.
    validate the artifact-first handoff with orchestration's `readHandoff` before
    using its report as evidence. Completion, review verdict and delivery acceptance
    are distinct; neither worker output nor a missing result advances tasks.
+   At every operator stop use the packaged `status` observations and Markdown
+   footer. Use the [file-backed checkpoint procedure](references/operator-workflow.md#read-only-status-and-checkpoint-relay)
+   for a fresh session or a separately authorized, already qualified relay.
 7. Freeze a clean committed candidate. Capture gates from a clean disposable
    checkout at that exact SHA. For a declared UI flow verify local-only try-out
    and accessible-name checks. Route a separately authorized deploy preview to

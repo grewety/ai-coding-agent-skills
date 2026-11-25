@@ -49,8 +49,8 @@ provides no OS isolation and is ineligible for the reviewer role.
 ## Install and bind
 
 1. Follow the [OpenSpec prerequisites](openspec-installation.md). Install
-   complete delivery 1.5.0 and next 0.6.0 packages from the
-   `openspec-development` 1.5.0 bundle and the separately selected
+   complete delivery 1.6.0 and next 0.7.0 packages from the
+   `openspec-development` 1.6.0 bundle and the separately selected
    orchestration 0.20.0 package from `autonomous-orchestration` 1.10.0.
    Check the exact CLI and supporting file bytes outside the workspace before
    enabling the project route. Use the normal collision, backup and fresh

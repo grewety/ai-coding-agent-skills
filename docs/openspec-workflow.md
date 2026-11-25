@@ -279,6 +279,48 @@ Verification is required at setup but advisory in use. It does not replace proje
 gates, independently block archive, or archive the change. It is not an
 `openspec verify` CLI gate.
 
+## Short operator checkpoints
+
+For a later plan whose verified integrated parent explicitly selects
+`propose-to-freeze`, a short proposal or `/goal draft` can reach a validated
+plan-only commit and one current approval card. The [packaged operator workflow](../skills/software-development/openspec-delivery/references/operator-workflow.md)
+defines the parent marker, native validation and review readbacks, and card
+records. Under prior policy or `draft only` / `no commits`, stop at the
+uncommitted draft after applicable review. Apply clear `changes: …` feedback
+within scope, revalidate and review, and replace the card only after an
+authorized refreeze. A consumed or superseded card cannot authorize the new
+revision.
+
+A verified immediate `approve` records exact approval only. `approve and run`
+also records a separate bounded local grant for the displayed scope, gates,
+role pair and restrictions. Both records must read back before combined
+dispatch. This authorizes bounded local execution under the selected contract.
+Finish publication, each paid or external run, retry, tunnel and preview, and
+any profile write need their applicable separate authority.
+
+Use `$openspec-next inspect <full-name>` in Codex for read-only inspection. Use
+the rendered Next-Step Footer to find the current stop, retained evidence and
+legal next input. At a verified clean checkpoint, use its concrete paths to
+start a fresh session:
+
+```sh
+codex --approve-for-me -C "$change_worktree" --add-dir "$change_records"
+```
+
+The [operator runbook](openspec-operator-runbook.md) covers the exact short
+inputs, bounded protected waits, partial cleanup, and optional profile sync.
+
+The flag selects workspace-write with automatic approval review. The starter
+points to an exact sealed checkpoint and keeps the original restrictions,
+budgets and role bindings. Sending `$openspec-next <full-name>` authorizes only
+the selected bounded local route and still requires exact approval and a
+separate execution grant. Sending `$openspec-delivery finish <full-name>`
+separately authorizes protected publication and closeout after finish readiness.
+An existing qualified Herdr route may rotate only with separate checkpoint
+authority, predecessor timer cancellation, exact successor readback and a
+matching file-backed `HANDOFF_ACK`. Keep the predecessor until handoff and
+original-attempt settlement are verified.
+
 ## Identity and path conventions
 
 The full change name is the stable reference in tickets, dependencies, handoffs
@@ -882,8 +924,8 @@ Orchestration is optional. It requires the workflow plugin, explicit role and
 model configuration, and a supported host. Package installation does not create
 those roles.
 
-Current source versions are delivery 1.5.0 and `openspec-next` 0.6.0 in
-`openspec-development` 1.5.0, and core skill 0.20.0 in
+Current source versions are delivery 1.6.0 and `openspec-next` 0.7.0 in
+`openspec-development` 1.6.0, and core skill 0.20.0 in
 `autonomous-orchestration` 1.10.0.
 Representation support adds no upstream workflow, runtime dependency or
 installation route. Package availability/byte checks do not establish account
