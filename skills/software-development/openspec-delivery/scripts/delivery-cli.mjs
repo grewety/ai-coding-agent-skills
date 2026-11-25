@@ -6,7 +6,7 @@ import { parseArgs } from "node:util";
 import { ancestor, candidate, commit, draftPolicyContext, goalSnapshot, integratedPolicyContext, planning, planningWorktree, policyContext } from "./change-guard.mjs";
 import { reconcileWorkspace, sourceObservation, workspacePreview } from "./change-workspace.mjs";
 import { contractChangePaths, resolveDeliveryPolicy, workerContinuationDecision } from "./delivery-policy.mjs";
-import { deliveryDecision, goalContractIdentity, readGoalContract } from "./delivery-control.mjs";
+import { deliveryDecision, goalContractIdentity, readGoalContract, withinScope } from "./delivery-control.mjs";
 import { deliveryStatus, preflight } from "./delivery-status.mjs";
 import { evidenceCommand } from "./evidence-cli.mjs";
 import { readBounded, readJson, scopedPath, separate, sha256, stableJson } from "./evidence-retention.mjs";
@@ -253,7 +253,6 @@ async function inspectPredecessor(input, delegation, implementation, taskGroups,
   const cap = control.reason === "native-turn-cap";
   need(prior.deliveryPhase === (cap ? "boundary" : "result") && prior.repo === input.repo && prior.plan === id.plan &&
     prior.target === input.target && prior.change === id.change && prior.workspace === id.workspace &&
-    prior.approval?.reference === input.approval?.reference &&
     prior.delegation?.runtimeSha256 === input.delegation.runtimeSha256 &&
     prior.delegation?.verifier === input.delegation.verifier &&
     stableJson(prior.taskGuidance?.groups) === stableJson(input.taskGuidance?.groups) &&
@@ -263,7 +262,8 @@ async function inspectPredecessor(input, delegation, implementation, taskGroups,
   "Predecessor request differs from the retained delivery boundary");
   const evaluated = await deliveryEvaluation(prior, options);
   const previous = evaluated.delegation;
-  need(previous?.result && previous.id.attempt === id.predecessor && previous.owner.claimId === owner.claimId &&
+  need(previous?.result && previous.verifiedApproval.reference === delegation.verifiedApproval.reference &&
+    previous.id.attempt === id.predecessor && previous.owner.claimId === owner.claimId &&
     previous.resultSha256 === control.priorResultSha256 && previous.settlementSha256 === control.priorSettlementSha256,
   "Predecessor has no exact verified settlement and result");
   need(previous.release?.settlementSha256 === previous.settlementSha256 && digest(previous.release?.releaseSha256),
@@ -395,6 +395,7 @@ async function deliveryEvaluation(input, options) {
   if (implementation) ancestor(implementation.workspace, context.plan, implementation.head);
   const identity = { change: context.change, plan: context.plan, planDigest, workspace: implementation?.workspace ?? null };
   let shortFailure;
+  let shortAuthority;
   let authorityEvidence;
   if (input.shortDecision) {
     try {
@@ -405,7 +406,7 @@ async function deliveryEvaluation(input, options) {
           "Working planning inputs differ from the complete frozen bytes");
       }
       const authority = readShortAuthority(input.shortDecision, bound, implementation.head,
-        input.shortDecision.resumeCheckpoint ? "boundary" : input.deliveryPhase, !options?.observationsOnly);
+        input.deliveryPhase, !options?.observationsOnly && input.restrictions?.inspect !== true);
       authorityEvidence = authority.replyFile;
       if (!authority.grant && input.shortDecision.localGrant) {
         authority.grant = readSeparateGrant(input.shortDecision.localGrant, authority, bound);
@@ -423,9 +424,9 @@ async function deliveryEvaluation(input, options) {
         need(input.runtimeAuthority?.approvalReference === authority.approval.reference &&
           input.runtimeAuthority?.grantReference === authority.grant.reference &&
           observed(input.runtimeAuthority), "Runtime authority is not bound to the short operator transaction");
-        input = { ...input, restrictions, verifiedShortRoles: pair };
+        input = { ...input, restrictions };
       } else input = { ...input, approval: authority.approval, grant: authority.grant, restrictions };
-      input = { ...input, shortGrant: authority.grant, shortApproval: authority.approval };
+      shortAuthority = { ...authority, roles: pair };
     } catch (error) {
       shortFailure = { action: "stop", reason: "SHORT_AUTHORITY_UNVERIFIED", detail: error.message };
     }
@@ -453,16 +454,20 @@ async function deliveryEvaluation(input, options) {
   const awaitingApproval = policy.proposeToFreeze && !input.approval && !input.shortDecision && !input.attempt?.id;
   const groups = implementation && nativeGroups(input, evaluation, implementation);
   if (delegated && implementation && !shortFailure && !awaitingApproval &&
-      input.restrictions?.inspect !== true && (!input.shortDecision || input.shortGrant)) {
+      input.restrictions?.inspect !== true && (!input.shortDecision || shortAuthority?.grant)) {
     try {
-      delegation = await readDelegation(input, { context, policy, identity, implementation, goal }, options?.registry);
-      if (input.shortGrant) {
-        const held = input.shortGrant;
+      delegation = await readDelegation(input, { context, policy, identity, implementation, goal, shortAuthority }, options?.registry);
+      if (shortAuthority) {
+        const held = shortAuthority.grant;
         const runtime = delegation.verifiedGrant;
-        const eligible = groups?.filter(({ taskIds }) => taskIds.some((task) => delegation.grant.eligibleTasks.includes(task)));
-        need(runtime.budgets.minutes <= held.budgets.minutes && runtime.budgets.corrections <= held.budgets.corrections &&
-          runtime.stop === held.stop && (!runtime.commits || held.commits) &&
-          (!eligible || eligible.every(({ id }) => held.eligibleGroups?.includes(id))),
+        const { group, noCommits } = input.restrictions;
+        const scopeMatches = goal ? delegation.request.scope.every((file) => withinScope(file, goal.contract.scope)) :
+          delegation.grant.eligibleTasks.every((task) => groups?.some(({ id, taskIds, authority }) =>
+            authority === "local" && held.eligibleGroups.includes(id) && (group === null || group === id) && taskIds.includes(task)));
+        const minutes = Math.min(held.budgets.minutes, held.budget?.limit ?? Infinity);
+        need(scopeMatches && runtime.budgets.minutes <= minutes && runtime.budgets.corrections <= held.budgets.corrections &&
+          delegation.request.budget.unit === "minutes" && delegation.request.budget.limit <= minutes &&
+          runtime.stop === held.stop && (!runtime.commits || held.commits && !noCommits),
         "Delegated runtime grant expands the short-approved local grant");
       }
       if (input.deliveryPhase === "dispatch") await inspectPredecessor(input, delegation, implementation, groups, options);
@@ -493,7 +498,7 @@ async function deliveryEvaluation(input, options) {
   if (input.restrictions?.inspect === true) decision = { action: "inspect", reason: null };
   else if (shortFailure) decision = shortFailure;
   else if (awaitingApproval) decision = { action: "queue", reason: "EXACT_APPROVAL_PENDING" };
-  else if (input.shortDecision && !input.shortGrant) decision = { action: "queue", reason: "LOCAL_AUTHORITY_PENDING" };
+  else if (input.shortDecision && !shortAuthority?.grant) decision = { action: "queue", reason: "LOCAL_AUTHORITY_PENDING" };
   else if (!implementation) decision = { action: "queue", reason: "DEDICATED_WORKSPACE_PENDING" };
   else if (input.deliveryPhase === "dispatch" && implementation.dirty) decision = { action: "stop", reason: "WORKSPACE_DIRTY" };
   else if (candidateFailure) {
@@ -563,7 +568,7 @@ async function deliveryEvaluation(input, options) {
   }
   return { policy, context, identity, planDigest, snapshot, decision, handoff, invalidHandover, candidateRequest, delegation,
     implementation, authorityEvidence, restrictions: input.restrictions,
-    grant: shortFailure ? null : input.shortDecision ? input.shortGrant : delegation?.verifiedGrant ?? input.grant };
+    grant: shortFailure ? null : input.shortDecision ? shortAuthority.grant : delegation?.verifiedGrant ?? input.grant };
 }
 
 function decorateStatus(base, input, evaluation, extras = {}) {

@@ -78,10 +78,10 @@ export async function fixture(t, { integratedOptIn = true, staged = false, exclu
   ]);
   if (!integratedOptIn && !exclusive) await write(workspace, "AGENTS.md", "# Unintegrated opt-in\n<!-- openspec-delivery-mode: goal-first -->\n");
   let index = 0;
-  const run = async (command, input, cli = delivery) => {
+  const run = async (command, input, cli = delivery, nodeArgs = []) => {
     const file = path.join(root, `input-${++index}.json`);
     await writeFile(file, JSON.stringify(input));
-    const result = exec(process.execPath, [cli, command, "--input", file, ...(cli === delivery ? ["--json"] : [])]);
+    const result = exec(process.execPath, [...nodeArgs, cli, command, "--input", file, ...(cli === delivery ? ["--json"] : [])]);
     assert.ok(result.stdout, result.stderr);
     return { status: result.status, stdout: result.stdout, value: JSON.parse(result.stdout) };
   };

@@ -143,10 +143,15 @@ unique conversation context, use the explicit exact-identity approval route.
    retention when a later invocation omits them.
 
 For exclusive delegation retain the normal pinned runtime authority files
-and paired qualifications. The role observation names the corresponding
-`runtimeBindingSha256` and route. `runtimeAuthority` cites the verified link
-between the assignment authority and the short approval and grant references.
-Read the assignment back through the existing exclusive-runtime admission.
+and paired qualifications. The sealed role observation names the qualified
+route and the qualification's `bindingSha256` (also accepted as
+`runtimeBindingSha256`). The approval card's role `bindingSha256` pins
+the sealed observation file. Supply a verified `runtimeAuthority` with a
+stable `reference`, the short transaction's `approvalReference` and
+`grantReference`, and the assignment's exact `approval` and `grant`
+`{path, sha256}` pins. Delivery checks those pins through the existing
+exclusive-runtime admission. The short route can omit top-level `approval`
+and `grant` inputs.
 The derived local grant must fit the retained budgets, stop, groups and commit
 restriction. A role pin identifies a qualified route. Each live provider run
 still needs separate authority.

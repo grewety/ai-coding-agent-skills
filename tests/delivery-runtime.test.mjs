@@ -12,7 +12,7 @@ import { runtimeIdentity } from "../skills/autonomous-ai-agents/autonomous-imple
 import { runReview } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-candidate.mjs";
 import { buildExport, jsonBytes, prepareExport } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-inputs.mjs";
 import { bubblewrapVersion, claudeVersion } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-runtime.mjs";
-import { buildExclusiveFixture } from "./delivery-runtime-fixtures.mjs";
+import { buildExclusiveFixture, workerRequest } from "./delivery-runtime-fixtures.mjs";
 import { change, current, currentSpec, exec, fixture, gateArgv, own, twoGroupGuidance } from "./delivery-runtime-setup.mjs";
 
 const evidence = fileURLToPath(new URL("../skills/software-development/openspec-delivery/scripts/evidence-cli.mjs", import.meta.url));
@@ -29,20 +29,6 @@ async function gateFixture(f, head, label, gates = [gateArgv]) {
     gates: gates.map((argv) => ({ argv, timeoutMs: 5_000 })) };
   const captured = await f.run("gate-capture", request, evidence);
   return { captured, checkout, request, gateRun: { file: output, sha256: captured.value.fileSha256 } };
-}
-
-function workerRequest(f, head, gateReference, attempt, directory, role = "reviewer") {
-  return { schemaVersion: 1,
-    identity: { attempt, predecessor: null, role, change, group: "1", task: "1.1", action: "1.1", workspace: f.workspace, plan: f.plan,
-      planDigest: f.planDigest, candidate: role === "reviewer" ? head : null, inputs: { ...f.evaluated.context.inputs },
-      implementerSession: role === "reviewer" ? "fixture-implementer" : null },
-    outcome: "Review the widget", acceptance: [`gate-run:${gateReference}`], scope: ["widget.txt"], nonGoals: ["Publish"],
-    authority: { orchestrator: "fixture-owner", writer: "fixture-owner", authorSession: "fixture-author",
-      approvalReference: f.request.approval.reference, executionReference: f.request.grant.reference },
-    restrictions: ["no Git writes", "no tasks.md writes", "no profile writes", "no subagents", "no multiplexers",
-      ...(role === "reviewer" ? ["read-only"] : [])], budget: { limit: 15, unit: "minutes" },
-    stop: "Scope conflict", evidenceRoots: [directory], requiredEvidence: ["native.txt", "lifecycle.jsonl"], mutablePaths: [],
-  };
 }
 
 async function createHandover(f, head, gateReference, attempt, role = "reviewer", active = false, identity = {}) {

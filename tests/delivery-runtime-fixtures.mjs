@@ -14,6 +14,22 @@ import { privateCheckoutIdentity } from "../skills/autonomous-ai-agents/autonomo
 import { jsonBytes } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-inputs.mjs";
 import { claudeVersion } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-runtime.mjs";
 
+import { change } from "./delivery-runtime-setup.mjs";
+
+export function workerRequest(f, head, gateReference, attempt, directory, role = "reviewer") {
+  return { schemaVersion: 1,
+    identity: { attempt, predecessor: null, role, change, group: "1", task: "1.1", action: "1.1", workspace: f.workspace, plan: f.plan,
+      planDigest: f.planDigest, candidate: role === "reviewer" ? head : null, inputs: { ...f.evaluated.context.inputs },
+      implementerSession: role === "reviewer" ? "fixture-implementer" : null },
+    outcome: "Review the widget", acceptance: [`gate-run:${gateReference}`], scope: ["widget.txt"], nonGoals: ["Publish"],
+    authority: { orchestrator: "fixture-owner", writer: "fixture-owner", authorSession: "fixture-author",
+      approvalReference: f.request.approval.reference, executionReference: f.request.grant.reference },
+    restrictions: ["no Git writes", "no tasks.md writes", "no profile writes", "no subagents", "no multiplexers",
+      ...(role === "reviewer" ? ["read-only"] : [])], budget: { limit: 15, unit: "minutes" },
+    stop: "Scope conflict", evidenceRoots: [directory], requiredEvidence: ["native.txt", "lifecycle.jsonl"], mutablePaths: [],
+  };
+}
+
 const fakeCodex = `#!/usr/bin/python3
 import json, pathlib, sys, uuid
 fence = chr(96) * 3

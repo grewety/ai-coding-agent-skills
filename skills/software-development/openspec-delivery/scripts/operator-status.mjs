@@ -1,6 +1,6 @@
 import path from "node:path";
-import { readBounded, scopedPath, separate, sha256, stableJson } from "./evidence-retention.mjs";
-import { need, observed, same, sealedObservation, text } from "./operator-records.mjs";
+import { readBounded, sha256, stableJson } from "./evidence-retention.mjs";
+import { need, observed, privateRecords, same, sealedObservation, text } from "./operator-records.mjs";
 
 const launch = 'codex --approve-for-me -C "$change_worktree" --add-dir "$change_records"';
 const shellQuote = (value) => "'" + value.replaceAll("'", "'\\''") + "'";
@@ -8,9 +8,8 @@ const shellQuote = (value) => "'" + value.replaceAll("'", "'\\''") + "'";
 export function checkpointObservation(input, identity, workspace, active, grant) {
   if (!input.checkpointFile) return null;
   const retained = sealedObservation(input.checkpointFile);
-  const records = scopedPath(retained.records);
-  need(input.checkpointFile.file.startsWith(records + path.sep) &&
-    separate(records, workspace.workspace) && separate(records, input.repo), "Checkpoint overlaps mutable checkout or is outside retained records");
+  const records = privateRecords(retained.records, [workspace.workspace, input.repo]);
+  need(input.checkpointFile.file.startsWith(records + path.sep), "Checkpoint is outside retained records");
   need(retained.schemaVersion === 1 && retained.kind === "delivery-checkpoint" && observed(retained) &&
     same(retained.identity, { ...identity, branch: workspace.branch, head: workspace.head }) &&
     retained.attempt === (active ?? null) && retained.grantReference === (grant?.reference ?? null) &&

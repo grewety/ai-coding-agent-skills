@@ -64,8 +64,10 @@ export function proposalFreeze({ input, context, policy, proposal, workspace, ch
   const validation = validatedDraft(input, context);
   if (!validation) return stop("NATIVE_VALIDATION_PENDING");
   const review = charter ?? input.reviewAcceptance;
+  const matchingPolicy = policy.approachPolicy === "charter-v1" ? review?.policy === "charter-v1" :
+    review?.policy === undefined || review.policy === "strict";
   if ((proposal.reviewRequested || policy.requireApproachReview) &&
-      (review?.action !== "freeze-ready" || !same(review.inputs, context.inputs) || !text(review.reference))) {
+      (!matchingPolicy || review?.action !== "freeze-ready" || !same(review.inputs, context.inputs) || !text(review.reference))) {
     return stop("APPROACH_REVIEW_PENDING");
   }
   if (!proposal.proposeToFreeze || !policy.proposeToFreeze || proposal.draftOnly) return stop("UNCOMMITTED_DRAFT_BOUNDARY");

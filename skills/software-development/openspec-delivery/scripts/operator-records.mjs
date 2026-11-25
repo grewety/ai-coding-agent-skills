@@ -25,7 +25,7 @@ export function sealedObservation({ file, sha256: expected }) {
   return JSON.parse(utf8.decode(raw));
 }
 
-function privateRecords(directory, roots) {
+export function privateRecords(directory, roots) {
   const dir = scopedPath(directory);
   const info = lstatSync(dir);
   need(info.isDirectory() && (process.getuid === undefined || info.uid === process.getuid() && (info.mode & 0o077) === 0) &&
@@ -242,8 +242,8 @@ export function readShortAuthority(control, identity, head, phase, live) {
     "Reply does not carry exact approval");
   const expected = authority(card, reply.turn, action);
   need(same(reply.approval, expected.approval) && same(reply.grant, expected.grant), "Partial or inconsistent short approval transaction");
-  if (phase === "dispatch") {
-    need(head === identity.plan, "Initial short-approved dispatch requires the exact frozen HEAD");
+  if (phase === "dispatch" && (!control.resumeCheckpoint || live)) {
+    if (!control.resumeCheckpoint) need(head === identity.plan, "Initial short-approved dispatch requires the exact frozen HEAD");
     fresh(card, control.at, live);
     need(instant(control.at) >= instant(reply.evidence.at), "Dispatch observation precedes the approval reply");
   }
@@ -292,6 +292,8 @@ export function verifyShortRoles(expected, entries) {
     need(observed(record) && record.reference === bound.reference && record.role === role &&
       record.route === bound.route && (role !== "reviewer" || record.readOnly === true),
     `Qualified ${role} no longer matches the retained role and route`);
-    return [role, record];
+    need(record.bindingSha256 === undefined || record.runtimeBindingSha256 === undefined ||
+      record.bindingSha256 === record.runtimeBindingSha256, `Conflicting qualified ${role} runtime pins`);
+    return [role, { ...record, runtimeBindingSha256: record.bindingSha256 ?? record.runtimeBindingSha256 }];
   }));
 }

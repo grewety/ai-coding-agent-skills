@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { sha256 } from "../skills/software-development/openspec-delivery/scripts/evidence-cli.mjs";
@@ -9,6 +9,8 @@ import { planningWorktree } from "../skills/software-development/openspec-delive
 import { operatorStatus } from "../skills/software-development/openspec-delivery/scripts/operator-status.mjs";
 import { startConvergenceReview, convergencePacket, acceptConvergenceReview } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/orchestration-core.mjs";
 import { boundary, change, fixture, own, twoGroupGuidance } from "./delivery-runtime-setup.mjs";
+import { buildExclusiveFixture, workerRequest } from "./delivery-runtime-fixtures.mjs";
+import { roleQualificationBinding } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-bindings.mjs";
 
 const cardEpoch = Date.now() - 30 * 60_000;
 const cardTime = (minutes) => new Date(cardEpoch + minutes * 60_000).toISOString();
@@ -20,10 +22,10 @@ async function sealedFixture(root, name, record) {
   return { file, sha256: sha256(source) };
 }
 
-async function operatorFixture(t, optedIn = true, inspectDraft, staged = false) {
+async function operatorFixture(t, optedIn = true, inspectDraft, staged = false, exclusive = false) {
   let freeze;
   let proposalRequest;
-  const f = await fixture(t, { proposeToFreeze: optedIn, staged, beforeFreeze: async ({ root, repo, workspace, base, run, draft }) => {
+  const f = await fixture(t, { proposeToFreeze: optedIn, staged, exclusive, beforeFreeze: async ({ root, repo, workspace, base, run, draft }) => {
     const verified = { verified: true, reference: "retained:operator-fixture" };
     const proposal = { ...verified, kind: "short-proposal", phase: "assess", goal: "Deliver the widget" };
     const validation = await sealedFixture(root, "validation", { ...verified, change, policyRevision: base,
@@ -75,7 +77,8 @@ async function operatorFixture(t, optedIn = true, inspectDraft, staged = false) 
   const request = { ...f.request, approval: undefined, grant: undefined, freeze, roleBindings,
     repositoryObservation, cardSummary, operator,
     ...(staged && { cardScope: { verified: true, reference: "retained:task-guidance", planDigest: f.planDigest, summary: cardSummary } }) };
-  return { ...f, records, request, operator, proposalRequest };
+  const runtime = exclusive ? await buildExclusiveFixture(f, { workerRequest }) : null;
+  return { ...f, records, request, operator, proposalRequest, runtime };
 }
 
 async function displayCard(f, turnId = "display-turn") {
@@ -188,6 +191,18 @@ test("short proposal replays pinned charter convergence with grounded correction
   });
 });
 
+test("strict proposal review accepts matching evidence and rejects a crossed approach policy", async (t) => {
+  await operatorFixture(t, true, async ({ draft, request, run }) => {
+    const reviewed = { ...request, proposal: { ...request.proposal, review: true } };
+    const review = { action: "freeze-ready", inputs: draft.context.inputs, reference: "retained:complete-review" };
+    for (const policy of [undefined, "strict", "charter-v1"]) {
+      const result = await run("proposal", { ...reviewed, reviewAcceptance: { ...review, policy } });
+      if (policy === "charter-v1") assert.equal(result.value.reason, "APPROACH_REVIEW_PENDING", result.stdout);
+      else assert.equal(result.value.action, "freeze-ready", result.stdout);
+    }
+  });
+});
+
 test("unique displayed approval yields separately retained approval and bounded execution through next", async (t) => {
   const f = await operatorFixture(t);
   const card = await displayCard(f);
@@ -251,6 +266,105 @@ test("Task-Guided short approval retains its ordered group and leaves unqualifie
   assert.match(drift.value.footer, /P8 blocked/);
 });
 
+test("settled short dispatch checks live expiry without requiring frozen HEAD on resume", async (t) => {
+  const f = await operatorFixture(t);
+  const operator = { ...f.operator, displayedAt: cardTime(-60), expiresAt: cardTime(-10) };
+  const at = cardTime(-58);
+  const pastArgs = ["--import", `data:text/javascript,Date.now%3D()%3D%3E${Date.parse(at)}`];
+  const runAtReply = (command, input) => f.run(command, input, undefined, pastArgs);
+  const historical = { ...f, operator, run: runAtReply, request: { ...f.request, operator } };
+  const card = await displayCard(historical);
+  const reply = await runAtReply("approval-reply", shortReply(historical, card, "approve and run", { at: cardTime(-59) }));
+  assert.equal(reply.status, 0, reply.stdout);
+  const { grant } = reply.value.entry;
+  await f.write(f.workspace, "widget.txt", "new");
+  const head = f.commit(f.workspace, "Settled fixture output");
+  const identity = { change, plan: f.plan, planDigest: f.planDigest, workspace: f.workspace,
+    branch: `change/${change}`, head };
+  const attempt = "settled-fixture";
+  const evidence = await sealedFixture(f.records, "settled-proof", { attempt, settled: true });
+  const resumeCheckpoint = await sealedFixture(f.records, "settled-checkpoint", {
+    schemaVersion: 1, kind: "delivery-checkpoint", verified: true, reference: "checkpoint:settled",
+    records: f.records, identity, attempt, grantReference: grant.reference, grantSha256: sha256(stableJson(grant)),
+    evidence, safeBoundary: true, originalSettlement: { verified: true, reference: evidence.file, attempt },
+    restrictions: card.entry.restrictions, budgets: { minutesUsed: 1, groupMinutesUsed: 1, correctionsUsed: 0, correctionHistory: [] },
+  });
+  const request = { ...historical.request, head,
+    shortDecision: { ...operator, at, replySha256: reply.value.sha256, resumeCheckpoint, resumeAttempt: attempt } };
+  const valid = await runAtReply("decision", request);
+  assert.equal(valid.value.action, "dispatch", valid.stdout);
+  const premature = await runAtReply("decision", { ...request, shortDecision: { ...request.shortDecision, at: cardTime(-60) } });
+  assert.equal(premature.value.reason, "SHORT_AUTHORITY_UNVERIFIED", premature.stdout);
+  assert.match(premature.value.detail, /precedes the approval reply/);
+  const expired = await f.run("decision", request);
+  assert.equal(expired.value.reason, "SHORT_AUTHORITY_UNVERIFIED", expired.stdout);
+  assert.match(expired.value.detail, /current display window/);
+  const observed = await f.run("status", { ...request, shortDecision: { ...request.shortDecision, at: new Date().toISOString() } });
+  assert.equal(observed.value.state, "local-ready", observed.stdout);
+});
+
+test("exclusive short dispatch binds the sealed runtime authority and independent qualification pair", { skip: process.platform !== "linux" }, async (t) => {
+  const f = await operatorFixture(t, true, undefined, false, true);
+  const runtime = f.runtime;
+  const { input, entry } = await runtime.assignment("short-dispatch", { noCommits: true });
+  const widening = await runtime.assignment("widening-dispatch");
+  const pin = async (variant, field, value, route) => {
+    const records = path.join(f.root, variant);
+    await mkdir(records, { mode: 0o700 });
+    const operator = { ...f.operator, records };
+    const roleBindings = {};
+    const roles = {};
+    for (const role of ["implementer", "reviewer"]) {
+      const runtimeRole = runtime.pair[role];
+      const observation = { verified: true, reference: runtimeRole.qualification.path, role, readOnly: role === "reviewer",
+        route: role === "reviewer" && route ? route : runtimeRole.route };
+      if (role === "implementer") observation.runtimeBindingSha256 = roleQualificationBinding(runtimeRole);
+      else if (field) observation[field] = value;
+      roleBindings[role] = await sealedFixture(records, role, observation);
+      roles[role] = { ...observation, bindingSha256: roleBindings[role].sha256 };
+    }
+    const cardSummary = { ...f.request.cardSummary, local: { ...f.request.cardSummary.local, roles } };
+    const request = { ...f.request, operator, roleBindings, cardSummary };
+    const scoped = { ...f, operator, request };
+    const card = await displayCard(scoped);
+    const reply = await f.run("approval-reply", shortReply(scoped, card));
+    assert.equal(reply.status, 0, reply.stdout);
+    return { ...request, preflight: input.preflight, delegation: input.delegation,
+      shortDecision: { ...operator, at: cardTime(4), replySha256: reply.value.sha256 },
+      runtimeAuthority: { verified: true, reference: "retained:runtime-authority-link",
+        approvalReference: reply.value.entry.approval.reference, grantReference: reply.value.entry.grant.reference,
+        approval: entry.approval, grant: entry.grant } };
+  };
+  const reviewerBinding = roleQualificationBinding(runtime.pair.reviewer);
+  const request = await pin("matching-pair", "bindingSha256", reviewerBinding);
+  const dispatched = await runtime.decide(request);
+  assert.equal(dispatched.action, "dispatch", JSON.stringify(dispatched));
+  assert.equal(dispatched.requiresExclusiveAdmission, true);
+  assert.equal(dispatched.commits, false);
+  const deny = async (candidate, reason, detail) => {
+    const decision = await runtime.decide(candidate);
+    assert.equal(decision.reason, reason, JSON.stringify(decision));
+    assert.match(decision.detail, detail);
+  };
+  const link = request.runtimeAuthority;
+  await deny({ ...request, runtimeAuthority: { ...link, grantReference: link.approvalReference } },
+    "SHORT_AUTHORITY_UNVERIFIED", /short operator transaction/);
+  for (const mismatch of [
+    { approval: { ...link.approval, sha256: "a".repeat(64) } },
+    { grant: widening.entry.grant },
+    { approval: undefined, grant: undefined },
+  ]) await deny({ ...request, runtimeAuthority: { ...link, ...mismatch } },
+    "DELEGATED_RUNTIME_UNVERIFIED", /pinned assignment approval or grant/);
+  await deny({ ...request, delegation: widening.input.delegation,
+    runtimeAuthority: { ...link, grant: widening.entry.grant } },
+  "DELEGATED_RUNTIME_UNVERIFIED", /expands the short-approved local grant/);
+  for (const variant of [
+    await pin("mismatched-pair", "bindingSha256", "b".repeat(64)),
+    await pin("missing-runtime-pin"),
+    await pin("crossed-route", "bindingSha256", reviewerBinding, runtime.pair.implementer.route),
+  ]) await deny(variant, "DELEGATED_RUNTIME_UNVERIFIED", /different pair/);
+});
+
 test("approval-only waits for independent local authority and checkpoint fresh-session is file-backed", async (t) => {
   const f = await operatorFixture(t);
   const card = await displayCard(f);
@@ -274,6 +388,16 @@ test("approval-only waits for independent local authority and checkpoint fresh-s
   assert.equal(inspected.value.session.kind, "fresh-session", inspected.stdout);
   assert.match(inspected.value.session.starter, /checkpoint\.json.*verify HEAD/);
   assert.equal(inspected.value.session.launch, 'codex --approve-for-me -C "$change_worktree" --add-dir "$change_records"');
+  if (process.getuid !== undefined) {
+    await chmod(f.records, 0o755);
+    try {
+      const exposed = await f.route("inspect", { ...request, checkpointFile, shortDecision: undefined });
+      assert.equal(exposed.value.stopPredicate, "OPERATOR_EVIDENCE_UNVERIFIED", exposed.stdout);
+      assert.match(exposed.value.footer, /owner-private/);
+    } finally {
+      await chmod(f.records, 0o700);
+    }
+  }
   assert.equal((await f.route("inspect", { ...request, checkpointFile: { ...checkpointFile, sha256: "a".repeat(64) } })).value.stopPredicate,
     "OPERATOR_EVIDENCE_UNVERIFIED");
   assert.equal((await f.route("checkpoint-relay", { ...request, checkpointFile })).value.action, "preserve-predecessor");

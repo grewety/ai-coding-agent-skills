@@ -37,7 +37,7 @@ function verifyRuntimeInventory(selected, scripts) {
   return inventory;
 }
 
-export async function readDelegation(input, { context, policy, identity, implementation, goal }, registryOverride) {
+export async function readDelegation(input, { context, policy, identity, implementation, goal, shortAuthority }, registryOverride) {
   need(process.platform === "linux", "Exclusive runtime requires a qualified Linux host");
   const selected = input.delegation;
   need(selected, "Selected exclusive runtime requires a pinned assignment and companion");
@@ -65,9 +65,17 @@ export async function readDelegation(input, { context, policy, identity, impleme
   need([input.repo, identity.workspace, ...request.evidenceRoots, registry].every((root) =>
     separate(root, selected.assignment.path) && separate(root, scripts)), "Runtime or assignment overlaps protected or mutable state");
   need(id.change === identity.change && id.workspace === identity.workspace && id.plan === identity.plan &&
-    id.planDigest === identity.planDigest && same(id.inputs, context.inputs) &&
-    assignment.approval.path === input.approval?.reference && assignment.grant.path === input.grant?.reference,
-  "Worker request differs from the active plan, checkout or authority");
+    id.planDigest === identity.planDigest && same(id.inputs, context.inputs), "Worker request differs from the active plan or checkout");
+  if (shortAuthority) {
+    const link = input.runtimeAuthority;
+    need(same(assignment.approval, link.approval) && same(assignment.grant, link.grant) &&
+      (!input.approval || input.approval.reference === assignment.approval.path) &&
+      (!input.grant || input.grant.reference === assignment.grant.path),
+    "Runtime authority link differs from the pinned assignment approval or grant");
+  } else {
+    need(assignment.approval.path === input.approval?.reference && assignment.grant.path === input.grant?.reference,
+      "Worker request differs from the active authority");
+  }
   const { approval, grant, inference } = await worker.loadAuthority(assignment, repository);
   need(grant.mode === policy.mode && grant.policyRevision === policy.policyRevision &&
     grant.branch === `refs/heads/${implementation.branch}` &&
@@ -78,9 +86,9 @@ export async function readDelegation(input, { context, policy, identity, impleme
   need(groupRestrictions.length <= 1 && (!groupRestrictions.length ||
     groupRestrictions[0] === `group:${input.restrictions?.group}`), "Retained delegated group restriction differs");
   const roles = await bindings.bindPair(assignment, grant, selected.runtimeSha256, registry);
-  if (input.verifiedShortRoles) {
-    need(["implementer", "reviewer"].every((role) => input.verifiedShortRoles[role].route === roles.pair[role].route &&
-      input.verifiedShortRoles[role].runtimeBindingSha256 === bindings.roleQualificationBinding(roles.pair[role])),
+  if (shortAuthority) {
+    need(["implementer", "reviewer"].every((role) => shortAuthority.roles[role].route === roles.pair[role].route &&
+      shortAuthority.roles[role].runtimeBindingSha256 === bindings.roleQualificationBinding(roles.pair[role])),
     "Exclusive runtime selected a different pair than the short approval card");
   }
   const directory = claims.claimPath(registry, repository, id.change);
