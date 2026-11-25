@@ -8,7 +8,7 @@ change: streamlined-operator-workflow-01m87kje8xgc5ge1nbydbf2pej
 
 ## 1. Verified planning and local delivery
 
-- [ ] 1.1 Deliver prospective proposal-to-freeze, exact approval cards and short replies, and deterministic local Next-Step Footer and handoff behavior. Prove opted-in, draft-only, superseded or crossed approval, paired role, finite convergence/correction, and read-only preflight/routing cases with positive and negative fixtures. Land the corresponding skill and operator guidance with the outcome.
+- [x] 1.1 Deliver prospective proposal-to-freeze, exact approval cards and short replies, and deterministic local Next-Step Footer and handoff behavior. Prove opted-in, draft-only, superseded or crossed approval, paired role, finite convergence/correction, and read-only preflight/routing cases with positive and negative fixtures. Land the corresponding skill and operator guidance with the outcome.
 
 Acceptance includes native artifacts and isolated probes, separately audited approval and execution, contextual advice and safe session handoff, and orchestration that honors narrower restrictions and sets no remote or profile authority.
 
