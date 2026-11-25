@@ -34,10 +34,8 @@ execution or remote writes.
 ## Optional worker runtime and reviewer
 
 The pinned [Linux runtime](references/worker-runtime.md) passed sealed trials.
-[Contained review](references/review-candidate.md) needs separate launch authority.
-The contained runner supports bounded offline packet preflight and inherited
-or integrated review authority. Keep host pins, spend reservations and
-private relay diagnostics outside the reviewer sandbox.
+[Contained review](references/review-candidate.md) requires separate authority
+for the exact export and paid inference.
 
 ## Legacy host execution
 
@@ -81,10 +79,9 @@ Optional persisted-goal launch (display grants no authority):
 
 Use `/goal`, not `/loop`. The operator controls pause/resume/clear and `/subgoal`.
 For earlier compression the operator runs `/goal pause`, `/compress here 2`,
-`/context`, then `/goal resume`. Printed commands do not execute.
+`/context`, then `/goal resume`.
 
-Stop discovery once authority, ownership, bootstrap and gates resolve.
-Reuse valid evidence; batch independent lookups.
+Reuse evidence and stop discovery once authority, ownership, bootstrap and gates resolve.
 
 ## Procedure
 
