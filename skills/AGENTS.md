@@ -13,6 +13,8 @@ Own optional, versioned agent playbooks that contributors can install and reuse 
 
 ## Local Contracts
 
+- Keep external role configuration, discovery, version policy and setup modules byte-identical across delivery and orchestration packages.
+
 - A skill is an execution aid, not a source of product behaviour, progress, or architectural authority.
 - Durable product policy lives in the adopting project's DOX chain. OpenSpec artifacts own specification and task progress. These skills do not replace them.
 - Delivery policy is read from the verified integrated plan parent. Keep Goal-First opt-in prospective and preserve existing Task-Guided and frozen approval boundaries. Delivery owns bounded dispatch, exact-candidate evidence and finish readiness. Next routes verified observations and delegates authority checks. Native tasks remain the only mutable progress authority.

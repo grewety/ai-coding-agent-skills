@@ -813,9 +813,9 @@ Orchestration is optional. It requires the workflow plugin, explicit role and
 model configuration, and a supported host. Package installation does not create
 those roles.
 
-Current source versions are delivery 1.7.0 and `openspec-next` 0.7.0 in
-`openspec-development` 1.7.0, and core skill 0.21.0 in
-`autonomous-orchestration` 1.11.0.
+Current source versions are delivery 1.8.0 and `openspec-next` 0.8.0 in
+`openspec-development` 1.8.0, and core skill 0.22.0 in
+`autonomous-orchestration` 1.12.0.
 Representation support adds no upstream workflow, runtime dependency or
 installation route. Package availability/byte checks do not establish account
 sync, host execution, native client discovery, Desktop acceptance or scanner approval.
@@ -825,6 +825,8 @@ and charter-v1 approach review. Check the exact approved export and applicable
 review authority before paid inference. A verified low-touch parent selects
 the per-change defaults and the explicit override. Replay the original
 request-bound output offline before applying candidate or charter admission.
+[External AI role configuration and backend pilots](configurable-backends.md).
+
 [Review authority and configured harness](openspec-review-configuration.md).
 
 Complete copies and generated packages preserve delivery's policy/task-authoring

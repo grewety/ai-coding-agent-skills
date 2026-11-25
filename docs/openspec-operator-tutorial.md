@@ -76,26 +76,30 @@ the original process has settled or can be recovered. Changes to scope,
 review binding, permissions, protected PR head or deadline require the
 applicable operator decision. A new host session supplies no new authority.
 
-## Configure the three roles
+## Configure AI roles
 
 | Role | Configuration owned by the operator |
 | --- | --- |
-| **Role 1 · Orchestrator** | Select an interactive host and model in its normal profile or launch args. It owns Git, `tasks.md`, evidence admission and protected closeout. |
+| **Role 1 · Orchestrator** | Bind the interactive client, provider, model, effort and version policy. It owns Git, `tasks.md`, evidence admission and protected closeout. |
 | **Role 2 · Implementer** | Select a standalone bounded implementer allowed by the integrated policy, or the exact qualified exclusive binding. The implementation outcome, editable paths, time and correction budget belong in the request. |
 | **Role 3 · Independent reviewer** | Select the qualified contained host, model, exact runtime/configuration, phase and exposure. Keep a separate reviewer session. Review has read-only scope over its approved manifest. |
+| **Role 4 · Optional AI helper or harness** | Select an explicit role tuple when enabled. The effective-binding gate currently blocks AI helper and AI harness execution. A configured non-AI harness uses the [standalone detached clone contract](openspec-review-configuration.md#optional-local-harness). |
 
 ### Role 1 · Interactive workset opener
 
 OpenSpec **2.1.1** reads `openers.codex.args` from its user-global
 `config.json` under `$XDG_CONFIG_HOME/openspec/` or the platform default.
-An override replaces the built-in argument list. This example preserves
-workspace-write and selects a model for the interactive session.
+An override replaces the built-in argument list. Generate the complete
+entry with the [external AI role setup](configurable-backends.md).
+Its `args` start with the launcher, `--launch-opener`, roles file path and
+SHA-256. The Codex native argument suffix preserves workspace-write.
 
 ```json
 {
   "openers": {
     "codex": {
-      "args": ["--sandbox", "workspace-write", "--model", "gpt-6.2-sol"]
+      "command": "/absolute/path/to/node",
+      "args": ["/absolute/path/to/setup.mjs", "--launch-opener", "/private/host/roles.json", "ROLES_SHA256", "--sandbox", "workspace-write", "-m", "gpt-6.2-sol", "-c", "model_provider=\"openai\"", "-c", "model_reasoning_effort=\"high\""]
     }
   }
 }
@@ -111,19 +115,18 @@ runbook. [OpenSpec 2.1.1 opener source](https://github.com/Fission-AI/OpenSpec/b
 
 ### Role 2 · Scoped implementer
 
-The pinned exclusive Linux pairing uses Codex **0.171.0**, `gpt-6.2-sol`,
+The recorded legacy Linux pairing used Codex **0.171.0**, `gpt-6.2-sol`,
 the dedicated `worker` profile and the native
 `codex-native-named-workspace-write` adapter. Bind the effective model, client,
 binary, profile, writable roots and attempt in the host registry. Other
 standalone implementers require applicable local policy and their own
-effective role readback. A host-native drafting or QA helper can advise on
-scope, tests or structure within authorized data. Its result supplies no
-disposable gate evidence or independent-review admission.
+effective role readback. The explicit Codex pilot shares the same supervised
+native route for standalone Goal-First and exclusive assignments.
 [Qualified worker setup](worker-runtime.md).
 
 ### Role 3 · Contained review
 
-The qualifying Linux/WSL route uses Claude Code **2.1.330**, Bubblewrap
+The recorded legacy Linux/WSL route used Claude Code **2.1.330**, Bubblewrap
 **0.9.0**, `claude-sonnet-4-6` and `same-uid-key`. In trusted external
 `host.json`, pin the binaries, libraries, model and relay. Choose per-process
 `maxTurns`, `maxBudgetUsd`, and `timeoutMs`. Before any live request, build
@@ -132,7 +135,7 @@ and check the export offline. An adopting policy requires a matching raw-file
 packet. Use an independently authorized host configuration change when a
 packet needs a different budget. [Reviewer setup](claude-reviewer.md).
 
-For example, the role settings below select a 96-turn packet budget. Merge
+The following legacy host settings select a 96-turn packet budget. Merge
 these into the external host's complete configuration only under a matching
 operator grant. A different configuration requires its own exact pin.
 

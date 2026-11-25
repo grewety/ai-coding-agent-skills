@@ -124,7 +124,15 @@ from an already suspect output cannot establish authenticity.
 
 ## Trusted launch configuration
 
-The separate host configuration has `schemaVersion` (1), `bwrap`, `claude`,
+For a new explicit Claude binding, use the schema 2 host produced by
+`scripts/setup.mjs`. Retain the raw file hash, separately pinned
+`expect.qualification`, and `expect.generator` provider and session.
+Offline `--prepare` and `--check` return the explicit runtime readback.
+Bind it as `expect.explicit` and include its scope in a separate single-run
+grant before execution. Sealed replay checks the retained readback,
+complete native Read content and framed receipt.
+
+The legacy host configuration has `schemaVersion` (1), `bwrap`, `claude`,
 and `node` pins (`path` and `sha256`), `libraries` (pins with exact absolute
 sandbox `target` paths), `model`, `relay`, `timeoutMs`, `maxTurns`,
 `maxBudgetUsd`, and `requirePreExposureAttestation` (false for this route).

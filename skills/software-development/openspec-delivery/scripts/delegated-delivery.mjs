@@ -27,6 +27,11 @@ const runtimeSources = [
   "run-implementer.mjs", "terminal-adapters.mjs", "worker-handoff.mjs", "worker-runtime-policy.mjs",
 ];
 
+const configurableRuntimeSources = [
+  "adapter-qualification.mjs", "agent-configuration.mjs", "agent-discovery.mjs", "agent-role-adapters.mjs",
+  "agent-role-config.mjs", "agent-setup.mjs", "role-config.mjs", "runtime-version.mjs", "setup.mjs",
+];
+
 const lowTouchRuntimeSources = [
   "harness-result.mjs", "low-touch-policy.mjs", "planning-inventory.mjs", "review-preflight.mjs",
   "review-spend.mjs", "review-upstream-status.mjs",
@@ -36,7 +41,8 @@ function verifyRuntimeInventory(selected, scripts) {
   need(digest(selected.verifierSha256) && digest(selected.runtimeSha256), "Independent implementer package pin is missing");
   // An independently pinned legacy package has none of these support files.
   // A partial newer inventory cannot fall back to the legacy runtime pin.
-  const additions = lowTouchRuntimeSources.some((name) => existsSync(path.join(scripts, name))) ? lowTouchRuntimeSources : [];
+  const additions = [lowTouchRuntimeSources, configurableRuntimeSources]
+    .flatMap((group) => group.some((name) => existsSync(path.join(scripts, name))) ? group : []);
   const inventory = Object.fromEntries([...runtimeSources, ...additions].map((name) => {
     const filename = path.join(scripts, name);
     return [name, sha256(readBounded(filename, 64 * 1024))];
@@ -97,7 +103,7 @@ export async function readDelegation(input, { context, policy, identity, impleme
   const roles = await bindings.bindPair(assignment, grant, selected.runtimeSha256, registry);
   if (shortAuthority) {
     need(["implementer", "reviewer"].every((role) => shortAuthority.roles[role].route === roles.pair[role].route &&
-      shortAuthority.roles[role].runtimeBindingSha256 === bindings.roleQualificationBinding(roles.pair[role])),
+      shortAuthority.roles[role].runtimeBindingSha256 === bindings.roleQualificationBinding(roles.pair[role], roles.roleAudit?.[role])),
     "Exclusive runtime selected a different pair than the short approval card");
   }
   const directory = claims.claimPath(registry, repository, id.change);
@@ -147,7 +153,7 @@ export async function readDelegation(input, { context, policy, identity, impleme
   need(owner, "Exclusive assignment claim is missing");
   const attemptDirectory = path.join(directory, "attempt-" + id.attempt);
   const launch = data.history.at(-1);
-  need(launch?.attempt === id.attempt, "Original launch is missing or superseded");
+  need(launch?.attempt === id.attempt && same(launch.roleAudit, roles.roleAudit), "Original launch or explicit role audit differs");
   const observation = await runtime.observeImplementer(assignment, { registry, action: "inspect" });
   if (observation.phase === "blocked") throw new Error(observation.reason);
   const view = await recovery.currentAttempt(attemptDirectory, launch);
@@ -233,6 +239,9 @@ export async function verifyPairedReview(delegation, handoff, input) {
   const reviewed = handoff?.result;
   const role = roles.pair.reviewer;
   const session = reviewed.runtime.session;
+  need(same(handoff.reviewExplicitBinding, roles.roleAudit?.reviewer), "Review differs from its qualified explicit role pins");
+  if (roles.roleAudit) need(same(handoff.reviewGenerator, { provider: result.runtime.provider, session: result.runtime.session }),
+    "Review generating role differs from the settled implementer");
   const pin = input.handover.reviewSessionBinding;
   need(typeof session === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(session),
     "Invalid reviewer session identity");

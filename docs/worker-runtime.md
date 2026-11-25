@@ -1,5 +1,11 @@
 # Exclusive OpenSpec worker runtime
 
+See [external AI roles and backend pilots](configurable-backends.md) for explicit role settings and route dispositions.
+
+For a new explicit deployment, use a schema 2 pair backed by the pinned
+`roles.json` and the exact qualification manifests. The standalone Goal-First
+and exclusive commands use the same native Codex containment and supervision.
+
 ## Supported binding
 
 The recorded synthetic qualification on one Linux host covers native
@@ -18,9 +24,9 @@ implementation route. Use the contained reviewer for its separate role.
 ## Install and bind
 
 1. Follow the [OpenSpec prerequisites](openspec-installation.md). Install
-   complete delivery 1.7.0 and next 0.7.0 packages from the
-   `openspec-development` 1.7.0 bundle and the separately selected
-   orchestration 0.21.0 package from `autonomous-orchestration` 1.11.0.
+   complete delivery 1.8.0 and next 0.8.0 packages from the
+   `openspec-development` 1.8.0 bundle and the separately selected
+   orchestration 0.22.0 package from `autonomous-orchestration` 1.12.0.
    Check the exact CLI and supporting file bytes outside the workspace before
    enabling the project route. Use the normal collision, backup and fresh
    session checks when updating or removing a package.

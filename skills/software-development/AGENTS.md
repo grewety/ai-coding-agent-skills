@@ -15,6 +15,8 @@ Own the portable boundaries OpenSpec does not enforce: one orchestrator for Git 
 
 ## Local Contracts
 
+- Candidate CLI and MCP harnesses require a verified standalone detached clone before and after invocation.
+
 - OpenSpec `openspec/specs/` and native change `tasks.md` are the specification and task authorities. These skills do not add a second mutable plan.
 - GitHub issues and pull requests are documentation and review records. A project may explicitly include one issue in an authorized new proposal; otherwise require `/openspec-delivery document <name>`. PRs and later issue updates need separate authority. A new issue uses the risk-focused body in `openspec-delivery/references/ticket.md`; read it back and bind its stable URL before plan approval. It is not an admission lock, not the task list, and not an ISO/IEC 27001 certificate. Identity frontmatter never duplicates progress or PR state and remains hashed. The full OpenSpec change name is the identity; documentation reuses it without generating another suffix.
 - Projects selecting the naming convention generate `<slug>-<lowercase-ulid>` once before proposal scaffolding, using the packaged naming helper. The authorized branch is `change/<full-name>` through specification, implementation and review. Existing names remain valid and unchanged; short-name ambiguity requires operator selection. Naming is not a lock, branch permission, or a substitute for spec reconciliation. Do not fork or modify installed OpenSpec adapters.

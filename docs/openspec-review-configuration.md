@@ -1,5 +1,7 @@
 # OpenSpec review and finish configuration
 
+See [external AI roles and backend pilots](configurable-backends.md) for explicit role settings and route dispositions.
+
 Read the [workflow](openspec-workflow.md) for authorization and the
 [operator tutorial](openspec-operator-tutorial.md) for the role and session
 setup. The exact frozen plan's verified integrated parent governs these
@@ -94,14 +96,22 @@ after a failed run.
 ## Optional local harness
 
 Omit `localHarness` or set it to null to use normal review with no harness.
+For an AI-backed harness, declare its external `aiRole` tuple. No configured
+AI harness adapter currently supplies the required effective-binding proof.
 When configured, use a POSIX host and prepare a clean disposable checkout
-detached at the exact committed candidate. A separately authorized operator calls the packaged
+as a standalone clone detached at the exact committed candidate. Use
+`git clone --no-local --no-checkout SOURCE CLONE` followed by
+`git -C CLONE checkout --detach SHA` in an authorized scratch location.
+Linked worktrees can cause the Opengrep `git ls-files` failure and are refused.
+A separately authorized operator calls the packaged
 `delivery-cli.mjs run-harness --input REQUEST --json` with `repo`, `change`,
 `plan`, `target`, `candidate`, `checkout`, `output`, `hostConfiguration`
 (`file`, `sha256`) and the verified `local-candidate-harness` grant. The
 grant binds change, policy revision, candidate, harness ID, checkout,
 configuration hash and independently verified exposure (`exposureVerified: true`). Host-owned adapters are pinned by executable path
-and SHA-256. CLI receives `--candidate SHA`. A local stdio MCP adapter
+and SHA-256. CLI receives `--candidate SHA` and `HARNESS_CHECKOUT` with the
+canonical scan root. Both adapters run in that root, which is checked for
+identity and cleanliness before and after the call. A local stdio MCP adapter
 receives `{ "candidate": "SHA", "checkout": "/absolute/path" }` on its
 configured tool. Both return JSON with `schemaVersion`, `harnessId`,
 `candidate`, `verdict`, `findings` and `observedAt`. A passing result has

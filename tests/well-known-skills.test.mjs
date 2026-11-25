@@ -91,6 +91,9 @@ test("well-known build publishes every skill and all advertised files", async ()
       "scripts/run-implementer.mjs",
       "scripts/worker-runtime-policy.mjs",
     ];
+    const roleFiles = ["adapter-qualification", "agent-configuration", "agent-discovery", "agent-role-adapters",
+      "agent-role-config", "agent-setup", "detect-agents", "role-config", "runtime-version", "setup"]
+      .map((name) => "scripts/" + name + ".mjs");
     assert.deepEqual(
       [...declaredFiles, ...reviewerFiles, ...implementerFiles].sort(),
       [...autonomous.files].sort(),
@@ -99,6 +102,7 @@ test("well-known build publishes every skill and all advertised files", async ()
     assert.deepEqual(autonomous?.files, [
       ...reviewerFiles,
       ...implementerFiles,
+      ...roleFiles,
       "references/claude-code-host.md",
       "references/claude-code-roles.md",
       "references/environment-passthrough.md",
@@ -121,6 +125,7 @@ test("well-known build publishes every skill and all advertised files", async ()
     ].sort((left, right) => left.localeCompare(right)));
     const integration = index.skills.find((skill) => skill.name === "openspec-delivery");
     assert.deepEqual(integration?.files, [
+      ...roleFiles,
       "references/continuation.md",
       "references/delivery-policy.md",
       "references/delivery-runtime.md",
@@ -159,8 +164,12 @@ test("well-known build publishes every skill and all advertised files", async ()
       "scripts/planning-inventory.mjs",
       "scripts/protected-finish.mjs",
       "SKILL.md",
-    ]);
+    ].sort((left, right) => left.localeCompare(right)));
     // Independent of dynamic package discovery: both representation files are required.
+    for (const file of roleFiles) {
+      assert.deepEqual(await readFile(path.join(endpoint, "openspec-delivery", file)),
+        await readFile(path.join(endpoint, "autonomous-implementation-review", file)));
+    }
     for (const file of ["references/evidence-retention.md", "scripts/evidence-retention.mjs", "references/delivery-policy.md", "references/task-authoring.md", "scripts/delivery-policy.mjs"]) {
       assert.ok(integration.files.includes(file), `delivery inventory omits ${file}`);
       assert.ok((await stat(path.join(endpoint, "openspec-delivery", file))).isFile());

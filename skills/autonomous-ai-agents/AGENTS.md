@@ -30,6 +30,8 @@ Herdr pane-selection helper.
 
 ## Local Contracts
 
+- The explicit pilot admission reports exact unsupported predicates before dispatch or review export exposure. Preserve legacy frozen bindings and sealed offline review replay.
+
 - Portable core work follows `references/portable-core.md` without Hermes or Herdr. Delivery owns integrated-parent policy, contributor-contract alignment and continuation; qualified terminal adapters (`hermes`, `claude-code`, `codex`, `grok-build`) in `references/terminal-adapters.md` and `scripts/terminal-adapters.mjs` own native worker processes, non-argv prompt transport, process supervision and same-session interaction. Core artifact checks require independently retained request/runtime bindings and protected publisher roots; they never grant worker writes or qualification. With `replacementReadiness` verified, `resolveLegacyRouteRequest` retires `code-tab-phase-roles` and operator-selected Herdr pane dispatch (`status: "retired-route"`), without fallback or `.claude/agents` edits.
 
 - The exclusive worker runtime requires separate exact qualification of the runtime and both roles. It retains assignment and physical slot ownership until authorized release with original process-tree settlement. Bootstrap and synthetic fixture evidence cannot qualify the candidate. The orchestration package owns launch and recovery observations. Delivery owns task order, exact candidate gates, independent acceptance and Git.
@@ -60,6 +62,11 @@ Run `npm test` and `npm run build`. Confirm the generated package advertises
 `scripts/terminal-adapters.mjs`, `scripts/worker-handoff.mjs`,
 `references/lifecycle-watch.md`, `references/openspec.md`, `references/claude-code-host.md`, `scripts/herdr_panes.py`,
 `scripts/herdr_lifecycle_watch.mjs`, `scripts/herdr-pane-state.mjs`,
+`scripts/adapter-qualification.mjs`, `scripts/agent-configuration.mjs`,
+`scripts/agent-discovery.mjs`, `scripts/agent-role-adapters.mjs`,
+`scripts/agent-role-config.mjs`, `scripts/agent-setup.mjs`,
+`scripts/detect-agents.mjs`, `scripts/role-config.mjs`,
+`scripts/runtime-version.mjs`, `scripts/setup.mjs`,
 `templates/phase-implementer.md`, and `templates/phase-reviewer.md`.
 
 Verify the implementer CLI, runtime helpers and references alongside the

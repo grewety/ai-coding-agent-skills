@@ -1,7 +1,9 @@
 # Contained Claude reviewer
 
-The optional `autonomous-implementation-review` 0.21.0 skill and
-`autonomous-orchestration` 1.11.0 bundle ship a standalone command for candidate
+See [external AI roles and backend pilots](configurable-backends.md) for explicit role settings and route dispositions.
+
+The optional `autonomous-implementation-review` 0.22.0 skill and
+`autonomous-orchestration` 1.12.0 bundle ship a standalone command for candidate
 review and charter-v1 approach review. Use the complete package from a reviewed
 checkout or the [Claude installation guide](claude-installation.md). Resolve
 `scripts/review-candidate.mjs` inside that package. This command runs locally
@@ -65,6 +67,19 @@ changed whole files, including deleted and renamed sources, plan inputs and
 approved attachments. In approach mode, bind the raw plan inputs, charter-v1
 record, correction if present, authority, fixed model and ledger. Use a fresh
 reviewer session and a declared publisher evidence root.
+
+For an explicit Claude pilot, use the setup-produced schema 2 host and
+independently pin the qualification manifest as `expect.qualification`
+(`path` and `sha256`). Also pin the generating `provider` and `session` in
+`expect.generator`. The candidate generator is the settled Implementer.
+The planning generator is the author. Retain the `explicit` runtime readback
+from `--prepare` or `--check` in the independently held expectation before
+launch. Use a separate single-run grant for the exact readback, export,
+scope and cost. For an explicit standalone probe, pass
+`--qualification PATH --qualification-sha256 SHA` and bind the canonical
+runtime readback hash as `explicitRuntimeSha256` in the probe grant.
+Replay uses the retained expectation, export and captures, including the
+original version audit. Older runs use their original bindings.
 
 Replace uppercase operands with absolute paths, including `REVIEW_CLI` for
 the packaged script and `NODE` for Node 22+. These examples describe the

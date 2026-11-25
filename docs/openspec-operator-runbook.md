@@ -1,5 +1,9 @@
 # OpenSpec operator runbook
 
+See [external AI roles and backend pilots](configurable-backends.md) for explicit role settings and route dispositions.
+Confirm setup's exact external bytes separately from any profile update.
+Match qualification to the current runtime bytes before admitting a pilot.
+
 The [workflow](openspec-workflow.md) defines repository authority. Read the
 integrated parent of the selected plan to determine the applicable policy.
 The root `openspec-proposal: propose-to-freeze` marker applies prospectively

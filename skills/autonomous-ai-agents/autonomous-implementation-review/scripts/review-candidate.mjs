@@ -8,10 +8,13 @@ import { convergenceDecision } from "./orchestration-core.mjs";
 import { admitReceipt, candidateResult, describeFile, receiptContext, reviewPrompt } from "./review-admission.mjs";
 import { absolute, checkExport, checkSealedDirectory, digest, equal, fields, fileLimit, hash, jsonBytes, need, newProtectedDirectory,
   prepareExport, protectedParent, readJson, reviewPolicy, sealDirectories, separate, totalLimit, uuid, validateReviewRequest } from "./review-inputs.mjs";
-import { bubblewrapVersion, claudeVersion, runtimeBinding, validateHostConfig, withReviewRuntime } from "./review-runtime.mjs";
+import { bubblewrapVersion, claudeVersion, requireReviewHost, runtimeBinding, verifyRuntimePins, withReviewRuntime } from "./review-runtime.mjs";
 import { checkPacketTurns, offlineHostBinding, reviewClock, trustedJson } from "./review-preflight.mjs";
 import { checkProbeSpend, checkReviewSpend, claimProbeRun, claimReviewRun } from "./review-spend.mjs";
 import { verifyHarnessSeal } from "./harness-result.mjs";
+import { runtimeIdentity } from "./implementer-runtime.mjs";
+import { checkRoleIndependence, validatePin } from "./role-config.mjs";
+import { auditVersion } from "./runtime-version.mjs";
 import { upstreamClasses } from "./review-upstream-status.mjs";
 import { auditClaudeStream } from "./review-stream.mjs";
 import { createAttempt, publishResult, readClosed, readHandoff, requestBytes as workerRequestBytes, writeClosed } from "./worker-handoff.mjs";
@@ -23,12 +26,37 @@ const readSealed = (dir, name, limit) => readClosed(path.join(dir, name), limit,
 
 function validateRuntime(runtime, expect) {
   fields(runtime, ["session", "model", "version", "bubblewrapVersion", "maxTurns", "maxBudgetUsd",
-    "configurationSha256", "route"], "retained runtime");
-  need(uuid(runtime.session) && runtime.version === claudeVersion && runtime.bubblewrapVersion === bubblewrapVersion &&
+    "configurationSha256", "route"], "retained runtime", ["explicit"]);
+  if (expect.explicit) {
+    need(equal(runtime.explicit, expect.explicit) && runtime.version === expect.explicit.version.observedVersion &&
+      runtime.bubblewrapVersion === expect.explicit.bubblewrap.observedVersion &&
+      runtime.route === "same-uid-key", "Explicit review runtime pins or version audit differ");
+  } else need(runtime.explicit === undefined && runtime.version === claudeVersion &&
+    runtime.bubblewrapVersion === bubblewrapVersion, "Legacy review runtime versions differ");
+  need(uuid(runtime.session) &&
     runtime.model === expect.model && runtime.configurationSha256 === expect.configurationSha256 &&
     ["same-uid-key", "dedicated-uid-broker"].includes(runtime.route) &&
     Number.isSafeInteger(runtime.maxTurns) && runtime.maxTurns >= 1 && runtime.maxTurns <= 128 &&
     Number.isFinite(runtime.maxBudgetUsd) && runtime.maxBudgetUsd > 0 && runtime.maxBudgetUsd <= 10, "Runtime binding mismatch");
+}
+
+function validateExplicit(expect, request) {
+  if (expect.qualification === undefined && expect.generator === undefined && expect.explicit === undefined) return;
+  validatePin(expect.qualification);
+  fields(expect.generator, ["provider", "session"], "independently retained generating role");
+  need(expect.generator.session === (request.worker.identity.implementerSession ?? request.worker.authority.authorSession),
+    "Generating session differs from the review request");
+  checkRoleIndependence(expect.generator, { provider: "anthropic", session: request.session });
+  if (expect.explicit === undefined) return;
+  const explicit = expect.explicit;
+  const pins = ["executableSha256", "relaySha256", "runtimeSha256", "qualificationSha256"];
+  fields(explicit, ["provider", "reasoningEffort", "version", "bubblewrap", ...pins], "independent explicit runtime");
+  need(explicit.provider === "anthropic" && ["low", "medium", "high", "max"].includes(explicit.reasoningEffort) &&
+    pins.every((key) => digest(explicit[key])) && explicit.qualificationSha256 === expect.qualification.sha256,
+  "Invalid independently retained explicit reviewer pins");
+  for (const [record, floor] of [[explicit.version, claudeVersion], [explicit.bubblewrap, bubblewrapVersion]]) {
+    need(equal(record, auditVersion(record, record.observedVersion, floor)), "Explicit runtime version audit differs");
+  }
 }
 
 async function loadInputs(requestFile, expectFile) {
@@ -36,12 +64,13 @@ async function loadInputs(requestFile, expectFile) {
   validateReviewRequest(request);
   const expect = await readJson(expectFile);
   fields(expect, ["schemaVersion", "requestSha256", "exportSha256", "configurationSha256", "model"],
-    "independent expectation", ["statusSha256", "harness"]);
+    "independent expectation", ["statusSha256", "harness", "qualification", "generator", "explicit"]);
   need(expect.schemaVersion === 1 && expect.requestSha256 === hash(jsonBytes(request)) &&
     (expect.exportSha256 === null || digest(expect.exportSha256)) && digest(expect.configurationSha256) &&
     typeof expect.model === "string" && /^claude-[a-z0-9-]{2,100}$/.test(expect.model) &&
     (expect.statusSha256 === undefined || digest(expect.statusSha256)), "Request differs from independently retained binding");
   if (request.mode === "approach") need(expect.model === request.snapshot.record.binding.model, "Approach model differs from fixed binding");
+  validateExplicit(expect, request);
   return { request, expect };
 }
 
@@ -80,9 +109,9 @@ async function replayCapture(directory, index, expect) {
     descriptors: [out, err, metadata].map((name, i) => describeFile(directory, name, files[i])) };
 }
 
-function audit(observation, paths, probe) {
+function audit(observation, paths, probe, files) {
   if (observation.upstreamStatus) return null;
-  try { return auditClaudeStream(observation.proc, observation.runtime, paths, probe); }
+  try { return auditClaudeStream(observation.proc, observation.runtime, paths, probe, files); }
   catch { return null; }
 }
 
@@ -115,11 +144,12 @@ async function replay(directory, request, expect, prepared, count) {
     captures.push(...observation.descriptors);
     if (observation.upstreamStatus) upstream.push({ packet: index, classification: observation.upstreamStatus });
     const packet = prepared.manifest.packets[index - 1];
-    const report = audit(observation, packet.paths, false);
+    const report = audit(observation, packet.paths, false, prepared.files);
     if (report === null) { phase = "runtime-failed"; continue; }
     reports.push(report);
     try {
-      receipts.push(admitReceipt(request, context, report, index - 1, path.join(directory, "report.md"), packet));
+      receipts.push(admitReceipt(request, context, report, index - 1, path.join(directory, "report.md"), packet,
+        { framedOnly: Boolean(observation.runtime.explicit) }));
     } catch {
       phase = request.mode === "candidate" ? "receipt-invalid" : "invalid-receipt";
       if (request.mode === "candidate") {
@@ -211,6 +241,7 @@ async function checkPrior(request, expect, prepared) {
   const retained = await loadInputs(prior.request, prior.expect);
   need(retained.request.mode === "approach" && retained.request.snapshot.priorLaunches.length === 0 &&
     retained.expect.configurationSha256 === expect.configurationSha256 && retained.expect.model === expect.model &&
+    equal(retained.expect.explicit, expect.explicit) && equal(retained.expect.generator, expect.generator) &&
     equal(retained.request.worker.identity.inputs, request.worker.identity.inputs) &&
     equal(retained.request.attachments, request.attachments) && equal(retained.request.limits, request.limits) &&
     equal(retained.request.snapshot.record, request.snapshot.record) &&
@@ -261,9 +292,9 @@ export async function runReview({ request, expect, prepared, directory, excluded
       await capture(raw, count++, observation);
       const { session: observedSession, ...pin } = observation.runtime;
       need(observedSession === session && equal(pin, probePin), "Packet runtime differs from probe");
-      const report = audit(observation, packet.paths, false);
+      const report = audit(observation, packet.paths, false, prepared.files);
       if (report === null) break;
-      try { admitReceipt(request, context, report, index, reference, packet); }
+      try { admitReceipt(request, context, report, index, reference, packet, { framedOnly: Boolean(observation.runtime.explicit) }); }
       catch { break; }
     }
   }
@@ -297,7 +328,7 @@ function cli(argv) {
   need(Object.hasOwn(commands, command), "Invalid CLI option");
   const optional = {
     "--prepare": ["host-config"], "--check": ["host-config", "admission"],
-    "--mode": ["admission"], "--verify": [], "--probe": [],
+    "--mode": ["admission"], "--verify": [], "--probe": ["qualification", "qualification-sha256"],
   }[command];
   const args = arguments_.slice();
   const mode = command === "--mode" ? args.shift() : null;
@@ -307,10 +338,12 @@ function cli(argv) {
     const flag = args.shift();
     const key = flag.startsWith("--") ? flag.slice(2) : "";
     const value = args.shift();
-    need([...commands[command], ...optional].includes(key) && !Object.hasOwn(options, key) && absolute(value), "Invalid CLI option or path");
+    need([...commands[command], ...optional].includes(key) && !Object.hasOwn(options, key) &&
+      (key === "qualification-sha256" ? digest(value) : absolute(value)), "Invalid CLI option or path");
     options[key] = value;
   }
   need(commands[command].every((key) => Object.hasOwn(options, key)), "Missing CLI option");
+  need(Boolean(options.qualification) === Boolean(options["qualification-sha256"]), "Missing independent qualification path or pin");
   return { command, mode, options };
 }
 
@@ -319,11 +352,19 @@ export async function reviewCommand(argv, openRuntime = withReviewRuntime) {
   if (command === "--probe") {
     const directory = options.output;
     const hostFile = options["host-config"];
-    const { value: config, configurationSha256 } = await trustedJson(hostFile, [directory]);
-    validateHostConfig(config);
+    const { value, configurationSha256 } = await trustedJson(hostFile, [directory]);
+    need(value.schemaVersion === 2 || !options.qualification, "Legacy probe cannot select explicit qualification");
+    const qualification = options.qualification && { path: options.qualification, sha256: options["qualification-sha256"] };
+    const config = requireReviewHost(value, [directory, options.admission], value.schemaVersion === 2 ? {
+      qualification, configurationSha256, runtimeSha256: await runtimeIdentity(), verifyRuntimeIdentity: runtimeIdentity,
+      hostPin: { path: hostFile, sha256: configurationSha256 },
+    } : {});
+    const explicit = runtimeBinding(config, null, configurationSha256).explicit;
+    if (explicit) await verifyRuntimePins(config, [directory, options.admission]);
     const excluded = [hostFile, ...hostPaths(config)];
     const spend = await checkProbeSpend({ file: options.admission, configurationSha256,
-      maxBudgetUsd: config.maxBudgetUsd, excluded: [...excluded, directory] });
+      maxBudgetUsd: config.maxBudgetUsd, excluded: [...excluded, directory],
+      ...(explicit ? { explicitRuntimeSha256: hash(jsonBytes(explicit)) } : {}) });
     await protectedParent(directory);
     await newAttemptPath(directory);
     need(excluded.every((root) => separate(directory, root)), "Output overlaps protected host paths");
@@ -353,9 +394,25 @@ export async function reviewCommand(argv, openRuntime = withReviewRuntime) {
   const trustExcluded = [request.worker.identity.workspace, exportDirectory, options.request, options.expect, ...request.worker.evidenceRoots];
   const checking = ["--prepare", "--check", "--mode"].includes(command);
   if (policy && checking) need(options["host-config"], "An adopting parent requires a pinned offline host configuration");
+  if (expect.qualification && command !== "--verify") {
+    const { value } = await trustedJson(options.expect, trustExcluded.filter((root) => root !== options.expect), true);
+    need(equal(value, expect), "Explicit review expectation changed during admission");
+  }
   const host = options["host-config"] ? await offlineHostBinding(options["host-config"], expect, trustExcluded,
-    Boolean(policy)) : null;
+    Boolean(policy), { qualification: expect.qualification, runtimeSha256: expect.qualification ? await runtimeIdentity() : undefined,
+      verifyRuntimeIdentity: runtimeIdentity,
+      independentOf: [request.session, request.worker.authority.authorSession, request.worker.authority.orchestrator,
+        request.worker.identity.implementerSession] }) : null;
   const { config } = host ?? {};
+  const explicit = config && runtimeBinding(config, request.session, host.configurationSha256).explicit;
+  if (explicit) {
+    need(expect.generator && (!expect.explicit || equal(expect.explicit, explicit)),
+      "Missing independent generating role or changed reviewer readback");
+    if (command === "--mode") need(policy && expect.explicit && options.admission,
+      "Explicit review requires adopting policy, independent runtime readback and durable run admission");
+  } else if (command === "--verify" && expect.qualification) {
+    need(expect.explicit, "Missing independently retained explicit reviewer readback");
+  }
   const binding = policy && request.mode === "candidate" && config?.localHarness;
   if (binding) {
     const { value } = await trustedJson(options.expect, [...trustExcluded.filter((root) => root !== options.expect),
@@ -374,7 +431,8 @@ export async function reviewCommand(argv, openRuntime = withReviewRuntime) {
     } else need(request.snapshot.harness === undefined && expect.harness === undefined,
       "Unexpected harness result without a host binding");
   };
-  if (command === "--prepare") return { exportSha256: await prepareExport(exportDirectory, request, expect.exportSha256, preflight) };
+  if (command === "--prepare") return { exportSha256: await prepareExport(exportDirectory, request, expect.exportSha256, preflight),
+    ...(explicit ? { explicit } : {}) };
   const prepared = await checkExport(exportDirectory, expect.exportSha256, request);
   preflight(prepared);
   if (options.admission) need(policy && config, "Admission file requires adopting policy and pinned host.json");
@@ -383,7 +441,8 @@ export async function reviewCommand(argv, openRuntime = withReviewRuntime) {
   receiptContext(request, prepared);
   await checkPrior(request, expect, prepared);
   if (command === "--check") return { exportSha256: expect.exportSha256, packets: prepared.manifest.packets.length,
-    ...(config ? { maxTurns: config.maxTurns } : {}), ...(spend ? { admission: spend.policy.mode, scope: spend.scope } : {}) };
+    ...(config ? { maxTurns: config.maxTurns } : {}), ...(spend ? { admission: spend.policy.mode, scope: spend.scope } : {}),
+    ...(explicit ? { explicit } : {}) };
   const directory = options.output;
   need([exportDirectory, options.request, options.expect].every((root) => separate(directory, root)), "Output overlaps retained inputs");
   if (command === "--verify") return verify(directory, request, expect, prepared);
@@ -424,7 +483,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     writeSync(1, JSON.stringify(result) + "\n");
     if (result.phase?.endsWith("-failed") || ["invalid-receipt", "receipt-invalid", "incomplete-packets"].includes(result.phase)) process.exitCode = 1;
   } catch (error) {
-    writeSync(2, `Review stopped: ${error.code ? "unsafe, missing or existing local artifact (" + error.code + ")" : error.message}\n`);
+    writeSync(2, error.disposition ? JSON.stringify(error.disposition) + "\n" :
+      `Review stopped: ${error.code ? "unsafe, missing or existing local artifact (" + error.code + ")" : error.message}\n`);
     process.exitCode = 1;
   }
 }

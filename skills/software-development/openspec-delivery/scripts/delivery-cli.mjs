@@ -162,6 +162,7 @@ export async function verifyHandover(input, pinnedReviewCommand) {
     "Reviewer request or runtime identity differs from its handover");
     return { ...verified, request: requestRecord.worker, reviewSnapshot: requestRecord.snapshot,
       reviewPolicyBinding: requestRecord.policy, reviewConfigurationSha256: expectation.configurationSha256,
+      reviewExplicitBinding: expectation.explicit, reviewGenerator: expectation.generator,
       reviewAttachments: requestRecord.attachments,
       reviewHarnessReferenceSha256: expectation.harness === undefined ? undefined : sha256(stableJson(expectation.harness)),
       reviewStatusSha256: expectation.statusSha256 };

@@ -53,11 +53,11 @@ export function reviewPrompt(request, context, packet, index, count, reference) 
   ].join("\n");
 }
 
-export function admitReceipt(request, context, report, index, reference, packet) {
+export function admitReceipt(request, context, report, index, reference, packet, { framedOnly = false } = {}) {
   let lines = report.trimEnd().split("\n");
   const begin = lines.indexOf(beginReceipt);
   const end = lines.indexOf(endReceipt);
-  if (begin !== -1 || end !== -1) {
+  if (framedOnly || begin !== -1 || end !== -1) {
     need(begin !== -1 && begin === lines.lastIndexOf(beginReceipt) && end === lines.length - 1 &&
       end === begin + 4 && !lines.slice(0, begin).some((line) => line.trimStart().startsWith("Verdict:")),
       "Invalid native receipt framing");

@@ -328,6 +328,29 @@ export function checkoutObservation(repo, head, { detached = false, generated = 
   requireThat(index.every((entry) => entry.startsWith("H ")), "Dirty checkout; unsupported Git index entries or flags");
   return { head, tree: git(repo, "rev-parse", `${head}^{tree}`).trim(), ignoredGenerated: ignoredGenerated.sort() };
 }
+
+export function standaloneCheckoutObservation(repo, head) {
+  const metadata = path.join(repo, ".git");
+  const root = lstatSync(repo);
+  const gitDir = lstatSync(metadata, { throwIfNoEntry: false });
+  requireThat(root.isDirectory() && realpathSync(repo) === repo && gitDir?.isDirectory() && realpathSync(metadata) === metadata &&
+    git(repo, "rev-parse", "--show-toplevel").trim() === repo &&
+    git(repo, "rev-parse", "--absolute-git-dir").trim() === metadata &&
+    git(repo, "rev-parse", "--path-format=absolute", "--git-common-dir").trim() === metadata,
+  "Expected a standalone detached clone with its own Git directory");
+  for (const name of ["objects", "objects/info", "objects/pack", "refs", "HEAD", "index", "config"]) {
+    const file = path.join(metadata, name);
+    const stat = lstatSync(file, { throwIfNoEntry: false });
+    requireThat(!stat || !stat.isSymbolicLink() && realpathSync(file) === file,
+      "Harness clone aliases external Git metadata or objects");
+  }
+  for (const name of ["commondir", "worktrees", "objects/info/alternates", "objects/info/http-alternates"]) {
+    requireThat(!lstatSync(path.join(metadata, name), { throwIfNoEntry: false }),
+      "Harness clone shares external Git metadata or objects");
+  }
+  const checkout = checkoutObservation(repo, head, { detached: true });
+  return { ...checkout, root: [root.dev, root.ino], gitDir: [gitDir.dev, gitDir.ino] };
+}
 function clean(repo, head, requireBranch = true) {
   const detached = git(repo, "rev-parse", "--symbolic-full-name", "HEAD").trim() === "HEAD";
   checkoutObservation(repo, head, { detached: !requireBranch && detached });

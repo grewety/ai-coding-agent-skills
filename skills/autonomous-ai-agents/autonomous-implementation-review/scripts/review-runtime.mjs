@@ -10,9 +10,15 @@ import { validateHarnessBinding } from "./harness-result.mjs";
 import { upstreamClasses } from "./review-upstream-status.mjs";
 import { safePath, writeClosed } from "./worker-handoff.mjs";
 import { absolute, digest, fields, hash, jsonBytes, need, relative, separate } from "./review-inputs.mjs";
+import { inspectPinnedFile, parseStrictJson } from "./agent-configuration.mjs";
+import { observeVersion } from "./agent-discovery.mjs";
+import { validatePilotHost } from "./agent-setup.mjs";
+import { requireQualifiedPilot } from "./adapter-qualification.mjs";
+import { auditVersion, reportedVersion } from "./runtime-version.mjs";
 
 export const claudeVersion = "2.1.330";
 export const bubblewrapVersion = "0.9.0";
+const admittedPilots = new WeakMap();
 const moduleFile = (name) => fileURLToPath(new URL(name, import.meta.url));
 const bridge = moduleFile("./review-sandbox-bridge.mjs");
 const launcherEnv = { PATH: "/usr/bin:/bin", HOME: "/nonexistent", LC_ALL: "C" };
@@ -65,6 +71,61 @@ export function validateHostConfig(config) {
   }
 }
 
+export function requireReviewHost(config, excluded, options = {}) {
+  if (config?.schemaVersion !== 2) {
+    validateHostConfig(config);
+    return config;
+  }
+  const pilot = validatePilotHost(config);
+  const { executable, ...policy } = pilot.bubblewrap;
+  try {
+    need(pilot.relay.route === "same-uid-key", pilot.relay.route === "dedicated-uid-broker"
+      ? "Dedicated UID broker has no verified explicit effort and relay identity readback" : "Selected inference relay is contract-only");
+    inspectPinnedFile(executable, { executable: true, excluded });
+    const bubblewrapAudit = auditVersion(policy, observeVersion(executable.path, { client: "bubblewrap" }), bubblewrapVersion);
+    inspectPinnedFile(executable, { executable: true, excluded });
+    if (options.qualification) need(pilot.runtime, "Missing explicit Node, runtime library and relay configuration pins");
+    const roleOptions = { ...options, excluded };
+    if (pilot.runtime) roleOptions.context = {
+      runtimeSha256: options.runtimeSha256, configurationSha256: options.configurationSha256,
+      constraintsSha256: hash(jsonBytes({ runtime: pilot.runtime, bubblewrapAudit })),
+      relaySha256: pilot.runtime.relayConfiguration.sha256,
+    };
+    const binding = requireQualifiedPilot("reviewer", pilot.roleBinding, roleOptions);
+    need(pilot.runtime, "Missing explicit Node, runtime library and relay configuration pins");
+    const { node, libraries, relayConfiguration } = pilot.runtime;
+    const relayFile = parseStrictJson(inspectPinnedFile(relayConfiguration, { excluded, read: true }));
+    const { schemaVersion, credentialRef, ...relay } = relayFile;
+    need(schemaVersion === 1 && credentialRef === pilot.relay.credentialRef &&
+      relay.route === pilot.relay.route, "Pinned relay does not resolve the selected route and credential reference");
+    const runtime = {
+      schemaVersion: 1, bwrap: executable, claude: pilot.roleBinding.executable, node, libraries, relay,
+      model: pilot.roleBinding.model, maxTurns: pilot.maxTurns, timeoutMs: pilot.timeoutMs,
+      interPacketDelayMs: pilot.interPacketDelayMs, maxBudgetUsd: pilot.maxBudgetUsd, requirePreExposureAttestation: false,
+      ...(pilot.localHarness === undefined ? {} : { localHarness: pilot.localHarness }),
+    };
+    validateHostConfig(runtime);
+    admittedPilots.set(runtime, { args: binding.args, role: binding.binding, bubblewrapAudit, relayConfiguration,
+      configurationSha256: options.configurationSha256, runtimeSha256: options.runtimeSha256,
+      qualificationSha256: binding.qualificationSha256,
+      recheck: async () => {
+        need(typeof options.verifyRuntimeIdentity === "function" && await options.verifyRuntimeIdentity() === options.runtimeSha256,
+          "Qualified reviewer package bytes changed before launch");
+        if (options.hostPin) inspectPinnedFile(options.hostPin, { excluded });
+        inspectPinnedFile(relayConfiguration, { excluded });
+        inspectPinnedFile(executable, { executable: true, excluded });
+        requireQualifiedPilot("reviewer", pilot.roleBinding, roleOptions);
+      } });
+    return runtime;
+  } catch (cause) {
+    if (cause.disposition) throw cause;
+    const reason = cause.code ?? cause.message;
+    const error = new Error("unsupported reviewer: " + reason);
+    error.disposition = { status: "unsupported", role: "reviewer", client: pilot.roleBinding.client, reason };
+    throw error;
+  }
+}
+
 export function containmentArgs(config, exportDirectory, socket, runtime) {
   return [
     "--unshare-all", "--unshare-user", "--die-with-parent", "--new-session", "--disable-userns", "--cap-drop", "ALL",
@@ -83,7 +144,8 @@ export function containmentArgs(config, exportDirectory, socket, runtime) {
     }).flatMap(([name, value]) => ["--setenv", name, value]),
     "--remount-ro", "/", "--chdir", "/review", "--", "/control/node", "/control/bridge.mjs",
     "--print", "--verbose", "--output-format", "stream-json", "--session-id", runtime.session,
-    "--model", config.model, "--permission-mode", "dontAsk", "--tools", "Read", "--allowedTools", "Read",
+    ...(admittedPilots.get(config)?.args ?? ["--model", config.model]),
+    "--permission-mode", "dontAsk", "--tools", "Read", "--allowedTools", "Read",
     "--no-session-persistence", "--setting-sources", "", "--settings", pluginSettings,
     "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}',
     "--disable-slash-commands", "--no-chrome", "--permission-prompts", "none", "--max-turns", String(config.maxTurns), "--max-budget-usd", String(config.maxBudgetUsd),
@@ -111,9 +173,16 @@ export async function verifyRuntimePins(config, excluded) {
 }
 
 export function runtimeBinding(config, session, configurationSha256 = hash(jsonBytes(config))) {
-  return { session, model: config.model, version: claudeVersion, bubblewrapVersion,
+  const pilot = admittedPilots.get(config);
+  if (pilot) need(pilot.configurationSha256 === configurationSha256, "Explicit reviewer configuration pin mismatch");
+  return { session, model: config.model, version: pilot?.role.runtimeVersion.observedVersion ?? claudeVersion,
+    bubblewrapVersion: pilot?.bubblewrapAudit.observedVersion ?? bubblewrapVersion,
     maxTurns: config.maxTurns, maxBudgetUsd: config.maxBudgetUsd,
-    configurationSha256, route: config.relay.route };
+    configurationSha256, route: config.relay.route,
+    ...(pilot ? { explicit: { provider: pilot.role.provider, reasoningEffort: pilot.role.reasoningEffort,
+      executableSha256: pilot.role.executable.sha256, version: pilot.role.runtimeVersion, bubblewrap: pilot.bubblewrapAudit,
+      relaySha256: pilot.relayConfiguration.sha256, runtimeSha256: pilot.runtimeSha256,
+      qualificationSha256: pilot.qualificationSha256 } } : {}) };
 }
 
 async function brokerSocket(relay, excluded) {
@@ -130,7 +199,7 @@ async function brokerSocket(relay, excluded) {
 async function sameUidRelay(config, scratch, requestLimit) {
   const socket = path.join(scratch, "inference.sock");
   checkSocketLength(socket);
-  const child = spawn(process.execPath, [moduleFile("./review-relay.mjs")], {
+  const child = spawn(admittedPilots.has(config) ? config.node.path : process.execPath, [moduleFile("./review-relay.mjs")], {
     env: launcherEnv, stdio: ["pipe", "ignore", "ignore", "ipc"],
   });
   // Exit can precede close of the parent-side IPC and stdin handles.
@@ -154,6 +223,7 @@ async function sameUidRelay(config, scratch, requestLimit) {
   child.stdin?.end(jsonBytes({
     socket, keyFile: config.relay.keyFile, keyFormat: config.relay.keyFormat, model: config.model, requestLimit, socketMode: 0o600,
     timeoutMs: config.timeoutMs,
+    ...(admittedPilots.has(config) ? { reasoningEffort: admittedPilots.get(config).role.reasoningEffort } : {}),
   }));
   const close = async () => {
     child.stdin?.destroy();
@@ -205,13 +275,22 @@ async function sameUidRelay(config, scratch, requestLimit) {
 
 export async function withReviewRuntime(config, { parent, excluded, packetCount, scratchRoot, configurationSha256 }, callback, startRelay = sameUidRelay) {
   validateHostConfig(config);
+  const pilot = admittedPilots.get(config);
+  const recheck = async () => {
+    if (pilot) {
+      await pilot.recheck();
+      await verifyRuntimePins(config, excluded);
+    }
+  };
   need(process.platform === "linux", "Linux namespaces and pidfds required");
   await verifyRuntimePins(config, excluded);
   const bwrap = await runBoundedWorker(config.bwrap.path, ["--version"], {
     cwd: parent, env: launcherEnv, timeoutMs: 4000, stdoutLimit: 4096, stderrLimit: 4096,
   });
   need(bwrap.quiescent && bwrap.outcome === "exit" && bwrap.code === 0 &&
-    bwrap.stdout.toString().trim() === "bubblewrap " + bubblewrapVersion, "Bubblewrap version pin mismatch");
+    (pilot ? reportedVersion(bwrap.stdout.toString(), "bubblewrap") === pilot.bubblewrapAudit.observedVersion :
+      bwrap.stdout.toString().trim() === "bubblewrap " + bubblewrapVersion), "Bubblewrap version pin mismatch");
+  await recheck();
   const owned = await allocateReviewScratch(scratchRoot ?? await defaultReviewScratchRoot(), [parent, ...excluded]);
   const scratch = owned.directory;
   let relay;
@@ -225,6 +304,7 @@ export async function withReviewRuntime(config, { parent, excluded, packetCount,
     return await callback(async ({ files, session = randomUUID(), prompt, timeoutMs = config.timeoutMs }) => {
       need(workersSettled, "Previous reviewer process has no quiescence proof");
       need(timeoutMs > 0, "Review deadline expired before launch");
+      await recheck();
       await owned.verify();
       const packet = await mkdtemp(path.join(scratch, "packet-"));
       for (const [name, bytes] of files) {

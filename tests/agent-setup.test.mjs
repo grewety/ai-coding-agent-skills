@@ -1,0 +1,142 @@
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import test from "node:test";
+import { applySetup, previewSetup, readWorksetOpener } from "../skills/software-development/openspec-delivery/scripts/agent-setup.mjs";
+import { hashBytes, inspectPinnedFile } from "../skills/software-development/openspec-delivery/scripts/agent-configuration.mjs";
+import { readRoleBindings } from "../skills/software-development/openspec-delivery/scripts/agent-role-config.mjs";
+import { detectAgents } from "../skills/software-development/openspec-delivery/scripts/agent-discovery.mjs";
+import { nativeRoleBinding } from "../skills/software-development/openspec-delivery/scripts/agent-role-adapters.mjs";
+import { pilotDisposition, qualificationInventory } from "../skills/software-development/openspec-delivery/scripts/adapter-qualification.mjs";
+import { checkRoleIndependence, verifyEffectiveRole } from "../skills/software-development/openspec-delivery/scripts/role-config.mjs";
+import { auditVersion, reportedVersion } from "../skills/software-development/openspec-delivery/scripts/runtime-version.mjs";
+
+function fixture(t) {
+  const root = mkdtempSync(path.join(os.tmpdir(), "agent-setup-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const directory = path.join(root, "host");
+  const workspace = path.join(root, "workspace");
+  mkdirSync(directory, { mode: 0o700 });
+  mkdirSync(workspace, { mode: 0o700 });
+  const command = path.join(root, "codex");
+  const executableBytes = '#!/bin/sh\nif [ "$1" = "--version" ]; then printf "codex-cli 0.172.0\\n"; else printf "%s\\n" "$@"; fi\n';
+  writeFileSync(command, executableBytes, { mode: 0o700 });
+  const executable = { path: command, sha256: hashBytes(executableBytes) };
+  const codex = { client: "codex", provider: "openai", model: "gpt-fixture", reasoningEffort: "high", executable };
+  const claude = { ...codex, client: "claude-code", provider: "anthropic", model: "claude-fixture" };
+  return { root, workspace, command, executable, codex, input: { schemaVersion: 1, directory,
+    roles: { orchestrator: codex, implementer: codex, reviewer: claude, helper: null },
+    reviewer: { bubblewrap: { executable }, relay: { route: "same-uid-key", credentialRef: "fixture-reference" },
+      interPacketDelayMs: 100, timeoutMs: 5000, maxBudgetUsd: 1 } } };
+}
+
+test("version audits preserve observed identity and independent checks", (t) => {
+  assert.equal(auditVersion({}, "0.171.0", "0.171.0").comparison, "passed");
+  assert.equal(auditVersion({ maxVersion: "0.172.0" }, "0.172.0", "0.171.0").comparison, "passed");
+  assert.throws(() => auditVersion({}, "0.171.0-beta.1", "0.171.0"), /below/);
+  assert.throws(() => auditVersion({ maxVersion: "0.171.0" }, "0.172.0", "0.171.0"), /above/);
+  assert.throws(() => auditVersion({ versionPolicy: "exact", exactVersion: "0.171.0" }, "0.172.0"), /exactVersion/);
+  const { codex } = fixture(t);
+  const observed = { ...codex, executableSha256: codex.executable.sha256, version: "0.170.0" };
+  assert.equal(verifyEffectiveRole({ ...codex, versionCheck: false }, observed).runtimeVersion.comparison, "disabled");
+  assert.throws(() => verifyEffectiveRole({ ...codex, versionCheck: false }, { ...observed, executableSha256: "0".repeat(64) }), /pin mismatch/);
+  assert.throws(() => verifyEffectiveRole(codex, { ...observed, reasoningEffort: "low" }), /reasoning effort/);
+  assert.throws(() => checkRoleIndependence({ provider: "openai", session: "one" }, { provider: "openai", session: "two" }), /provider/);
+  assert.throws(() => checkRoleIndependence({ provider: "openai", session: "one" }, { provider: "anthropic", session: "one" }), /session/);
+});
+
+test("discovery redacts raw output and keeps present pilots unsupported", (t) => {
+  const { root, executable, codex } = fixture(t);
+  const detected = detectAgents({ searchPath: root, run: (_command, args, options) => {
+    assert.deepEqual(args, ["--version"]);
+    assert.equal(options.env.HOME, "/nonexistent");
+    assert.equal(options.env.OPENAI_API_KEY, undefined);
+    return { status: 0, stdout: "codex-cli 0.172.0", stderr: "private fixture text" };
+  } });
+  assert.equal(detected.find(({ client }) => client === "codex").version, "0.172.0");
+  assert.ok(!JSON.stringify(detected).includes("private fixture text"));
+  assert.match(qualificationInventory(detected).find(({ client }) => client === "hermes").reason, /Executable unavailable/);
+  const pilot = pilotDisposition("implementer", codex);
+  assert.equal(pilot.status, "unsupported");
+  assert.equal(pilot.runtimeVersion.observedVersion, "0.172.0");
+  assert.match(pilot.reason, /bounded live proof/);
+  assert.throws(() => inspectPinnedFile({ ...executable, sha256: "0".repeat(64) }, { executable: true }), /SHA-256/);
+});
+
+test("accepts unambiguous native version output without treating an arbitrary version mention as identity", () => {
+  for (const [client, text, expected] of [
+    ["codex", "codex-cli 0.171.0\n", "0.171.0"],
+    ["claude-code", "2.1.330 (Claude Code)\n", "2.1.330"],
+    ["bubblewrap", "bubblewrap 0.9.0\n", "0.9.0"],
+    ["openspec", "2.1.1\n", "2.1.1"],
+    ["hermes", "Hermes Agent v0.11.0 (2026-01-02)\n", "0.11.0"],
+    ["opencode", "1.5.0-beta.1\n", "1.5.0-beta.1"],
+    ["codex", "download required version 0.172.0", null],
+    ["codex", "2.1.330 (Claude Code)\n", null],
+    ["codex", "codex-cli 0.172.0\nrunner 0.1.0", null],
+    ["codex", "codex-cli 0.172.0.1", null],
+    ["pi", "v1.2.3-01", null],
+  ]) assert.equal(reportedVersion(text, client), expected, text);
+});
+
+test("setup previews exact bytes, refuses drift and reads back independent role and host pins", (t) => {
+  const { input, workspace, root, codex } = fixture(t);
+  const options = { workspace };
+  const preview = previewSetup(input, options);
+  assert.deepEqual(readdirSync(input.directory), []);
+  assert.ok(nativeRoleBinding(codex, "orchestrator").args.includes('model_reasoning_effort="high"'));
+  assert.ok(JSON.parse(preview.outputs[2].utf8).openers.codex.args.includes('model_provider="openai"'));
+  assert.equal(JSON.parse(preview.outputs[0].utf8).maxTurns, 96);
+  assert.throws(() => applySetup(input, "0".repeat(64), options), /confirmation/);
+  const alias = path.join(root, "alias");
+  symlinkSync(input.directory, alias);
+  assert.throws(() => previewSetup({ ...input, directory: alias }, options), /canonical/);
+  assert.throws(() => previewSetup({ ...input, directory: workspace }, options), /repository/);
+  symlinkSync(path.join(root, "absent"), preview.outputs[0].path);
+  assert.throws(() => applySetup(input, preview.confirmationSha256, options), /conflicts/);
+  rmSync(preview.outputs[0].path);
+  const result = applySetup(input, preview.confirmationSha256, options);
+  assert.equal(result.status, "verified");
+  assert.equal(result.configurationSha256, hashBytes(readFileSync(preview.outputs[0].path)));
+  const pin = { path: preview.outputs[1].path, sha256: preview.outputs[1].sha256 };
+  assert.equal(readRoleBindings(pin).roles.implementer.reasoningEffort, "high");
+  const repeat = previewSetup(input, options);
+  assert.ok(repeat.outputs.every(({ state }) => state === "matching"));
+  assert.equal(applySetup(input, repeat.confirmationSha256, options).configurationSha256, result.configurationSha256);
+  assert.throws(() => applySetup(input, preview.confirmationSha256, options), /confirmation/);
+  const { command, args } = JSON.parse(preview.outputs[2].utf8).openers.codex;
+  const native = [...args.slice(4), "--add-dir", workspace];
+  const launch = readWorksetOpener(pin, native, { workspace, env: {} });
+  assert.deepEqual(launch.args, native);
+  assert.throws(() => readWorksetOpener(pin, [...native, "--model", "elsewhere"], { workspace }), /workset members/);
+  assert.throws(() => readWorksetOpener(pin, native, { workspace, env: { OPENAI_BASE_URL: "fixture" } }), /override/);
+  const opener = spawnSync(command, [...args, "--add-dir", workspace], { cwd: workspace, encoding: "utf8",
+    env: { PATH: "/usr/bin:/bin", HOME: root } });
+  assert.equal(opener.status, 0, opener.stderr);
+  assert.deepEqual(opener.stdout.trimEnd().split("\n"), native);
+  assert.equal(JSON.parse(opener.stderr).observedVersion, "0.172.0");
+  writeFileSync(preview.outputs[0].path, preview.outputs[0].utf8 + " ");
+  assert.throws(() => readRoleBindings(pin), /SHA-256/);
+  assert.throws(() => readWorksetOpener(pin, native, { workspace }), /SHA-256/);
+});
+
+test("setup allows a distinct XDG application directory and refuses a live profile alias", (t) => {
+  const { input, root, workspace } = fixture(t);
+  const configRoot = path.join(root, "xdg");
+  const separate = path.join(configRoot, "fixture-role-setup");
+  mkdirSync(configRoot, { mode: 0o700 });
+  mkdirSync(separate, { mode: 0o700 });
+  const previous = process.env.XDG_CONFIG_HOME;
+  process.env.XDG_CONFIG_HOME = configRoot;
+  t.after(() => {
+    if (previous === undefined) delete process.env.XDG_CONFIG_HOME;
+    else process.env.XDG_CONFIG_HOME = previous;
+  });
+  const request = { ...input, directory: separate };
+  assert.equal(previewSetup(request, { workspace }).directory, separate);
+  symlinkSync(separate, path.join(configRoot, "openspec"));
+  assert.throws(() => previewSetup(request, { workspace }), /live profile/);
+  assert.deepEqual(readdirSync(separate), []);
+});

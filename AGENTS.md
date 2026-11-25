@@ -17,6 +17,8 @@ Maintain portable AI coding-agent playbooks and publish complete Agent Skills pa
 
 ## Local Contracts
 
+- The external role setup and pilot disposition contract lives in `docs/configurable-backends.md`. Setup writes only confirmed external files. Preserve original approved legacy pins and require separate live qualification for explicit pilots.
+
 - Read applicable parent and child AGENTS.md files before editing. Update owning contracts and child indexes after changing durable responsibilities or workflows.
 - `skills/<category>/<name>/SKILL.md` is canonical. Generated `.well-known/skills/` packages contain only SKILL.md and explicitly supported package directories, never repository-control documents, credentials, or profile state.
 - Preserve portable workflows and synthetic examples; project DOX and product policy always outrank a skill.

@@ -2,6 +2,7 @@
 import { createHash } from "node:crypto";
 import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, realpathSync } from "node:fs";
 import path from "node:path";
+import { roleConfig } from "./role-config.mjs";
 
 const digest = (value) => createHash("sha256").update(value).digest("hex");
 const need = (ok, reason) => { if (!ok) throw new Error(reason); };
@@ -78,6 +79,7 @@ export function checkHarnessExecutable(binding, excluded) {
 }
 
 export function verifyHarnessSeal({ reference, binding, configurationSha256, candidate, excluded, attachment, now = Date.now() }) {
+  need(!binding.aiRole, "No verified effective binding adapter for optional AI invocation");
   need(keys(reference, ["file", "sha256"]), "Missing independent host-retained harness seal reference");
   const bytes = readHostPin(reference.file, reference.sha256, excluded, 64 * 1024, true);
   checkHarnessExecutable(binding, [...excluded, reference.file]);
@@ -96,6 +98,7 @@ export function verifyHarnessSeal({ reference, binding, configurationSha256, can
 
 export function validateHarnessBinding(binding) {
   const fields = ["id", "kind", "executable", "executableSha256", "args", "timeoutMs", "maxAgeMs", "exposure"];
+  if (Object.hasOwn(binding ?? {}, "aiRole")) fields.push("aiRole");
   need(keys(binding, binding?.kind === "mcp" ? [...fields, "tool"] : fields) &&
     typeof binding.id === "string" && /^[a-z][a-z0-9-]{0,63}$/.test(binding.id) &&
     ["cli", "mcp"].includes(binding.kind) && typeof binding.executable === "string" &&
@@ -106,4 +109,5 @@ export function validateHarnessBinding(binding) {
     Number.isSafeInteger(binding.maxAgeMs) && binding.maxAgeMs >= 1000 && binding.maxAgeMs <= 7 * 86400000 &&
     ["local-only", "separate-run"].includes(binding.exposure) &&
     (binding.kind !== "mcp" || /^[A-Za-z][A-Za-z0-9_.-]{0,127}$/.test(binding.tool)), "Invalid host harness binding");
+  if (Object.hasOwn(binding, "aiRole")) roleConfig(binding.aiRole);
 }

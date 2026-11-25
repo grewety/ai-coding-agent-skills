@@ -1,7 +1,7 @@
 ---
 name: openspec-next
 description: Inspect or advance an approved OpenSpec goal or task group.
-version: 0.7.0
+version: 0.8.0
 author: Raphael (forgegod), Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -12,6 +12,8 @@ metadata:
 ---
 
 # OpenSpec Next
+
+Route explicit backend and harness admission results through delivery. An unsupported configured pilot stops before dispatch. Retain the existing authority and pins for frozen legacy evidence.
 
 Resolve the real unfinished boundary of one change and advance its approved local
 goal or Task-Guided group within the selected continuation policy.

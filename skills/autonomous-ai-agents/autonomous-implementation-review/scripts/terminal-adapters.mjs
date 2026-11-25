@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 import { lstat, mkdtemp } from "node:fs/promises";
 import path from "node:path";
 import { createAttempt, publishResult, readHandoff, safePath, writeClosed } from "./worker-handoff.mjs";
+import { requireQualifiedPilot } from "./adapter-qualification.mjs";
 
 const need = (ok, message) => { if (!ok) throw new Error(message); };
 const text = (v) => typeof v === "string" && v.trim().length > 0;
@@ -745,10 +746,12 @@ function parseNativeReviewFindings(lines) {
 }
 
 export async function executeTerminalAdapterAttempt({
-  directory, request, excludedRoots, runtime, scratchRoot,
+  directory, request, excludedRoots, runtime, scratchRoot, roleBinding,
   command = process.execPath, runnerPrefixArgs = [], args = null, promptText, transportRoute = null,
   completionKind = "exit", turnId = "turn-1", humanWait = null, records = CANDIDATE_RECORDS,
 }) {
+  if (roleBinding !== undefined) requireQualifiedPilot(request.identity.role, roleBinding,
+    { excluded: [directory, request.identity.workspace, ...excludedRoots] });
   await safePath(scratchRoot);
   need((await lstat(scratchRoot)).isDirectory(), "Unsafe worker scratch root");
   const captureDir = await mkdtemp(path.join(scratchRoot, "transport-"));
