@@ -78,7 +78,7 @@ sealed export and original `OUTPUT` path for `--verify`.
 ```text
 NODE REVIEW_CLI --prepare --request REQUEST --expect EXPECT --export EXPORT
 NODE REVIEW_CLI --check --request REQUEST --expect EXPECT --export EXPORT
-NODE REVIEW_CLI --probe --host-config HOST --output PROBE_OUTPUT
+NODE REVIEW_CLI --probe --host-config HOST --admission PROBE_GRANT --output PROBE_OUTPUT
 NODE REVIEW_CLI --mode candidate --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --output OUTPUT
 NODE REVIEW_CLI --mode approach --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --output OUTPUT
 NODE REVIEW_CLI --verify --request REQUEST --expect EXPECT --export EXPORT --output OUTPUT
@@ -92,11 +92,14 @@ NODE REVIEW_CLI --verify --request REQUEST --expect EXPECT --export EXPORT --out
    a sealed export and reports its manifest hash. Inspect the whole manifest,
    file bytes and packet scopes. Retain the approved hash in the independent
    expectation, then use offline `--check` to confirm the sealed inventory and
-   packet count. The bound `maxTurns` allows at most `maxTurns - 10` assigned
-   whole-file reads per packet. Configure optional `interPacketDelayMs`
+   packet count. Set `maxTurns >= 11` for low-touch packet feasibility.
+   Each packet can assign at most `maxTurns - 10` whole-file reads. The host
+   schema still accepts 1–128 for standalone probes and retained legacy runs. Configure optional `interPacketDelayMs`
    from 0 to 30000 and `runTimeoutMs` from 1000 to 3600000 in the pinned host.
-2. With live authority, `--probe` sends a synthetic prompt with an empty packet,
-   and records `probe-passed` or `probe-failed` with separate captures. For
+2. With a separately authorized `PROBE_GRANT`, `--probe` first reserves the
+   approved host configuration and single-invocation cost in the host-owned
+   ledger. It then sends a synthetic prompt with an empty packet and records
+   `probe-passed` or `probe-failed` with separate captures. For
    each approved mode run, use a fresh output root and an expectation without
    `statusSha256`. The mode run performs its own separate probe before sending
    any packet. It checks the model and session, only `Read` in the tool

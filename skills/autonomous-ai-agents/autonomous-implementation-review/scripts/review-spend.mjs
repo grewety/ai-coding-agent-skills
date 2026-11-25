@@ -42,6 +42,35 @@ async function syncDirectory(location) {
   try { await handle.sync(); } finally { await handle.close(); }
 }
 
+export async function checkProbeSpend({ file, configurationSha256, maxBudgetUsd, excluded }) {
+  const { value: grant } = await trustedJson(file, excluded);
+  fields(grant, ["schemaVersion", "kind", "reference", "verified", "runs", "configurationSha256", "upperUsdMicros", "ledger"],
+    "standalone probe grant");
+  need(grant.schemaVersion === 1 && grant.kind === "standalone-review-probe" && grant.verified === true &&
+    grant.runs === 1 && text(grant.reference) && grant.configurationSha256 === configurationSha256 &&
+    grant.upperUsdMicros === usdMicros(maxBudgetUsd), "Missing exact single-run standalone probe authority");
+  return { grant, excluded: [...excluded, file] };
+}
+
+export async function claimProbeRun({ grant, excluded }) {
+  const root = grant.ledger;
+  await protectedLedger(root, excluded);
+  // The leading dot keeps this namespace distinct from all per-change ledgers.
+  const directory = path.join(root, ".standalone-probes");
+  try { await mkdir(directory, { mode: 0o700 }); }
+  catch (error) { if (error.code !== "EEXIST") throw error; }
+  await protectedLedger(directory, excluded);
+  await syncDirectory(root);
+  const file = path.join(directory, hash(jsonBytes(grant.reference)) + ".json");
+  try {
+    await writeClosed(file, jsonBytes({ ...grant, reservedAt: new Date().toISOString() }), true);
+  } catch (error) {
+    if (error.code === "EEXIST") throw new Error("Standalone probe authority was already consumed");
+    throw error;
+  }
+  await syncDirectory(directory);
+}
+
 export async function claimReviewRun({ root, excluded, scope, policy, explicitGrant, retryGrant }) {
   await protectedLedger(root, excluded);
   need(/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(scope.change) && scope.change.length <= 200, "Invalid review ledger change");

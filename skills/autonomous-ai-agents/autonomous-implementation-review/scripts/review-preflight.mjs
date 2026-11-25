@@ -24,8 +24,8 @@ export async function offlineHostBinding(file, expect, excluded, exactBytes = tr
 }
 
 export function checkPacketTurns({ manifest }, maxTurns) {
-  need(Number.isSafeInteger(maxTurns) && maxTurns >= 11 && maxTurns <= 128,
-    "Invalid maxTurns for packet review with ten reserved turns");
+  need(Number.isSafeInteger(maxTurns) && maxTurns <= 128, "Invalid maxTurns for packet review");
+  need(maxTurns >= 11, "maxTurns must be at least 11 to leave a 10-turn reserve for at least 1 whole-file read");
   for (const [index, packet] of manifest.packets.entries()) {
     need(packet.paths.length <= maxTurns - 10,
       `Packet ${index + 1} requires ${packet.paths.length} whole-file reads. maxTurns ${maxTurns} allows ${maxTurns - 10} after reserve.`);

@@ -25,7 +25,8 @@ An omitted cap uses the built-in default up to the integrated ceiling.
 Increasing integrated ceilings requires an integrated policy revision for
 later changes. Use `"mode":"explicit"` in the integrated marker to require
 one distinct grant for every run, or place `"mode":"explicit"` in the
-host admission file for one run under automatic policy. A parent without
+host admission file for one run under automatic policy. Every review mode
+uses the integrated phase allowlist. A parent without
 the marker follows its existing single-run approval and exact-head rules.
 A denied automatic attempt stops at that bound.
 
@@ -68,7 +69,10 @@ reviewed exact target require retry authority for that purpose.
 }
 ```
 
-Offline preparation and checking use `--host-config HOST`. Offline
+Offline preparation and checking use `--host-config HOST`. Set
+`maxTurns >= 11` for low-touch packet feasibility. The ten-turn reserve
+leaves at most `maxTurns - 10` whole-file reads per packet. The host schema
+accepts 1–128 for standalone probes and retained legacy runs. Offline
 `--check --admission ADMISSION` also checks the effective scope and
 authority without claiming the reservation. The approved launch uses
 `--mode ... --host-config HOST --admission ADMISSION`. Before contacting the
@@ -78,7 +82,13 @@ number of packets plus one probe. The ledger retains spent and uncertain
 amounts conservatively and refuses replay or excess. A crashed or partially
 written ledger stops future claims pending host reconciliation. Keep the
 original entries when reconciling. A standalone diagnostic `--probe` is
-outside automatic approval and has its own single-run grant.
+outside automatic approval. Use `--probe --host-config HOST --admission
+PROBE_GRANT --output PROBE_OUTPUT` with a separate host-owned
+`standalone-review-probe` grant. It binds one invocation to the raw host
+SHA-256, exact cost bound in USD millionths and stable host ledger path.
+The runner reserves the grant's unique approval reference in that ledger
+before opening the runtime or reading credentials. Keep that reservation
+after a failed run.
 [Packaged request and command schema](../skills/autonomous-ai-agents/autonomous-implementation-review/references/review-candidate.md).
 
 ## Optional local harness

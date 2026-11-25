@@ -9,8 +9,8 @@ import { admitReceipt, candidateResult, describeFile, receiptContext, reviewProm
 import { absolute, checkExport, checkSealedDirectory, digest, equal, fields, fileLimit, hash, jsonBytes, need, newProtectedDirectory,
   prepareExport, protectedParent, readJson, reviewPolicy, sealDirectories, separate, totalLimit, uuid, validateReviewRequest } from "./review-inputs.mjs";
 import { bubblewrapVersion, claudeVersion, runtimeBinding, validateHostConfig, withReviewRuntime } from "./review-runtime.mjs";
-import { checkPacketTurns, offlineHostBinding, reviewClock } from "./review-preflight.mjs";
-import { checkReviewSpend, claimReviewRun } from "./review-spend.mjs";
+import { checkPacketTurns, offlineHostBinding, reviewClock, trustedJson } from "./review-preflight.mjs";
+import { checkProbeSpend, checkReviewSpend, claimProbeRun, claimReviewRun } from "./review-spend.mjs";
 import { checkHarnessSeal } from "./harness-result.mjs";
 import { upstreamClasses } from "./review-upstream-status.mjs";
 import { auditClaudeStream } from "./review-stream.mjs";
@@ -287,7 +287,7 @@ export async function runReview({ request, expect, prepared, directory, excluded
 const commands = {
   "--prepare": ["request", "expect", "export"],
   "--check": ["request", "expect", "export"],
-  "--probe": ["host-config", "output"],
+  "--probe": ["host-config", "admission", "output"],
   "--mode": ["request", "expect", "export", "output", "host-config"],
   "--verify": ["request", "expect", "export", "output"],
 };
@@ -314,22 +314,25 @@ function cli(argv) {
   return { command, mode, options };
 }
 
-async function hostConfig(filename) {
-  const config = await readJson(filename, 65536);
-  validateHostConfig(config);
-  return config;
-}
-
 export async function reviewCommand(argv, openRuntime = withReviewRuntime) {
   const { command, mode, options } = cli(argv);
   if (command === "--probe") {
-    const config = await hostConfig(options["host-config"]);
-    const excluded = [options["host-config"], ...hostPaths(config)];
     const directory = options.output;
-    await newProtectedDirectory(directory, excluded);
+    const hostFile = options["host-config"];
+    const { value: config, configurationSha256 } = await trustedJson(hostFile, [directory]);
+    validateHostConfig(config);
+    const excluded = [hostFile, ...hostPaths(config)];
+    const spend = await checkProbeSpend({ file: options.admission, configurationSha256,
+      maxBudgetUsd: config.maxBudgetUsd, excluded: [...excluded, directory] });
+    await protectedParent(directory);
+    await newAttemptPath(directory);
+    need(excluded.every((root) => separate(directory, root)), "Output overlaps protected host paths");
+    await claimProbeRun(spend);
+    await newProtectedDirectory(directory, [...excluded, options.admission, spend.grant.ledger]);
     let phase = "probe-failed";
     try {
-      const passed = await openRuntime(config, { parent: directory, excluded: [directory], packetCount: 0 }, async (run) => {
+      const passed = await openRuntime(config, { parent: directory, excluded: [directory, hostFile, options.admission, spend.grant.ledger],
+        packetCount: 0, configurationSha256 }, async (run) => {
         const attempt = await run({ files: new Map(), prompt: probePrompt });
         await capture(directory, 0, attempt);
         return audit(attempt, [], true) !== null;

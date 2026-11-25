@@ -26,6 +26,10 @@ test("verified policy defaults, phase ceilings and explicit override stay bounde
   assert.deepEqual(reviewAuthority(policy, { phase: "execution", mode: "explicit" }), { mode: "explicit" });
   assert.equal(reviewAuthority(null, { phase: "execution" }).mode, "explicit");
   assert.equal(reviewAuthority(optIn({ mode: "explicit" }), { phase: "execution" }).mode, "explicit");
+  const phaseError = { message: "Review phase is outside the integrated phase allowlist" };
+  assert.throws(() => reviewAuthority(optIn({ mode: "explicit", phases: ["planning"] }), { phase: "execution" }), phaseError);
+  assert.throws(() => reviewAuthority(optIn({ phases: ["planning"] }), { mode: "explicit", phase: "finish" }), phaseError);
+  assert.deepEqual(reviewAuthority(optIn({ phases: ["planning"] }), { mode: "explicit", phase: "planning" }), { mode: "explicit" });
   assert.throws(() => reviewAuthority(optIn({ phases: ["planning"] }), { phase: "finish" }), /phase/);
   assert.throws(() => reviewAuthority(policy, { phase: "finish", caps: { maxReviews: 11 } }), /ceiling/);
   assert.throws(() => reviewAuthority(policy, { phase: "finish", caps: { maxTotalUsd: 25.001 } }), /ceiling/);
@@ -101,6 +105,11 @@ test("pacing uses the same run deadline and cancellation, and upstream diagnosti
   const prepared = { manifest: { packets: [{ paths: ["a", "b", "c"] }, { paths: ["a", "b", "c", "d"] }] } };
   assert.doesNotThrow(() => checkPacketTurns(prepared, 14));
   assert.throws(() => checkPacketTurns(prepared, 13), /Packet 2.*maxTurns 13/);
+  const oneFile = { manifest: { packets: [{ paths: ["a"] }] } };
+  assert.throws(() => checkPacketTurns(oneFile, 10), {
+    message: "maxTurns must be at least 11 to leave a 10-turn reserve for at least 1 whole-file read",
+  });
+  assert.doesNotThrow(() => checkPacketTurns(oneFile, 11));
   assert.throws(() => checkPacketTurns(prepared, undefined), /maxTurns/);
 });
 

@@ -77,8 +77,9 @@ export function readLowTouchPolicy(source) {
 
 export function reviewAuthority(policy, { mode, phase, caps = {} }) {
   need(mode === undefined || mode === "explicit", "Only an explicit per-run override is supported");
+  need(!policy || policy.phases.includes(phase), "Review phase is outside the integrated phase allowlist");
   if (!policy || policy.mode === "explicit" || mode === "explicit") return { mode: "explicit" };
-  need(policy.phases.includes(phase) && keys(caps, ["maxReviews", "maxTotalUsd"]), "Automatic review phase or effective caps are unverified");
+  need(keys(caps, ["maxReviews", "maxTotalUsd"]), "Automatic review caps are unverified");
   const { maxReviews = Math.min(reviewDefaults.maxReviews, policy.maxReviews),
     maxTotalUsd = Math.min(reviewDefaults.maxTotalUsd, policy.maxTotalUsd) } = caps;
   const limitMicros = usdMicros(maxTotalUsd);
