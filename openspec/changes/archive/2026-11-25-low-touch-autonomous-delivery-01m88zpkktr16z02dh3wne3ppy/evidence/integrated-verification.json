@@ -1,0 +1,204 @@
+{
+  "schemaVersion": 1,
+  "kind": "integrated-verification",
+  "change": "low-touch-autonomous-delivery-01m88zpkktr16z02dh3wne3ppy",
+  "integrated": "94624e4416353712310d8b065271e325ff92d515",
+  "integrationReference": "https://github.com/grewety/ai-coding-agent-skills/pull/60",
+  "proof": {
+    "implementationHead": "4c7761a76c7685de705a064ce94178a12750fd7b",
+    "previousTarget": "870cb731755a22a0eadde9e935418a7d142a4f94",
+    "mergeTime": "2026-11-25T16:55:34Z",
+    "exactTree": "e235a90e9a023415848b360949f753cc72647a81"
+  },
+  "disposableGates": {
+    "head": "94624e4416353712310d8b065271e325ff92d515",
+    "tree": "e235a90e9a023415848b360949f753cc72647a81",
+    "fileSha256": "4a9f1b76201950b9a71ffbb3daa8598439f2d4180a15c29d3667b0f537b39b18",
+    "wrapperSha256": "4fb77d2e699dea7d800caff407470932aa408298fd53e53842fdb24d6e7b1ea9",
+    "testSummary": {
+      "tests": 537,
+      "pass": 537,
+      "fail": 0,
+      "skipped": 0
+    },
+    "commands": [
+      {
+        "command": "npm test",
+        "argv": [
+          "npm",
+          "test"
+        ],
+        "commit": "94624e4416353712310d8b065271e325ff92d515",
+        "exitCode": 0,
+        "observedAt": "2026-11-25T16:57:24.081Z",
+        "evidence": "disposable-gate-run.json (4a9f1b76201950b9a71ffbb3daa8598439f2d4180a15c29d3667b0f537b39b18)",
+        "stdoutSha256": "d5b252649c1140d09cf5fe1792ef54c7ea3867edc9dc00e5d381bf0aec89a6a1",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "npm run build",
+        "argv": [
+          "npm",
+          "run",
+          "build"
+        ],
+        "commit": "94624e4416353712310d8b065271e325ff92d515",
+        "exitCode": 0,
+        "observedAt": "2026-11-25T16:57:24.640Z",
+        "evidence": "disposable-gate-run.json (4a9f1b76201950b9a71ffbb3daa8598439f2d4180a15c29d3667b0f537b39b18)",
+        "stdoutSha256": "86d282327cd8b75021699ffc649a121021f5fc2a9dc6d602765d9e5a806d4d0f",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "openspec validate --all --strict",
+        "argv": [
+          "openspec",
+          "validate",
+          "--all",
+          "--strict"
+        ],
+        "commit": "94624e4416353712310d8b065271e325ff92d515",
+        "exitCode": 0,
+        "observedAt": "2026-11-25T16:57:24.892Z",
+        "evidence": "disposable-gate-run.json (4a9f1b76201950b9a71ffbb3daa8598439f2d4180a15c29d3667b0f537b39b18)",
+        "stdoutSha256": "6fa9cdbbcc91714a86839589afbfc6c99efe73e4beca32d163df1c1c80e0755e",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "npm run validate:openspec -- --require-issue",
+        "argv": [
+          "npm",
+          "run",
+          "validate:openspec",
+          "--",
+          "--require-issue"
+        ],
+        "commit": "94624e4416353712310d8b065271e325ff92d515",
+        "exitCode": 0,
+        "observedAt": "2026-11-25T16:57:25.162Z",
+        "evidence": "disposable-gate-run.json (4a9f1b76201950b9a71ffbb3daa8598439f2d4180a15c29d3667b0f537b39b18)",
+        "stdoutSha256": "aed4fee964da1bb05aa4d47d1666d0757950fccb595438aabf7859cfc8cb0206",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "git diff --check 870cb731755a22a0eadde9e935418a7d142a4f94 HEAD",
+        "argv": [
+          "git",
+          "diff",
+          "--check",
+          "870cb731755a22a0eadde9e935418a7d142a4f94",
+          "HEAD"
+        ],
+        "commit": "94624e4416353712310d8b065271e325ff92d515",
+        "exitCode": 0,
+        "observedAt": "2026-11-25T16:57:25.232Z",
+        "evidence": "disposable-gate-run.json (4a9f1b76201950b9a71ffbb3daa8598439f2d4180a15c29d3667b0f537b39b18)",
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "Changed-file size gate (<65,536 bytes)",
+        "argv": [
+          "python3",
+          "-c",
+          "import subprocess, sys\npaths = subprocess.check_output(['git', 'diff', '--name-only', '--diff-filter=ACMRT', '-z', sys.argv[1], 'HEAD']).split(b'\\0')\nfor path in filter(None, paths):\n    size = int(subprocess.check_output([b'git', b'cat-file', b'-s', b'HEAD:' + path]))\n    if size >= 65536:\n        sys.exit(f'{path!r}: {size} bytes exceeds changed-file ceiling')",
+          "870cb731755a22a0eadde9e935418a7d142a4f94"
+        ],
+        "commit": "94624e4416353712310d8b065271e325ff92d515",
+        "exitCode": 0,
+        "observedAt": "2026-11-25T16:57:25.430Z",
+        "evidence": "disposable-gate-run.json (4a9f1b76201950b9a71ffbb3daa8598439f2d4180a15c29d3667b0f537b39b18)",
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  "workflows": [
+    {
+      "id": 45659199576,
+      "name": "Verify skills",
+      "workflow_id": 379747589,
+      "head_sha": "94624e4416353712310d8b065271e325ff92d515",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/grewety/ai-coding-agent-skills/actions/runs/45659199576",
+      "event": "push",
+      "run_attempt": 1
+    },
+    {
+      "id": 45659199318,
+      "name": "Publish skills",
+      "workflow_id": 379747590,
+      "head_sha": "94624e4416353712310d8b065271e325ff92d515",
+      "status": "completed",
+      "conclusion": "success",
+      "html_url": "https://github.com/grewety/ai-coding-agent-skills/actions/runs/45659199318",
+      "event": "push",
+      "run_attempt": 1
+    }
+  ],
+  "workflowJobs": {
+    "Verify skills": [
+      {
+        "id": 139364094350,
+        "name": "verify",
+        "head_sha": "94624e4416353712310d8b065271e325ff92d515",
+        "conclusion": "success",
+        "html_url": "https://github.com/grewety/ai-coding-agent-skills/actions/runs/45659199576/job/139364094350",
+        "completed_at": "2026-11-25T16:57:25Z"
+      }
+    ],
+    "Publish skills": [
+      {
+        "id": 139364093839,
+        "name": "build",
+        "head_sha": "94624e4416353712310d8b065271e325ff92d515",
+        "conclusion": "success",
+        "html_url": "https://github.com/grewety/ai-coding-agent-skills/actions/runs/45659199318/job/139364093839",
+        "completed_at": "2026-11-25T16:57:30Z"
+      },
+      {
+        "id": 139365285449,
+        "name": "deploy",
+        "head_sha": "94624e4416353712310d8b065271e325ff92d515",
+        "conclusion": "success",
+        "html_url": "https://github.com/grewety/ai-coding-agent-skills/actions/runs/45659199318/job/139365285449",
+        "completed_at": "2026-11-25T16:57:46Z"
+      }
+    ]
+  },
+  "pages": {
+    "deployment": {
+      "id": 8063877111,
+      "sha": "94624e4416353712310d8b065271e325ff92d515",
+      "environment": "github-pages",
+      "created_at": "2026-11-25T16:57:30Z"
+    },
+    "status": {
+      "id": 23150772004,
+      "state": "success",
+      "environment_url": "https://grewety.github.io/ai-coding-agent-skills/",
+      "log_url": "https://github.com/grewety/ai-coding-agent-skills/actions/runs/45659199318/job/139365285449",
+      "created_at": "2026-11-25T16:57:47Z"
+    }
+  },
+  "discoveryIndex": {
+    "head": "94624e4416353712310d8b065271e325ff92d515",
+    "url": "https://grewety.github.io/ai-coding-agent-skills/.well-known/skills/index.json",
+    "liveSha256": "01cb32b94a18be1d7da4290a451c8d0847e65778cc381ef73d6e3042c5639e19",
+    "localSha256": "01cb32b94a18be1d7da4290a451c8d0847e65778cc381ef73d6e3042c5639e19",
+    "exactBuiltIndex": true,
+    "verified": true,
+    "bytes": 4479
+  },
+  "specPromotions": [
+    {
+      "capability": "contained-independent-review",
+      "requirements": 5
+    },
+    {
+      "capability": "openspec-integration",
+      "requirements": 10
+    }
+  ]
+}
