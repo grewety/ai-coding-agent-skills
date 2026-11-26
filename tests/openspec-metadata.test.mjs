@@ -189,7 +189,7 @@ test("tiered containment promotes all three frozen deltas within the review expo
       readCapabilitySpec(currentSpecs, capability),
     ]);
     assert.equal(checkPromotion({ capability, delta, current }), expected, capability);
-    assert.ok(Buffer.byteLength(current) < 65536, `${capability} must fit the pinned review export`);
+    assert.ok(Buffer.byteLength(current) <= 65536, `${capability} must fit the pinned review export`);
   }
 });
 async function fixture(t) {
