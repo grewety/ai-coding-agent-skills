@@ -152,9 +152,14 @@ export function finishCreditDecision(credits, decision, readbackSha256, selectio
   const triggers = decision.triggerInventories?.flatMap((inventory) => inventory.bundle ?? []) ?? [];
   if (!triggers.length) return selection ? pause("FINISH_TRIGGER_SELECTION_UNVERIFIED") : {};
   const amount = (entries) => entries.reduce((total, trigger) => total + (trigger.credits ?? 0), 0);
-  const paid = journal.reservations.flatMap((entry) => entry.triggers);
-  if (!(now < instant(grant.deadline)) || amount(paid) + amount(triggers) > grant.maxDeepReviewCredits ||
-      (triggers.some((trigger) => trigger.check) && paid.some((trigger) => trigger.check))) return pause("FINISH_TRIGGER_CAP_OR_DEADLINE");
+  const reserved = journal.reservations.flatMap((entry) => entry.triggers);
+  const paidReferences = new Set(reserved.filter((trigger) => trigger.credits > 0).map((trigger) => trigger.providerReference));
+  for (const trigger of triggers.filter((trigger) => trigger.credits > 0)) {
+    if (paidReferences.has(trigger.providerReference)) return pause("FINISH_TRIGGER_PROVIDER_REFERENCE_REUSED");
+    paidReferences.add(trigger.providerReference);
+  }
+  if (!(now < instant(grant.deadline)) || amount(reserved) + amount(triggers) > grant.maxDeepReviewCredits ||
+      (triggers.some((trigger) => trigger.check) && reserved.some((trigger) => trigger.check))) return pause("FINISH_TRIGGER_CAP_OR_DEADLINE");
   const expected = { reference: grant.reference, chapter: decision.chapter, operation: decision.action,
     head: decision.head, readbackSha256 };
   if (!selection) return { ...pause("FINISH_TRIGGER_RESERVATION_REQUIRED"), finishTriggerSelection: expected };

@@ -144,11 +144,13 @@ export async function finishPrFixReadiness(input, result, ref, verifyHandover, o
   const readiness = finishReadiness(input, { action: "accept-result", head: input.head });
   if (!readiness.ready) return readiness;
   try {
-    const proof = await verifyPrFixLineage(input, ref, verifyHandover, options);
-    need(result?.action === "accept-result" && result.head === proof.reviewedAncestor &&
-      result.independentZeroWaiver === true && result.gateReference === proof.ancestorGate &&
+    need(result?.action === "accept-result" && result.independentZeroWaiver === true,
+      "Accepted ancestor review or gates differ");
+    const { proof, gateAuthority } = await verifyPrFixLineage(input, ref, verifyHandover,
+      { ...options, acceptedAncestorGate: result.gateReference });
+    need(result.head === proof.reviewedAncestor && result.gateReference === proof.ancestorGate &&
       options.reviewReference === proof.ancestorReview.reference, "Accepted ancestor review or gates differ");
-    return { ...readiness, prFixLineage: proof };
+    return { ...readiness, prFixLineage: proof, ...(gateAuthority ? { gateAuthority } : {}) };
   } catch (error) {
     return { ...readiness, ready: false, predicate: "FULL_EXACT_HEAD_REVIEW_REQUIRED", issue: error.message };
   }

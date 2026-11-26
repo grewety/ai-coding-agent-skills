@@ -170,6 +170,29 @@ without it, the reported `receiptSha256` is the identity to record and read back
 independently. Paths must be repository-relative, inside the selected change or its
 single archive, and below `evidence/` with a `.json` suffix.
 
+PR-fix receipts require the committed archive `--receipt-path` and the
+`--pr-fix-lineage` file and SHA-256. Task-Guided lineage also requires the
+authority and verified run references shown here for read-only replay.
+
+```sh
+node <guard> receipt --repo <repo> --change <name> --target <actual-target-sha> \
+  --issue <issue-url> --receipt <receipt-json-path> \
+  --receipt-path <repo-relative-path-to-archived-receipt> \
+  --pr-fix-lineage <bundle-file> --pr-fix-lineage-sha256 <bundle-file-sha256> \
+  --gate-authority <authority-json> --gate-authority-sha256 <authority-file-sha256> \
+  --verified-gate-run <run-json> --verified-gate-run-sha256 <run-file-sha256>
+```
+
+Use the `gateAuthority` object from the independently pinned
+`finish-readiness-readback` anchor as the authority JSON. Retain it in
+owner-private records and pin the SHA-256 of the exact file bytes. The run
+must be the successful disposable capture from `integrated.gate` at the
+receipt's exact `verified` SHA and tree. Both `review.gates` at the reviewed
+ancestor and receipt `gates` at `verified` must list the approved `argv` in
+order, with each `command` equal to its argv joined by spaces. Goal-First
+lineage takes gate authority from the approved Goal Contract. Receipts
+without PR-fix lineage use the existing gate row format.
+
 Keep evidence factual and secret-free. The receipt describes verification at
 `verified`; it does not predeclare its own eventual archive-PR merge or cleanup.
 Closure CI validates the receipt/archive diff, and exact readback of the merge and

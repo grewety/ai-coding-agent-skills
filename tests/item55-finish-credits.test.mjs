@@ -33,7 +33,7 @@ function inventory(selected, event, candidate = identity.candidate) {
   const kind = event === "retry" ? "repository-check" : "app-trigger";
   const entry = { ...fields, event, kind, repository: identity.repository, installation: "42", verified: true };
   const live = { ...selected, event, kind, repository: identity.repository, candidate };
-  entry.providerProof = verified("provider", { installation: "42", scope: live, ...(event === "retry" ?
+  entry.providerProof = verified(`provider:${chapter}`, { installation: "42", scope: live, ...(event === "retry" ?
     { source: "provider-workflow-and-billing", provider: "github-actions", product: "repository-ci" } :
     { source: "provider-installation-and-billing", provider: "aikido", product: "deep-review", unit: "credits", credits: 1 }) });
   return { candidate, chapter, event, repository: identity.repository, target: identity.target, finishReference: finish.reference,
@@ -109,6 +109,42 @@ test("one named finish cap covers two chapter heads and persists consumption acr
   assert.equal(next.head, b.candidate);
   assert.equal(settleFinishCredit(read(), outcome(next, "uncertain"), readbackSha, now).finishTriggerOutcome.state, "uncertain");
   assert.equal(read().journal.pending.outcome.state, "uncertain");
+});
+
+test("paid proofs must have distinct references within one finish selection", (t) => {
+  const { read } = journalFixture(t);
+  const secondTrigger = { ...impl, id: "aikido:43:deep-review" };
+  const extended = { ...grant, deepReview: [...grant.deepReview, secondTrigger] };
+  const observation = inventory(impl, "pull_request");
+  const [second] = inventory(secondTrigger, "pull_request").observed.triggers;
+  observation.observed.triggers.push(second);
+  const reserve = () => {
+    const match = checkPaid(observation, { grant: extended });
+    assert.equal(match.bundle.length, 2);
+    const chosen = decision(observation, match);
+    return finishCreditDecision(read(extended), chosen, readbackSha, selection(chosen), now);
+  };
+  assert.equal(reserve().reason, "FINISH_TRIGGER_PROVIDER_REFERENCE_REUSED");
+  assert.equal(read().journal.reservations.length, 0);
+  second.providerProof.reference = "provider:second-implementation-trigger";
+  assert.equal(reserve().finishTriggerReservation.triggers.length, 2);
+});
+
+test("a paid proof reference stays unavailable to another chapter after reservation and settlement", (t) => {
+  const { read } = journalFixture(t);
+  const implementation = inventory(impl, "pull_request");
+  const closeout = inventory(closure, "pull_request", "e".repeat(40));
+  closeout.observed.triggers[0].providerProof.reference = implementation.observed.triggers[0].providerProof.reference;
+  const first = decision(implementation, checkPaid(implementation));
+  const match = checkPaid(closeout);
+  assert.equal(match.bundle.length, 1);
+  const second = decision(closeout, match);
+  const reserve = (selected) => finishCreditDecision(read(), selected, readbackSha, selection(selected), now);
+  const { finishTriggerReservation } = reserve(first);
+  assert.equal(reserve(second).reason, "FINISH_TRIGGER_OUTCOME_PENDING");
+  assert.equal(settleFinishCredit(read(), outcome(finishTriggerReservation, "consumed"), readbackSha, now).action, "finish-trigger-settled");
+  assert.equal(reserve(second).reason, "FINISH_TRIGGER_PROVIDER_REFERENCE_REUSED");
+  assert.equal(read().journal.reservations.length, 1);
 });
 
 test("competing finish journal writers cannot reserve the same sequence slot", async (t) => {

@@ -4,7 +4,7 @@ import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { change, current, currentSpec, exec, fixture, own } from "./delivery-runtime-setup.mjs";
+import { change, current, currentSpec, exec, fixture, gateArgv, own, twoGroupGuidance } from "./delivery-runtime-setup.mjs";
 import { containedHandover, gateFixture, workerRequest } from "./delivery-runtime-fixtures.mjs";
 import { buildExport, jsonBytes, prepareExport } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-inputs.mjs";
 import { bubblewrapVersion, claudeVersion } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-runtime.mjs";
@@ -31,7 +31,7 @@ async function scopedHandover(f, workspace, head, gates, attempt, {
     "--src-prefix=a/", "--dst-prefix=b/", base, head, "--"]);
   assert.equal(diff.status, 0, diff.stderr);
   const worker = workerRequest(f, head, gates.captured.value.wrapperSha256, attempt, output);
-  worker.acceptance.push(`goal-contract:${f.planDigest}`);
+  if (f.policy.mode === "goal-first") worker.acceptance.push(`goal-contract:${f.planDigest}`);
   const planDigest = f.evaluated.context.planDigest;
   Object.assign(worker.identity, { workspace, planDigest });
   const prFix = { declaration: "fix.json", source: "check-source.json", impacted: [current] };
@@ -82,8 +82,8 @@ async function scopedHandover(f, workspace, head, gates, attempt, {
     request, requestFileSha256: sha256(bytes), expect, expectFileSha256: sha256(expectationBytes), exportDirectory, output };
 }
 
-test("sealed PR-fix lineage reaches finish, rejects stale evidence and replays from committed archive", async (t) => {
-  const f = await fixture(t, { lowTouch: true });
+async function exerciseLineage(t, goalFirst) {
+  const f = await fixture(t, { lowTouch: true, integratedOptIn: goalFirst });
   const records = path.join(f.root, "records");
   await mkdir(records, { mode: 0o700 });
   const retained = { ...f, root: records };
@@ -94,19 +94,22 @@ test("sealed PR-fix lineage reaches finish, rejects stale evidence and replays f
     return { file, sha256: sha256(bytes) };
   };
   const hostConfiguration = await save("host", { schemaVersion: 1, localHarness: null });
+  const approvedGates = goalFirst ? [gateArgv] : [gateArgv, [process.execPath, "--version"]];
+  const guidance = twoGroupGuidance(f.planDigest);
+  const taskGuidance = goalFirst ? undefined : { ...guidance, groups: [{ ...guidance.groups[0], gates: approvedGates }] };
   await f.write(f.workspace, "widget.txt", "new");
   await f.write(f.workspace, current, currentSpec);
   await f.write(f.workspace, own + "/tasks.md", "# Tasks\n\n## 1. Widget\n- [x] 1.1 Pass the widget gate\n");
   const reviewedAncestor = f.commit(f.workspace, "Reviewed outcome");
-  const ancestorGate = await gateFixture(retained, reviewedAncestor, "ancestor");
+  const ancestorGate = await gateFixture(retained, reviewedAncestor, "ancestor", approvedGates);
   const reviewer = path.join(f.root, "ancestor-checkout");
   f.git(f.repo, "worktree", "add", "--detach", reviewer, reviewedAncestor);
   const configurationSha256 = hostConfiguration.sha256;
   const ancestorReview = await containedHandover(retained, reviewer, reviewedAncestor, ancestorGate, "ancestor-review",
-    { configurationSha256, goalDigest: f.planDigest });
+    { configurationSha256, goalDigest: goalFirst ? f.planDigest : undefined });
   await chmod(path.join(f.workspace, "widget.txt"), 0o755);
   const head = f.commit(f.workspace, "Fix CI executable mode");
-  const finalGate = await gateFixture(retained, head, "final");
+  const finalGate = await gateFixture(retained, head, "final", approvedGates);
   const pullRequest = "https://github.com/Example/Fixture/pull/1";
   const issue = "https://github.com/Example/Fixture/issues/2";
   const observedAt = new Date().toISOString();
@@ -132,7 +135,7 @@ test("sealed PR-fix lineage reaches finish, rejects stale evidence and replays f
   const bundle = { schemaVersion: 1, workspace: f.workspace, reviewedAncestor, declaration, source,
     ancestorReview, deltaReview, ancestorGate: ancestorGate.gateRun, finalGate: finalGate.gateRun };
   const prFixLineage = await save("bundle", bundle);
-  const input = { ...f.request, head, hostConfiguration, deliveryPhase: "result", handover: ancestorReview,
+  const input = { ...f.request, head, hostConfiguration, taskGuidance, deliveryPhase: "result", handover: ancestorReview,
     gateRun: ancestorGate.gateRun, attempt: { id: "ancestor-review" }, prFixLineage };
   const readiness = (await f.run("finish-readiness", input)).value;
   assert.equal(readiness.ready, true, JSON.stringify(readiness));
@@ -156,9 +159,17 @@ test("sealed PR-fix lineage reaches finish, rejects stale evidence and replays f
   const fullCheckout = path.join(f.root, "full-checkout");
   f.git(f.repo, "worktree", "add", "--detach", fullCheckout, head);
   const full = await containedHandover(retained, fullCheckout, head, finalGate, "full-review",
-    { configurationSha256, goalDigest: f.planDigest });
+    { configurationSha256, goalDigest: goalFirst ? f.planDigest : undefined });
   assert.equal((await f.run("finish-readiness", { ...input, prFixLineage: undefined, gateRun: finalGate.gateRun,
     handover: full, attempt: { id: "full-review" } })).value.ready, true);
+  const unrelated = [[process.execPath, "-e", "process.exit(0)"]];
+  if (!goalFirst) {
+    const wrongFinal = await gateFixture(retained, head, "unrelated-final", unrelated);
+    assert.equal(wrongFinal.captured.value.ok, true, wrongFinal.captured.stdout);
+    const rejected = (await f.run("finish-readiness", { ...input,
+      prFixLineage: await save("unrelated-final-bundle", { ...bundle, finalGate: wrongFinal.gateRun }) })).value;
+    assert.equal(rejected.issue, "Gate commands differ from approved acceptance", JSON.stringify(rejected));
+  }
   const identity = { repo: f.repo, workspace: f.workspace, repository: "Example/Fixture", branch: "change/" + change,
     change, candidate: head, policyRevision: f.base, targetRevision: f.base, target: "main", mode: f.policy.mode,
     plan: f.plan, planDigest: f.planDigest, issue };
@@ -166,14 +177,17 @@ test("sealed PR-fix lineage reaches finish, rejects stale evidence and replays f
   const deadline = new Date(now + 50000).toISOString();
   const grantReference = "fixture-finish";
   const bound = (fields) => ({ verified: true, reference: "synthetic", observedAt, identity, grantReference, ...fields });
+  const startedAt = new Date(now - 40000).toISOString();
   const grant = await save("finish-grant", bound({ schemaVersion: 1, kind: "protected-finish", reference: grantReference,
-    startedAt: new Date(now - 40000).toISOString(), deadline, keepWorktree: false, uiDeclaration: null }));
-  const anchor = await save("finish-anchor", bound({ kind: "finish-readiness-readback", ready: true, keepWorktree: false,
+    startedAt, deadline, keepWorktree: false, uiDeclaration: null, integratedGates: approvedGates }));
+  const anchorValue = bound({ kind: "finish-readiness-readback", ready: true, keepWorktree: false,
     implementationReview: { verified: true, ...proof.ancestorReview, head: reviewedAncestor },
     implementationGate: finalGate.gateRun, implementationGateSha256: proof.finalGate, prFixLineage,
-    hostConfigurationSha256: configurationSha256 }));
-  const finishCheckpoint = await save("finish-checkpoint", bound({ schemaVersion: 1, kind: "protected-finish-checkpoint",
-    records, grant, anchor, deadline, keepWorktree: false, prs: { implementation: pullRequest, closure: null } }));
+    hostConfigurationSha256: configurationSha256, gateAuthority: readiness.gateAuthority });
+  const anchor = await save("finish-anchor", anchorValue);
+  const checkpointValue = bound({ schemaVersion: 1, kind: "protected-finish-checkpoint",
+    records, grant, anchor, deadline, keepWorktree: false, prs: { implementation: pullRequest, closure: null } });
+  const finishCheckpoint = await save("finish-checkpoint", checkpointValue);
   const finishRemote = await save("finish-remote", bound({ implementation: bound({
     state: "OPEN", url: pullRequest, head: reviewedAncestor, complete: true, target: "main",
   }) }));
@@ -182,23 +196,106 @@ test("sealed PR-fix lineage reaches finish, rejects stale evidence and replays f
   assert.deepEqual(finish.prFixLineage, proof);
   const archive = "openspec/changes/archive/2026-11-26-" + change;
   const receiptPath = archive + "/evidence/receipt.json";
-  const gates = (revision) => [{ command: "fixture gate", commit: revision, exitCode: 0, evidence: "retained fixture gate" }];
+  const rows = (revision, commands = approvedGates) => commands.map((argv) => ({ command: argv.join(" "), argv,
+    commit: revision, exitCode: 0, evidence: "retained fixture gate" }));
+  const gates = goalFirst ? (revision) => [{ command: "fixture gate", commit: revision, exitCode: 0, evidence: "retained fixture gate" }] : rows;
+  if (!goalFirst) f.git(f.workspace, "commit", "--allow-empty", "-m", "Integrate the fixed candidate");
+  const verified = f.git(f.workspace, "rev-parse", "HEAD");
   const receipt = { schemaVersion: 1, change, issueUrl: issue, base: f.base, plan: f.plan, mode: f.policy.mode,
-    planDigest: f.planDigest, head, integrated: head, verified: head, integrationReference: pullRequest, gates: gates(head),
+    planDigest: f.planDigest, head, integrated: verified, verified, integrationReference: pullRequest, gates: gates(verified),
     prFixLineage: proof, review: { schemaVersion: 1, change, issueUrl: issue, head: reviewedAncestor, planDigest: f.planDigest,
       verdict: "pass", findings: [], reviewer: proof.ancestorReview.session, reference: proof.ancestorReview.reference,
       gates: gates(reviewedAncestor) } };
-  const receiptRef = await save("receipt", receipt);
-  await mkdir(path.dirname(path.join(f.workspace, archive)));
-  await rename(path.join(f.workspace, own), path.join(f.workspace, archive));
-  await f.write(f.workspace, receiptPath, await readFile(receiptRef.file));
-  const archived = f.commit(f.workspace, "Archive exact change and receipt");
   const guard = fileURLToPath(new URL("../skills/software-development/openspec-delivery/scripts/change-guard.mjs", import.meta.url));
-  const args = [guard, "receipt", "--repo", f.workspace, "--change", change, "--target", archived,
-    "--receipt", receiptRef.file, "--issue", issue, "--receipt-path", receiptPath];
+  const archiveReceipt = async (label, value) => {
+    const checkout = path.join(f.root, `archive-${label}`);
+    const ref = await save(label, value);
+    f.git(f.repo, "worktree", "add", "--detach", checkout, verified);
+    await mkdir(path.dirname(path.join(checkout, archive)));
+    await rename(path.join(checkout, own), path.join(checkout, archive));
+    await f.write(checkout, receiptPath, await readFile(ref.file));
+    const archived = f.commit(checkout, "Archive exact change and receipt");
+    const args = [guard, "receipt", "--repo", checkout, "--change", change, "--target", archived,
+      "--receipt", ref.file, "--issue", issue, "--receipt-path", receiptPath];
+    return { args, archived, ref };
+  };
+  const { args, archived, ref: receiptRef } = await archiveReceipt("receipt", receipt);
   assert.equal(exec(process.execPath, args).status, 1);
-  const replay = exec(process.execPath, [...args, "--pr-fix-lineage", prFixLineage.file, "--pr-fix-lineage-sha256", prFixLineage.sha256]);
+  const referenceArgs = (key, ref) => [`--${key}`, ref.file, `--${key}-sha256`, ref.sha256];
+  const lineageArgs = referenceArgs("pr-fix-lineage", prFixLineage);
+  const replayReceipt = (receiptArgs, ...evidenceArgs) => exec(process.execPath, [...receiptArgs, ...lineageArgs, ...evidenceArgs]);
+  let evidenceArgs = [];
+  if (!goalFirst) {
+    const authority = readiness.gateAuthority;
+    assert.deepEqual(authority.gates, approvedGates);
+    const authorityArgs = referenceArgs("gate-authority", await save("gate-authority", authority));
+    const verifiedGate = await gateFixture(retained, verified, "verified", approvedGates);
+    assert.equal(verifiedGate.captured.value.ok, true, verifiedGate.captured.stdout);
+    const verifiedArgs = referenceArgs("verified-gate-run", verifiedGate.gateRun);
+    evidenceArgs = [...authorityArgs, ...verifiedArgs];
+    const mergedAt = new Date(now - 3000).toISOString();
+    const preMerge = new Date(now - 5000).toISOString();
+    const checks = [{ id: "fixture-ci", head, conclusion: "success", completedAt: preMerge }];
+    const seal = (name, payload, at) => save(`merged-${name}`, createRepresentation({
+      original: jsonBytes({ pullRequest, head, ...payload }),
+      provenance: { source: name, revision: head, scope: pullRequest, command: ["synthetic", "read"],
+        environmentScope: "fixture", exitStatus: 0, pagination: "complete", observedAt: at, readbackType: "original-response" },
+      labels: { representation: "original-response", completeness: "complete", confidentiality: "publishable" },
+    }));
+    const merge = { state: "MERGED", mergedAt, mergeCommit: verified };
+    const requiredCheckIds = ["fixture-ci"];
+    const postMergeRemote = await save("post-merge", bound({ implementation: bound({ ...merge, url: pullRequest, head,
+      complete: true, target: "main", requiredCheckIds, assertion: { pullRequest, expectedHead: head,
+        applicableCheckIds: requiredCheckIds, mergedAt, observedNotBefore: startedAt, readbacks: {
+          pr: await seal("github-pull-request", merge, mergedAt),
+          checks: await seal("github-applicable-checks", { checks }, preMerge),
+          checkRuns: await seal("github-check-runs", { checks }, preMerge),
+          threads: await seal("github-review-threads", { threads: [] }, preMerge),
+        } } }), integrated: bound({ head: verified, mergeCommit: verified, gate: verifiedGate.gateRun }),
+    closureCandidate: bound({ head: archived, integrated: verified, archive, receipt: receiptRef, receiptPath,
+      receiptSha256: receiptRef.sha256 }) }));
+    const closeout = (await f.run("finish", { repo: f.repo, change, head, finishCheckpoint, finishRemote: postMergeRemote })).value;
+    assert.equal(closeout.action, "verify-closure", JSON.stringify(closeout));
+    const unpinnedAnchor = await save("unpinned-anchor", { ...anchorValue, gateAuthority: undefined });
+    const unpinnedCheckpoint = await save("unpinned-checkpoint", { ...checkpointValue, anchor: unpinnedAnchor });
+    const unpinned = (await f.run("finish", { repo: f.repo, change, head,
+      finishCheckpoint: unpinnedCheckpoint, finishRemote: postMergeRemote })).value;
+    assert.equal(unpinned.reason, "FINISH_OBSERVATIONS_UNVERIFIED", JSON.stringify(unpinned));
+    assert.equal(unpinned.detail, "Missing approved Task-Guided PR-fix gate authority");
+
+    const refused = (replay, reason) => {
+      assert.equal(replay.status, 1, replay.stdout);
+      assert.match(JSON.parse(replay.stdout).error, reason);
+    };
+    refused(replayReceipt(args, ...verifiedArgs), /Missing approved Task-Guided PR-fix gate authority/);
+    refused(replayReceipt(args, ...authorityArgs), /Missing exact verified Task-Guided PR-fix gate run/);
+    refused(replayReceipt(args, ...authorityArgs, ...referenceArgs("verified-gate-run", finalGate.gateRun)), /different revision\/tree/);
+
+    const wrongVerified = await gateFixture(retained, verified, "unrelated-verified", unrelated);
+    assert.equal(wrongVerified.captured.value.ok, true, wrongVerified.captured.stdout);
+    refused(replayReceipt(args, ...authorityArgs, ...referenceArgs("verified-gate-run", wrongVerified.gateRun)), /differ from approved acceptance/);
+    const wrongAuthority = await save("wrong-authority", { ...authority, gates: [...approvedGates].reverse() });
+    refused(replayReceipt(args, ...referenceArgs("gate-authority", wrongAuthority), ...verifiedArgs), /differ from approved acceptance/);
+    const wrongAncestor = await save("wrong-ancestor", { ...authority, ancestorGate: proof.finalGate });
+    refused(replayReceipt(args, ...referenceArgs("gate-authority", wrongAncestor), ...verifiedArgs), /differs from the accepted ancestor/);
+
+    const { args: wrongRows } = await archiveReceipt("unrelated-rows", { ...receipt, gates: rows(verified, unrelated) });
+    refused(replayReceipt(wrongRows, ...evidenceArgs), /Receipt gate commands differ from approved acceptance/);
+    const { args: wrongReview } = await archiveReceipt("unrelated-review", { ...receipt, review: { ...receipt.review, gates: rows(reviewedAncestor, unrelated) } });
+    refused(replayReceipt(wrongReview, ...evidenceArgs), /Receipt gate commands differ from approved acceptance/);
+
+    const { prFixLineage: omitted, ...ordinary } = receipt;
+    const legacyRows = (revision) => [{ command: "fixture gate", commit: revision, exitCode: 0, evidence: "retained fixture gate" }];
+    const { args: ordinaryArgs } = await archiveReceipt("ordinary", { ...ordinary, gates: legacyRows(verified),
+      review: { ...ordinary.review, head, gates: legacyRows(head) } });
+    const ordinaryReplay = exec(process.execPath, ordinaryArgs);
+    assert.equal(ordinaryReplay.status, 0, ordinaryReplay.stdout);
+  }
+  const replay = replayReceipt(args, ...evidenceArgs);
   assert.equal(replay.status, 0, replay.stdout);
   assert.deepEqual(JSON.parse(replay.stdout).prFixLineage, proof);
   assert.throws(() => verifyPrFixIntegration({ repo: f.repo, plan: f.plan, head }, proof, head, reviewedAncestor), /ancestry/);
-});
+}
+
+test("sealed Goal-First PR-fix lineage reaches finish, rejects stale evidence and replays from committed archive", (t) => exerciseLineage(t, true));
+test("Task-Guided PR-fix replay requires approved ordered gates through receipt and verified evidence", (t) => exerciseLineage(t, false));

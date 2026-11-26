@@ -44,6 +44,11 @@ Use UTC timestamps with milliseconds.
   observation with its session, exact disposable `implementationGate` file
   and `implementationGateSha256`, the accepted gate wrapper digest. For first publication include the original delivery
   evaluation inputs for live exact candidate finish-readiness verification.
+- For Task-Guided PR fixes, copy `gateAuthority` from accepted finish
+  readiness into the separately sealed anchor. Readiness binds the approved
+  ordered argv to the accepted ancestor gate wrapper, workspace, plan and
+  policy target. Keep this anchor pin independent of the `prFixLineage`
+  bundle. The final-head and integrated runs must use those same ordered gates.
 - A contextual `continue` passes a sealed `finishReply`, a bound
   `finish-reply` with `reply: "continue"`, `checkpointSha256`,
   `pullRequest` for the retained active PR, and `observedAt`. Read back the
@@ -94,6 +99,8 @@ Use UTC timestamps with milliseconds.
    `assert-closeout` PR, check, run and thread assertions. Keep their
    original evidence. The bound `integrated` observation identifies actual
    `mergeCommit`, containing `head` and exact disposable `gate` reference.
+   For Task-Guided PR fixes, archive replay uses this same successful gate
+   capture at the receipt's `verified` SHA and the authority from the anchor.
    Reuse a completed chapter only on verified readback. An unverified merge
    outcome remains pending.
 4. After integrated gates pass, prepare the receipt and record-only archive.
@@ -190,6 +197,9 @@ from installation and billing evidence (`source:
 "deep-review"`, `unit: "credits"`, positive integer `credits`). Its scope
 repeats the selected fields plus `repository`, `candidate`, `event` and
 `kind`. Take the proof's reference and observation time from that evidence.
+Each paid trigger needs a distinct `providerProof.reference`. A reference
+can appear only once in a selection and across all reservations in the finish
+journal, including both PR chapters and after settlement or resume.
 Every other trigger must pass existing standing or separately reserved
 external authority. An unknown cost, exposure, configuration or kind blocks
 the bundled event inventory.

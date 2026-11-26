@@ -314,9 +314,9 @@ export async function protectedFinish(input, readiness, now = Date.now(), verify
   if (fixRef) {
     need(checkpoint.prs.implementation && digest(anchor.hostConfigurationSha256),
       "PR-fix finish requires the retained implementation PR and host pin");
-    fix = await verifyPrFixLineage(fixRequest, fixRef, verifyHandover, { workspace, records,
+    ({ proof: fix } = await verifyPrFixLineage(fixRequest, fixRef, verifyHandover, { workspace, records,
       hostConfigurationSha256: anchor.hostConfigurationSha256, pullRequest: checkpoint.prs.implementation,
-      gates: implementationGate.gateCommands });
+      gateAuthority: anchor.gateAuthority }));
     need(fix.finalGate === implementationGate.reference && fix.ancestorReview.session === anchor.implementationReview.session &&
       fix.ancestorReview.reference === anchor.implementationReview.reference, "PR-fix reviews or final gates differ from finish readiness");
     need(finishReadiness(fixRequest, { action: "accept-result", head: candidate }, undefined, false).ready,
@@ -414,9 +414,12 @@ export async function protectedFinish(input, readiness, now = Date.now(), verify
       pr: merged.url, prState: "MERGED" }));
   }
   ancestor(repo, merged.mergeCommit, integrated.head);
-  if (!gatePass(integrated.gate, records, identity, integrated.head, grant.integratedGates).passed) {
+  const integratedGate = gatePass(integrated.gate, records, identity, integrated.head, grant.integratedGates);
+  if (!integratedGate.passed) {
     return observe(stop("INTEGRATED_GATE_FAILED", { head: integrated.head, pr: merged.url }));
   }
+  need(!fix || identity.mode !== "task-guided" || same(integratedGate.gateCommands, anchor.gateAuthority.gates),
+    "Integrated PR-fix gate commands differ from approved acceptance");
   if (fix) verifyPrFixIntegration(fixRequest, fix, merged.mergeCommit, integrated.head);
   const closure = remote.closureCandidate;
   if (!closure && remote.closure?.state === "ABSENT" && bound(remote.closure, identity, grant) &&
@@ -433,7 +436,8 @@ export async function protectedFinish(input, readiness, now = Date.now(), verify
   const archive = { repo, change, verified: integrated.head, archive: closure.archive, receiptSha256: closure.receiptSha256,
     receiptFile: retainedPath(records, closure.receipt), committedReceiptPath: closure.receiptPath,
     issue: identity.issue, policyTarget: identity.targetRevision,
-    integrationReference: merged.url, prFixLineage: fixRef, verifyHandover };
+    integrationReference: merged.url, prFixLineage: fixRef, verifyHandover, gateAuthority: anchor.gateAuthority,
+    verifiedGateRun: fix && identity.mode === "task-guided" ? { ...integrated.gate, file: retainedPath(records, integrated.gate) } : undefined };
   need(closure.receipt.sha256 === closure.receiptSha256, "Closure receipt declaration differs");
   const receipt = await verifyArchive({ ...archive, head: closure.head });
   need(receipt.integrated === merged.mergeCommit && receipt.verified === integrated.head && receipt.head === candidate &&

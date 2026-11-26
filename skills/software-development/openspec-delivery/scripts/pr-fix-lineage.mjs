@@ -107,9 +107,23 @@ export async function verifyPrFixLineage(input, ref, verifyHandover, options = {
     need(run.passed, "PR-fix disposable gates failed");
     return run;
   };
-  const declaredGates = mode === "goal-first" ?
-    goalSnapshot(repo, head, change, context.parent, planning(repo, head, change, true)).contract.gates : options.gates;
+  const { gateAuthority, acceptedAncestorGate } = options;
+  const taskGuided = mode === "task-guided";
+  if (taskGuided) {
+    need(digest(gateAuthority?.ancestorGate ?? acceptedAncestorGate), "Missing approved Task-Guided PR-fix gate authority");
+  }
+  const declaredGates = taskGuided ? gateAuthority?.gates :
+    goalSnapshot(repo, head, change, context.parent, planning(repo, head, change, true)).contract.gates;
   const originalGate = gate(bundle.ancestorGate, original, declaredGates);
+  // Readiness has already checked the accepted wrapper against the approved
+  // group. Later replay requires the independently retained readiness record.
+  const authority = taskGuided ? { schemaVersion: 1, kind: "task-guided-pr-fix-gates", change, plan,
+    planDigest: original.planDigest, policyTarget: target, workspace: bundle.workspace, reviewedAncestor: original.head,
+    ancestorGate: originalGate.reference, gates: originalGate.gateCommands } : undefined;
+  if (taskGuided) {
+    need(gateAuthority ? same(gateAuthority, authority) : acceptedAncestorGate === originalGate.reference,
+      "Task-Guided PR-fix gate authority differs from the accepted ancestor");
+  }
   const finalGate = gate(bundle.finalGate, final, originalGate.gateCommands);
   const { ancestorReview, deltaReview } = bundle;
   need([ancestorReview, deltaReview].every((review) => review.kind === "review-candidate" &&
@@ -137,9 +151,10 @@ export async function verifyPrFixLineage(input, ref, verifyHandover, options = {
     reviewed.session !== reReview.session && reviewed.session !== delta.result.identity.implementerSession &&
     reReview.session !== parent.result.identity.implementerSession,
   "Independent exact-delta scope and impacted postimage determination is missing");
-  return { schemaVersion: 1, bundleSha256: ref.sha256, reviewedAncestor: original.head, head, pullRequest, policyTarget: target,
+  const proof = { schemaVersion: 1, bundleSha256: ref.sha256, reviewedAncestor: original.head, head, pullRequest, policyTarget: target,
     revisions: range.edges.map(({ revision }) => revision), impacted, declarationSha256: bundle.declaration.sha256,
     ancestorReview: reviewed, deltaReview: reReview, ancestorGate: originalGate.reference, finalGate: finalGate.reference };
+  return { proof, gateAuthority: authority };
 }
 
 export function verifyPrFixIntegration(input, proof, integrated, verified) {
