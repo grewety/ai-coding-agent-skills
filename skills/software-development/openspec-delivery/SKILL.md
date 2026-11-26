@@ -1,7 +1,7 @@
 ---
 name: openspec-delivery
 description: Automate setup, execution and closeout of OpenSpec changes.
-version: 1.9.0
+version: 1.10.0
 author: Raphael (forgegod), Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -37,6 +37,10 @@ node "$review_cli" --mode candidate --request REQUEST --expect EXPECT --export E
 Replay the sealed result offline before candidate readback. Follow
 [the operator workflow](references/operator-workflow.md#launch-contained-review)
 for approach review and authority.
+Use an explicit alternative only with the independently pinned qualification
+for its exact runtime and host relay. The optional Pi trial is a separate
+synthetic single-run action under the
+[integrated review authority](references/low-touch.md#host-configuration-and-finish-triggers).
 Use the local capture, seal and offline readback interfaces for byte-preserving
 gate, readback and review evidence. [Evidence retention](references/evidence-retention.md).
 

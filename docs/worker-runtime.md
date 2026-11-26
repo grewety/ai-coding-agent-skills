@@ -25,9 +25,9 @@ implementation route. Use the contained reviewer for its separate role.
 ## Install and bind
 
 1. Follow the [OpenSpec prerequisites](openspec-installation.md). Install
-   complete delivery 1.9.0 and next 0.8.0 packages from the
-   `openspec-development` 1.9.0 bundle and the separately selected
-   orchestration 0.23.0 package from `autonomous-orchestration` 1.13.0.
+   complete delivery 1.10.0 and next 0.8.0 packages from the
+   `openspec-development` 1.10.0 bundle and the separately selected
+   orchestration 0.24.0 package from `autonomous-orchestration` 1.14.0.
    Check the exact CLI and supporting file bytes outside the workspace before
    enabling the project route. Use the normal collision, backup and fresh
    session checks when updating or removing a package.
@@ -39,7 +39,10 @@ implementation route. Use the contained reviewer for its separate role.
    persistent Codex home and isolated HOME and XDG config, plus a separate
    reviewer config slot. The operator provisions dedicated authentication
    separately and protects the pinned package, binaries, qualification
-   records, authority and evidence outside the mutable checkout.
+   records, authority and evidence outside the mutable checkout. Claude remains
+   the default contained reviewer. The opt-in Pi 1.5.2 route requires a private host
+   Hermes proxy socket for xAI OAuth and matching offline and bounded live qualification
+   before real review. A different worker pair requires its own exact qualification.
    [Role binding schema](../skills/autonomous-ai-agents/autonomous-implementation-review/references/worker-runtime.md),
    [reviewer setup](claude-reviewer.md).
 3. Pin the exact package inventories, role client, version, generating

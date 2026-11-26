@@ -1,7 +1,7 @@
 ---
 name: autonomous-implementation-review
 description: Implement changes with an independent review loop.
-version: 0.23.0
+version: 0.24.0
 author: Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -38,6 +38,12 @@ use the direct command with retained admission.
 ```text
 node "$review_cli" --mode candidate --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --admission ADMISSION --output OUTPUT
 ```
+
+Claude remains the default. The explicit Pi 1.5.2 reviewer requires a pinned
+release and host Hermes proxy xAI OAuth relay with matching offline and live
+qualification. Its separately granted [synthetic trial](references/review-candidate.md#pi-qualification-trial)
+uses a fixed non-project fixture. Grok 1.0.92 is unsupported for contained review
+until host-only OAuth routing is verified.
 
 ## Legacy host execution
 

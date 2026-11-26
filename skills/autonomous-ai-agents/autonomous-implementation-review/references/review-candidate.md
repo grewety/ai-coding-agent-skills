@@ -1,4 +1,4 @@
-# Contained Claude review command
+# Contained review command
 
 Use this opt-in transport for candidate or charter-v1 approach exports under
 separate authority for the exact export and paid inference. Use an independently
@@ -130,7 +130,7 @@ from an already suspect output cannot establish authenticity.
 
 ## Trusted launch configuration
 
-For a new explicit Claude binding, use the schema 2 host produced by
+For a new explicitly qualified binding, use the schema 2 host produced by
 `scripts/setup.mjs`. Retain the raw file hash, separately pinned
 `expect.qualification`, and `expect.generator` provider and session.
 Offline `--prepare` and `--check` return the explicit runtime readback.
@@ -167,6 +167,57 @@ stays at its approved destination. Startup must report only `Read` as a tool and
 plugin, MCP, skill and slash-command inventories. Native agent labels may
 appear as startup metadata. Agent invocation and child activity fail the
 audit. Every assigned file must have a successful whole-file `Read`.
+
+## Pi qualification trial
+
+The optional route is exact Pi 1.5.2, `grok-4.7`, `xai-oauth`, thinking `off`
+and `hermes-proxy-xai-oauth`. It uses the same namespace and read-only packet
+boundary with a pinned release-only snapshot and Node entry point. The only
+native tool is `read`. The host broker owns the OAuth credential lifecycle.
+The relay validates chat-completion requests and streamed frames, caps the
+invocation at 96 requests and keeps upstream diagnostics host-side. The
+supervisor settles the process tree by the configured deadline. Audit matches
+parallel tool results by call ID and verifies the full bytes of every assigned
+file and the mode-specific framed receipt. Grok 1.0.92 remains unsupported
+because its `streaming-messages-json` route has no verified host-only xAI OAuth
+routing through `inference.sock`.
+
+For the Pi trial, use independently sealed offline controls for the exact
+package, schema 2 host, runtime constraints, role, release and relay pins. The
+offline control record uses `kind: "offline"` and the qualification subject,
+effective identity, supervisor and controls defined by
+`scripts/adapter-qualification.mjs`. Its controls include
+`finiteRelayRequestsAndDeadline` and `parallelWholeFileResults` in addition to
+the contained reviewer controls. The synthetic fixture suite and retained
+native Pi replay establish offline behavior on synthetic data. Qualification
+also requires separately observed correct behavior on the intended host.
+
+The separate `standalone-review-probe` grant binds `explicitRuntimeSha256` to
+the SHA-256 of the canonical JSON bytes of `runtimeBinding(...).explicit`,
+including the offline control hash. Use `requireReviewHost` with that offline
+pin, the raw configuration hash and current `runtimeIdentity()` to derive the
+binding. Hash it using `hash(jsonBytes(explicit))` from `review-inputs.mjs`.
+The grant also binds one invocation, the raw host hash, cost bound and ledger
+as in the standalone example above. The first command consumes that grant and
+runs the two-file synthetic trial. The second reads back the original sealed
+trial offline. Set `review_cli` to the absolute packaged script path.
+
+```sh
+node "$review_cli" --probe --host-config "$HOST" --admission "$PROBE_GRANT" --output "$TRIAL_OUTPUT" --tier1-offline "$OFFLINE" --tier1-offline-sha256 "$OFFLINE_SHA256"
+node "$review_cli" --verify-tier1-trial --host-config "$HOST" --output "$TRIAL_OUTPUT" --tier1-offline "$OFFLINE" --tier1-offline-sha256 "$OFFLINE_SHA256" --status-sha256 "$STATUS_SHA256"
+```
+
+Retain the independently observed status hash and original captures. After a
+successful replay, the independent supervisor records actual live positive and
+negative controls, the approval reference and attempt, `trialStatus` (the
+sealed `status.json` file pin), and `trialGrantSha256` (the grant digest from
+the status, over canonical grant JSON bytes). Seal this live file and the
+matching offline file under the `explicit-route-qualification` manifest with
+route `pi-bubblewrap-read-only`. Bind the manifest in `expect.qualification`
+and the returned explicit runtime readback in `expect.explicit` before candidate
+or approach review. Each review requires its own authority and a generating
+provider and session independent of the reviewer. Claude host and archive
+pins continue to replay with their original schemas.
 
 ## Readback and decisions
 

@@ -72,6 +72,15 @@ ledger. Reservations and uncertain charges carry across extension and expiry.
 See `references/review-candidate.md` inside the separate
 `autonomous-implementation-review` package.
 
+The original Claude route remains the default. An explicitly selected Pi
+1.5.2 reviewer requires exact offline and live proof through the private host
+Hermes proxy xAI OAuth socket before using real review data. Its fixed benign
+qualification trial uses a distinct single-run grant. The qualified mode uses
+explicit single-run admission and existing durable spend and packet scheduling.
+The host relay enforces the request ceiling under the pinned deadline. Grok
+1.0.92 is unsupported because host-only xAI OAuth routing through the
+inference socket is unverified.
+
 For an adopting parent, the protected-finish remote readback supplies
 `eventInventories` per PR chapter. The before-publication readback binds the
 actual `sourceRef`. Before publication supply current complete `push`

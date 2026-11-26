@@ -13,7 +13,7 @@ Portable engineering workflows for AI coding agents that use OpenSpec. This repo
 | [Review and finish configuration](docs/openspec-review-configuration.md) | Paid review modes, host pins, local harness and standing triggers. |
 | [OpenSpec installation](docs/openspec-installation.md) | Upstream prerequisite and upgrade procedures. |
 | [Claude installation](docs/claude-installation.md) | Native marketplace, ZIP installation and host checks. |
-| [Contained Claude reviewer](docs/claude-reviewer.md) | Pinned host configuration, offline preparation and receipt replay. |
+| [Contained reviewer](docs/claude-reviewer.md) | Pinned host configuration, route qualification and offline receipt replay. |
 | [Exclusive worker runtime](docs/worker-runtime.md) | Qualified worker setup, role bindings and recovery. |
 | [OpenSpec metadata](docs/openspec-metadata.md) | Native identity, issue links, validation and vault views. |
 
@@ -781,9 +781,9 @@ no generated skill copies are committed. Its explicit skill lists separate the
 OpenSpec companion workflow from opt-in orchestration. Bump every affected plugin's version when
 its bundled content changes. See the [Claude release checks](docs/claude-installation.md#maintainer-verification).
 
-Current source versions are delivery 1.9.0 and its affected
-`openspec-development` plugin 1.9.0; `openspec-next` is 0.8.0 and
-`autonomous-orchestration` is 1.13.0 (core skill 0.23.0). Complete well-known output,
+Current source versions are delivery 1.10.0 and its affected
+`openspec-development` plugin 1.10.0; `openspec-next` is 0.8.0 and
+`autonomous-orchestration` is 1.14.0 (core skill 0.24.0). Complete well-known output,
 skill ZIPs, workflow plugin ZIP and isolated native copies must retain all support
 files byte-for-byte, including delivery's runtime and evidence commands and next's
 read-only routing script and reference. Include `scripts/delegated-delivery.mjs`
@@ -793,9 +793,13 @@ proof or a claim of updated public downloads, native client discovery, Desktop
 acceptance or scanner approval. No upstream prerequisite or installation route is
 added by this representation facility.
 
-The packaged Claude reviewer is a separate opt-in for approved candidate or charter-v1
-exports. The [operator guide](docs/claude-reviewer.md) records the limited packaged live
-qualification, required export and paid inference grant, credential limits and offline verification.
+The packaged contained reviewer is a separate opt-in for approved candidate or
+charter-v1 exports. Claude remains the qualified default under its original
+pins. Pi 1.5.2 through host Hermes proxy xAI OAuth has synthetic offline evidence
+and requires an exact separately granted live qualification before real review.
+Grok 1.0.92 fails closed because its native stream has no verified host-only
+xAI OAuth path through the inference socket. The setup, limits and offline replay
+procedure are in the [operator guide](docs/claude-reviewer.md).
 
 Preserve orchestration's complete `references/portable-core.md`,
 `scripts/orchestration-core.mjs`, `references/worker-handoff.md`,
