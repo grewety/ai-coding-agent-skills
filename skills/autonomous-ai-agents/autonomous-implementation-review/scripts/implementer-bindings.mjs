@@ -8,6 +8,7 @@ import { readRoleBindings, validateRoleBindings } from "./agent-role-config.mjs"
 import { inspectPinnedFile, parseStrictJson } from "./agent-configuration.mjs";
 import { requireQualifiedPilot } from "./adapter-qualification.mjs";
 import { checkRoleIndependence } from "./role-config.mjs";
+import { maximumAttemptMs } from "./worker-runtime-policy.mjs";
 
 const implementerRoute = "codex-native-named-workspace-write";
 const reviewerRoute = "claude-bubblewrap-read-only";
@@ -99,7 +100,7 @@ export async function checkRolePins(pair, excluded, reviewerConfig) {
   ]);
 }
 
-export async function bindPair(entry, grant, runtimeSha256, registry) {
+export async function bindPair(entry, grant, runtimeSha256, registry, prospective = false) {
   const host = await trustedJson(entry.host);
   const request = entry.request;
   const roots = [request.identity.workspace, ...request.evidenceRoots, registry];
@@ -110,8 +111,10 @@ export async function bindPair(entry, grant, runtimeSha256, registry) {
   }
   const explicit = host.schemaVersion === 2;
   fields(host, ["schemaVersion", "runtimeSha256", "pair", "override", "restrictions", ...(explicit ? ["roleBindings"] : [])],
-    "independent host binding");
+    "independent host binding", ["goalFirstTimeoutMs"]);
   need([1, 2].includes(host.schemaVersion) && host.runtimeSha256 === runtimeSha256, "Host qualification does not name this runtime");
+  if (Object.hasOwn(host, "goalFirstTimeoutMs")) need(Number.isSafeInteger(host.goalFirstTimeoutMs) &&
+    host.goalFirstTimeoutMs > 0 && host.goalFirstTimeoutMs <= maximumAttemptMs, "Invalid finite Goal-First host deadline override");
   fields(host.restrictions, ["allowedClients", "allowedModels", "allowedProviders", "requireDistinctModels"], "paired role restrictions");
   need(Object.entries(host.restrictions).every(([name, value]) => name === "requireDistinctModels" ? typeof value === "boolean" :
     Array.isArray(value) && value.length > 0 && value.length <= 64 && value.every((item) => typeof item === "string")),
@@ -201,5 +204,6 @@ export async function bindPair(entry, grant, runtimeSha256, registry) {
     roleOptions);
   await checkRolePins(pair, roots, cfg);
   return { pair, ...roleOptions, reviewerConfig: cfg, profileIds,
+    ...(prospective ? { attemptPolicy: true, goalFirstTimeoutMs: host.goalFirstTimeoutMs ?? null } : {}),
     physicalSlot: profileIds[0], expiresAt: host.override?.expiresAt ?? grant.expiresAt };
 }

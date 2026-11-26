@@ -8,6 +8,9 @@ import { identifier, privateDirectory, trustedJson } from "./implementer-state.m
 import { repositoryIdentity } from "./implementer-claims.mjs";
 
 export const maximumBatch = 4;
+export const maximumAttemptMs = 10800000;
+const goalFirstDefaultMs = 1800000;
+const smokeBudgetMs = 28000;
 const captureNames = ["native.txt", "lifecycle.jsonl", "stdout.jsonl", "stderr.log", "launch.json"];
 const gitText = (workspace, ...args) => utf8(git(workspace, ...args));
 const finite = (n, max) => Number.isSafeInteger(n) && n > 0 && n <= max;
@@ -119,13 +122,14 @@ async function compareKnownCheckouts(workspace, repository, change, knownWorkspa
   }
 }
 
-export async function checkCheckout(request, grant) {
+export async function checkCheckout(request, grant, { allowRetainedProgress = false } = {}) {
   const { workspace, plan, planDigest, inputs, change, task } = request.identity;
   await verifiedGitRoot(workspace);
   need(repositoryIdentity(workspace) === grant.repository && equal(await privateCheckoutIdentity(workspace), grant.checkoutIdentity),
     "Checkout or repository changed under claim");
   const checked = checkoutIdentity(workspace);
-  need(checked.head === grant.head && checked.branch === grant.branch && checkoutStatus(workspace) === "", "Unexpected branch, HEAD or dirty checkout");
+  need(checked.head === grant.head && checked.branch === grant.branch &&
+    (allowRetainedProgress || checkoutStatus(workspace) === ""), "Unexpected branch, HEAD or dirty checkout");
   need(gitText(workspace, "ls-files", "-v", "-z").split("\0").filter(Boolean).every((line) => line.startsWith("H ")),
     "Untrusted Git index state");
   exactCommit(workspace, plan);
@@ -199,6 +203,37 @@ export async function privateCheckoutIdentity(workspace) {
   return { device: String(st.dev), inode: String(st.ino) };
 }
 
+// Determine adoption from the independently approved revision. Workspace spec edits
+// and existing frozen Goal-First grants cannot activate the prospective policy.
+export function selectsAttemptDeadline(grant) {
+  if (grant.mode !== "goal-first") return false;
+  const filename = "openspec/specs/exclusive-worker-runtime/spec.md";
+  const entry = tree(grant.workspace, grant.policyRevision, [filename]).get(filename);
+  if (!entry || entry.mode !== "100644") return false;
+  const spec = utf8(git(grant.workspace, "cat-file", "blob", entry.oid));
+  return /^### Requirement: Bounded Goal-First attempt deadline$/m.test(spec) &&
+    /^### Requirement: Bounded progress-based timeout continuation$/m.test(spec);
+}
+
+export function attemptWindow(request, grant, roles, history, createdAt, expiry, now = Date.now()) {
+  const previous = history.at(-1);
+  need(!previous || (Object.entries(grant.limits).every(([name, limit]) =>
+    limit <= (previous.limits[name] ?? (name === "timeoutMs" ? Infinity : -1))) &&
+    (!Object.hasOwn(previous.limits, "timeoutMs") || Object.hasOwn(grant.limits, "timeoutMs")) &&
+    grant.expiresAt <= previous.grantExpiresAt), "A successor cannot widen retained limits");
+  const first = history.find((launch) => launch.task === request.identity.task);
+  const deadline = Math.min(grant.expiresAt, expiry, createdAt + grant.limits.totalMs,
+    (first?.startedAt ?? now) + grant.limits.groupMs);
+  const remainingMs = deadline - now - smokeBudgetMs;
+  const prospective = roles.attemptPolicy === true;
+  const selectedMs = prospective ? roles.goalFirstTimeoutMs ?? goalFirstDefaultMs : grant.limits.timeoutMs;
+  const timeoutMs = prospective ? Math.min(selectedMs, grant.limits.timeoutMs ?? Infinity,
+    request.budget.limit * 60000, remainingMs) : selectedMs;
+  need(finite(timeoutMs, maximumAttemptMs) && timeoutMs <= remainingMs,
+    "Finite grant, assignment or group deadline cannot admit the worker");
+  return { deadline, timeoutMs, smokeBudgetMs };
+}
+
 export async function loadAuthority(entry, repository) {
   const r = entry.request;
   const { workspace, change, plan, planDigest, task } = r.identity;
@@ -227,11 +262,14 @@ export async function loadAuthority(entry, repository) {
     Array.isArray(grant.mutablePaths) && equal([...grant.mutablePaths].sort(), [...r.mutablePaths].sort()) &&
     Array.isArray(grant.restrictions) && grant.restrictions.every((item) => r.restrictions.includes(item)) &&
     (grant.mode !== "goal-first" || digest(grant.normalizedPlanDigest)), "Local grant scope, predecessor or restrictions differ");
-  fields(grant.limits, ["timeoutMs", "stdoutBytes", "stderrBytes", "maxTurns", "totalMs", "groupMs", "corrections", "batchSize"], "runtime limits");
+  const prospective = selectsAttemptDeadline(grant);
+  fields(grant.limits, ["stdoutBytes", "stderrBytes", "maxTurns", "totalMs", "groupMs", "corrections", "batchSize",
+    ...(prospective ? [] : ["timeoutMs"])], "runtime limits", prospective ? ["timeoutMs"] : []);
   const { timeoutMs, stdoutBytes, stderrBytes, maxTurns, totalMs, groupMs, corrections, batchSize } = grant.limits;
-  need(finite(timeoutMs, 600000) && timeoutMs <= r.budget.limit * 60000 &&
+  need((prospective ? !Object.hasOwn(grant.limits, "timeoutMs") || finite(timeoutMs, maximumAttemptMs) :
+    finite(timeoutMs, 600000) && timeoutMs <= r.budget.limit * 60000 && timeoutMs <= groupMs) &&
     finite(stdoutBytes, captureLimit) && finite(stderrBytes, captureLimit) && finite(maxTurns, 128) &&
-    finite(totalMs, 10800000) && finite(groupMs, totalMs) && timeoutMs <= groupMs &&
+    finite(totalMs, maximumAttemptMs) && finite(groupMs, totalMs) &&
     Number.isSafeInteger(corrections) && corrections >= 0 && corrections <= 8 && finite(batchSize, maximumBatch),
   "Invalid finite wall-clock, stream, turn or batch budget");
   need(Number.isSafeInteger(approval.approvedAt) && Number.isSafeInteger(grant.issuedAt) && approval.approvedAt <= grant.issuedAt &&
@@ -257,5 +295,5 @@ export async function loadAuthority(entry, repository) {
     inference.maxRuns === 1 && Number.isSafeInteger(inference.expiresAt) && inference.expiresAt > grant.issuedAt &&
     inference.expiresAt <= grant.expiresAt, "Independent single-run inference authority differs");
   await privateDirectory(path.dirname(r.evidenceRoots[0]));
-  return { approval, grant, inference };
+  return { approval, grant, inference, prospective };
 }

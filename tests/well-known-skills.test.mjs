@@ -69,6 +69,7 @@ test("well-known build publishes every skill and all advertised files", async ()
       "scripts/review-inputs.mjs",
       "scripts/review-preflight.mjs",
       "scripts/review-relay.mjs",
+      "scripts/review-packet-scheduler.mjs",
       "scripts/review-runtime-scratch.mjs",
       "scripts/review-runtime.mjs",
       "scripts/review-sandbox-bridge.mjs",
@@ -154,6 +155,7 @@ test("well-known build publishes every skill and all advertised files", async ()
       "scripts/evidence-retention.mjs",
       "scripts/external-verification.mjs",
       "scripts/finish-readiness.mjs",
+      "scripts/finish-trigger-credits.mjs",
       "scripts/git-environment.mjs",
       "scripts/harness-result.mjs",
       "scripts/local-harness.mjs",
@@ -162,6 +164,7 @@ test("well-known build publishes every skill and all advertised files", async ()
       "scripts/operator-records.mjs",
       "scripts/operator-status.mjs",
       "scripts/planning-inventory.mjs",
+      "scripts/pr-fix-lineage.mjs",
       "scripts/protected-finish.mjs",
       "SKILL.md",
     ].sort((left, right) => left.localeCompare(right)));

@@ -15,6 +15,7 @@ import { observeVersion } from "./agent-discovery.mjs";
 import { validatePilotHost } from "./agent-setup.mjs";
 import { requireQualifiedPilot } from "./adapter-qualification.mjs";
 import { auditVersion, reportedVersion } from "./runtime-version.mjs";
+import { packetConcurrency } from "./review-packet-scheduler.mjs";
 
 export const claudeVersion = "2.1.330";
 export const bubblewrapVersion = "0.9.0";
@@ -31,7 +32,9 @@ const pluginSettings = JSON.stringify({ enabledPlugins: {
 
 export function validateHostConfig(config) {
   fields(config, ["schemaVersion", "bwrap", "claude", "node", "libraries", "model", "relay",
-    "timeoutMs", "maxTurns", "maxBudgetUsd", "requirePreExposureAttestation"], "trusted host configuration", ["interPacketDelayMs", "runTimeoutMs", "localHarness"]);
+    "timeoutMs", "maxTurns", "maxBudgetUsd", "requirePreExposureAttestation"], "trusted host configuration",
+  ["interPacketDelayMs", "runTimeoutMs", "localHarness", "packetConcurrency"]);
+  const concurrency = packetConcurrency(config.packetConcurrency);
   if (config.localHarness !== undefined && config.localHarness !== null) validateHarnessBinding(config.localHarness);
   for (const [name, min, max] of [["interPacketDelayMs", 0, 30000], ["runTimeoutMs", 1000, 3600000]]) {
     need(config[name] === undefined || Number.isSafeInteger(config[name]) && config[name] >= min && config[name] <= max,
@@ -57,6 +60,7 @@ export function validateHostConfig(config) {
   }
   need(Number.isFinite(config.maxBudgetUsd) && config.maxBudgetUsd > 0 && config.maxBudgetUsd <= 10, "Invalid finite cost limit");
   const relay = config.relay;
+  need(concurrency === 1 || relay?.route === "same-uid-key", "Review relay has no verified packet isolation");
   if (relay?.route === "same-uid-key") {
     fields(relay, ["route", "keyFile", "keyFormat"], "same-UID key route");
     need(absolute(relay.keyFile) && ["raw", "assignment"].includes(relay.keyFormat), "Invalid host key source");
@@ -102,6 +106,7 @@ export function requireReviewHost(config, excluded, options = {}) {
       schemaVersion: 1, bwrap: executable, claude: pilot.roleBinding.executable, node, libraries, relay,
       model: pilot.roleBinding.model, maxTurns: pilot.maxTurns, timeoutMs: pilot.timeoutMs,
       interPacketDelayMs: pilot.interPacketDelayMs, maxBudgetUsd: pilot.maxBudgetUsd, requirePreExposureAttestation: false,
+      ...(pilot.packetConcurrency === undefined ? {} : { packetConcurrency: pilot.packetConcurrency }),
       ...(pilot.localHarness === undefined ? {} : { localHarness: pilot.localHarness }),
     };
     validateHostConfig(runtime);
@@ -196,7 +201,7 @@ async function brokerSocket(relay, excluded) {
   return relay.socket;
 }
 
-async function sameUidRelay(config, scratch, requestLimit) {
+async function sameUidRelay(config, scratch, requestLimit, onFailure) {
   const socket = path.join(scratch, "inference.sock");
   checkSocketLength(socket);
   const child = spawn(admittedPilots.has(config) ? config.node.path : process.execPath, [moduleFile("./review-relay.mjs")], {
@@ -254,7 +259,10 @@ async function sameUidRelay(config, scratch, requestLimit) {
   let classification;
   let sequence = 0;
   child.on("message", (event) => {
-    if (upstreamClasses.includes(event?.upstreamStatus)) classification ??= event.upstreamStatus;
+    if (classification === undefined && upstreamClasses.includes(event?.upstreamStatus)) {
+      classification = event.upstreamStatus;
+      onFailure?.(classification);
+    }
   });
   const diagnostic = () => new Promise((resolve, reject) => {
     const token = ++sequence;
@@ -291,19 +299,17 @@ export async function withReviewRuntime(config, { parent, excluded, packetCount,
     (pilot ? reportedVersion(bwrap.stdout.toString(), "bubblewrap") === pilot.bubblewrapAudit.observedVersion :
       bwrap.stdout.toString().trim() === "bubblewrap " + bubblewrapVersion), "Bubblewrap version pin mismatch");
   await recheck();
-  const owned = await allocateReviewScratch(scratchRoot ?? await defaultReviewScratchRoot(), [parent, ...excluded]);
-  const scratch = owned.directory;
-  let relay;
-  let workersSettled = true;
-  try {
-    if (config.relay.route === "same-uid-key") {
-      need(excluded.every((root) => separate(root, config.relay.keyFile)), "Host key overlaps protected roots");
-      relay = await startRelay(config, scratch, Math.min((config.maxTurns + 8) * (packetCount + 1), 4096));
-    } else relay = { socket: await brokerSocket(config.relay, excluded), close: async () => {} };
-    checkSocketLength(relay.socket);
-    return await callback(async ({ files, session = randomUUID(), prompt, timeoutMs = config.timeoutMs }) => {
+  if (config.relay.route === "same-uid-key") {
+    need(excluded.every((root) => separate(root, config.relay.keyFile)), "Host key overlaps protected roots");
+  }
+  const root = scratchRoot ?? await defaultReviewScratchRoot();
+  const withScratch = async (invocations, onFailure, use) => {
+    const owned = await allocateReviewScratch(root, [parent, ...excluded]);
+    const scratch = owned.directory;
+    let relay;
+    let workersSettled = true;
+    const run = async ({ files, session = randomUUID(), prompt, timeoutMs = config.timeoutMs, begin, retain }) => {
       need(workersSettled, "Previous reviewer process has no quiescence proof");
-      need(timeoutMs > 0, "Review deadline expired before launch");
       await recheck();
       await owned.verify();
       const packet = await mkdtemp(path.join(scratch, "packet-"));
@@ -315,22 +321,41 @@ export async function withReviewRuntime(config, { parent, excluded, packetCount,
       }
 
       const runtime = runtimeBinding(config, session, configurationSha256);
+      const args = containmentArgs(config, packet, relay.socket, runtime);
+      const input = Buffer.from(prompt);
+      if (begin) {
+        timeoutMs = begin();
+        if (timeoutMs === 0) return null;
+      }
+      need(timeoutMs > 0, "Review deadline expired before launch");
       workersSettled = false;
-      const proc = await runBoundedWorker(config.bwrap.path, containmentArgs(config, packet, relay.socket, runtime), {
-        cwd: scratch, env: launcherEnv, input: Buffer.from(prompt), timeoutMs: Math.min(timeoutMs, config.timeoutMs),
+      const proc = await runBoundedWorker(config.bwrap.path, args, {
+        cwd: scratch, env: launcherEnv, input, timeoutMs: Math.min(timeoutMs, config.timeoutMs),
         postLeaderGraceMs: 250, // Bubblewrap's namespace reaper can outlive its status-reporting launcher.
         stdoutLimit: 8 * 1024 * 1024, stderrLimit: 128 * 1024,
       });
       workersSettled = proc.quiescent;
+      retain?.({ runtime, proc });
       const upstreamStatus = await relay.diagnostic?.();
-      return { runtime, proc, ...(upstreamStatus ? { upstreamStatus } : {}) };
-    });
-  } catch (error) {
-    if (error.relayUnsettled) workersSettled = false;
-    throw error;
-  } finally {
-    await relay?.close();
-    if (workersSettled) await owned.clean();
-    else throw new Error("Reviewer process has no quiescence proof; private scratch retained");
-  }
+      const observation = { runtime, proc, ...(upstreamStatus ? { upstreamStatus } : {}) };
+      retain?.(observation);
+      return observation;
+    };
+    try {
+      relay = config.relay.route === "same-uid-key"
+        ? await startRelay(config, scratch, Math.min((config.maxTurns + 8) * invocations, 4096), onFailure)
+        : { socket: await brokerSocket(config.relay, excluded), close: async () => {} };
+      checkSocketLength(relay.socket);
+      return await use(run);
+    } catch (error) {
+      if (error.relayUnsettled) workersSettled = false;
+      throw error;
+    } finally {
+      await relay?.close();
+      if (workersSettled) await owned.clean();
+      else throw new Error("Reviewer process has no quiescence proof; private scratch retained");
+    }
+  };
+  if (packetConcurrency(config.packetConcurrency) === 1) return withScratch(packetCount + 1, undefined, callback);
+  return callback((input) => withScratch(1, input.onFailure, (run) => run(input)));
 }

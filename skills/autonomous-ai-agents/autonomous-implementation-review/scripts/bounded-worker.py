@@ -59,7 +59,10 @@ def run(spec, on_started=None, on_delivered=None, observe=None):
     finally:
         os.close(fd)
     kill_children()
-    deadline = time.monotonic() + spec["timeoutMs"] / 1000
+    now = time.monotonic()
+    deadline = min(now + spec["timeoutMs"] / 1000, spec.get("monotonicDeadline", float("inf")))
+    if deadline <= now:
+        raise ValueError("worker deadline expired before launch")
     grace = spec.get("postLeaderGraceMs", 0) / 1000
     captures = {"stdout": bytearray(), "stderr": bytearray()}
     with selectors.DefaultSelector() as ready:

@@ -1,7 +1,7 @@
 ---
 name: autonomous-implementation-review
 description: Implement changes with an independent review loop.
-version: 0.22.0
+version: 0.23.0
 author: Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -25,17 +25,19 @@ One authorized OpenSpec change, one named task group per worker; no GitHub write
 
 ## Portable core
 
-Follow `references/portable-core.md`, `references/terminal-adapters.md`,
-`references/profile-preparation.md`, `references/openspec.md`, and
-`references/worker-handoff.md` without Hermes or Herdr. For integrated-parent
-charter-v1 review, the core bounds readiness and grants no freeze, approval,
-execution or remote writes.
+Use [portable core](references/portable-core.md) without Hermes or Herdr.
+Integrated-parent charter-v1 readiness grants no freeze, approval, execution or remote writes.
 
 ## Optional worker runtime and reviewer
 
-Use `scripts/detect-agents.mjs` and `scripts/setup.mjs` for explicit bindings.
+Bind roles with `scripts/detect-agents.mjs` and `scripts/setup.mjs`.
 [Worker runtime](references/worker-runtime.md) and [contained review](references/review-candidate.md)
-require matching qualification and separate inference authority.
+require qualification and separate inference authority. For Codex Auto-review,
+use the direct command with retained admission.
+
+```text
+node "$review_cli" --mode candidate --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --admission ADMISSION --output OUTPUT
+```
 
 ## Legacy host execution
 
@@ -59,7 +61,7 @@ govern only the Herdr interaction fallback.
   (`hermes`, `claude-code`, `codex`, `grok-build`) in `references/terminal-adapters.md`.
   Apply the route's session, provider and model independence rules. No implicit consent, `delegate_task`,
   subagent, or multiplexer fallback.
-- Model keys are session selectors, not executables; never shell-execute them or edit global config.
+- Use model keys as session selectors; preserve global configuration.
 - Isolate writers/services; use finite budgets; no secrets or destructive tasks.
 - Compare installed skill version to source once; source edits do not update profiles.
 
@@ -80,7 +82,7 @@ Use `/goal`, not `/loop`. The operator controls pause/resume/clear and `/subgoal
 For earlier compression the operator runs `/goal pause`, `/compress here 2`,
 `/context`, then `/goal resume`.
 
-Stop discovery once authority, ownership, bootstrap and gates resolve. Reuse evidence.
+Reuse evidence. Stop discovery once authority, ownership and gates resolve.
 
 ## Procedure
 
@@ -95,7 +97,8 @@ Stop discovery once authority, ownership, bootstrap and gates resolve. Reuse evi
    On human-input waits, `exposeOperatorInteraction` exposes the same session
    natively or via a fresh Herdr fallback pane (`references/herdr.md`,
    `references/lifecycle-watch.md`, `--resume-from` once on `inconclusive`). Worker
-   caps use turn-cap recovery below; other incomplete outcomes stop.
+   caps use turn-cap recovery below. Use the worker runtime reference for
+   an eligible Goal-First supervisor timeout; other incomplete outcomes stop.
    Dispatch failed prerequisites to a fresh implementer session;
    the orchestrator does not edit worker code.
 4. Freeze the clean committed candidate via `openspec-delivery`. Dispatch a
@@ -108,10 +111,9 @@ Stop discovery once authority, ownership, bootstrap and gates resolve. Reuse evi
    checkout with the original contract. Changed content needs renewed gates and
    review. Limit to eight fix/review cycles (two for already-frozen legacy work).
 7. Delivery owns publication/completion; commits use `git-commit-message`.
-   Identity/tests grant no writes. Push/PR/merge need separate authority and
-   remote-ref readback; otherwise preserve/report the candidate.
+   Push/PR/merge require separate authority and remote-ref readback.
 8. Continue only unfinished work in the named task group. Stop after that group or
-   a real blocker; no next change without a new request.
+   a blocker; a new change needs a request.
 
 ## Executor turn-cap recovery
 

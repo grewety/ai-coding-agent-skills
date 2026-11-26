@@ -85,13 +85,21 @@ The separate `local-execution-grant` adds these fields.
 | `commits` | Optional boolean for the orchestrator's delivery decision. Omission grants no local commits. |
 | `head`, `checkoutIdentity` | Exact clean launch HEAD and checkout device/inode as decimal strings under `device` and `inode`. |
 | `eligibleTasks`, `accepted`, `knownWorkspaces` | Eligible native task IDs, ordered accepted predecessors, and explicitly known sibling clones. |
-| `issuedAt`, `expiresAt`, `limits` | Grant time fence in Unix milliseconds and positive `timeoutMs`, `stdoutBytes`, `stderrBytes`, `maxTurns`, `totalMs`, `groupMs`, `batchSize`, plus nonnegative `corrections`. |
+| `issuedAt`, `expiresAt`, `limits` | Grant time fence in Unix milliseconds and positive `stdoutBytes`, `stderrBytes`, `maxTurns`, `totalMs`, `groupMs`, `batchSize`, plus nonnegative `corrections`. The per-attempt `timeoutMs` is required for frozen policy and optional under the prospective Goal-First rule. |
 | `inference` | Protected locator for the separate one-run provider authorization. |
 | `overrideSha256`, `continuation` | Null unless independently authorized. Overrides pin canonical override bytes. Continuations pin a protected record. |
 | `normalizedPlanDigest` | Additional task-normalized Git plan digest for Goal-First. |
 
-Limits are capped at 600,000 ms per worker, 8 MiB per stream, 128 native
-turns, 180 minutes per assignment, eight corrections and four batch members.
+The verified integrated policy revision selects the prospective rule when its
+current exclusive worker runtime spec contains both deadline and continuation
+requirements. The Goal-First default is 30 minutes. The independently pinned
+host binding can set an integer `goalFirstTimeoutMs` from 1 to 10,800,000.
+The effective limit fits the request, any explicit grant `limits.timeoutMs`,
+and the remaining grant, group, assignment, role and inference windows after
+reserving native preflight. The `supervisor-armed` milestone reports the
+admitted `timeoutMs`. Task-Guided and earlier Goal-First approvals retain
+their explicit limit up to 600,000 ms. Shared ceilings are 8 MiB per stream,
+128 native turns, 180 minutes per assignment, eight corrections and four batch members.
 Native sandbox preflight consumes the held wall-clock grant. Successors
 inherit the original time fence and can narrow limits. Each accepted
 predecessor is `{ task, candidate, receipt }`. Its `accepted-dependency`

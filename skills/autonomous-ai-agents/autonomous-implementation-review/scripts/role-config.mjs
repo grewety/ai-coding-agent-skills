@@ -6,7 +6,7 @@ export const clients = Object.freeze({
   codex: { command: "codex", floor: "0.171.0" },
   "claude-code": { command: "claude", floor: "2.1.330" },
   hermes: { command: "hermes" }, opencode: { command: "opencode" }, pi: { command: "pi" },
-  agy: { command: "agy" }, "grok-build": { command: "grok-build" }, kilo: { command: "kilo" },
+  agy: { command: "agy" }, "grok-build": { command: "grok", fallbackCommand: "grok-build" }, kilo: { command: "kilo" },
   gemini: { command: "gemini" },
 });
 const settings = ["versionPolicy", "versionCheck", "minVersion", "maxVersion", "exactVersion"];

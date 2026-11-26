@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { fixtureTest as test } from "./test-shards.mjs";
 import assert from "node:assert/strict";
 import { chmod, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";

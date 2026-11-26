@@ -1,4 +1,6 @@
+import { fakeHost, scratch, startupLabels } from "./item55-review-concurrency.test.mjs?fixtures";
 import { execFile, spawnSync } from "node:child_process";
+import { generateKeyPairSync, sign } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
@@ -247,18 +249,18 @@ test("CLI usage rejects a request-selected host override before filesystem reads
 });
 
 import { randomUUID } from "node:crypto";
-import { chmod, mkdir, mkdtemp, readFile, realpath, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { chmod, mkdir, mkdtemp, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { hash, jsonBytes, buildExport } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-inputs.mjs";
 import { reviewCommand, runReview } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-candidate.mjs";
+import { claimReviewRun } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-spend.mjs";
 import { containmentArgs, withReviewRuntime } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-runtime.mjs";
 import { auditVersion } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/runtime-version.mjs";
 import * as relay from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-relay.mjs";
+import { classifyUpstream } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-upstream-status.mjs";
 
 const { readHostKey, credentialValue, relayRequest } = relay;
 
-const startupLabels = ["claude", "Explore", "general-purpose", "Plan", "statusline-setup"];
 
 test("containment retains the exact namespace, mount and Claude controls", () => {
   const argv = containmentArgs({ bwrap: { path: "/host/bwrap" }, node: { path: "/host/node" },
@@ -475,19 +477,6 @@ test("built-in agent labels are metadata while agent invocation and child turns 
   assert.throws(() => auditClaudeStream(proc([startup, { ...output, parent_tool_use_id: "fixture" }, end]), runtime, [], true), /identity/);
 });
 
-async function scratch(t) {
-  const root = await mkdtemp(path.join(tmpdir(), "contained-review-test-"));
-  t.after(async () => {
-    async function restore(dir) {
-      await chmod(dir, 0o700);
-      for (const entry of await readdir(dir, { withFileTypes: true })) if (entry.isDirectory()) await restore(path.join(dir, entry.name));
-    }
-    await restore(root);
-    await rm(root, { recursive: true, force: true });
-  });
-  return root;
-}
-
 test("only an explicit literal assignment or dedicated raw key passes the host file contract", async (t) => {
   const root = await scratch(t);
   const key = "sk-" + "ant-" + "fixture".repeat(3);
@@ -505,69 +494,6 @@ test("only an explicit literal assignment or dedicated raw key passes the host f
   assert.equal(await readHostKey(filename, "raw"), key);
   await assert.rejects(readHostKey(filename, "assignment"), /Unsafe/);
 });
-
-// This executable only emits synthetic stream events. It cannot invoke Claude or call a relay.
-async function fakeHost(root, behavior = "valid") {
-  const node = await realpath(process.execPath);
-  const launcher = path.join(root, "fixture-launcher-" + behavior);
-  await writeFile(launcher, `#!${node}
-const fs = require("node:fs");
-const args = process.argv.slice(2);
-if (args[0] === "--version") { fs.writeSync(1, "bubblewrap 0.9.0\\n"); process.exit(0); }
-const arg = (flag) => args[args.indexOf(flag) + 1];
-const policy = ["--unshare-all", "--unshare-user", "--disable-userns", "--clearenv", "--remount-ro", "--no-chrome", "--strict-mcp-config",
-  "--no-session-persistence", "--disable-slash-commands", "--die-with-parent"];
-if (!policy.every((flag) => args.includes(flag)) || arg("--permission-prompts") !== "none" ||
-    arg("--tools") !== "Read" || arg("--allowedTools") !== "Read" ||
-    args[args.indexOf("CLAUDE_CODE_DISABLE_BUILTIN_PLUGINS") + 1] !== "1") process.exit(31);
-const prompt = fs.readFileSync(0, "utf8");
-const probe = prompt.includes("REVIEW_PROBE_OK");
-const model = arg("--model");
-const session_id = arg("--session-id");
-const emit = (event) => fs.writeSync(1, JSON.stringify({ ...event, session_id }) + "\\n");
-const message = (type, content) => emit({ type, message: { content } });
-const behavior = ${JSON.stringify(behavior)};
-emit({ type: "system", subtype: "init", model: behavior === "probe-fails" && probe ? "wrong-model" : model,
-  claude_code_version: "2.1.330", cwd: "/review", tools: ["Read"], permissionMode: "dontAsk",
-  mcp_servers: [], skills: [], slash_commands: [], plugins: [], agents: ${JSON.stringify(startupLabels)} });
-const lines = prompt.split("\\n");
-const assigned = lines.filter((line) => line.startsWith("/review/"));
-if (behavior !== "no-coverage") assigned.forEach((file_path, index) => {
-  const id = String(index);
-  const root = args[args.indexOf("/review") - 1];
-  const content = fs.readFileSync(root + file_path.slice("/review".length), "utf8");
-  message("assistant", [{ type: "tool_use", id, name: "Read", input: { file_path } }]);
-  const numLines = content ? content.split("\\n").length : 0;
-  emit({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: id, content }] },
-    tool_use_result: { type: "text", file: { filePath: file_path, content, numLines, startLine: 1, totalLines: numLines } } });
-});
-const verdict = "Verdict: No findings";
-if (!probe && (lines.at(-5) !== "BEGIN_REVIEW_RECEIPT" || lines.at(-1) !== "END_REVIEW_RECEIPT")) process.exit(32);
-const input = probe ? null : JSON.parse(lines.at(-2));
-const reference = lines.find((line) => line.startsWith("Native reference: "))?.slice(18);
-const candidate = input?.target;
-const value = candidate
-  ? { target: candidate, packet: Number(lines.find((line) => line.startsWith("Packet: ")).split(" ")[1]),
-      findings: [], coverageLimitations: [] }
-  : { identity: input?.identity, readOnly: true, reference, verdict, findings: [], observations: [],
-      coverageLimitations: behavior === "packet-gap" ? [{ class: "packet-gap", detail: "fixture gap" }] : [], ledgerChecks: [] };
-if (behavior === "wrong-second-sha" && candidate && value.packet === 2) value.target = "f".repeat(40);
-const result = probe ? "REVIEW_PROBE_OK" : behavior === "bad-receipt" || (behavior === "retry" && !reference.includes("retried"))
-  ? "malformed fixture receipt" : ["Reviewed the assigned fixture files.", "BEGIN_REVIEW_RECEIPT", verdict,
-    candidate ? "Target: " + candidate : "Policy: charter-v1", JSON.stringify(value), "END_REVIEW_RECEIPT"].join("\\n");
-message("assistant", [{ type: "text", text: result }]);
-emit({ type: "result", subtype: "success", is_error: false, num_turns: 1, total_cost_usd: 0, permission_denials: [], result });
-`, { mode: 0o700 });
-  const keyFile = path.join(root, "fixture-key");
-  await writeFile(keyFile, "EXAMPLE=true\nANTHROPIC_API_KEY=sk-" + "ant-" + "synthetic".repeat(3) + "\n", { mode: 0o600 });
-  const pin = async (file) => ({ path: file, sha256: hash(await readFile(file)) });
-  const config = { schemaVersion: 1, bwrap: await pin(launcher), node: await pin(launcher), claude: await pin(launcher),
-    libraries: [], model: "claude-fixture", relay: { route: "same-uid-key", keyFile, keyFormat: "assignment" },
-    timeoutMs: 4000, maxTurns: 16, maxBudgetUsd: 1, requirePreExposureAttestation: false };
-  const filename = path.join(root, "fixture-host-" + behavior + ".json");
-  await writeFile(filename, jsonBytes(config));
-  return { filename, config };
-}
 
 test("runtime rejects a group-writable Node pin", async (t) => {
   const root = await scratch(t);
@@ -714,12 +640,14 @@ async function prepareFixture(f, name = "first", write = true) {
   const expect = path.join(f.root, name + "-expect.json");
   const directory = path.join(f.root, name + "-export");
   const approval = { schemaVersion: 1, requestSha256: hash(jsonBytes(f.request)), exportSha256: null,
-    configurationSha256: hash(jsonBytes(f.host.config)), model: f.host.config.model };
+    configurationSha256: hash(jsonBytes(f.host.config)), model: f.host.config.model,
+    ...(f.host.config.packetConcurrency ? { packetConcurrency: f.host.config.packetConcurrency } : {}) };
   await writeFile(request, jsonBytes(f.request));
   await writeFile(expect, jsonBytes(approval));
   const flags = ["--request", request, "--expect", expect, "--export", directory];
   if (write) {
-    approval.exportSha256 = invoke(["--prepare", ...flags]).exportSha256;
+    approval.exportSha256 = invoke(["--prepare", ...flags,
+      ...(f.request.policy ? ["--host-config", f.host.filename] : [])]).exportSha256;
     await writeFile(expect, jsonBytes(approval));
   }
   return { request, expect, export: directory, output: f.output, approval, flags,
@@ -802,7 +730,7 @@ test("malformed approach receipt permits one exact zero-cycle retry and a packet
   assert.equal(observed.approach.record.cumulativeCycles, 0);
 });
 
-async function gitCandidate(t, behavior = "valid") {
+async function gitCandidate(t, behavior = "valid", concurrency) {
   const f = await fixture(t, "candidate", behavior);
   const git = (...args) => {
     const result = spawnSync("/usr/bin/git", ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
@@ -812,7 +740,16 @@ async function gitCandidate(t, behavior = "valid") {
     return result.stdout;
   };
   git("init", "-q");
-  const changeFiles = ["one.txt", "two.txt"];
+  const changeFiles = concurrency ? ["one.txt", "six.txt", "ten.txt", "two.txt"] : ["one.txt", "two.txt"];
+  if (concurrency) {
+    await writeFile(path.join(f.workspace, "AGENTS.md"), "<!-- openspec-low-touch: {} -->\n");
+    git("add", "AGENTS.md");
+    git("commit", "-qm", "adopt contained review policy");
+    const parent = git("rev-parse", "HEAD").trim();
+    f.request.policy = { parent, target: parent };
+    Object.assign(f.host.config, { packetConcurrency: concurrency, interPacketDelayMs: 25, maxTurns: 24 });
+    await writeFile(f.host.filename, jsonBytes(f.host.config));
+  }
   for (const name of changeFiles) await writeFile(path.join(f.workspace, name), "old " + name.repeat(14) + "\n");
   git("add", ".");
   git("commit", "-qm", "fixture planning and baseline");
@@ -834,6 +771,150 @@ async function gitCandidate(t, behavior = "valid") {
   f.request.snapshot = { base, target, plan: base, planDigest, diffSha256: hash(diff(base, target)),
     gates: [{ command: "synthetic test", commit: target, exitCode: 0, evidence: "gate.txt" }] };
   return { ...f, git, diff, base, target, changeFiles };
+}
+
+test("direct candidate launch reserves the signed extension before opening the runtime", async (t) => {
+  const f = await gitCandidate(t, "valid", 1);
+  f.host.config.maxBudgetUsd = 2.50;
+  await writeFile(f.host.filename, jsonBytes(f.host.config));
+  const a = await prepareFixture(f);
+  const ledger = await mkdtemp(path.join(f.root, "ledger-"));
+  const admission = path.join(f.root, "spend.json");
+  const key = path.join(f.root, "operator-key.json");
+  const record = path.join(f.root, "extension.json");
+  const { change, plan, planDigest } = f.request.worker.identity;
+  const { approvalReference, executionReference } = f.request.worker.authority;
+  const policyRevision = f.request.policy.parent;
+  const baseCaps = { maxReviews: 1, maxTotalUsd: 15 };
+  const original = await claimReviewRun({ root: ledger, excluded: [], policy: { mode: "auto-approved", maxReviews: 1, limitMicros: 15_000_000 },
+    scope: { change, phase: "planning", purpose: "approach", target: policyRevision, requestSha256: a.approval.requestSha256,
+      configurationSha256: a.approval.configurationSha256, exportSha256: a.approval.exportSha256,
+      attempt: "earlier-hold", scopeSha256: a.approval.requestSha256, upperUsdMicros: 5_000_000, invocations: 2 } });
+  await writeFile(admission, jsonBytes({ schemaVersion: 1, configurationSha256: a.approval.configurationSha256,
+    ledger, phase: "execution", caps: baseCaps, phaseGrant: { kind: "contained-review-phase", verified: true, reference: "review-phase",
+      change, phase: "execution", policyRevision, requestSha256: a.approval.requestSha256, authorityReference: executionReference } }),
+  { mode: 0o600 });
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const keyBytes = jsonBytes({ publicKey: publicKey.export({ format: "der", type: "spki" }).toString("base64") });
+  await writeFile(key, keyBytes, { mode: 0o600 });
+  const options = ["--admission", admission, "--operator-key", key, "--operator-key-sha256", hash(keyBytes)];
+  const launch = [...a.launch, ...options];
+  const check = ["--check", ...a.flags, "--host-config", f.host.filename, ...options];
+  const mustNotOpen = () => assert.fail("runtime opened without a durable extension and reservation");
+  await assert.rejects(reviewCommand(launch, mustNotOpen), /cost cap exceeded/);
+  const { ledgerIdentity, scope } = await reviewCommand(check, mustNotOpen);
+  assert.equal(scope.upperUsdMicros, 12_500_000);
+  const grant = { change, plan, planDigest, approvalReference, executionReference, policyRevision, ledgerIdentity, baseCaps,
+    schemaVersion: 1, kind: "review-budget-extension", reference: "operator:fixture-grant", caps: { maxReviews: 2, maxTotalUsd: 17.50 },
+    validFrom: new Date(Date.now() - 60_000).toISOString(), expiresAt: new Date(Date.now() + 60_000).toISOString() };
+  await writeFile(record, jsonBytes({ grant, signature: sign(null, jsonBytes(grant), privateKey).toString("base64") }), { mode: 0o600 });
+  const signed = ["--budget-extension", record];
+  await reviewCommand([...check, ...signed], mustNotOpen);
+  assert.deepEqual(await readdir(path.dirname(original.file)), [path.basename(original.file)]);
+  const opened = Symbol("synthetic runtime");
+  const result = await reviewCommand([...launch, ...signed], async () => {
+    const files = await readdir(path.dirname(original.file));
+    assert.equal(files.length, 3);
+    assert.equal(files.filter((name) => name.startsWith("extension-")).length, 1);
+    const reservation = files.find((name) => !name.startsWith("extension-") && name !== path.basename(original.file));
+    assert.equal(JSON.parse(await readFile(path.join(path.dirname(original.file), reservation))).upperUsdMicros, 12_500_000);
+    return opened;
+  });
+  assert.equal(result, opened);
+  await assert.rejects(reviewCommand([...launch, ...signed], mustNotOpen), /already redeemed/);
+});
+
+for (const [name, cap, statusCode] of [["reordered success", 2], ["429", 2, 429], ["529", 3, 529]]) {
+  test(`concurrent mode and sealed verify handle ${name}`, { timeout: 12000 }, async (t) => {
+    const f = await gitCandidate(t, "valid", cap);
+    const a = await prepareFixture(f);
+    const ledger = path.join(f.root, "ledger");
+    await mkdir(ledger, { mode: 0o700 });
+    const admission = path.join(f.root, "review-admission.json");
+    await writeFile(admission, jsonBytes({ schemaVersion: 1, configurationSha256: a.approval.configurationSha256,
+      ledger, phase: "execution", phaseGrant: { kind: "contained-review-phase", verified: true, reference: "fixture-phase",
+        change: f.request.worker.identity.change, phase: "execution", policyRevision: f.request.policy.parent,
+        requestSha256: a.approval.requestSha256, authorityReference: f.request.worker.authority.executionReference } }), { mode: 0o600 });
+    const runtimeMustNotOpen = () => assert.fail("runtime opened without an exact reservation");
+    await assert.rejects(reviewCommand(a.launch, runtimeMustNotOpen), /durable reservation/);
+    const launch = [...a.launch, "--admission", admission];
+    await writeFile(a.expect, jsonBytes({ ...a.approval, packetConcurrency: undefined }));
+    await assert.rejects(reviewCommand(launch, runtimeMustNotOpen), /concurrency differs/);
+    await writeFile(a.expect, jsonBytes(a.approval));
+
+    const opened = [];
+    const started = [];
+    const closed = [];
+    const siblingStarted = Promise.withResolvers();
+    let active = 0;
+    let peak = 0;
+    const classification = classifyUpstream(statusCode);
+    const launched = await reviewCommand(launch, async (config, options, callback) => {
+      const location = path.join(ledger, f.request.worker.identity.change);
+      const [reservation] = await readdir(location);
+      assert.equal(JSON.parse(await readFile(path.join(location, reservation))).invocations, 5);
+      return withReviewRuntime(config, options, (run) => callback((input) => run({ ...input, begin: () => {
+        const remaining = input.begin();
+        if (remaining > 0) {
+          started.push(performance.now());
+          if (started.length === (statusCode ? cap + 1 : 4)) siblingStarted.resolve();
+        }
+        return remaining;
+      } })), async (_, directory, limit, onFailure) => {
+        const packet = opened.push(directory) - 1;
+        assert.equal(limit, config.maxTurns + 8);
+        if (packet > 0) peak = Math.max(peak, ++active);
+        assert.ok(packet === 0 || closed.includes(0), "probe relay settled before packet setup");
+        return { socket: path.join(directory, "fixture.sock"), diagnostic: async () => {
+          if (packet !== 1) {
+            if (statusCode && packet > 1) await siblingStarted.promise;
+            return undefined;
+          }
+          await siblingStarted.promise;
+          if (classification) onFailure(classification);
+          return classification ?? undefined;
+        }, close: async () => {
+          if (packet > 0) active--;
+          closed.push(packet);
+        } };
+      });
+    });
+    await retain(a, launched);
+    const statusFile = path.join(f.output, "status.json");
+    const status = JSON.parse(await readFile(statusFile));
+    assert.equal(status.packetConcurrency, cap);
+    assert.equal(new Set(opened).size, opened.length);
+    assert.equal(new Set(status.sessions).size, status.count);
+    assert.equal(peak, cap);
+    assert.equal(active, 0);
+    assert.deepEqual(closed.toSorted((x, y) => x - y), opened.map((_, i) => i));
+    assert.ok(started.slice(2).every((time, i) => time - started[i + 1] >= f.host.config.interPacketDelayMs));
+    const verify = ["--verify", ...a.flags, "--output", f.output];
+    assert.equal(invoke(verify, statusCode ? 1 : 0).phase, statusCode ? "runtime-failed" : "complete");
+    if (!statusCode) {
+      assert.ok(status.schedule.findIndex(([event, packet]) => event === "settle" && packet === 2) <
+        status.schedule.findIndex(([event, packet]) => event === "settle" && packet === 1));
+      assert.equal(status.count, 5);
+      await writeFile(a.expect, jsonBytes({ ...a.approval, packetConcurrency: 3 }));
+      assert.match(invoke(verify, 1), /Status differs from verified handover/);
+      return;
+    }
+    assert.deepEqual(status.upstream, [{ packet: 1, classification }]);
+    assert.equal(status.count, cap + 1);
+    const halt = status.schedule.findIndex(([event]) => event === "halt");
+    assert.ok(halt >= 0 && status.schedule.slice(halt + 1).every(([event]) => event === "settle"));
+    if (statusCode === 429) {
+      const later = status.schedule.findIndex(([event, packet]) => event === "launch" && packet === 2);
+      const [launchAfterFailure] = status.schedule.splice(later, 1);
+      status.schedule.splice(status.schedule.findIndex(([event]) => event === "halt") + 1, 0, launchAfterFailure);
+      await chmod(statusFile, 0o600);
+      const tampered = jsonBytes(status);
+      await writeFile(statusFile, tampered);
+      await chmod(statusFile, 0o400);
+      await writeFile(a.expect, jsonBytes({ ...a.approval, statusSha256: hash(tampered) }));
+      assert.match(invoke(verify, 1), /Packet launched after failure/);
+    }
+  });
 }
 
 test("candidate subprocess fixtures seal a complete multi-packet run against exact Git objects", async (t) => {

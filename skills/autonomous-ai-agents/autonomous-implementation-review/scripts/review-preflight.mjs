@@ -4,6 +4,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { digest, hash, jsonBytes, need, parseStrictJson, separate, absolute } from "./review-inputs.mjs";
 import { requireReviewHost, validateHostConfig, verifyRuntimePins } from "./review-runtime.mjs";
 import { readClosed } from "./worker-handoff.mjs";
+import { packetConcurrency } from "./review-packet-scheduler.mjs";
 
 export async function trustedJson(file, excluded, privateFile = false) {
   need(absolute(file) && excluded.every((root) => separate(file, root)), "Trusted configuration overlaps the checkout or review records");
@@ -16,6 +17,10 @@ export async function trustedJson(file, excluded, privateFile = false) {
 
 export async function offlineHostBinding(file, expect, excluded, exactBytes = true, pilotOptions = {}) {
   const { value: config, configurationSha256 } = await trustedJson(file, excluded);
+  const concurrency = packetConcurrency(config.packetConcurrency);
+  need(concurrency === packetConcurrency(expect.packetConcurrency) &&
+    (concurrency === 1 || expect.configurationSha256 === configurationSha256),
+  "Review packet concurrency differs from the exact host pin or independent expectation");
   if (config.schemaVersion === 2) {
     need(configurationSha256 === expect.configurationSha256 && config.roleBinding?.model === expect.model,
       "Explicit host configuration pin or model mismatch");
@@ -51,11 +56,18 @@ export function reviewClock(config, count, { signal, now = () => performance.now
   }
   return {
     remaining,
-    async next(index) {
+    async next(index, stop) {
+      const waitSignal = signal && stop ? AbortSignal.any([signal, stop]) : signal ?? stop;
+      waitSignal?.throwIfAborted();
       if (index > 0 && interval) {
         if (remaining() <= interval) return false;
-        await wait(interval, undefined, { signal });
+        const earliest = now() + interval;
+        await wait(interval, undefined, { signal: waitSignal });
+        while (stop && now() < earliest) {
+          await wait(Math.ceil(earliest - now()), undefined, { signal: waitSignal });
+        }
       }
+      waitSignal?.throwIfAborted();
       return remaining() > 0;
     },
   };

@@ -51,15 +51,18 @@ function directoryState(directory, workspace) {
 
 export function validatePilotHost(input) {
   fields(input, ["schemaVersion", "roleBinding", "bubblewrap", "relay", "maxTurns", "interPacketDelayMs",
-    "timeoutMs", "maxBudgetUsd"], ["runtime", "localHarness"], "reviewer pilot host");
+    "timeoutMs", "maxBudgetUsd"], ["runtime", "localHarness", "packetConcurrency"], "reviewer pilot host");
   need(input.schemaVersion === 2, "Invalid reviewer pilot host schema");
-  const { relay, maxTurns, interPacketDelayMs, timeoutMs, maxBudgetUsd } = input;
+  const { relay, maxTurns, interPacketDelayMs, timeoutMs, maxBudgetUsd, packetConcurrency } = input;
   fields(relay, ["route", "credentialRef"], [], "named relay reference");
   need(["same-uid-key", "dedicated-uid-broker", "openrouter", "openai-compatible", "gemini"].includes(relay.route) &&
     token(relay.credentialRef) && !/^(?:sk-|ghp_|github_pat_)/i.test(relay.credentialRef), "Invalid named relay reference");
   need(maxTurns === 96 && Number.isSafeInteger(interPacketDelayMs) && interPacketDelayMs >= 0 && interPacketDelayMs <= 30000 &&
     Number.isSafeInteger(timeoutMs) && timeoutMs >= 1000 && timeoutMs <= 300000 &&
     Number.isFinite(maxBudgetUsd) && maxBudgetUsd > 0 && maxBudgetUsd <= 10, "Invalid reviewer limits");
+  need(packetConcurrency === undefined || Number.isSafeInteger(packetConcurrency) && packetConcurrency >= 1 &&
+    packetConcurrency <= 3 && (packetConcurrency === 1 || relay.route === "same-uid-key"),
+  "Invalid packetConcurrency or relay without packet isolation");
   fields(input.bubblewrap, ["executable"], ["versionPolicy", "versionCheck", "exactVersion", "minVersion", "maxVersion"],
     "Bubblewrap policy");
   let runtime;
@@ -81,6 +84,7 @@ export function validatePilotHost(input) {
   return { schemaVersion: 2, roleBinding: roleConfig(input.roleBinding),
     bubblewrap: { executable: validatePin(input.bubblewrap.executable), ...versionPolicy(input.bubblewrap, "0.9.0") },
     relay, maxTurns, interPacketDelayMs, timeoutMs, maxBudgetUsd,
+    ...(packetConcurrency === undefined ? {} : { packetConcurrency }),
     ...(runtime === undefined ? {} : { runtime }), ...(input.localHarness === undefined ? {} : { localHarness: input.localHarness }) };
 }
 
@@ -153,9 +157,10 @@ export function previewSetup(input, { workspace = process.cwd() } = {}) {
   need(input.schemaVersion === 1, "Unsupported setup schema");
   const directory = input.directory;
   const identity = directoryState(directory, workspace);
-  fields(input.reviewer, ["bubblewrap", "relay", "interPacketDelayMs", "timeoutMs", "maxBudgetUsd"],
-    ["runtime", "localHarness"], "reviewer choices");
-  const reviewer = validatePilotHost({ ...input.reviewer, schemaVersion: 2, maxTurns: 96, roleBinding: input.roles?.reviewer });
+  fields(input.reviewer, ["bubblewrap", "relay", "interPacketDelayMs", "timeoutMs"],
+    ["maxBudgetUsd", "runtime", "localHarness", "packetConcurrency"], "reviewer choices");
+  const reviewer = validatePilotHost({ maxBudgetUsd: 2.50, ...input.reviewer,
+    schemaVersion: 2, maxTurns: 96, roleBinding: input.roles?.reviewer });
   const host = jsonBytes(reviewer);
   const configurationSha256 = hashBytes(host);
   const roots = input.worksetRoots ?? [realpathSync(workspace)];

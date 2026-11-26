@@ -2,17 +2,20 @@ import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { once } from "node:events";
 import { randomUUID } from "node:crypto";
+import fsPromises from "node:fs/promises";
 import { chmod, lstat, mkdir, mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
+import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
-import { test } from "node:test";
+import { fixtureTest as test } from "./test-shards.mjs";
 import { hash, jsonBytes } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-inputs.mjs";
 import { roleQualificationBinding } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-bindings.mjs";
 import { checkoutStatus, privateCheckoutIdentity } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/worker-runtime-policy.mjs";
 import { claimPath, slotPath } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-claims.mjs";
 import { observeImplementer, runImplementers, runtimeIdentity } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-runtime.mjs";
 import { readState } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-state.mjs";
+import { operationProcess } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-supervisor.mjs";
 import { requestBytes, writeClosed } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/worker-handoff.mjs";
 import { applySetup, previewSetup, validatePilotHost } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/agent-setup.mjs";
 import { hashBytes, jsonBytes as roleBytes } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/agent-configuration.mjs";
@@ -56,13 +59,22 @@ if behavior == "startup-warning":
     emit("item.completed", item={"id": "item_0", "type": "error",
          "message": ${JSON.stringify(startupWarning)} + os.environ["CODEX_HOME"] + "/config.toml."})
 emit("turn.started")
+attempt = assignment["identity"]["attempt"]
+if attempt.startswith("timeout-"):
+    if attempt != "timeout-empty":
+        target = "outside.txt" if attempt == "timeout-outside" else "allowed.txt"
+        with open(target, "a") as out:
+            out.write(attempt + "\n")
+    time.sleep(30)
 if behavior == "wait":
     emit("approval.requested", kind="credential", thread_id=session, request_id="fixture-approval")
     time.sleep(30)
 if behavior == "late":
     time.sleep(0.75)
 if behavior == "recover":
-    time.sleep(1.5)
+    release = os.path.join(os.environ["HOME"], "release-after-launcher-exit")
+    while not os.path.exists(release):
+        time.sleep(0.01)
 if behavior == "descendant":
     subprocess.Popen(["/usr/bin/python3", "-c", "import os,time; os.setsid(); time.sleep(30)"],
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -86,12 +98,13 @@ emit("item.completed", item={"type": "agent_message", "text": "Synthetic native 
 emit("turn.completed", usage={"input_tokens": 1, "output_tokens": 6})
 `;
 
-async function fixture(t, label = "first", mode = "task-guided") {
+async function fixture(t, label = "first", mode = "task-guided", prospective = false) {
   const source = { ...taskGuidedSource };
   const contract = { schemaVersion: 1, outcome: "valid", scope: ["allowed.txt"],
     invariants: ["Fixture isolation"], nonGoals: ["Publication"], adaptableAssumptions: [],
     acceptance: ["One bounded synthetic result"], gates: [["fixture"]],
-    localAuthority: { commits: false, stop: "Stop on drift" }, budgets: { minutes: 1, corrections: 0 } };
+    localAuthority: { commits: false, stop: "Stop on drift" },
+    budgets: prospective ? { minutes: 60, corrections: 3 } : { minutes: 1, corrections: 0 } };
   if (mode === "goal-first") {
     const fence = String.fromCharCode(96).repeat(3);
     source[prefix + "proposal.md"] += fence + "openspec-goal-contract\n" + JSON.stringify(contract) + "\n" + fence + "\n";
@@ -110,6 +123,11 @@ async function fixture(t, label = "first", mode = "task-guided") {
   for (const [name, value] of Object.entries({ ...source, "allowed.txt": "Allowed source\n", "outside.txt": "Read-only control\n" })) {
     await mkdir(path.dirname(path.join(workspace, name)), { recursive: true });
     await writeFile(path.join(workspace, name), value);
+  }
+  if (prospective) {
+    const file = "openspec/specs/exclusive-worker-runtime/spec.md";
+    await mkdir(path.dirname(path.join(workspace, file)), { recursive: true });
+    await writeFile(path.join(workspace, file), await readFile(new URL("../" + file, import.meta.url)));
   }
   const git = (cwd, ...args) => {
     const result = spawnSync("/usr/bin/git", ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", ...args],
@@ -168,7 +186,8 @@ async function fixture(t, label = "first", mode = "task-guided") {
       positiveControl: true, deniedPublication: true, protectedPaths: true, settlementVerified: true, inventoryUnchanged: true });
   }
   const issuedAt = Date.now() - 1000;
-  const expiresAt = issuedAt + 180000;
+  const totalMs = prospective ? 3600000 : 180000;
+  const expiresAt = issuedAt + totalMs;
   const pair = initialPair;
   const hostValue = { schemaVersion: 1, runtimeSha256, pair, override: null,
     restrictions: { allowedClients: ["codex", "claude-code"], allowedModels: ["fixture-codex", "claude-fixture"],
@@ -187,7 +206,7 @@ async function fixture(t, label = "first", mode = "task-guided") {
       inputs: Object.fromEntries(Object.entries(source).map(([name, value]) => [name, hash(value)])) },
     outcome, acceptance: ["One bounded synthetic result"], scope: ["Fixture only"], nonGoals: ["Publication"],
     authority, restrictions: ["no Git writes", "no tasks.md writes", "no profile writes", "no subagents", "no multiplexers"],
-    budget: { limit: 1, unit: "minutes" }, stop: "Stop on drift", evidenceRoots: [path.join(evidence, attempt)],
+    budget: { limit: prospective ? 60 : 1, unit: "minutes" }, stop: "Stop on drift", evidenceRoots: [path.join(evidence, attempt)],
     requiredEvidence: ["native.txt", "lifecycle.jsonl", "stdout.jsonl", "stderr.log", "launch.json"], mutablePaths: ["allowed.txt"],
     ...r };
     const inference = await locator(attempt + "-inference.json", { schemaVersion: 1, kind: "worker-inference-authority",
@@ -199,8 +218,9 @@ async function fixture(t, label = "first", mode = "task-guided") {
       head: plan, eligibleTasks: mode === "goal-first" ? ["1.1"] : ["1.1", "2.1"], accepted: [], knownWorkspaces: [],
       ...(mode === "goal-first" ? { normalizedPlanDigest } : {}),
       mutablePaths: request.mutablePaths, restrictions: request.restrictions, stop: request.stop,
-      limits: { timeoutMs: 3000, stdoutBytes: 16384, stderrBytes: 16384, maxTurns: 1,
-        totalMs: 180000, groupMs: mode === "task-guided" ? 120000 : 60000, corrections: mode === "task-guided" ? 2 : 0,
+      limits: { ...(prospective ? {} : { timeoutMs: 3000 }), stdoutBytes: 16384, stderrBytes: 16384, maxTurns: 1,
+        totalMs, groupMs: prospective ? totalMs : mode === "task-guided" ? 120000 : 60000,
+        corrections: prospective ? 3 : mode === "task-guided" ? 2 : 0,
         batchSize: 4, ...grant.limits },
       issuedAt, expiresAt, overrideSha256: null, continuation: null, inference, ...Object.fromEntries(Object.entries(grant).filter(([key]) => key !== "limits")),
     });
@@ -344,6 +364,37 @@ test("sealed completion, immutable recovery and explicit slot/claim retirement",
   await assert.rejects(lstat(claimPath(f.registry, repository, change)), { code: "ENOENT" });
 });
 
+test("process observation treats Linux ESRCH as absence only for the verified procfs stat read", async (t) => {
+  const procStat = "/proc/2/stat";
+  const bootId = "/proc/sys/kernel/random/boot_id";
+  const boot = (await readFile(bootId, "utf8")).trim();
+  const namespace = String((await fsPromises.stat("/proc/self/ns/pid", { bigint: true })).ino);
+  const identity = { pid: 2, start: "1", boot, namespace, session: "2" };
+  const originalRead = fsPromises.readFile;
+  let failure = "ESRCH";
+  let failingPath = procStat;
+  const mockRead = t.mock.method(fsPromises, "readFile", (file, ...args) => {
+    if (file === failingPath) throw Object.assign(new Error(failure), { code: failure });
+    return originalRead(file, ...args);
+  });
+  syncBuiltinESMExports();
+  try {
+    assert.equal(await operationProcess(identity), "absent");
+    assert.equal(await operationProcess({ ...identity, boot: randomUUID() }), "unverified");
+    assert.equal(mockRead.mock.calls.filter(({ arguments: [file] }) => file === procStat).length, 1);
+    failure = "ENOENT";
+    assert.equal(await operationProcess(identity), "absent");
+    failure = "EACCES";
+    await assert.rejects(operationProcess(identity), { code: "EACCES" });
+    failure = "ESRCH";
+    failingPath = bootId;
+    await assert.rejects(operationProcess(identity), { code: "ESRCH" });
+  } finally {
+    mockRead.mock.restore();
+    syncBuiltinESMExports();
+  }
+});
+
 test("native cap remains separate and permits at most one retained, verified same-action continuation", async (t) => {
   const f = await fixture(t);
   const initial = await f.assignment("cap1", "cap");
@@ -357,7 +408,8 @@ test("native cap remains separate and permits at most one retained, verified sam
     const release = await f.locator(name + "-release.json", { schemaVersion: 1, kind: "exclusive-runtime-release", action: "release-slot",
       change, attempt: name, claimId: attempt.claimId, settlementSha256: result.settlementSha256,
       orchestrator: entry.request.authority.orchestrator, quiescent: true, falloutVerified: true });
-    assert.equal((await observeImplementer(entry, { registry: f.registry, action: "release-slot", release })).phase, "slot-released");
+    const released = await observeImplementer(entry, { registry: f.registry, action: "release-slot", release });
+    assert.equal(released.phase, "slot-released", released.reason);
     return f.locator(name + "-continue.json", { schemaVersion: 1, kind: "exclusive-runtime-continuation", change,
       plan: f.plan, planDigest: f.planDigest, previousAttempt: name, attempt: next, task: "1.1",
       orchestrator: entry.request.authority.orchestrator, priorResultSha256: publication.resultSha256,
@@ -482,7 +534,9 @@ test("bounded foreground run rejects out-of-budget turns, stream limits and ambi
 
 test("a killed foreground launcher leaves an original supervisor that can publish one late handover on recovery", async (t) => {
   const f = await fixture(t);
-  const entry = await f.assignment("recovery", "recover");
+  const entry = await f.assignment("recovery", "recover", { grant: { limits: { timeoutMs: 15000 } } });
+  const attempt = attemptDirectory(f, "recovery");
+  const release = path.join(f.pair.implementer.home, "release-after-launcher-exit");
   const runtime = new URL("../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-runtime.mjs", import.meta.url).href;
   const childCode = `
 import { writeSync } from "node:fs";
@@ -496,20 +550,35 @@ await runImplementers([JSON.parse(serialized)], {
   const child = spawn(process.execPath, ["--input-type=module", "-e", childCode, JSON.stringify(entry), f.registry],
     { stdio: ["ignore", "pipe", "pipe"] });
   const exited = once(child, "exit");
+  let early;
+  let supervisor;
+  let worker;
+  let session;
   let timer;
   try {
     const ready = await Promise.race([once(child.stdout, "data").then(([value]) => value.toString()),
-      exited.then(() => "early exit"),
-      new Promise((resolve) => { timer = setTimeout(() => resolve("startup timeout"), 5000); })]);
+      exited.then(([code, signal]) => `early exit (${code ?? signal})`),
+      new Promise((resolve) => { timer = setTimeout(() => resolve("startup timeout"), 8000); })]);
     assert.equal(ready, "ready");
+    supervisor = await readState(attempt, "supervisor.json");
+    worker = await readState(attempt, "worker.json");
+    const sessionDeadline = Date.now() + 3000;
+    while (!(session = await readState(attempt, "session.json", true)) && Date.now() < sessionDeadline) await delay(25);
+    assert.ok(session?.session, "The original supervisor must record the native session before the kill");
+    assert.notEqual(supervisor.process.pid, child.pid);
+    assert.equal(child.kill("SIGKILL"), true);
+    assert.deepEqual(await exited, [null, "SIGKILL"]);
+    await assert.rejects(lstat(resultPath(f, "recovery")), { code: "ENOENT" });
+    assert.equal(await readState(attempt, "settlement.json", true), null);
+    early = await observeImplementer(entry, { registry: f.registry, action: "recover" });
+    assert.equal(early.phase, "running", early.reason);
+    assert.equal(early.session, session.session);
   } finally {
     clearTimeout(timer);
-    child.kill("SIGKILL");
-    await exited;
+    if (child.exitCode === null && child.signalCode === null && !child.killed && child.pid) child.kill("SIGKILL");
+    await exited.catch(() => {});
+    await writeFile(release, "", { flag: "wx" });
   }
-  await assert.rejects(lstat(resultPath(f, "recovery")), { code: "ENOENT" });
-  const early = await observeImplementer(entry, { registry: f.registry, action: "recover" });
-  assert.equal(early.phase, "running", early.reason);
   const deadline = Date.now() + 4500;
   let value;
   do {
@@ -519,8 +588,19 @@ await runImplementers([JSON.parse(serialized)], {
   } while (Date.now() < deadline);
   assert.equal(value.phase, "completed", value.reason);
   assert.equal(value.result.runtime.session, early.session);
+  const settlement = await readState(attempt, "settlement.json");
+  assert.deepEqual(settlement.process, supervisor.process);
+  assert.deepEqual(settlement.binding, supervisor.binding);
+  assert.deepEqual(await readState(attempt, "worker.json"), worker);
+  assert.equal(settlement.result.quiescent, true);
+  assert.equal(value.settlementSha256, hash(jsonBytes(settlement)));
+  const publication = await readState(attempt, "publication.json");
+  const sealed = await readFile(resultPath(f, "recovery"));
+  assert.equal(publication.resultSha256, hash(sealed));
   const replay = await observeImplementer(entry, { registry: f.registry, action: "recover" });
   assert.deepEqual(replay.result, value.result);
+  assert.deepEqual(await readState(attempt, "publication.json"), publication);
+  assert.deepEqual(await readFile(resultPath(f, "recovery")), sealed);
 });
 
 test("independent repositories keep independent foreground batch results", async (t) => {
@@ -556,4 +636,117 @@ test("Goal-First binds its sole native outcome and governed contract independent
   const [blocked] = await run(drifted, [await drifted.assignment("drifted", "another outcome")]);
   assert.equal(blocked.phase, "blocked");
   assert.match(blocked.reason, /Goal Contract digest or invocation changed/);
+});
+
+test("prospective Goal-First admission reports the default, finite overrides and a tighter held window", async (t) => {
+  for (const [label, setting, expiresIn, expected] of [
+    ["default", null, null, 1800000],
+    ["override", 2100000, null, 2100000],
+    ["tight", null, 40000, null],
+    ["invalid", 10800001, null, /host deadline override/],
+    ["exhausted", null, 10000, /deadline cannot admit/],
+  ]) {
+    await t.test(label, async (t) => {
+      const f = await fixture(t, label, "goal-first", true);
+      const hostPin = setting === null ? f.host : await f.locator("override-time.json", { ...f.hostValue, goalFirstTimeoutMs: setting });
+      const entry = await f.assignment(label, "valid", { hostPin,
+        grant: expiresIn === null ? {} : { expiresAt: Date.now() + expiresIn } });
+      const events = [];
+      const [result] = await run(f, [entry], { emit: (event) => events.push(event) });
+      if (expected instanceof RegExp) {
+        assert.equal(result.phase, "blocked");
+        assert.match(result.reason, expected);
+        await assert.rejects(lstat(attemptDirectory(f, label)), { code: "ENOENT" });
+        return;
+      }
+      assert.equal(result.phase, "completed", result.reason);
+      const { timeoutMs } = events.find(({ phase }) => phase === "supervisor-armed");
+      if (expected !== null) assert.equal(timeoutMs, expected);
+      else assert.ok(timeoutMs > 0 && timeoutMs < expiresIn - 28000);
+      const spawnSpec = await readState(attemptDirectory(f, label), "spawn.json");
+      assert.equal(spawnSpec.timeoutMs, timeoutMs);
+    });
+  }
+});
+
+test("productive supervisor timeout permits one sealed same-outcome continuation", async (t) => {
+  const f = await fixture(t, "productive", "goal-first", true);
+  const nextHost = (name) => f.locator(name + "-host.json", { ...f.hostValue, goalFirstTimeoutMs: 450,
+    pair: { ...f.pair, reviewer: { ...f.pair.reviewer, session: randomUUID() } } });
+  const firstEntry = await f.assignment("timeout-first", "valid", { hostPin: await nextHost("first") });
+  const [first] = await run(f, [firstEntry]);
+  assert.equal(first.reason, "timeout");
+  assert.equal(first.result.status, "stopped");
+  assert.equal(first.quiescent, true);
+  assert.deepEqual(Object.keys(first.result.outputs), ["allowed.txt"]);
+  assert.deepEqual((await observeImplementer(firstEntry, { registry: f.registry, action: "recover" })).result, first.result);
+
+  async function continuation(entry, result, attempt, { releaseSlot = true, wrongSeal = false } = {}) {
+    const previousAttempt = entry.request.identity.attempt;
+    const directory = attemptDirectory(f, previousAttempt);
+    const launch = await readState(directory, "launch.json");
+    const progress = await readState(directory, "timeout-progress.json");
+    const publication = await readState(directory, "publication.json");
+    if (releaseSlot) {
+      const release = await f.locator(previousAttempt + "-release.json", { schemaVersion: 1, kind: "exclusive-runtime-release",
+        action: "release-slot", change, attempt: previousAttempt, claimId: launch.claimId,
+        settlementSha256: result.settlementSha256, orchestrator: entry.request.authority.orchestrator,
+        quiescent: true, falloutVerified: true });
+      const released = await observeImplementer(entry, { registry: f.registry, action: "release-slot", release });
+      assert.equal(released.phase, "slot-released", released.reason);
+    }
+    return f.locator(attempt + "-continue.json", { schemaVersion: 1, kind: "exclusive-runtime-continuation",
+      change, plan: f.plan, planDigest: f.planDigest, previousAttempt, attempt, task: "1.1",
+      orchestrator: entry.request.authority.orchestrator, priorResultSha256: publication.resultSha256,
+      priorSettlementSha256: result.settlementSha256, reason: "supervisor-timeout",
+      verifiedProgress: true, progressSha256: wrongSeal ? "0".repeat(64) : hash(jsonBytes(progress)) });
+  }
+  async function successor(name, continuation, extra = {}) {
+    return f.assignment(name, "valid", { predecessor: "timeout-first", hostPin: await nextHost(name),
+      ...extra, grant: { continuation, ...extra.grant } });
+  }
+  async function refused(entry, reason) {
+    const [result] = await run(f, [entry], { runProbe: () => assert.fail("refused successor reached preflight") });
+    assert.equal(result.phase, "blocked", result.reason);
+    assert.match(result.reason, reason);
+    await assert.rejects(lstat(attemptDirectory(f, entry.request.identity.attempt)), { code: "ENOENT" });
+  }
+  await refused(await successor("unreleased", await continuation(firstEntry, first, "unreleased", { releaseSlot: false })), /slot-release/);
+  const altered = await continuation(firstEntry, first, "altered", { wrongSeal: true });
+  await refused(await successor("altered", altered), /missing, stale or out-of-scope progress/);
+  const drift = await continuation(firstEntry, first, "drift", { releaseSlot: false });
+  await refused(await successor("drift", drift, { r: { scope: ["Different scope"] } }), /changed the approved outcome or scope/);
+  const stale = await continuation(firstEntry, first, "stale", { releaseSlot: false });
+  const output = path.join(f.workspace, "allowed.txt");
+  const saved = await readFile(output);
+  await writeFile(output, "stale");
+  await refused(await successor("stale", stale), /missing, stale or out-of-scope progress/);
+  await writeFile(output, saved);
+  const exhausted = await continuation(firstEntry, first, "exhausted", { releaseSlot: false });
+  await refused(await successor("exhausted", exhausted, { grant: { limits: { corrections: 0 } } }), /correction budget exhausted/);
+  const secondEntry = await successor("timeout-second", await continuation(firstEntry, first, "timeout-second", { releaseSlot: false }));
+  const [second] = await run(f, [secondEntry]);
+  assert.equal(second.reason, "timeout");
+  assert.notEqual(second.result.runtime.session, first.result.runtime.session);
+  const successorLaunch = await readState(attemptDirectory(f, "timeout-second"), "launch.json");
+  assert.equal(successorLaunch.timeoutContinuation.correctionsUsed, 1);
+  assert.equal(successorLaunch.timeoutContinuation.previousAttempt, "timeout-first");
+  assert.equal(successorLaunch.timeoutContinuation.settlementSha256, first.settlementSha256);
+  assert.ok(successorLaunch.timeoutContinuation.priorElapsedMs >= 400);
+  assert.ok(successorLaunch.timeoutContinuation.elapsedWallMs >= successorLaunch.timeoutContinuation.priorElapsedMs);
+  const third = await f.assignment("third", "valid", { predecessor: "timeout-second", hostPin: await nextHost("third"),
+    grant: { continuation: await continuation(secondEntry, second, "third") } });
+  await refused(third, /continuation was consumed/);
+});
+
+test("a timeout with empty or out-of-scope checkout output seals no reusable progress", async (t) => {
+  for (const name of ["timeout-empty", "timeout-outside"]) {
+    const f = await fixture(t, name, "goal-first", true);
+    const hostPin = await f.locator("short-time.json", { ...f.hostValue, goalFirstTimeoutMs: 450 });
+    const entry = await f.assignment(name, "valid", { hostPin });
+    const [result] = await run(f, [entry]);
+    if (name === "timeout-empty") assert.equal(result.reason, "timeout");
+    else assert.match(result.reason, /out-of-scope/);
+    assert.equal(await readState(attemptDirectory(f, name), "timeout-progress.json", true), null);
+  }
 });

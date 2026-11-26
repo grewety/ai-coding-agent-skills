@@ -244,8 +244,16 @@ export function validateReviewRequest(request) {
     request.limits.diffBytes <= fileLimit, "Invalid diff packet limit");
   const s = request.snapshot;
   if (request.mode === "candidate") {
-    fields(s, ["base", "target", "plan", "planDigest", "diffSha256", "gates"], "candidate snapshot", ["archiveEvidence", "harness"]);
+    fields(s, ["base", "target", "plan", "planDigest", "diffSha256", "gates"], "candidate snapshot", ["archiveEvidence", "harness", "prFix"]);
     if (s.archiveEvidence !== undefined) inventory(s.archiveEvidence);
+    if (s.prFix !== undefined) {
+      fields(s.prFix, ["declaration", "source", "impacted"], "PR-fix review scope");
+      need(request.policy && s.base !== s.plan && !s.archiveEvidence && relative(s.prFix.declaration) &&
+        relative(s.prFix.source) && s.prFix.source !== s.prFix.declaration &&
+        [s.prFix.declaration, s.prFix.source].every((file) => Object.hasOwn(request.attachments, file)) && Array.isArray(s.prFix.impacted) &&
+        s.prFix.impacted.length <= 256 && s.prFix.impacted.every(relative) &&
+        equal(s.prFix.impacted, [...new Set(s.prFix.impacted)].sort()), "Invalid PR-fix review scope");
+    }
     if (s.harness !== undefined) need(relative(s.harness) && Object.hasOwn(request.attachments, s.harness), "Missing harness attachment");
     need([s.base, s.target, s.plan].every(sha) && [s.planDigest, s.diffSha256].every(digest) &&
       s.target === w.identity.candidate && s.plan === w.identity.plan && s.planDigest === w.identity.planDigest, "Candidate identity mismatch");
@@ -496,16 +504,20 @@ export async function buildExport(request) {
       const file = name.slice(name.indexOf("/") + 1);
       remember(name, blob(workspace, (name.startsWith("base/") ? oldTree : newTree).get(file), file));
     }
+    for (const name of s.prFix?.impacted ?? []) {
+      need(exportable(name, change), "Excluded PR-fix impacted path");
+      common.push(remember("target/" + name, blob(workspace, newTree.get(name), name)));
+    }
     common.push(remember("review-context.json", jsonBytes({
       base: s.base, target: s.target, plan: s.plan, planDigest: s.planDigest,
       acceptance: w.acceptance, outcome: w.outcome, scope: w.scope, nonGoals: w.nonGoals, gates: s.gates,
     })));
     packets = packetize(diff, entries, request.limits.diffBytes, (paths, patch) => {
-      const assigned = [...common, ...paths];
+      const assigned = [...new Set([...common, ...paths])];
       return assigned.length < 96 &&
         assigned.reduce((n, name) => n + files.get(name).length, Buffer.byteLength(patch)) <= 512 * 1024;
     }).map((part, index) => ({
-      paths: [...common, ...part.paths, remember(`diff/packet-${index + 1}.patch`, Buffer.from(part.diff))].sort(), units: part.units,
+      paths: [...new Set([...common, ...part.paths, remember(`diff/packet-${index + 1}.patch`, Buffer.from(part.diff))])].sort(), units: part.units,
     }));
   } else {
     const prefix = planningPrefix(change);

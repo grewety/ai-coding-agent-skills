@@ -24,6 +24,24 @@ Use only the command for the current boundary and its matching request.
 Recording a verified display or reply appends a local observation. The other
 commands read observations. These examples supply no authority by themselves.
 
+## Launch contained review
+
+Under adopting integrated policy, keep offline preparation and checking, the
+live launch, and offline replay and readback as separate invocations. For
+Codex Auto-review, run the selected line directly as a Node command. Set
+`review_cli` to the absolute `scripts/review-candidate.mjs` path in the pinned
+orchestration package. Substitute absolute paths for the uppercase operands.
+
+```text
+node "$review_cli" --mode candidate --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --admission ADMISSION --output OUTPUT
+node "$review_cli" --mode approach --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --admission ADMISSION --output OUTPUT
+```
+
+Each live command runs the automatic probe and sends the scoped export
+packets for paid inference. Use the exact authority verified by `ADMISSION`
+for the selected mode and phase. Codex still applies its permission checks.
+Use the original single-run authority procedure under inherited policy.
+
 ## Prepare, review and freeze
 
 1. On a short proposal or `/goal draft`, read the inline goal or named note,

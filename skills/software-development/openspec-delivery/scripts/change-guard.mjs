@@ -8,7 +8,7 @@ import { parseArgs } from "node:util";
 import { gitEnvironment } from "./git-environment.mjs";
 import { readLowTouchPolicy } from "./low-touch-policy.mjs";
 import { planningBudget, planningLayout, planningLimits, safePlanningPath } from "./planning-inventory.mjs";
-import { readBounded, sha256, verifyGateRun } from "./evidence-retention.mjs";
+import { readBounded, sha256, stableJson, verifyGateRun } from "./evidence-retention.mjs";
 import { goalContractIdentity, readGoalContract, withinScope } from "./delivery-control.mjs";
 
 const requireThat = (condition, message) => { if (!condition) throw new Error(message); };
@@ -374,6 +374,48 @@ export function changedFiles(repo, before, after) {
   return git(repo, "diff-tree", "--no-commit-id", "--no-renames", "--name-only", "-r", "-z", before, after).split("\0").filter(Boolean).sort();
 }
 
+// The review reads every edge patch, including changes invisible in the final net diff.
+export function prFixRange(repo, reviewedAncestor, head) {
+  repository(repo);
+  commit(repo, reviewedAncestor);
+  commit(repo, head);
+  ancestor(repo, reviewedAncestor, head);
+  const revisions = git(repo, "rev-list", "--reverse", "--max-count=17", `${reviewedAncestor}..${head}`).trim().split(/\s+/);
+  requireThat(revisions.length > 0 && revisions.length <= 16 && revisions.at(-1) === head, "Unbounded or empty PR-fix ancestry");
+  let previous = reviewedAncestor;
+  let bytes = 0;
+  const edges = revisions.map((revision) => {
+    const parents = commitParents(repo, revision);
+    requireThat(parents.length === 1 && parents[0] === previous, "Ambiguous PR-fix ancestry");
+    const files = changedFiles(repo, previous, revision);
+    requireThat(files.length > 0 && files.length <= 256 && files.every(safePlanningPath), "Unsafe or empty PR-fix edge");
+    const patch = decode(runGit(repo, 65536, ["diff", "--no-color", "--no-ext-diff", "--no-textconv", "--no-renames",
+      "--no-relative", "--diff-algorithm=myers", "--no-indent-heuristic", "--full-index",
+      "--src-prefix=a/", "--dst-prefix=b/", "--unified=3", previous, revision, "--"]), "Invalid PR-fix patch encoding");
+    bytes += Buffer.byteLength(patch);
+    requireThat(bytes <= 65536 && !/^Binary files .* differ$/m.test(patch), "PR-fix patches exceed the review boundary");
+    previous = revision;
+    return { revision, files, patch };
+  });
+  const files = changedFiles(repo, reviewedAncestor, head);
+  requireThat(files.length > 0 && samePaths(files, edges.flatMap((edge) => edge.files)), "PR-fix edges escape the final fix scope");
+  return { reviewedAncestor, head, files, edges };
+}
+function samePaths(files, all) {
+  return JSON.stringify(files) === JSON.stringify([...new Set(all)].sort());
+}
+
+export function committedPostimages(repo, head, paths) {
+  requireThat(paths.length <= 512 && paths.every(safePlanningPath), "Unsafe postimage inventory");
+  if (!paths.length) return {};
+  const tree = entries(repo, head, paths.map((file) => `:(literal)${file}`));
+  return Object.fromEntries(paths.map((file) => {
+    const entry = tree.get(file);
+    requireThat(!entry || entry.type === "blob" && ["100644", "100755"].includes(entry.mode), "Non-regular postimage");
+    return [file, entry ? { mode: entry.mode, oid: entry.oid } : null];
+  }));
+}
+
 export function committedOutputHashes(repo, ref, paths, maxBytes) {
   if (!paths.length) return {};
   requireThat(paths.every(safePlanningPath), "Unsafe committed output path");
@@ -568,8 +610,8 @@ function fresh(repo, verified, target, change, limit) {
   requireThat(archives.length <= 1, "Duplicate canonical change archives");
   if (archives.length) requireThat(![...after.keys()].some((file) => file.startsWith(root(change))), "Both active and archived canonical change exist");
 }
-export function verifyArchive({ repo, change, verified, head, archive, receiptSha256, receiptFile, committedReceiptPath,
-  issue, policyTarget, integrationReference }) {
+export async function verifyArchive({ repo, change, verified, head, archive, receiptSha256, receiptFile, committedReceiptPath,
+  issue, policyTarget, integrationReference, prFixLineage, verifyHandover, finishCheckpoint, finishRemote }) {
   repository(repo);
   root(change);
   requireThat(archivePattern(change).test(archive + "/"), "Archive identity mismatch");
@@ -582,7 +624,8 @@ export function verifyArchive({ repo, change, verified, head, archive, receiptSh
   requireThat(isRegular(entry) && sha256(gitBytes(repo, "show", `${head}:${committedReceiptPath}`)) === receiptSha256,
     "Committed archive receipt identity mismatch");
   return receipt({ repo, change, target: head, receipt: receiptFile, issue, allowIssueAbsent: true,
-    "receipt-path": committedReceiptPath, limit: MAX_CLOSURE_COMMITS, policyTarget, integrationReference }, false);
+    "receipt-path": committedReceiptPath, limit: MAX_CLOSURE_COMMITS, policyTarget, integrationReference, prFixLineage,
+    verifyHandover, finishCheckpoint, finishRemote }, false);
 }
 export function exactTree(repo, head) {
   repository(repo);
@@ -599,27 +642,52 @@ function receiptPath(value, change) {
   requireThat(relative.startsWith("evidence/") && relative.endsWith(".json"), "Receipt path must name a committed evidence JSON file");
   return value;
 }
-function receipt(o, requireCheckout = true) {
+async function receipt(o, requireCheckout = true) {
   const record = evidence(o.receipt);
   identity(record.value, o);
   const mode = record.value.mode ?? "task-guided";
-  const snapshot = candidate({ ...o, target: o.policyTarget ?? o.target, mode, base: record.value.base, head: record.value.head, plan: record.value.plan,
+  const lineage = record.value.prFixLineage;
+  const policyTarget = o.policyTarget ?? lineage?.policyTarget ?? o.target;
+  if (lineage) {
+    requireThat(archivePattern(o.change).test(o["receipt-path"] ?? ""), "PR-fix receipt must be read back from committed archive custody");
+    ancestor(o.repo, commit(o.repo, policyTarget), commit(o.repo, o.target));
+  }
+  const snapshot = candidate({ ...o, target: policyTarget, mode, base: record.value.base, head: record.value.head, plan: record.value.plan,
     "expect-plan": record.value.planDigest }, false);
   requireThat(snapshot.tasksComplete, "Incomplete implementation tasks cannot complete a change");
   const completion = record.value.taskCompletion;
-  if (completion) {
-    const proof = proveTaskCompletion({ repo: o.repo, change: o.change, head: snapshot.head, base: snapshot.base, plan: snapshot.plan,
-      mode, target: o.policyTarget ?? o.target, "expect-plan": snapshot.planDigest }, completion.reviewedParent, completion.taskIds);
-    requireThat(proof.acceptanceChild === completion.acceptanceChild && JSON.stringify(proof.taskIds) === JSON.stringify(completion.taskIds),
-      "Receipt task completion differs from Git proof");
-  }
-  review(record.value.review, completion ? { ...snapshot, head: completion.reviewedParent } : snapshot, o);
+  requireThat(!(completion && lineage) && Boolean(lineage) === Boolean(o.prFixLineage), "Receipt PR-fix custody is missing or conflicts with task completion");
   const integrated = commit(o.repo, record.value.integrated);
   const verified = commit(o.repo, record.value.verified);
   const target = commit(o.repo, o.target);
   ancestor(o.repo, snapshot.head, integrated);
   ancestor(o.repo, integrated, verified);
   ancestor(o.repo, verified, target);
+  let fix;
+  let gateAuthority;
+  if (lineage) {
+    const verifier = await import("./pr-fix-lineage.mjs");
+    const request = { repo: o.repo, change: o.change, head: snapshot.head, base: snapshot.base,
+      plan: snapshot.plan, mode, target: policyTarget, "expect-plan": snapshot.planDigest };
+    const pullRequest = record.value.integrationReference;
+    if (mode === "task-guided") {
+      const { replayTaskGuidedFinish } = await import("./protected-finish.mjs");
+      ({ proof: fix, gateAuthority } = await replayTaskGuidedFinish(request, { ...o, pullRequest, integrated, verified }));
+    } else {
+      ({ proof: fix } = await verifier.verifyPrFixLineage(request, o.prFixLineage, o.verifyHandover, { pullRequest }));
+    }
+    requireThat(stableJson(fix) === stableJson(lineage), "Receipt PR-fix lineage differs from replay");
+    requireThat(record.value.review?.reference === fix.ancestorReview.reference &&
+      record.value.review?.reviewer === fix.ancestorReview.session, "Receipt review does not identify the independently reviewed ancestor");
+    verifier.verifyPrFixIntegration(request, fix, integrated, verified);
+  }
+  if (completion) {
+    const proof = proveTaskCompletion({ repo: o.repo, change: o.change, head: snapshot.head, base: snapshot.base, plan: snapshot.plan,
+      mode, target: o.policyTarget ?? o.target, "expect-plan": snapshot.planDigest }, completion.reviewedParent, completion.taskIds);
+    requireThat(proof.acceptanceChild === completion.acceptanceChild && JSON.stringify(proof.taskIds) === JSON.stringify(completion.taskIds),
+      "Receipt task completion differs from Git proof");
+  }
+  review(record.value.review, { ...snapshot, head: completion?.reviewedParent ?? fix?.reviewedAncestor ?? snapshot.head }, o);
   const prPrefix = o.issue === null ? null : o.issue.split("/issues/")[0] + "/pull/";
   requireThat((o.integrationReference === undefined || record.value.integrationReference === o.integrationReference) &&
     (prPrefix === null ? text(o.integrationReference) : typeof record.value.integrationReference === "string" &&
@@ -631,6 +699,13 @@ function receipt(o, requireCheckout = true) {
     requireThat(digest === snapshot.planDigest && current.complete, "Integrated planning content changed or tasks incomplete");
   }
   gates(record.value.gates, verified);
+  if (gateAuthority) {
+    const { gates: approved } = gateAuthority;
+    for (const rows of [record.value.review.gates, record.value.gates]) {
+      requireThat(stableJson(rows.map(({ argv }) => argv)) === stableJson(approved) &&
+        rows.every(({ command }, index) => command === approved[index].join(" ")), "Receipt gate commands differ from approved acceptance");
+    }
+  }
   fresh(o.repo, verified, target, o.change, o.limit);
   if (o["receipt-path"] !== undefined) {
     const published = receiptPath(o["receipt-path"], o.change);
@@ -641,7 +716,7 @@ function receipt(o, requireCheckout = true) {
   // Integrated verification may run detached at this exact target SHA. Candidate
   // and review checks still require an attached implementation branch.
   if (requireCheckout) clean(o.repo, target, false);
-  return { ...snapshot, integrated, verified, target, receiptSha256: record.sha256, ...(completion ? { taskCompletion: completion } : {}) };
+  return { ...snapshot, integrated, verified, target, receiptSha256: record.sha256, ...(completion ? { taskCompletion: completion } : {}), ...(fix ? { prFixLineage: fix } : {}) };
 }
 export function integratedPolicyContext(repo, parent, target, allowUnintegratedParent = false) {
   repository(repo);
@@ -708,12 +783,14 @@ export function draftPolicyContext(o) {
   return { ...context, ...draft, plan: null, planDigest: null, changedPaths };
 }
 
-function main() {
+async function main() {
   childEnv();
   const command = process.argv[2];
   requireThat(["planning", "planning-worktree", "policy-context", "candidate", "review", "receipt"].includes(command), "Expected planning, planning-worktree, policy-context, candidate, review or receipt command");
   const args = process.argv.slice(3);
-  const names = ["repo", "change", ...(command === "planning-worktree" ? ["parent", "target"] : command === "policy-context" ? ["plan", "target"] : command === "planning" ? ["head", "plan", "target"] : command === "receipt" ? ["target", "receipt", "issue", "receipt-path", "max-closure-commits"] : ["base", "head", "plan", "expect-plan", "gate-run", "gate-run-sha256", "mode", "target", ...(command === "review" ? ["issue", "review"] : [])])];
+  const receiptRefs = ["pr-fix-lineage", "finish-checkpoint", "finish-readback"];
+  const receiptOptions = receiptRefs.flatMap((key) => [key, `${key}-sha256`]);
+  const names = ["repo", "change", ...(command === "planning-worktree" ? ["parent", "target"] : command === "policy-context" ? ["plan", "target"] : command === "planning" ? ["head", "plan", "target"] : command === "receipt" ? ["target", "receipt", "issue", "receipt-path", "max-closure-commits", ...receiptOptions] : ["base", "head", "plan", "expect-plan", "gate-run", "gate-run-sha256", "mode", "target", ...(command === "review" ? ["issue", "review"] : [])])];
   const seen = new Set();
   for (const arg of args) {
     const match = /^--([A-Za-z][A-Za-z-]*)(?:=|$)/.exec(arg);
@@ -722,7 +799,7 @@ function main() {
     seen.add(match[1]);
   }
   const { values: o } = parseArgs({ args, options: Object.fromEntries(names.map((key) => [key, { type: "string" }])), strict: true, allowPositionals: false });
-  for (const key of names.filter((key) => !["parent", ...(command === "planning" ? ["plan"] : []), "expect-plan", "gate-run", "gate-run-sha256", "mode", "target", "receipt-path", "max-closure-commits"].includes(key))) requireThat(text(o[key]), `Missing --${key}`);
+  for (const key of names.filter((key) => !["parent", ...(command === "planning" ? ["plan"] : []), "expect-plan", "gate-run", "gate-run-sha256", "mode", "target", "receipt-path", "max-closure-commits", ...receiptOptions].includes(key))) requireThat(text(o[key]), `Missing --${key}`);
   if (o["expect-plan"] !== undefined) requireThat(/^[a-f0-9]{64}$/.test(o["expect-plan"]), "Expected a full plan digest");
   repository(o.repo);
   if (command === "planning-worktree") {
@@ -748,13 +825,19 @@ function main() {
   }
   const limit = o["max-closure-commits"] === undefined ? MAX_CLOSURE_COMMITS : Number(o["max-closure-commits"]);
   requireThat(Number.isInteger(limit) && limit > 0 && limit <= MAX_CLOSURE_COMMITS, `--max-closure-commits must be an integer from 1 to ${MAX_CLOSURE_COMMITS}`);
-  writeFileSync(1, `${JSON.stringify({ ok: true, ...receipt({ ...o, limit }) })}\n`);
+  const [prFixLineage, finishCheckpoint, finishRemote] = receiptRefs.map((key) => {
+    const file = o[key];
+    const sha256 = o[`${key}-sha256`];
+    requireThat(Boolean(file) === Boolean(sha256), `Supply both --${key} and --${key}-sha256`);
+    return file && { file, sha256 };
+  });
+  const verifyHandover = prFixLineage ? (await import("./delivery-cli.mjs")).verifyHandover : undefined;
+  writeFileSync(1, `${JSON.stringify({ ok: true, ...await receipt({ ...o, limit, prFixLineage, verifyHandover, finishCheckpoint, finishRemote }) })}\n`);
 }
 function isMain() {
   try { return realpathSync(process.argv[1]) === realpathSync(new URL(import.meta.url)); }
   catch { return false; }
 }
 if (isMain()) {
-  try { main(); }
-  catch (error) { writeFileSync(1, `${JSON.stringify({ ok: false, error: error.message })}\n`); process.exitCode = 1; }
+  main().catch((error) => { writeFileSync(1, `${JSON.stringify({ ok: false, error: error.message })}\n`); process.exitCode = 1; });
 }

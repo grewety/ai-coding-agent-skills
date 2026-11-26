@@ -42,6 +42,12 @@ the run. `finish` requests bind `request.policy.finishReference` to the
 retained finish grant. Review authorization has no effect on approval,
 implementation, publication, profile sync or retries.
 
+The reviewer host defaults to `packetConcurrency: 1`. An integer of 2 or 3
+requires the same value in the independent expectation, a raw-byte host pin,
+the private same-UID relay, and a durable reservation for the probe and all
+packets before launch. A failure stops queued packets while active packets
+settle. Offline verification binds the sealed schedule and audits each packet.
+
 The following admission shape selects automatic mode by omission. Replace
 the SHA and references with verified values for one exact run. Use one
 stable host-owned mode-0700 ledger per repository across sessions and
@@ -80,7 +86,10 @@ authority without claiming the reservation. The approved launch uses
 `--mode ... --host-config HOST --admission ADMISSION`. Before contacting the
 relay or reading credential material, it durably claims the run. The full
 reservation is the host's per-invocation `maxBudgetUsd` multiplied by the
-number of packets plus one probe. The ledger retains spent and uncertain
+number of packets plus one probe. New setup uses 96 turns and defaults to
+USD 2.50 per invocation. Six packets with a probe reserve USD 17.50 and
+seven with a probe reserve USD 20.00 at this setting. Existing host pins
+retain their configured values. The ledger retains spent and uncertain
 amounts conservatively and refuses replay or excess. A crashed or partially
 written ledger stops future claims pending host reconciliation. Keep the
 original entries when reconciling. A standalone diagnostic `--probe` is
@@ -92,6 +101,47 @@ The runner reserves the grant's unique approval reference in that ledger
 before opening the runtime or reading credentials. Keep that reservation
 after a failed run.
 [Packaged request and command schema](../skills/autonomous-ai-agents/autonomous-implementation-review/references/review-candidate.md).
+
+## Signed execution cap extension
+
+Use this during automatic candidate execution when a lower count or USD
+cap must rise within the original plan parent's integrated ceilings.
+Keep the original admission caps and host pin. The operator independently
+provides a canonical JSON key file with one `publicKey` field containing
+standard base64 Ed25519 SPKI DER, and supplies the SHA-256 of those file
+bytes separately from the grant.
+
+Append `--operator-key KEY --operator-key-sha256 SHA256` to the usual
+offline `--check --host-config HOST --admission ADMISSION` command to
+read the `ledgerIdentity` for the existing per-change directory. The
+signed record is a canonical JSON object with `grant` and `signature`.
+Use the repository's canonical JSON encoding for these files and the
+signed payload (recursively sorted object keys, compact UTF-8 and one
+trailing newline). The signature is standard base64 Ed25519 over the
+canonical `grant` bytes. The operator retains the signing key separately.
+
+The grant requires these fields.
+
+| Field | Value |
+| --- | --- |
+| `schemaVersion`, `kind` | `1`, `review-budget-extension` |
+| `reference` | Unique operator grant reference for this ledger |
+| `change`, `plan`, `planDigest`, `policyRevision` | Exact change, approved plan commit, plan digest and verified integrated parent |
+| `approvalReference`, `executionReference` | Exact approval and local execution authority references from the request |
+| `ledgerIdentity` | Existing per-change directory identity from the offline check |
+| `baseCaps` | Both original effective caps, `maxReviews` and `maxTotalUsd` |
+| `caps` | One or both caps to raise, as new absolute ceilings |
+| `validFrom`, `expiresAt` | Canonical UTC timestamps with milliseconds, with the expiry exclusive |
+
+Keep the private grant file outside checkout, export and evidence roots.
+Append the key options and `--budget-extension GRANT` to the authorized
+candidate launch to consume the grant with its first successfully reserved
+run. An offline check verifies the file and binding. The launch rechecks
+expiry, replay and available budget under the ledger lock. Later execution
+launches use the key options alone to apply a retained, unexpired extension
+for the same plan, authority and lower caps. Keep spent and uncertain
+reservations and the retained extension record after expiry. Earlier
+reservations still count in full, and retries still need separate authority.
 
 ## Optional local harness
 

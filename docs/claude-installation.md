@@ -181,25 +181,27 @@ Bump the affected plugin version in the catalog whenever its selected skills or
 support files change; skill versions alone do not update the enclosing plugin.
 See [external role configuration](configurable-backends.md) for host setup and qualification status after installation.
 
-The source catalog's `openspec-development` 1.8.0 includes `openspec-delivery`
-1.8.0 with its shared `scripts/git-environment.mjs` and
+The source catalog's `openspec-development` 1.9.0 includes `openspec-delivery`
+1.9.0 with its shared `scripts/git-environment.mjs` and
 `references/git-environment.md` for the Git guard/workspace helpers. Also preserve
 `references/evidence-retention.md`, `scripts/evidence-retention.mjs`,
 `scripts/evidence-cli.mjs`, `scripts/delivery-cli.mjs` and
-`scripts/delegated-delivery.mjs` in complete copies and
+`scripts/delegated-delivery.mjs`, `scripts/finish-trigger-credits.mjs` and
+`scripts/pr-fix-lineage.mjs` in complete copies and
 skill/plugin ZIP exports. The evidence command supports authorized exact-SHA gate
 capture and offline readback. Keep next's `references/routing.md` and
 `scripts/next.mjs` with that skill. If direct packages load from different scopes,
 use the router's explicit trusted runtime path. The optional
-`autonomous-orchestration` is 1.12.0 (core skill 0.22.0) and `openspec-next` is 0.8.0. These
+`autonomous-orchestration` is 1.13.0 (core skill 0.23.0) and `openspec-next` is 0.8.0. These
 source versions do not assert that the public marketplace/downloads are updated.
 Preserve delivery's policy/task-authoring references and `delivery-policy.mjs`,
 and orchestration's `references/portable-core.md`, `scripts/orchestration-core.mjs`,
 `references/worker-handoff.md`, `scripts/worker-handoff.mjs`,
 `references/terminal-adapters.md`, `scripts/terminal-adapters.mjs` and
 `references/profile-preparation.md`, in full copies and
-generated skill/plugin packages. Keep `scripts/run-implementer.mjs` and all
-its runtime helpers in the separate orchestration package. The handoff pair is required portable support,
+generated skill/plugin packages. Keep `scripts/run-implementer.mjs`, the
+worker supervision helpers and `scripts/review-packet-scheduler.mjs` in the
+separate orchestration package. The handoff pair is required portable support,
 not disposable worker scratch or evidence of adapter qualification.
 The [policy protocol](../skills/software-development/openspec-delivery/references/delivery-policy.md)
 adds no automatic plugin dependency: selected approach-review/continuous-goal

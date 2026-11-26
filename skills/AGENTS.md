@@ -26,6 +26,7 @@ Own optional, versioned agent playbooks that contributors can install and reuse 
 - A skill installed in a shared agent profile must not remove or modify its installed package while operating on a target project.
 
 - The two independently installable delivery and orchestration packages ship matching portable planning inventory, low-touch policy, and harness result contracts. Delivery owns planning and protected finish admission. Orchestration owns contained review preflight, durable spend and private runtime diagnostics.
+- Orchestration owns original process settlement, scoped timeout-progress evidence, packet scheduling and signed spend extensions within integrated ceilings. Delivery owns successor admission, chapter-level finish credit custody and PR-fix lineage through receipt replay. Keep the two packages' runtime inventories synchronized for exact pin verification.
 
 ## Work Guidance
 

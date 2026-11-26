@@ -22,7 +22,7 @@ const runtimeSources = [
   "bounded-worker.mjs", "bounded-worker.py", "implementer-bindings.mjs", "implementer-claims.mjs",
   "implementer-observations.mjs", "implementer-recovery.mjs", "implementer-runtime.mjs", "implementer-sandbox.mjs",
   "implementer-state.mjs", "implementer-supervisor.mjs", "implementer-supervisor.py", "orchestration-core.mjs",
-  "review-admission.mjs", "review-archive.mjs", "review-candidate.mjs", "review-inputs.mjs", "review-relay.mjs",
+  "review-admission.mjs", "review-archive.mjs", "review-candidate.mjs", "review-inputs.mjs", "review-packet-scheduler.mjs", "review-relay.mjs",
   "review-runtime-scratch.mjs", "review-runtime.mjs", "review-sandbox-bridge.mjs", "review-stream.mjs",
   "run-implementer.mjs", "terminal-adapters.mjs", "worker-handoff.mjs", "worker-runtime-policy.mjs",
 ];
@@ -91,7 +91,7 @@ export async function readDelegation(input, { context, policy, identity, impleme
     need(assignment.approval.path === input.approval?.reference && assignment.grant.path === input.grant?.reference,
       "Worker request differs from the active authority");
   }
-  const { approval, grant, inference } = await worker.loadAuthority(assignment, repository);
+  const { approval, grant, inference, prospective } = await worker.loadAuthority(assignment, repository);
   need(grant.mode === policy.mode && grant.policyRevision === policy.policyRevision &&
     grant.branch === `refs/heads/${implementation.branch}` &&
     (policy.mode !== "goal-first" || goal && request.mutablePaths.every((file) => withinScope(file, goal.contract.scope))),
@@ -100,7 +100,7 @@ export async function readDelegation(input, { context, policy, identity, impleme
   const groupRestrictions = request.restrictions.filter((item) => item.startsWith("group:"));
   need(groupRestrictions.length <= 1 && (!groupRestrictions.length ||
     groupRestrictions[0] === `group:${input.restrictions?.group}`), "Retained delegated group restriction differs");
-  const roles = await bindings.bindPair(assignment, grant, selected.runtimeSha256, registry);
+  const roles = await bindings.bindPair(assignment, grant, selected.runtimeSha256, registry, prospective);
   if (shortAuthority) {
     need(["implementer", "reviewer"].every((role) => shortAuthority.roles[role].route === roles.pair[role].route &&
       shortAuthority.roles[role].runtimeBindingSha256 === bindings.roleQualificationBinding(roles.pair[role], roles.roleAudit?.[role])),
@@ -138,17 +138,31 @@ export async function readDelegation(input, { context, policy, identity, impleme
   }
   if (input.deliveryPhase === "dispatch") {
     const now = Date.now();
-    const groupStartedAt = data.history.find((launch) => launch.task === id.task)?.startedAt ?? now;
-    need(now + grant.limits.timeoutMs + 28000 <= Math.min(grant.expiresAt, roles.expiresAt, inference.expiresAt,
-      (owner?.createdAt ?? now) + grant.limits.totalMs, groupStartedAt + grant.limits.groupMs),
-      "Delegated execution window is exhausted");
+    const expiry = Math.min(roles.expiresAt, inference.expiresAt);
+    let window;
+    if (worker.attemptWindow) {
+      window = worker.attemptWindow(request, grant, roles, data.history, owner?.createdAt ?? now, expiry, now);
+    } else {
+      const groupStartedAt = data.history.find((launch) => launch.task === id.task)?.startedAt ?? now;
+      need(now + grant.limits.timeoutMs + 28000 <= Math.min(grant.expiresAt, expiry,
+        (owner?.createdAt ?? now) + grant.limits.totalMs, groupStartedAt + grant.limits.groupMs),
+        "Delegated execution window is exhausted");
+    }
     need(id.predecessor === null ? !owner && grant.continuation === null : owner && grant.continuation,
       "Original assignment must be reconciled before dispatch");
     if (owner) need(data.history.at(-1)?.attempt === id.predecessor &&
       data.history.every((launch) => launch.attempt !== id.attempt && launch.pair.reviewer.session !== roles.pair.reviewer.session),
     "Successor is stale or reuses a retained role attempt");
-    await worker.checkCheckout(request, grant);
-    return { ...data, phase: "dispatch", continuation: grant.continuation ? await state.trustedJson(grant.continuation) : null };
+    const continuation = grant.continuation ? await state.trustedJson(grant.continuation) : null;
+    let timeoutContinuation;
+    if (continuation?.reason === "supervisor-timeout") {
+      need(prospective && owner && typeof runtime.predecessorCheck === "function",
+        "Integrated policy does not select timeout continuation");
+      ({ timeoutContinuation } = await runtime.predecessorCheck(assignment, grant, roles, registry, directory, data.history));
+      need(!await exists(claims.slotPath(registry, roles.physicalSlot)), "Physical role slot is occupied");
+    }
+    await worker.checkCheckout(request, grant, { allowRetainedProgress: Boolean(timeoutContinuation) });
+    return { ...data, phase: "dispatch", continuation, timeoutContinuation, timeoutMs: window?.timeoutMs };
   }
   need(owner, "Exclusive assignment claim is missing");
   const attemptDirectory = path.join(directory, "attempt-" + id.attempt);
@@ -201,6 +215,8 @@ export async function readDelegation(input, { context, policy, identity, impleme
     })),
   "Original sealed result and supervisor settlement disagree");
   return { ...data, result, settlementSha256, resultSha256, reason: native.reason,
+    timeoutProgress: launch.attemptPolicy && native.reason === "timeout" ?
+      await state.readState(attemptDirectory, "timeout-progress.json", true) : null,
     progressSha256: publication.nativeSha256, launch, process: view.state.worker.process, release,
     checkWorkingOutputs: () => readWorkingOutputs(observations, state, request, grant, attemptDirectory) };
 }

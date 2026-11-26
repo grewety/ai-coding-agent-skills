@@ -134,3 +134,26 @@ Release uses an `exclusive-runtime-release` record with
 survived leader exit, unsettled probe or unknown identity requires
 reconciliation before any replacement. Result publication records the
 original association and never advances tasks or delivery state.
+
+## Goal-First supervisor timeout
+
+Under the prospective integrated policy, read back the original delivery
+boundary and sealed handover. A productive timeout has a protected
+`timeout-progress.json` with the exact checkout HEAD, settlement hash, and
+before and after output fingerprints. The runtime verifies those bytes, the
+sealed result, Git state and current output scope again before dispatch.
+
+Use the existing protected slot-release receipt and retain the assignment
+claim. The successor's `exclusive-runtime-continuation` record uses
+`reason: "supervisor-timeout"`, `verifiedProgress: true`, and
+`progressSha256` over the protected progress record. Include the existing
+prior result and settlement hashes and exact attempt, action, plan and
+orchestrator bindings. The same checkout and qualified role bindings must
+pass fresh native preflight. A fresh attempt and independently bounded
+inference grant are still required.
+
+The launch record retains its predecessor, progress seal, elapsed and
+remaining wall time, and consumed correction count. A second supervisor
+timeout stops. Native turn-cap recovery remains separate and shares held
+correction authority in an assignment that uses timeout continuation.
+A timeout or checkpoint leaves the native outcome pending.

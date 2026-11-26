@@ -170,6 +170,34 @@ without it, the reported `receiptSha256` is the identity to record and read back
 independently. Paths must be repository-relative, inside the selected change or its
 single archive, and below `evidence/` with a `.json` suffix.
 
+PR-fix receipts require the committed archive `--receipt-path` and the
+`--pr-fix-lineage` file and SHA-256. For Task-Guided lineage, obtain the
+exact checkpoint and post-merge readback references from the orchestrator's
+independently retained, owner-private finish records.
+
+```sh
+node <guard> receipt --repo <repo> --change <name> --target <actual-target-sha> \
+  --issue <issue-url> --receipt <receipt-json-path> \
+  --receipt-path <repo-relative-path-to-archived-receipt> \
+  --pr-fix-lineage <bundle-file> --pr-fix-lineage-sha256 <bundle-file-sha256> \
+  --finish-checkpoint <checkpoint-file> --finish-checkpoint-sha256 <held-checkpoint-sha256> \
+  --finish-readback <readback-file> --finish-readback-sha256 <held-readback-sha256>
+```
+
+The held references are external trust pins for the replay. The hashes
+verify file bytes. The orchestrator establishes the records' provenance
+before retaining those pins, independently of the receipt, lineage bundle,
+and captures supplied for verification. Replay follows the checkpoint to
+its sealed readiness anchor for approved argv and follows the bound
+post-merge readback to the exact `integrated.gate` file path and hash.
+The guard matches the frozen plan, policy parent and target, candidate,
+protected merge and verified SHA, then verifies the capture against the
+exact verified tree. Both `review.gates` at the reviewed ancestor and
+receipt `gates` at `verified` must list the approved `argv` in order,
+with each `command` equal to its argv joined by spaces. Goal-First lineage
+takes gate authority from the approved Goal Contract. Receipts without
+PR-fix lineage use the existing gate row format and require no finish pins.
+
 Keep evidence factual and secret-free. The receipt describes verification at
 `verified`; it does not predeclare its own eventual archive-PR merge or cleanup.
 Closure CI validates the receipt/archive diff, and exact readback of the merge and

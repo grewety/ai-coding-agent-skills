@@ -132,6 +132,23 @@ test("all launch examples carry the same bounded operator authorization", async 
     prompts.push(prompt);
   }
   assert.ok(prompts.every((prompt) => prompt === prompts[0]), "launch contract drift");
+
+  const root = new URL("../", import.meta.url);
+  const delivery = "skills/software-development/openspec-delivery/";
+  const reviewer = "skills/autonomous-ai-agents/autonomous-implementation-review/";
+  const candidate = "--mode candidate --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --admission ADMISSION --output OUTPUT";
+  const approach = candidate.replace("candidate", "approach");
+  for (const [file, modes] of [
+    [delivery + "SKILL.md", [candidate]], [reviewer + "SKILL.md", [candidate]],
+    [delivery + "references/operator-workflow.md", [candidate, approach]],
+    [reviewer + "references/review-candidate.md", [candidate, approach]],
+    ["docs/openspec-operator-runbook.md", [candidate, approach]], ["docs/claude-reviewer.md", [candidate, approach]],
+  ]) {
+    const source = await readFile(new URL(file, root), "utf8");
+    const commands = [...source.matchAll(/^node (?:review-candidate\.mjs|"\$review_cli") (--mode .+)$/gm)].map(([, args]) => args);
+    assert.deepEqual(commands, modes, file);
+    assert.match(source, /Codex\s+Auto-review/, file);
+  }
 });
 
 test("normal installer loop documents all generic software-development skills", async () => {

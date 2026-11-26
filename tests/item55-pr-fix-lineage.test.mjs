@@ -1,0 +1,360 @@
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import test from "node:test";
+import { change, current, currentSpec, exec, fixture, gateArgv, own, twoGroupGuidance } from "./delivery-runtime-setup.mjs";
+import { containedHandover, gateFixture, workerRequest } from "./delivery-runtime-fixtures.mjs";
+import { buildExport, jsonBytes, prepareExport } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-inputs.mjs";
+import { bubblewrapVersion, claudeVersion } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-runtime.mjs";
+import { runReview } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-candidate.mjs";
+import { createRepresentation, sha256 } from "../skills/software-development/openspec-delivery/scripts/evidence-retention.mjs";
+import { committedPostimages, prFixRange } from "../skills/software-development/openspec-delivery/scripts/change-guard.mjs";
+import { verifyPrFixIntegration, verifyPrFixLineage } from "../skills/software-development/openspec-delivery/scripts/pr-fix-lineage.mjs";
+import { verifyHandover } from "../skills/software-development/openspec-delivery/scripts/delivery-cli.mjs";
+
+async function scopedHandover(f, workspace, head, gates, attempt, {
+  base, declaration, source, configurationSha256, determination = "verified",
+} = {}) {
+  const session = randomUUID();
+  const root = path.join(f.root, attempt);
+  await mkdir(root, { mode: 0o700 });
+  const output = path.join(root, "output");
+  const exportDirectory = path.join(root, "export");
+  const request = path.join(root, "request.json");
+  const expect = path.join(root, "expect.json");
+  const evidence = "fixture-gate-evidence.json";
+  const evidenceBytes = await readFile(gates.gateRun.file);
+  await writeFile(path.join(workspace, evidence), evidenceBytes);
+  const diff = exec("git", ["-C", workspace, "diff", "--no-color", "--no-ext-diff", "--no-textconv", "--no-relative",
+    "--find-renames=50%", "--diff-algorithm=myers", "--no-indent-heuristic", "--patch", "--text", "--full-index", "--unified=3",
+    "--src-prefix=a/", "--dst-prefix=b/", base, head, "--"]);
+  assert.equal(diff.status, 0, diff.stderr);
+  const worker = workerRequest(f, head, gates.captured.value.wrapperSha256, attempt, output);
+  if (f.policy.mode === "goal-first") worker.acceptance.push(`goal-contract:${f.planDigest}`);
+  const planDigest = f.evaluated.context.planDigest;
+  Object.assign(worker.identity, { workspace, planDigest });
+  const prFix = { declaration: "fix.json", source: "check-source.json", impacted: [current] };
+  await writeFile(path.join(workspace, prFix.declaration), await readFile(declaration.file));
+  await writeFile(path.join(workspace, prFix.source), await readFile(source.file));
+  const record = { schemaVersion: 1, mode: "candidate", session, worker, policy: { parent: f.base, target: f.base },
+    snapshot: { base, target: head, plan: f.plan, planDigest, diffSha256: sha256(diff.stdout), prFix,
+      gates: [{ command: "Check widget", commit: head, exitCode: 0, evidence }] },
+    attachments: { [evidence]: sha256(evidenceBytes), [prFix.declaration]: declaration.sha256, [prFix.source]: source.sha256 },
+    limits: { diffBytes: 65536 } };
+  const bytes = jsonBytes(record);
+  await writeFile(request, bytes, { mode: 0o400 });
+  const prepared = await buildExport(record);
+  const binding = { schemaVersion: 1, requestSha256: sha256(bytes), exportSha256: await prepareExport(exportDirectory, record, null),
+    configurationSha256, model: "claude-fixture" };
+  const replay = await runReview({ request: record, expect: binding, prepared, directory: output, excluded: [exportDirectory],
+    run: async ({ files, prompt, session }) => {
+      const events = [];
+      const emit = (event) => events.push({ ...event, session_id: session });
+      const runtime = { session, model: binding.model, version: claudeVersion, bubblewrapVersion, maxTurns: f.evaluated.context.lowTouch ? 64 : 4, maxBudgetUsd: 1,
+        configurationSha256: binding.configurationSha256, route: "same-uid-key" };
+      emit({ type: "system", subtype: "init", model: runtime.model, claude_code_version: runtime.version, cwd: "/review",
+        tools: ["Read"], permissionMode: "dontAsk", mcp_servers: [], skills: [], slash_commands: [], plugins: [] });
+      for (const [name, data] of files) {
+        const id = `read-${events.length}`;
+        const file_path = `/review/${name}`;
+        const content = data.toString("utf8");
+        const numLines = content ? content.split("\n").length : 0;
+        emit({ type: "assistant", message: { content: [{ type: "tool_use", id, name: "Read", input: { file_path } }] } });
+        emit({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: id, content }] },
+          tool_use_result: { type: "text", file: { filePath: file_path, content, startLine: 1, numLines, totalLines: numLines } } });
+      }
+      const packet = Number(/^Packet: (\d+) of/m.exec(prompt)?.[1]);
+      const report = files.size ? ["Verdict: No findings", `Target: ${head}`, JSON.stringify({ target: head, packet,
+        findings: [], coverageLimitations: determination === "verified" ? [] : ["Impact unknown"],
+        prFix: { declarationSha256: declaration.sha256, determination } })].join("\n") : "REVIEW_PROBE_OK";
+      emit({ type: "assistant", message: { content: [{ type: "text", text: report }] } });
+      emit({ type: "result", subtype: "success", is_error: false, num_turns: 1, total_cost_usd: 0, permission_denials: [], result: report });
+      return { runtime, proc: { code: 0, signal: null, outcome: "exit", quiescent: true,
+        stdout: Buffer.from(events.map(JSON.stringify).join("\n") + "\n"), stderr: Buffer.alloc(0) } };
+    },
+  });
+  assert.equal(replay.phase, "complete");
+  const containedVerifier = fileURLToPath(new URL("../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-candidate.mjs", import.meta.url));
+  const expectationBytes = jsonBytes({ ...binding, statusSha256: replay.statusSha256 });
+  await writeFile(expect, expectationBytes, { mode: 0o400 });
+  return { kind: "review-candidate", verifier: containedVerifier, verifierSha256: sha256(await readFile(containedVerifier)),
+    request, requestFileSha256: sha256(bytes), expect, expectFileSha256: sha256(expectationBytes), exportDirectory, output };
+}
+
+async function exerciseLineage(t, goalFirst) {
+  const f = await fixture(t, { lowTouch: true, integratedOptIn: goalFirst });
+  const records = path.join(f.root, "records");
+  await mkdir(records, { mode: 0o700 });
+  const retained = { ...f, root: records };
+  const save = async (name, value) => {
+    const file = path.join(records, name + ".json");
+    const bytes = jsonBytes(value);
+    await writeFile(file, bytes, { mode: 0o600 });
+    return { file, sha256: sha256(bytes) };
+  };
+  const hostConfiguration = await save("host", { schemaVersion: 1, localHarness: null });
+  const approvedGates = goalFirst ? [gateArgv] : [gateArgv, [process.execPath, "--version"]];
+  const unrelated = [[process.execPath, "-e", "process.exit(0)"]];
+  const guidance = twoGroupGuidance(f.planDigest);
+  const taskGuidance = goalFirst ? undefined : { ...guidance, groups: [{ ...guidance.groups[0], gates: approvedGates }] };
+  await f.write(f.workspace, "widget.txt", "new");
+  await f.write(f.workspace, current, currentSpec);
+  await f.write(f.workspace, own + "/tasks.md", "# Tasks\n\n## 1. Widget\n- [x] 1.1 Pass the widget gate\n");
+  const reviewedAncestor = f.commit(f.workspace, "Reviewed outcome");
+  const ancestorGate = await gateFixture(retained, reviewedAncestor, "ancestor", approvedGates);
+  const forgedAncestor = goalFirst ? null : await gateFixture(retained, reviewedAncestor, "forged-ancestor", unrelated);
+  const reviewer = path.join(f.root, "ancestor-checkout");
+  f.git(f.repo, "worktree", "add", "--detach", reviewer, reviewedAncestor);
+  const configurationSha256 = hostConfiguration.sha256;
+  const ancestorReview = await containedHandover(retained, reviewer, reviewedAncestor, ancestorGate, "ancestor-review",
+    { configurationSha256, goalDigest: goalFirst ? f.planDigest : undefined });
+  await chmod(path.join(f.workspace, "widget.txt"), 0o755);
+  const head = f.commit(f.workspace, "Fix CI executable mode");
+  const finalGate = await gateFixture(retained, head, "final", approvedGates);
+  const forgedFinal = goalFirst ? null : await gateFixture(retained, head, "forged-final", unrelated);
+  const pullRequest = "https://github.com/Example/Fixture/pull/1";
+  const issue = "https://github.com/Example/Fixture/issues/2";
+  const observedAt = new Date().toISOString();
+  const source = await save("source", createRepresentation({
+    original: jsonBytes({ pullRequest, head: reviewedAncestor,
+      checks: [{ id: "fixture-ci", head: reviewedAncestor, conclusion: "failure" }] }),
+    provenance: { source: "github-check-runs", revision: reviewedAncestor, scope: pullRequest,
+      command: ["synthetic", "read"], environmentScope: "fixture", exitStatus: 0, pagination: "complete",
+      observedAt, readbackType: "original-response" },
+    labels: { representation: "original-response", completeness: "complete", confidentiality: "publishable" },
+  }));
+  const range = prFixRange(f.repo, reviewedAncestor, head);
+  const declarationValue = { schemaVersion: 1, change, plan: f.plan, planDigest: f.planDigest, pullRequest,
+    sourceSha256: source.sha256, range, impacted: [current],
+    postimages: committedPostimages(f.repo, head, [...range.files, current]),
+    findings: [{ id: "fixture-ci", kind: "ci", reason: "The check could not execute the widget.",
+      disposition: "fixed", files: ["widget.txt"] }] };
+  const declaration = await save("declaration", declarationValue);
+  const deltaCheckout = path.join(f.root, "delta-checkout");
+  f.git(f.repo, "worktree", "add", "--detach", deltaCheckout, head);
+  const deltaReview = await scopedHandover(retained, deltaCheckout, head, finalGate, "delta-review",
+    { base: reviewedAncestor, declaration, source, configurationSha256 });
+  const bundle = { schemaVersion: 1, workspace: f.workspace, reviewedAncestor, declaration, source,
+    ancestorReview, deltaReview, ancestorGate: ancestorGate.gateRun, finalGate: finalGate.gateRun };
+  const prFixLineage = await save("bundle", bundle);
+  const input = { ...f.request, head, hostConfiguration, taskGuidance, deliveryPhase: "result", handover: ancestorReview,
+    gateRun: ancestorGate.gateRun, attempt: { id: "ancestor-review" }, prFixLineage };
+  const readiness = (await f.run("finish-readiness", input)).value;
+  assert.equal(readiness.ready, true, JSON.stringify(readiness));
+  const proof = readiness.prFixLineage;
+  assert.equal(proof.reviewedAncestor, reviewedAncestor);
+  assert.equal(readiness.reviewReference, proof.ancestorReview.reference);
+  assert.equal(readiness.gateReference, finalGate.captured.value.wrapperSha256);
+  assert.equal((await f.run("status", input)).value.state, "finish-ready");
+  for (const [label, replacement] of [
+    ["wrong-gate", { finalGate: ancestorGate.gateRun }],
+    ["waiver", { declaration: await save("waived", { ...declarationValue,
+      findings: [{ ...declarationValue.findings[0], disposition: "waived" }] }) }],
+    ["postimage", { declaration: await save("missing-image", { ...declarationValue, postimages: {} }) }],
+    ["unrelated", { declaration: await save("incomplete-range", { ...declarationValue, range: { ...range,
+      edges: [{ ...range.edges[0], patch: "" }] } }) }],
+    ["tampered-review", { deltaReview: { ...deltaReview, expectFileSha256: "0".repeat(64) } }],
+  ]) {
+    const bad = (await f.run("finish-readiness", { ...input, prFixLineage: await save(label, { ...bundle, ...replacement }) })).value;
+    assert.equal(bad.predicate, "FULL_EXACT_HEAD_REVIEW_REQUIRED", JSON.stringify(bad));
+  }
+  const fullCheckout = path.join(f.root, "full-checkout");
+  f.git(f.repo, "worktree", "add", "--detach", fullCheckout, head);
+  const full = await containedHandover(retained, fullCheckout, head, finalGate, "full-review",
+    { configurationSha256, goalDigest: goalFirst ? f.planDigest : undefined });
+  assert.equal((await f.run("finish-readiness", { ...input, prFixLineage: undefined, gateRun: finalGate.gateRun,
+    handover: full, attempt: { id: "full-review" } })).value.ready, true);
+  const lineageRequest = { repo: f.repo, change, head, base: f.base, plan: f.plan, mode: f.policy.mode,
+    target: f.base, "expect-plan": f.planDigest };
+  if (!goalFirst) {
+    await assert.rejects(verifyPrFixLineage(lineageRequest, prFixLineage, verifyHandover,
+      { acceptedAncestorGate: proof.ancestorGate }), /Missing approved Task-Guided PR-fix gate authority/);
+    await assert.rejects(verifyPrFixLineage(lineageRequest, prFixLineage, verifyHandover,
+      { acceptedAncestorGate: proof.ancestorGate, approvedTaskGates: unrelated }), /differ from approved acceptance/);
+    await assert.rejects(verifyPrFixLineage(lineageRequest, prFixLineage, verifyHandover,
+      { acceptedAncestorGate: proof.finalGate, approvedTaskGates: approvedGates }), /differs from the accepted ancestor/);
+    const wrongFinal = await gateFixture(retained, head, "unrelated-final", unrelated);
+    assert.equal(wrongFinal.captured.value.ok, true, wrongFinal.captured.stdout);
+    const rejected = (await f.run("finish-readiness", { ...input,
+      prFixLineage: await save("unrelated-final-bundle", { ...bundle, finalGate: wrongFinal.gateRun }) })).value;
+    assert.equal(rejected.issue, "Gate commands differ from approved acceptance", JSON.stringify(rejected));
+  }
+  const identity = { repo: f.repo, workspace: f.workspace, repository: "Example/Fixture", branch: "change/" + change,
+    change, candidate: head, policyRevision: f.base, targetRevision: f.base, target: "main", mode: f.policy.mode,
+    plan: f.plan, planDigest: f.planDigest, issue };
+  const now = Date.now();
+  const deadline = new Date(now + 50000).toISOString();
+  const grantReference = "fixture-finish";
+  const bound = (fields) => ({ verified: true, reference: "synthetic", observedAt, identity, grantReference, ...fields });
+  const startedAt = new Date(now - 40000).toISOString();
+  const grant = await save("finish-grant", bound({ schemaVersion: 1, kind: "protected-finish", reference: grantReference,
+    startedAt, deadline, keepWorktree: false, uiDeclaration: null, integratedGates: approvedGates }));
+  const anchorValue = bound({ kind: "finish-readiness-readback", ready: true, keepWorktree: false,
+    implementationReview: { verified: true, ...proof.ancestorReview, head: reviewedAncestor },
+    implementationGate: finalGate.gateRun, implementationGateSha256: proof.finalGate, prFixLineage,
+    hostConfigurationSha256: configurationSha256, gateAuthority: readiness.gateAuthority });
+  const anchor = await save("finish-anchor", anchorValue);
+  const checkpointValue = bound({ schemaVersion: 1, kind: "protected-finish-checkpoint",
+    records, grant, anchor, deadline, keepWorktree: false, prs: { implementation: pullRequest, closure: null } });
+  const finishCheckpoint = await save("finish-checkpoint", checkpointValue);
+  const finishRemote = await save("finish-remote", bound({ implementation: bound({
+    state: "OPEN", url: pullRequest, head: reviewedAncestor, complete: true, target: "main",
+  }) }));
+  const finish = (await f.run("finish", { repo: f.repo, change, head, finishCheckpoint, finishRemote })).value;
+  assert.equal(finish.reason, "PR_HEAD_CHANGED", JSON.stringify(finish));
+  assert.deepEqual(finish.prFixLineage, proof);
+  const archive = "openspec/changes/archive/2026-11-26-" + change;
+  const receiptPath = archive + "/evidence/receipt.json";
+  const rows = (revision, commands = approvedGates) => commands.map((argv) => ({ command: argv.join(" "), argv,
+    commit: revision, exitCode: 0, evidence: "retained fixture gate" }));
+  const gates = goalFirst ? (revision) => [{ command: "fixture gate", commit: revision, exitCode: 0, evidence: "retained fixture gate" }] : rows;
+  if (!goalFirst) f.git(f.workspace, "commit", "--allow-empty", "-m", "Integrate the fixed candidate");
+  const integrated = f.git(f.workspace, "rev-parse", "HEAD");
+  if (!goalFirst) f.git(f.workspace, "commit", "--allow-empty", "-m", "Advance the verification target");
+  const verified = f.git(f.workspace, "rev-parse", "HEAD");
+  const receipt = { schemaVersion: 1, change, issueUrl: issue, base: f.base, plan: f.plan, mode: f.policy.mode,
+    planDigest: f.planDigest, head, integrated, verified, integrationReference: pullRequest, gates: gates(verified),
+    prFixLineage: proof, review: { schemaVersion: 1, change, issueUrl: issue, head: reviewedAncestor, planDigest: f.planDigest,
+      verdict: "pass", findings: [], reviewer: proof.ancestorReview.session, reference: proof.ancestorReview.reference,
+      gates: gates(reviewedAncestor) } };
+  const guard = fileURLToPath(new URL("../skills/software-development/openspec-delivery/scripts/change-guard.mjs", import.meta.url));
+  const archiveReceipt = async (label, value) => {
+    const checkout = path.join(f.root, `archive-${label}`);
+    const ref = await save(label, value);
+    f.git(f.repo, "worktree", "add", "--detach", checkout, verified);
+    await mkdir(path.dirname(path.join(checkout, archive)));
+    await rename(path.join(checkout, own), path.join(checkout, archive));
+    await f.write(checkout, receiptPath, await readFile(ref.file));
+    const archived = f.commit(checkout, "Archive exact change and receipt");
+    const args = [guard, "receipt", "--repo", checkout, "--change", change, "--target", archived,
+      "--receipt", ref.file, "--issue", issue, "--receipt-path", receiptPath];
+    return { args, archived, ref };
+  };
+  const { args, archived, ref: receiptRef } = await archiveReceipt("receipt", receipt);
+  assert.equal(exec(process.execPath, args).status, 1);
+  const referenceArgs = (key, ref) => [`--${key}`, ref.file, `--${key}-sha256`, ref.sha256];
+  const lineageArgs = referenceArgs("pr-fix-lineage", prFixLineage);
+  const replayReceipt = (receiptArgs, ...evidenceArgs) => exec(process.execPath, [...receiptArgs, ...lineageArgs, ...evidenceArgs]);
+  let evidenceArgs = [];
+  if (!goalFirst) {
+    const authority = readiness.gateAuthority;
+    assert.deepEqual(authority.gates, approvedGates);
+    const verifiedGate = await gateFixture(retained, verified, "verified", approvedGates);
+    assert.equal(verifiedGate.captured.value.ok, true, verifiedGate.captured.stdout);
+    const mergedAt = new Date(now - 3000).toISOString();
+    const preMerge = new Date(now - 5000).toISOString();
+    const checks = [{ id: "fixture-ci", head, conclusion: "success", completedAt: preMerge }];
+    const seal = (name, payload, at) => save(`merged-${name}`, createRepresentation({
+      original: jsonBytes({ pullRequest, head, ...payload }),
+      provenance: { source: name, revision: head, scope: pullRequest, command: ["synthetic", "read"],
+        environmentScope: "fixture", exitStatus: 0, pagination: "complete", observedAt: at, readbackType: "original-response" },
+      labels: { representation: "original-response", completeness: "complete", confidentiality: "publishable" },
+    }));
+    const merge = { state: "MERGED", mergedAt, mergeCommit: integrated };
+    const requiredCheckIds = ["fixture-ci"];
+    const postMergeValue = bound({ checkpointSha256: finishCheckpoint.sha256, implementation: bound({ ...merge, url: pullRequest, head,
+      complete: true, target: "main", requiredCheckIds, assertion: { pullRequest, expectedHead: head,
+        applicableCheckIds: requiredCheckIds, mergedAt, observedNotBefore: startedAt, readbacks: {
+          pr: await seal("github-pull-request", merge, mergedAt),
+          checks: await seal("github-applicable-checks", { checks }, preMerge),
+          checkRuns: await seal("github-check-runs", { checks }, preMerge),
+          threads: await seal("github-review-threads", { threads: [] }, preMerge),
+        } } }), integrated: bound({ head: verified, mergeCommit: integrated, gate: verifiedGate.gateRun }),
+    closureCandidate: bound({ head: archived, integrated: verified, archive, receipt: receiptRef, receiptPath,
+      receiptSha256: receiptRef.sha256 }) });
+    const postMergeRemote = await save("post-merge", postMergeValue);
+    const checkpointArgs = referenceArgs("finish-checkpoint", finishCheckpoint);
+    const readbackArgs = referenceArgs("finish-readback", postMergeRemote);
+    evidenceArgs = [...checkpointArgs, ...readbackArgs];
+    const closeout = (await f.run("finish", { repo: f.repo, change, head, finishCheckpoint, finishRemote: postMergeRemote })).value;
+    assert.equal(closeout.action, "verify-closure", JSON.stringify(closeout));
+    const unpinnedAnchor = await save("unpinned-anchor", { ...anchorValue, gateAuthority: undefined });
+    const unpinnedCheckpoint = await save("unpinned-checkpoint", { ...checkpointValue, anchor: unpinnedAnchor });
+    const unpinned = (await f.run("finish", { repo: f.repo, change, head,
+      finishCheckpoint: unpinnedCheckpoint, finishRemote: postMergeRemote })).value;
+    assert.equal(unpinned.reason, "FINISH_OBSERVATIONS_UNVERIFIED", JSON.stringify(unpinned));
+    assert.equal(unpinned.detail, "Missing approved Task-Guided PR-fix gate authority");
+
+    const refused = (replay, reason) => {
+      assert.equal(replay.status, 1, replay.stdout);
+      assert.match(JSON.parse(replay.stdout).error, reason);
+    };
+    refused(replayReceipt(args, ...readbackArgs), /Missing independently retained/);
+    refused(replayReceipt(args, ...checkpointArgs), /Missing independently retained/);
+    refused(replayReceipt(args, ...checkpointArgs, ...referenceArgs("finish-readback", finishRemote)), /does not establish a protected merge/);
+
+    const wrongVerified = await gateFixture(retained, verified, "unrelated-verified", unrelated);
+    assert.equal(wrongVerified.captured.value.ok, true, wrongVerified.captured.stdout);
+    const withGate = (gate) => ({ ...postMergeValue, integrated: { ...postMergeValue.integrated, gate } });
+    const checkReadback = (ref) => replayReceipt(args, ...checkpointArgs, ...referenceArgs("finish-readback", ref));
+    refused(checkReadback(await save("wrong-revision", withGate(finalGate.gateRun))), /different revision\/tree/);
+    refused(checkReadback(await save("wrong-argv", withGate(wrongVerified.gateRun))), /differ from approved acceptance/);
+    const copiedGate = { ...verifiedGate.gateRun, file: path.join(records, "copied-gate.json") };
+    const exactGateBytes = await readFile(verifiedGate.gateRun.file);
+    await writeFile(copiedGate.file, exactGateBytes);
+    const copyReadback = await save("copy-readback", withGate(copiedGate));
+    refused(checkReadback({ ...copyReadback, sha256: postMergeRemote.sha256 }), /observation file identity mismatch/);
+    const unretained = { ...copiedGate, file: path.join(f.root, "unretained-gate.json") };
+    await writeFile(unretained.file, exactGateBytes);
+    refused(checkReadback(await save("unretained-readback", withGate(unretained))), /outside retained records/);
+    refused(checkReadback(await save("wrong-checkpoint-readback", { ...postMergeValue, checkpointSha256: unpinnedCheckpoint.sha256 })),
+      /does not bind the held checkpoint/);
+    await chmod(records, 0o755);
+    try {
+      refused(replayReceipt(args, ...evidenceArgs), /owner-private/);
+    } finally {
+      await chmod(records, 0o700);
+    }
+
+    for (const forged of [forgedAncestor, forgedFinal]) {
+      assert.equal(forged.captured.value.ok, true, forged.captured.stdout);
+    }
+    const forgedAncestorCheckout = path.join(f.root, "forged-ancestor-checkout");
+    const forgedDeltaCheckout = path.join(f.root, "forged-delta-checkout");
+    f.git(f.repo, "worktree", "add", "--detach", forgedAncestorCheckout, reviewedAncestor);
+    f.git(f.repo, "worktree", "add", "--detach", forgedDeltaCheckout, head);
+    const forgedAncestorReview = await containedHandover(retained, forgedAncestorCheckout, reviewedAncestor, forgedAncestor, "forged-ancestor-review",
+      { configurationSha256 });
+    const forgedDeltaReview = await scopedHandover(retained, forgedDeltaCheckout, head, forgedFinal, "forged-delta-review",
+      { base: reviewedAncestor, declaration, source, configurationSha256 });
+    const forgedBundle = await save("forged-bundle", { ...bundle, ancestorGate: forgedAncestor.gateRun, finalGate: forgedFinal.gateRun,
+      ancestorReview: forgedAncestorReview, deltaReview: forgedDeltaReview });
+    const forgedAuthority = { ...authority, gates: unrelated, ancestorGate: forgedAncestor.captured.value.wrapperSha256 };
+    const { proof: forgedProof } = await verifyPrFixLineage(lineageRequest, forgedBundle, verifyHandover, { gateAuthority: forgedAuthority });
+    const { args: forgedArgs } = await archiveReceipt("forged-receipt", { ...receipt, prFixLineage: forgedProof, gates: rows(verified, unrelated),
+      review: { ...receipt.review, reviewer: forgedProof.ancestorReview.session, reference: forgedProof.ancestorReview.reference,
+        gates: rows(reviewedAncestor, unrelated) } });
+    const forgedLineageArgs = referenceArgs("pr-fix-lineage", forgedBundle);
+    refused(exec(process.execPath, [...forgedArgs, ...forgedLineageArgs, ...evidenceArgs]), /lineage differs from the held checkpoint/);
+    refused(exec(process.execPath, [...forgedArgs, ...forgedLineageArgs]), /Missing independently retained/);
+    const forgedAuthorityRef = await save("forged-authority", forgedAuthority);
+    refused(exec(process.execPath, [...forgedArgs, ...forgedLineageArgs, ...referenceArgs("gate-authority", forgedAuthorityRef),
+      ...referenceArgs("verified-gate-run", wrongVerified.gateRun)]), /Unknown option.*gate-authority/);
+
+    const { args: wrongMerge } = await archiveReceipt("wrong-merge", { ...receipt, integrated: head });
+    refused(replayReceipt(wrongMerge, ...evidenceArgs), /merge or verified SHA differs/);
+    const { args: wrongVerifiedSha } = await archiveReceipt("wrong-verified", { ...receipt, verified: integrated, gates: rows(integrated) });
+    refused(replayReceipt(wrongVerifiedSha, ...evidenceArgs), /merge or verified SHA differs/);
+
+    const { args: wrongRows } = await archiveReceipt("unrelated-rows", { ...receipt, gates: rows(verified, unrelated) });
+    refused(replayReceipt(wrongRows, ...evidenceArgs), /Receipt gate commands differ from approved acceptance/);
+    const { args: wrongReview } = await archiveReceipt("unrelated-review", { ...receipt, review: { ...receipt.review, gates: rows(reviewedAncestor, unrelated) } });
+    refused(replayReceipt(wrongReview, ...evidenceArgs), /Receipt gate commands differ from approved acceptance/);
+
+    const { prFixLineage: omitted, ...ordinary } = receipt;
+    const legacyRows = (revision) => [{ command: "fixture gate", commit: revision, exitCode: 0, evidence: "retained fixture gate" }];
+    const { args: ordinaryArgs } = await archiveReceipt("ordinary", { ...ordinary, gates: legacyRows(verified),
+      review: { ...ordinary.review, head, gates: legacyRows(head) } });
+    const ordinaryReplay = exec(process.execPath, ordinaryArgs);
+    assert.equal(ordinaryReplay.status, 0, ordinaryReplay.stdout);
+  }
+  const replay = replayReceipt(args, ...evidenceArgs);
+  assert.equal(replay.status, 0, replay.stdout);
+  assert.deepEqual(JSON.parse(replay.stdout).prFixLineage, proof);
+  assert.throws(() => verifyPrFixIntegration({ repo: f.repo, plan: f.plan, head }, proof, head, reviewedAncestor), /ancestry/);
+}
+
+test("sealed Goal-First PR-fix lineage reaches finish, rejects stale evidence and replays from committed archive", (t) => exerciseLineage(t, true));
+test("Task-Guided PR-fix replay requires approved ordered gates through receipt and verified evidence", (t) => exerciseLineage(t, false));

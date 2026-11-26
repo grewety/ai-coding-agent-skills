@@ -21,15 +21,20 @@ export async function operationProcess(processIdentity) {
     if (tail[19] !== processIdentity.start) return "reused-pid";
     if (tail[3] !== processIdentity.session) return "unverified";
     return tail[0] === "Z" ? "settled-process" : "active";
-  } catch (error) { if (error.code === "ENOENT") return "absent"; throw error; }
+  } catch (error) {
+    // Linux may report ESRCH when the task exits during the procfs stat read.
+    if (error.code === "ENOENT" || error.code === "ESRCH") return "absent";
+    throw error;
+  }
 }
 
-export async function startSupervisor(directory, launch, binding, limits) {
+export async function startSupervisor(directory, launch, binding, limits, deadlineMs) {
   const { timeoutMs, stdoutBytes: stdoutLimit, stderrBytes: stderrLimit, maxTurns } = limits;
   need(launch.input.length <= 128 * 1024 && [stdoutLimit, stderrLimit].every((n) =>
     Number.isSafeInteger(n) && n > 0 && n <= captureLimit), "Supervisor capture bounds changed");
   const spec = { binding, argv: [launch.command, ...launch.args], cwd: launch.cwd, env: launch.env,
-    input: launch.input.toString("base64"), timeoutMs, stdoutLimit, stderrLimit, maxTurns };
+    input: launch.input.toString("base64"), timeoutMs, stdoutLimit, stderrLimit, maxTurns,
+    ...(deadlineMs === undefined ? {} : { deadlineMs }) };
   await writeState(directory, "spawn.json", spec);
   const child = spawn("/usr/bin/python3", ["-I", "-B", supervisor, directory, hash(jsonBytes(spec))], {
     env: { PATH: "/usr/bin:/bin", LC_ALL: "C.UTF-8" }, stdio: "ignore", detached: true,

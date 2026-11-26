@@ -44,6 +44,12 @@ Use UTC timestamps with milliseconds.
   observation with its session, exact disposable `implementationGate` file
   and `implementationGateSha256`, the accepted gate wrapper digest. For first publication include the original delivery
   evaluation inputs for live exact candidate finish-readiness verification.
+- For Task-Guided PR fixes, copy `gateAuthority` from accepted finish
+  readiness into the separately sealed anchor. Readiness verifies the
+  ordered argv from the frozen group against the ancestor and final gate
+  runs. The authority binds the approved argv to the accepted ancestor
+  wrapper, workspace, plan, policy parent and target. The integrated grant
+  and gate run must use those same ordered gates.
 - A contextual `continue` passes a sealed `finishReply`, a bound
   `finish-reply` with `reply: "continue"`, `checkpointSha256`,
   `pullRequest` for the retained active PR, and `observedAt`. Read back the
@@ -94,6 +100,14 @@ Use UTC timestamps with milliseconds.
    `assert-closeout` PR, check, run and thread assertions. Keep their
    original evidence. The bound `integrated` observation identifies actual
    `mergeCommit`, containing `head` and exact disposable `gate` reference.
+   For Task-Guided PR fixes, include `checkpointSha256` in the top-level
+   post-merge readback, using the exact checkpoint against which it was
+   verified. Independently retain the exact checkpoint and readback
+   `{file, sha256}` references in orchestrator custody for later archive
+   replay. Those external pins bind the readiness authority and the exact
+   path and hash of the successful gate capture at the receipt's `verified`
+   SHA. Receipt bytes, gate tables and matching capture hashes can be
+   produced by the evidence author and cannot establish that custody.
    Reuse a completed chapter only on verified readback. An unverified merge
    outcome remains pending.
 4. After integrated gates pass, prepare the receipt and record-only archive.
@@ -166,3 +180,60 @@ exception. Recheck the applicable harness and current complete per-event
 trigger inventories before activation. Keep the trigger matches in finish
 evidence. Use the [record-only closure body](integration.md#record-only-closure-and-stop-boundary)
 and explicitly close the issue only after verified acceptance readback.
+
+## Named finish-trigger grant
+
+Attach the sealed `triggerGrant` to the protected-finish checkpoint when
+explicitly granted. The record uses `schemaVersion: 1`,
+`kind: "protected-finish-trigger-grant"`, `verified: true`, a distinct
+`reference`, the original `finishReference` and exact finish `identity`.
+Its `startedAt` and `deadline` fit within the protected finish. Set
+`maxDeepReviewCredits` to a finite integer, `deepReview` to the selected
+chapter scopes, `maxZeroCostCiRetries` to 0 or 1, and `retry` to its one
+selected scope or null. Each scope contains `chapter`, `id`, `target`,
+`configurationSha256`, `exposure` and `costUsd`. Retain the exact same
+sealed grant and owner-private records directory across both chapters. The
+closure trigger binds to the closure head established by its archived receipt,
+gates and independent review.
+
+Read the entire event inventory immediately before each action and retain the
+original provider and platform observations. A bundled `pull_request` entry
+needs a matching installation and an independently sourced `providerProof`
+from installation and billing evidence (`source:
+"provider-installation-and-billing"`, `provider: "aikido"`, `product:
+"deep-review"`, `unit: "credits"`, positive integer `credits`). Its scope
+repeats the selected fields plus `repository`, `candidate`, `event` and
+`kind`. Take the proof's reference and observation time from that evidence.
+Each paid trigger needs a distinct `providerProof.reference`. A reference
+can appear only once in a selection and across all reservations in the finish
+journal, including both PR chapters and after settlement or resume.
+Every other trigger must pass existing standing or separately reserved
+external authority. An unknown cost, exposure, configuration or kind blocks
+the bundled event inventory.
+
+The retry path uses the exact failed check's `runId` and `attempt` from
+protected check readback and a complete `retry` event inventory. Require
+a matching provider proof from workflow and billing evidence (`source:
+"provider-workflow-and-billing"`, `provider: "github-actions"`, `product:
+"repository-ci"`). Supply `retryEvidence.failure` and `retryEvidence.push`
+from separate official runs. Both bind the check ID, workflow, configuration,
+and equivalent execution digest to the identical candidate SHA. The failure
+must match the PR run's first attempt and prove a lost or unprovisioned runner
+or a GitHub Actions service interruption, with a verified absence of test
+failure. The push run must independently pass. A fresh observation of the
+same run's next attempt plus ordinary exact-head protection and gate readback
+is required for progression.
+
+A read-only `finish` assessment returns `FINISH_TRIGGER_RESERVATION_REQUIRED`
+and a `finishTriggerSelection` bound to the current sealed readback. With the
+retained grant, the orchestrator invokes `reserve-finish-trigger` using that
+selection and the same inputs. Only a successful result with a durable
+`finishTriggerReservation` admits one activation at the selected head. If an
+inventory or scope changes before activation, stop. After an attempt, invoke
+`settle-finish-trigger` with a sealed `finishTriggerOutcome`. The verified
+outcome names `kind: "finish-trigger-outcome"`, the grant reference and
+reservation SHA, the reservation's chapter, operation, head and readback SHA
+in `scope`, a provider outcome reference, and the observed time. Record
+`consumed` for a confirmed activation and `uncertain` when the outcome
+cannot be established. Both charge the reservation. A pending or uncertain
+outcome blocks progression and supplies no replay authority.

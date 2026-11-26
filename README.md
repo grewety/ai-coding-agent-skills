@@ -413,7 +413,9 @@ After the exact candidate passes readiness, the delivery skill's `finish <name>`
 verb separately authorizes the protected PR and verified receipt, archive, issue
 closure and clean-worktree retirement. Declared local UI gates use loopback
 try-out and accessible-name checks. External tests, tunnels, app triggers
-and PR deploy previews require their own single-run grants. [Authority, finish examples and upstream host syntax](docs/openspec-workflow.md#short-operator-commands).
+and PR deploy previews require separately held authority. The runbook
+describes exact standing $0 matches, event-bound bundled finish credits and
+the permitted identical-SHA CI retry. [Authority and finish examples](docs/openspec-operator-runbook.md#finish-and-recover).
 
 For later plans whose integrated parent selects `propose-to-freeze`, the
 short workflow can display a frozen approval card and record `approve` or
@@ -779,9 +781,9 @@ no generated skill copies are committed. Its explicit skill lists separate the
 OpenSpec companion workflow from opt-in orchestration. Bump every affected plugin's version when
 its bundled content changes. See the [Claude release checks](docs/claude-installation.md#maintainer-verification).
 
-Current source versions are delivery 1.8.0 and its affected
-`openspec-development` plugin 1.8.0; `openspec-next` is 0.8.0 and
-`autonomous-orchestration` is 1.12.0 (core skill 0.22.0). Complete well-known output,
+Current source versions are delivery 1.9.0 and its affected
+`openspec-development` plugin 1.9.0; `openspec-next` is 0.8.0 and
+`autonomous-orchestration` is 1.13.0 (core skill 0.23.0). Complete well-known output,
 skill ZIPs, workflow plugin ZIP and isolated native copies must retain all support
 files byte-for-byte, including delivery's runtime and evidence commands and next's
 read-only routing script and reference. Include `scripts/delegated-delivery.mjs`
@@ -839,7 +841,7 @@ use `--force` to bypass security findings; `--yes` only skips the install questi
 
 Pull requests run credential-free checks. Pushes to main and manual publishing runs build and test before deploying dist/ to GitHub Pages. Deployment packages dot-directories explicitly because the stock upload-pages-artifact action omits them.
 
-The build tests cover metadata, workflow contracts, complete inventories, forbidden paths, symlinks, and deployment packaging. Release verification must additionally fetch the live index and every advertised file and exercise actual Hermes discovery/installation in an isolated scratch home.
+The build tests cover metadata, workflow contracts, complete inventories, forbidden paths, symlinks, and deployment packaging. On Linux, `npm test` isolates selected fixture suites in private processes and scratch paths. `npm test -- --serial` runs the complete inventory serially. Release verification must additionally fetch the live index and every advertised file and exercise actual Hermes discovery/installation in an isolated scratch home.
 
 ## Provenance and license
 

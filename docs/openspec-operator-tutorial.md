@@ -138,7 +138,9 @@ and check the export offline. An adopting policy requires a matching raw-file
 packet. Use an independently authorized host configuration change when a
 packet needs a different budget. [Reviewer setup](claude-reviewer.md).
 
-The following legacy host settings select a 96-turn packet budget. Merge
+New setup defaults to 96 turns and USD 2.50 per invocation, including the
+automatic probe as a separate reservation. The following host settings
+select those limits and serial packet execution. Merge
 these into the external host's complete configuration only under a matching
 operator grant. A different configuration requires its own exact pin.
 
@@ -149,10 +151,13 @@ operator grant. A different configuration requires its own exact pin.
   "maxBudgetUsd": 2.50,
   "timeoutMs": 180000,
   "interPacketDelayMs": 1000,
+  "packetConcurrency": 1,
   "runTimeoutMs": 900000
 }
 ```
 
+Use the [direct Node launch](openspec-operator-runbook.md#launch-contained-review)
+after offline export preflight and exact run admission.
 
 ## Optional Intent-Driven planning
 

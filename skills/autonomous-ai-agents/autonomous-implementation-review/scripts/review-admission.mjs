@@ -24,12 +24,14 @@ export function receiptContext(request, prepared) {
 export function reviewPrompt(request, context, packet, index, count, reference) {
   const candidate = request.mode === "candidate";
   const packetNumber = index + 1;
+  const fix = request.snapshot?.prFix;
   const header = candidate ? `Target: ${context.target}` : "Policy: charter-v1";
   const schema = candidate
     ? 'JSON object with target (the exact SHA), packet (the integer below), findings (array of objects with severity critical/high/medium/low, path, line, impact, trigger, remedy), and coverageLimitations (array of strings).'
     : 'JSON object with identity (copy the exact supplied identity), readOnly (true), reference (exact supplied reference), verdict (copy the verdict line), findings, observations, coverageLimitations and ledgerChecks. Findings and observations have id, severity (High/Medium/Low), path, line, impact, trigger, remedy, scopeDisposition, clause, and optional boolean regression. Every findings item must use scopeDisposition "in-scope" and a clause copied exactly from charter.clauses. Every observations item must use scopeDisposition "outside-charter" and clause null. For coverageLimitations, use the following fields. For declared-deferral, use class and exactly one of task (copied exactly from charter.tasks) or gate (copied exactly from charter.gates). For containment-boundary, use class and boundary copied exactly from charter.boundaries. For packet-gap, use class and detail. Ledger checks have id and status (persistent, regression or resolved). Resolved checks include disposition (applied with evidence and reReviewReference, or unfounded with evidence and reason).';
   const receipt = candidate
-    ? { target: context.target, packet: packetNumber, findings: [], coverageLimitations: [] }
+    ? { target: context.target, packet: packetNumber, findings: [], coverageLimitations: [],
+      ...(fix ? { prFix: { declarationSha256: request.attachments[fix.declaration], determination: "verified" } } : {}) }
     : { identity: context.identity, readOnly: true, reference, verdict: clean, findings: [], observations: [],
       coverageLimitations: [], ledgerChecks: [] };
   return [
@@ -48,6 +50,11 @@ export function reviewPrompt(request, context, packet, index, count, reference) 
       "In the JSON, copy the verdict line exactly. Populate observations and coverageLimitations when warranted, even when findings is empty.",
       "Include exactly one ledgerChecks entry for each open ledger item, using its id. Use [] only when there are no open ledger items. For an applied resolution, reReviewReference must equal the supplied native reference.",
     ]),
+    ...(fix ? [
+      `Read the sealed PR-fix declaration at context/${fix.declaration} and its exact ordered patches, the source at context/${fix.source}, and the assigned final postimages.`,
+      "Check that every hunk addresses a cited fix with no unrelated changes, each disposition is justified, all impacts are identified, and only unaffected ancestor coverage can be retained.",
+      'Include prFix with the exact declarationSha256 and determination set to "verified" only when those conditions are established. Otherwise use determination "insufficient" and include the reason in coverageLimitations.',
+    ] : []),
     "End your final assistant message with the exact five-line block below, with each marker on its own line and nothing after END_REVIEW_RECEIPT. Do not use lines beginning with Verdict: outside the block, even if indented.",
     beginReceipt, clean, header, JSON.stringify(receipt), endReceipt,
   ].join("\n");
@@ -67,7 +74,15 @@ export function admitReceipt(request, context, report, index, reference, packet,
   need([clean, findings].includes(verdict) && json && rest.length === 0, "Invalid native receipt framing");
   const receipt = parseStrictJson(Buffer.from(json));
   if (request.mode === "candidate") {
-    fields(receipt, ["target", "packet", "findings", "coverageLimitations"], "candidate receipt");
+    const fix = request.snapshot?.prFix;
+    fields(receipt, ["target", "packet", "findings", "coverageLimitations", ...(fix ? ["prFix"] : [])], "candidate receipt");
+    if (fix) {
+      fields(receipt.prFix, ["declarationSha256", "determination"], "PR-fix determination");
+      need(receipt.prFix.declarationSha256 === request.attachments[fix.declaration] &&
+        (receipt.prFix.determination === "verified" || receipt.prFix.determination === "insufficient" &&
+          Array.isArray(receipt.coverageLimitations) && receipt.coverageLimitations.length > 0),
+      "PR-fix scope or coverage determination is missing");
+    }
     need(header === `Target: ${context.target}` && receipt.target === context.target &&
       receipt.packet === index + 1, "Candidate receipt identity mismatch");
     need(Array.isArray(receipt.findings) && Array.isArray(receipt.coverageLimitations) &&
