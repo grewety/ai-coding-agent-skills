@@ -138,10 +138,12 @@ export function pilotDisposition(role, input, options = {}) {
     }
     const binding = roleConfig(input);
     inspectPinnedFile(binding.executable, { executable: true, excluded: options.excluded });
-    const actual = role === "reviewer" && client === piReviewer.client && options.piReleaseVersion
-      ? options.piReleaseVersion : observeVersion(binding.executable.path, { ...options, client });
+    const actual = observeVersion(binding.executable.path, { ...options, client });
     if (!actual) return unsupported(role, client, "Executable version could not be verified");
     inspectPinnedFile(binding.executable, { executable: true, excluded: options.excluded });
+    if (role === "reviewer" && client === piReviewer.client && options.piReleaseVersion !== undefined) {
+      need(actual === options.piReleaseVersion, "Observed Pi executable version differs from the pinned release version");
+    }
     runtimeVersion = auditVersion(binding, actual, clients[client].floor);
     const mapped = nativeRoleBinding(binding, role);
     const contract = contractFor(role, client);

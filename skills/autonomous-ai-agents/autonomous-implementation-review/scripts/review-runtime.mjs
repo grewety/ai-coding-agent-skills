@@ -1,4 +1,4 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { spawn } from "node:child_process";
 import { constants } from "node:fs";
 import { lstat, mkdir, mkdtemp, open } from "node:fs/promises";
@@ -104,7 +104,7 @@ export function requireReviewHost(config, excluded, options = {}) {
     const roleOptions = { ...options, excluded };
     if (pi) {
       need(pilot.runtime?.piRelease, "Missing pinned Pi release runtime");
-      // The managed shim is provenance only. The closed release is checked before exposure.
+      // Cross-check the executable version before verifying the closed release inventory.
       roleOptions.piReleaseVersion = pilot.runtime.piRelease.version;
     }
     if (pilot.runtime) roleOptions.context = {
@@ -300,6 +300,10 @@ async function sameUidRelay(config, scratch, requestLimit, onFailure, allowedPat
     try { await close(); } catch (closeError) { closeError.relayUnsettled = true; throw closeError; }
     throw error;
   }
+  return { socket, close, diagnostic: relayDiagnostics(child, onFailure) };
+}
+
+export function relayDiagnostics(child, onFailure) {
   let classification;
   let sequence = 0;
   child.on("message", (event) => {
@@ -308,11 +312,18 @@ async function sameUidRelay(config, scratch, requestLimit, onFailure, allowedPat
       onFailure?.(classification);
     }
   });
-  const diagnostic = () => new Promise((resolve, reject) => {
+  return () => new Promise((resolve, reject) => {
     const token = ++sequence;
+    need(Number.isSafeInteger(token), "Host relay diagnostic sequence exhausted");
+    const expected = Buffer.alloc(8);
+    expected.writeBigUInt64BE(BigInt(token));
     const done = () => { child.off("message", received); clearTimeout(timeout); };
     const received = (event) => {
-      if (event?.barrier !== token) return;
+      const barrier = event?.barrier;
+      if (!Number.isSafeInteger(barrier) || barrier <= 0) return;
+      const actual = Buffer.alloc(8);
+      actual.writeBigUInt64BE(BigInt(barrier));
+      if (!timingSafeEqual(actual, expected)) return;
       done();
       const status = classification;
       classification = undefined;
@@ -322,7 +333,6 @@ async function sameUidRelay(config, scratch, requestLimit, onFailure, allowedPat
     child.on("message", received);
     child.send({ barrier: token }, (error) => { if (error) { done(); reject(new Error("Host relay unavailable")); } });
   });
-  return { socket, close, diagnostic };
 }
 
 export async function withReviewRuntime(config, { parent, excluded, packetCount, scratchRoot, configurationSha256 }, callback, startRelay = sameUidRelay) {

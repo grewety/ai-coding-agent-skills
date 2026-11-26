@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
+import { EventEmitter } from "node:events";
 import { createServer } from "node:http";
 import { chmod, copyFile, lstat, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { hash } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-inputs.mjs";
-import { withReviewRuntime } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-runtime.mjs";
+import { relayDiagnostics, withReviewRuntime } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-runtime.mjs";
 
 const fixtureSource = String.raw`
 #include <arpa/inet.h>
@@ -90,6 +91,39 @@ async function bridgeNodePin(fixture, executable) {
 }
 
 const options = ({ evidence, short }) => ({ parent: evidence, excluded: [evidence], packetCount: 1, scratchRoot: short });
+
+test("relay diagnostics settle only on the matching numeric barrier and retain the settlement deadline", async (t) => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  const sent = [];
+  const child = new EventEmitter();
+  child.send = (event, callback) => { sent.push(event); callback(null); };
+  const diagnostic = relayDiagnostics(child);
+  const first = diagnostic();
+  assert.deepEqual(sent, [{ barrier: 1 }]);
+  child.emit("message", { upstreamStatus: "upstream-rate-limited" });
+  for (const event of [null, {}, { barrier: "1" }, { barrier: true }, { barrier: 0 },
+    { barrier: -1 }, { barrier: 1.5 }, { barrier: Number.MAX_SAFE_INTEGER + 1 }, { barrier: 1 + 2 ** 32 }]) {
+    child.emit("message", event);
+    assert.equal(child.listenerCount("message"), 2);
+  }
+  child.emit("message", { barrier: 1 });
+  assert.equal(await first, "upstream-rate-limited");
+  assert.equal(child.listenerCount("message"), 1);
+
+  const second = diagnostic();
+  assert.deepEqual(sent, [{ barrier: 1 }, { barrier: 2 }]);
+  child.emit("message", { barrier: 1 });
+  assert.equal(child.listenerCount("message"), 2);
+  child.emit("message", { barrier: 2 });
+  assert.equal(await second, undefined);
+
+  const timeout = assert.rejects(diagnostic(), /Host relay diagnostic settlement failed/);
+  t.mock.timers.tick(999);
+  assert.equal(child.listenerCount("message"), 2);
+  t.mock.timers.tick(1);
+  await timeout;
+  assert.equal(child.listenerCount("message"), 1);
+});
 
 test("private scratch validation rejects group-writable pins, unsafe scratch and oversized UTF-8 socket addresses before bind", async (t) => {
   const f = await fixture(t);

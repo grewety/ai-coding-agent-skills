@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import { piReleaseInventory, verifyPiRelease } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/agent-pi-runtime.mjs";
 import { jsonBytes as settingsBytes } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/agent-configuration.mjs";
+import { validatePilotHost } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/agent-setup.mjs";
 import { runtimeIdentity } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-runtime.mjs";
 import { reviewCommand } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-candidate.mjs";
 import { hash, jsonBytes } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-inputs.mjs";
@@ -44,6 +45,11 @@ test("Pi requires exact qualification and its single-run synthetic trial is inde
     interPacketDelayMs: 0, timeoutMs: 1000, maxBudgetUsd: 1, runtime: { node: bwrap, libraries: [], relayConfiguration: relay, piRelease } };
   const hostPin = await pin("host.json", settingsBytes(host));
   const shared = { runtimeSha256: await runtimeIdentity(), configurationSha256: hostPin.sha256 };
+  await t.test("setup validates the required Pi release pin", () => {
+    assert.deepEqual(validatePilotHost(host).runtime.piRelease, piRelease);
+    assert.throws(() => validatePilotHost({ ...host, runtime: { ...host.runtime, piRelease: null } }), /Invalid Pi release pin/);
+  });
+
   const subject = { ...shared, relaySha256: relay.sha256,
     constraintsSha256: hash(jsonBytes({ runtime: host.runtime, bubblewrapAudit: {
       versionPolicy: "exact", versionCheck: true, exactVersion: "0.9.0", observedVersion: "0.9.0", comparison: "passed",
@@ -58,12 +64,25 @@ test("Pi requires exact qualification and its single-run synthetic trial is inde
   const offlineProof = { schemaVersion: 1, kind: "offline", supervisor: "fixture-supervisor", subject,
     effective: { client, provider, model, reasoningEffort, transport, version: "1.5.2", executableSha256: pi.sha256 }, controls };
   const offline = await pin("offline.json", settingsBytes(offlineProof));
+  await t.test("the pinned Pi executable must report the pinned release version", async () => {
+    const wrongPi = await pin("wrong-pi", versionFixture("pi 1.5.3"), 0o700);
+    const wrongHost = { ...host, roleBinding: { ...role, executable: wrongPi } };
+    const wrongHostPin = await pin("wrong-host.json", settingsBytes(wrongHost));
+    const wrongOffline = await pin("wrong-offline.json", settingsBytes({ ...offlineProof,
+      subject: { ...subject, configurationSha256: wrongHostPin.sha256, roleBindingSha256: hash(settingsBytes(wrongHost.roleBinding)) },
+      effective: { ...offlineProof.effective, executableSha256: wrongPi.sha256 },
+    }));
+    assert.throws(() => requireReviewHost(wrongHost, [], {
+      ...shared, configurationSha256: wrongHostPin.sha256, trialOffline: wrongOffline,
+    }), /Observed Pi executable version differs from the pinned release version/);
+  });
   assert.throws(() => requireReviewHost(host, [], shared), /bounded live proof/);
   assert.throws(() => requireReviewHost(host, [], { ...shared, trialOffline: { ...offline, sha256: "0".repeat(64) } }), /pin mismatch/);
   assert.throws(() => requireReviewHost({ ...host, runtime: undefined, roleBinding: { ...role, client: "grok-build", exactVersion: "1.0.92" },
     relay: { ...host.relay, route: "xai-oauth" } }, [], shared), /no verified host-only xAI OAuth/);
   const config = requireReviewHost(host, [], { ...shared, trialOffline: offline });
   const explicit = runtimeBinding(config, null, hostPin.sha256).explicit;
+  assert.equal(explicit.version.observedVersion, piRelease.version);
   const snapshot = path.join(root, "release-copy");
   await verifyPiRelease(piRelease, [], snapshot);
   const session = "12121212-3434-4b4b-b5b5-565656565656";

@@ -79,18 +79,21 @@ export function validatePilotHost(input) {
   if (input.runtime !== undefined) {
     fields(input.runtime, ["node", "libraries", "relayConfiguration",
       ...(roleBinding.client === piReviewer.client ? ["piRelease"] : [])], [], "reviewer runtime pins");
-    const { node, libraries, relayConfiguration } = input.runtime;
+    const { node, libraries, relayConfiguration, piRelease } = input.runtime;
     need(Array.isArray(libraries) && libraries.length <= 64, "Invalid reviewer library pins");
     const targets = new Set();
-    runtime = { node: validatePin(node), relayConfiguration: validatePin(relayConfiguration),
-      ...(input.runtime.piRelease ? { piRelease: validatePiRelease(input.runtime.piRelease) } : {}), libraries: libraries.map((entry) => {
-      fields(entry, ["path", "sha256", "target"], [], "runtime library");
-      const { target, ...pin } = entry;
-      need(typeof target === "string" && /^\/(?:usr\/)?lib(?:64)?\/(?:[a-zA-Z0-9_-]+\/)?[a-zA-Z0-9_+-]+\.so(?:\.[\w.-]+)?$/.test(target) &&
-        !targets.has(target), "Unsafe reviewer runtime library target");
-      targets.add(target);
-      return { ...validatePin(pin), target };
-    }) };
+    runtime = {
+      node: validatePin(node), relayConfiguration: validatePin(relayConfiguration),
+      ...(roleBinding.client === piReviewer.client ? { piRelease: validatePiRelease(piRelease) } : {}),
+      libraries: libraries.map((entry) => {
+        fields(entry, ["path", "sha256", "target"], [], "runtime library");
+        const { target, ...pin } = entry;
+        need(typeof target === "string" && /^\/(?:usr\/)?lib(?:64)?\/(?:[a-zA-Z0-9_-]+\/)?[a-zA-Z0-9_+-]+\.so(?:\.[\w.-]+)?$/.test(target) &&
+          !targets.has(target), "Unsafe reviewer runtime library target");
+        targets.add(target);
+        return { ...validatePin(pin), target };
+      }),
+    };
   }
   if (input.localHarness != null) validateHarnessBinding(input.localHarness);
   return { schemaVersion: 2, roleBinding,
