@@ -37,7 +37,7 @@ export function roleConfig(input) {
     typeof reasoningEffort === "string" && /^[a-z][a-z0-9-]{0,31}$/.test(reasoningEffort),
   "Invalid explicit provider, model or reasoningEffort");
   need(client === "hermes" ? token(profile) : profile === undefined, "Hermes requires an explicit profile. Other clients do not accept profile.");
-  need(transport === undefined || ["interactive", "stdin", "unix-socket"].includes(transport), "Unsupported role transport");
+  need(transport === undefined || ["interactive", "stdin", "unix-socket", "provider-https"].includes(transport), "Unsupported role transport");
   return { client, provider, model, reasoningEffort, ...versionPolicy(input, clients[client].floor),
     executable: validatePin(input.executable), ...(profile === undefined ? {} : { profile }),
     ...(transport === undefined ? {} : { transport }) };

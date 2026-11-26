@@ -9,6 +9,7 @@ import { acquireClaim, claimPath, defaultRegistry, exclusiveOperation, openRegis
   retireReservation, serializedOperation, slotPath } from "./implementer-claims.mjs";
 import { verifyPostWorker } from "./implementer-observations.mjs";
 import { currentAttempt, handoffFor, supervisorBinding, verifyTimeoutContinuation } from "./implementer-recovery.mjs";
+import { tierIdentity } from "./containment-tier.mjs";
 import { buildCodexLaunch, smokeCheck } from "./implementer-sandbox.mjs";
 import { cancelSupervisor, operationProcess, startSupervisor } from "./implementer-supervisor.mjs";
 import { identifier, newDirectory, privateDirectory, readState, syncDirectory, trustedJson, writeState } from "./implementer-state.mjs";
@@ -18,12 +19,12 @@ const packageRoot = fileURLToPath(new URL("../", import.meta.url)).replace(/\/$/
 // Keep this inventory in sync with the delivery verifier and its transitive inventory test.
 const runtimeSources = [
   "adapter-qualification.mjs", "agent-configuration.mjs", "agent-discovery.mjs", "agent-pi-runtime.mjs", "agent-role-adapters.mjs",
-  "agent-role-config.mjs", "agent-setup.mjs", "role-config.mjs", "runtime-version.mjs", "setup.mjs",
+  "agent-role-config.mjs", "agent-setup.mjs", "role-config.mjs", "runtime-version.mjs", "setup.mjs", "containment-tier.mjs",
   "bounded-worker.mjs", "bounded-worker.py", "implementer-bindings.mjs", "implementer-claims.mjs",
   "implementer-observations.mjs", "implementer-recovery.mjs", "implementer-runtime.mjs", "implementer-sandbox.mjs",
   "implementer-state.mjs", "implementer-supervisor.mjs", "implementer-supervisor.py", "orchestration-core.mjs",
   "review-admission.mjs", "review-archive.mjs", "review-candidate.mjs", "review-inputs.mjs", "review-packet-scheduler.mjs", "review-relay.mjs",
-  "review-runtime-scratch.mjs", "review-runtime.mjs", "review-sandbox-bridge.mjs", "review-stream.mjs",
+  "containment-linux-offline.mjs", "review-grok-offline.mjs", "review-runtime-scratch.mjs", "review-runtime.mjs", "review-sandbox-bridge.mjs", "review-stream.mjs",
   "harness-result.mjs", "low-touch-policy.mjs", "planning-inventory.mjs", "review-preflight.mjs",
   "review-spend.mjs", "review-upstream-status.mjs",
   "run-implementer.mjs", "terminal-adapters.mjs", "worker-handoff.mjs", "worker-runtime-policy.mjs",
@@ -206,7 +207,7 @@ async function prepareAttempt(entry, registry, runtimeSha256, batchSize, emit, r
     const now = Date.now();
     const { deadline, timeoutMs } = attemptWindow(request, grant, roles, history, owner.createdAt, expiry, now);
     const binding = physicalReservation(owner.claimId, attempt, roles);
-    const launch = { schemaVersion: 1, repository, workspace, change, task, attempt, predecessor, transition,
+    const launch = { schemaVersion: 1, ...tierIdentity(roles), repository, workspace, change, task, attempt, predecessor, transition,
       claimId: owner.claimId, nonce: randomUUID(), startedAt: now, sequence: history.length, deadline,
       limits: grant.limits, grantExpiresAt: grant.expiresAt,
       requestSha256: hash(requestBytes(request)), invocationSha256: hash(jsonBytes(entry)), runtimeSha256,
@@ -368,7 +369,7 @@ async function retainedContext(entry, registry) {
     launch.runtimeSha256 === runtimeSha256, "Original retained attempt, runtime or request differs");
   const { grant, prospective } = await loadAuthority(entry, repository);
   const roles = await bindPair(entry, grant, runtimeSha256, registry, prospective, runtimeIdentity);
-  need(equal(roles.pair, launch.pair) && equal(roles.roleAudit, launch.roleAudit) && equal(roles.physicalSlot, launch.slot) &&
+  need(equal(tierIdentity(roles), tierIdentity(launch)) && equal(roles.pair, launch.pair) && equal(roles.roleAudit, launch.roleAudit) && equal(roles.physicalSlot, launch.slot) &&
     equal(physicalReservation(launch.claimId, attempt, roles), launch.reservation), "Original pinned role or physical slot differs");
   return { entry, registry, repository, claimDirectory, attemptDirectory, owner, launch, grant, roles, runtimeSha256 };
 }

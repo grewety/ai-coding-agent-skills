@@ -54,6 +54,7 @@ const adoptedDelivery = "low-touch-autonomous-delivery-01m88zpkktr16z02dh3wne3pp
 const configurableBackends = "configurable-worker-and-reviewer-backends-01m8a1cfak28znhgw126kzxye4";
 const testingOverhaul = "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n";
 const tier1Reviewer = "tier1-non-claude-contained-reviewer-01m8by1bvkhr053edzgtt5t0cm";
+const tieredContainment = "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb";
 const currentSpecs = path.join(root, "openspec", "specs");
 
 function readCapabilitySpec(specsRoot, capability) {
@@ -119,8 +120,8 @@ test("low-touch delivery retains requirements until explicitly superseded, with 
 });
 
 test("configurable worker and reviewer backends retain exact requirements until explicitly superseded", async () => {
-  const [deltaRoot, overhaulRoot, tier1Root] = await Promise.all(
-    [configurableBackends, testingOverhaul, tier1Reviewer].map(deltaDirectory),
+  const [deltaRoot, overhaulRoot, tier1Root, tieredRoot] = await Promise.all(
+    [configurableBackends, testingOverhaul, tier1Reviewer, tieredContainment].map(deltaDirectory),
   );
   for (const [capability, expected] of [["contained-independent-review", 1], ["exclusive-worker-runtime", 2], ["openspec-integration", 3]]) {
     let [delta, current] = await Promise.all([
@@ -134,6 +135,11 @@ test("configurable worker and reviewer backends retain exact requirements until 
     if (capability === "contained-independent-review") {
       const newerDelta = await readCapabilitySpec(tier1Root, capability);
       delta = withoutSupersededRequirements(delta, newerDelta, "Contained Reviewer adapter and relay qualification");
+      const tieredDelta = await readCapabilitySpec(tieredRoot, capability);
+      const retained = withoutSupersededRequirements(delta, tieredDelta, "Probed OS containment");
+      assert.doesNotMatch(retained, /^### Requirement: /m);
+      // Verify the exact current modification of the last configurable-backend requirement.
+      [delta] = tieredDelta.split("\n## ADDED Requirements\n", 1);
     }
     assert.ok(current.startsWith(header("spec", `capability: ${capability}\n`)));
     assert.equal(checkPromotion({ capability, delta, current }), expected, capability);
@@ -172,6 +178,18 @@ test("Tier 1 reviewer promotes both frozen deltas exactly within the review expo
     assert.equal(checkPromotion({ capability, delta, current }), 1, capability);
     assert.ok(current.startsWith(header("spec", `capability: ${capability}\n`)));
     assert.ok(Buffer.byteLength(current) <= 65536, `${capability} must fit the pinned review export`);
+  }
+});
+
+test("tiered containment promotes all three frozen deltas within the review export limit", async () => {
+  const deltaRoot = await deltaDirectory(tieredContainment);
+  for (const [capability, expected] of [["contained-independent-review", 4], ["exclusive-worker-runtime", 1], ["openspec-integration", 3]]) {
+    const [delta, current] = await Promise.all([
+      readCapabilitySpec(deltaRoot, capability),
+      readCapabilitySpec(currentSpecs, capability),
+    ]);
+    assert.equal(checkPromotion({ capability, delta, current }), expected, capability);
+    assert.ok(Buffer.byteLength(current) < 65536, `${capability} must fit the pinned review export`);
   }
 });
 async function fixture(t) {

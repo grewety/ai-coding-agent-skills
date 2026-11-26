@@ -19,6 +19,7 @@ import { upstreamClasses } from "./review-upstream-status.mjs";
 import { piReviewer } from "./agent-role-adapters.mjs";
 import { auditClaudeStream, auditPiStream } from "./review-stream.mjs";
 import { createAttempt, publishResult, readClosed, readHandoff, requestBytes as workerRequestBytes, writeClosed } from "./worker-handoff.mjs";
+import { maximumReviewerTimeoutMs, requireTier, tierFields, tierIdentity } from "./containment-tier.mjs";
 import { packetConcurrency, replayPacketSchedule, schedulePackets } from "./review-packet-scheduler.mjs";
 
 const probePrompt = "Do not call any tools. Reply with exactly REVIEW_PROBE_OK.";
@@ -28,7 +29,8 @@ const readSealed = (dir, name, limit) => readClosed(path.join(dir, name), limit,
 
 function validateRuntime(runtime, expect) {
   fields(runtime, ["session", "model", "version", "bubblewrapVersion", "maxTurns", "maxBudgetUsd",
-    "configurationSha256", "route"], "retained runtime", ["explicit"]);
+    "configurationSha256", "route"], "retained runtime", ["explicit", ...tierFields]);
+  need(equal(tierIdentity(runtime), tierIdentity(expect)), "Retained runtime tier or driver differs");
   const pi = expect.explicit?.client === piReviewer.client;
   if (expect.explicit) {
     need(equal(runtime.explicit, expect.explicit) && runtime.version === expect.explicit.version.observedVersion &&
@@ -60,7 +62,7 @@ function validateExplicit(expect, request) {
   need((pi ? explicit.provider === piReviewer.provider && explicit.reasoningEffort === piReviewer.effort &&
     explicit.version?.versionPolicy === "exact" && explicit.version.versionCheck === true &&
     explicit.version.exactVersion === piReviewer.version && explicit.requestLimit === 96 && digest(explicit.piReleaseSha256) &&
-    Number.isSafeInteger(explicit.timeoutMs) && explicit.timeoutMs >= 1000 && explicit.timeoutMs <= 300000 :
+    Number.isSafeInteger(explicit.timeoutMs) && explicit.timeoutMs >= 1000 && explicit.timeoutMs <= (expect.osDriver ? maximumReviewerTimeoutMs : 300000) :
     explicit.provider === "anthropic" && ["low", "medium", "high", "max"].includes(explicit.reasoningEffort)) &&
     pins.every((key) => digest(explicit[key])) && explicit.qualificationSha256 === expect.qualification.sha256,
   "Invalid independently retained explicit reviewer pins");
@@ -74,7 +76,9 @@ async function loadInputs(requestFile, expectFile) {
   validateReviewRequest(request);
   const expect = await readJson(expectFile);
   fields(expect, ["schemaVersion", "requestSha256", "exportSha256", "configurationSha256", "model"],
-    "independent expectation", ["statusSha256", "harness", "qualification", "generator", "explicit", "packetConcurrency"]);
+    "independent expectation", ["statusSha256", "harness", "qualification", "generator", "explicit", "packetConcurrency", ...tierFields]);
+  const tier = tierIdentity(expect);
+  if (tier.osDriver) requireTier(tier, "reviewer", expect.explicit?.client ?? "claude-code");
   packetConcurrency(expect.packetConcurrency);
   need(expect.schemaVersion === 1 && expect.requestSha256 === hash(jsonBytes(request)) &&
     (expect.exportSha256 === null || digest(expect.exportSha256)) && digest(expect.configurationSha256) &&
@@ -91,7 +95,7 @@ function attemptRuntime(runtime) {
   const client = runtime.explicit?.client ?? "claude-code";
   return { adapter: client, client, version: runtime.version,
     session: runtime.session, provider: runtime.explicit?.provider ?? "anthropic", model: runtime.model,
-    configurationSource: runtime.configurationSha256, configurationScope: "contained-review", readOnly: true };
+    ...tierIdentity(runtime), configurationSource: runtime.configurationSha256, configurationScope: "contained-review", readOnly: true };
 }
 
 function attemptNames(index) {
@@ -206,6 +210,13 @@ async function outcome(directory, request, expect, prepared, count, expected, sc
   const observed = await replay(directory, request, expect, prepared, count, schedule);
   const files = {};
   const describe = (name, bytes) => describeFile(directory, name, bytes);
+  if (expect.osDriver) {
+    files["launch.json"] = jsonBytes({ schemaVersion: 1, ...tierIdentity(expect), runtime: observed.runtime,
+      requestSha256: expect.requestSha256, exportSha256: expect.exportSha256, sessions: observed.sessions });
+    if (observed.phase === "complete") files["receipt.json"] = jsonBytes({ schemaVersion: 1, ...tierIdentity(expect),
+      configurationSha256: expect.configurationSha256, requestSha256: expect.requestSha256,
+      exportSha256: expect.exportSha256, packets: observed.receipts });
+  }
   let result;
   let handoff = null;
   if (request.mode === "candidate" && observed.phase === "complete") {
@@ -214,7 +225,7 @@ async function outcome(directory, request, expect, prepared, count, expected, sc
     result = handoff;
   } else {
     files["report.md"] = observed.native;
-    result = { schemaVersion: 1, mode: request.mode, requestSha256: expect.requestSha256,
+    result = { schemaVersion: 1, ...tierIdentity(expect), mode: request.mode, requestSha256: expect.requestSha256,
       phase: observed.phase,
       ...(request.mode === "approach" ? {
         native: observed.receipts[0]?.receipt ?? null, approachAction: observed.receipts[0]?.admission.action ?? null,
@@ -227,7 +238,7 @@ async function outcome(directory, request, expect, prepared, count, expected, sc
 
 function statusFor(directory, expect, count, outcome, resultBytes, requestBytes) {
   return {
-    schemaVersion: 1, requestSha256: expect.requestSha256, exportSha256: expect.exportSha256,
+    schemaVersion: 1, ...tierIdentity(expect), requestSha256: expect.requestSha256, exportSha256: expect.exportSha256,
     configurationSha256: expect.configurationSha256, model: expect.model, phase: outcome.observed.phase, count,
     ...(packetConcurrency(expect.packetConcurrency) > 1 ?
       { packetConcurrency: expect.packetConcurrency, schedule: outcome.observed.schedule } : {}),
@@ -390,7 +401,7 @@ export async function runReview({ request, expect, prepared, directory, excluded
   if (reconstructed.handoff) {
     await publishResult({ expected, runtime: reconstructed.observed.runtime, result: reconstructed.handoff, files: reconstructed.files });
   } else {
-    await writeClosed(path.join(directory, "report.md"), reconstructed.files["report.md"], true);
+    for (const [name, bytes] of Object.entries(reconstructed.files)) await writeClosed(path.join(directory, name), bytes, true);
     await writeClosed(path.join(directory, "result.json"), reconstructed.resultBytes, true);
   }
   const status = jsonBytes(statusFor(directory, expect, count, reconstructed,
@@ -508,12 +519,12 @@ export async function reviewCommand(argv, openRuntime = withReviewRuntime) {
     const directory = options.output;
     const hostFile = options["host-config"];
     const { value, configurationSha256 } = await trustedJson(hostFile, [directory]);
-    need(value.schemaVersion === 2 || !options.qualification, "Legacy probe cannot select explicit qualification");
+    need([2, 4].includes(value.schemaVersion) || !options.qualification, "Legacy probe cannot select explicit qualification");
     const qualification = options.qualification && { path: options.qualification, sha256: options["qualification-sha256"] };
     const trialOffline = options["tier1-offline"] && { path: options["tier1-offline"], sha256: options["tier1-offline-sha256"] };
     need(!trialOffline || value.schemaVersion === 2, "Tier 1 trial requires an explicit host pin");
     const trustExcluded = [directory, options.admission].filter(Boolean);
-    const config = requireReviewHost(value, trustExcluded, value.schemaVersion === 2 ? {
+    const config = requireReviewHost(value, trustExcluded, [2, 4].includes(value.schemaVersion) ? {
       qualification, trialOffline, configurationSha256, runtimeSha256: await runtimeIdentity(), verifyRuntimeIdentity: runtimeIdentity,
       hostPin: { path: hostFile, sha256: configurationSha256 },
     } : {});
@@ -540,7 +551,7 @@ export async function reviewCommand(argv, openRuntime = withReviewRuntime) {
       });
       if (passed) phase = "probe-passed";
     } finally {
-      await writeJson(directory, "status.json", { schemaVersion: 1, phase, deliveryAccepted: false });
+      await writeJson(directory, "status.json", { schemaVersion: 1, ...tierIdentity(config), phase, deliveryAccepted: false });
       await sealDirectories(directory);
     }
     return { phase };
@@ -595,7 +606,7 @@ export async function reviewCommand(argv, openRuntime = withReviewRuntime) {
       "Unexpected harness result without a host binding");
   };
   if (command === "--prepare") return { exportSha256: await prepareExport(exportDirectory, request, expect.exportSha256, preflight),
-    ...(explicit ? { explicit } : {}) };
+    ...(explicit ? { explicit } : {}), ...(config ? tierIdentity(config) : {}) };
   const prepared = await checkExport(exportDirectory, expect.exportSha256, request);
   preflight(prepared);
   if (options.admission) need(policy && config, "Admission file requires adopting policy and pinned host.json");
@@ -608,7 +619,7 @@ export async function reviewCommand(argv, openRuntime = withReviewRuntime) {
   if (command === "--check") return { exportSha256: expect.exportSha256, packets: prepared.manifest.packets.length,
     ...(config ? { maxTurns: config.maxTurns } : {}), ...(spend ? { admission: spend.policy.mode, scope: spend.scope } : {}),
     ...(spend?.ledgerIdentity ? { ledgerIdentity: spend.ledgerIdentity } : {}),
-    ...(explicit ? { explicit } : {}) };
+    ...(explicit ? { explicit } : {}), ...(config ? tierIdentity(config) : {}) };
   const directory = options.output;
   need([exportDirectory, options.request, options.expect].every((root) => separate(directory, root)), "Output overlaps retained inputs");
   if (command === "--verify") return verify(directory, request, expect, prepared);

@@ -2,6 +2,7 @@ import { hashBytes, inspectPinnedFile, jsonBytes, parseStrictJson } from "./agen
 import { observeVersion } from "./agent-discovery.mjs";
 import { grokReviewerBlocker, nativeRoleBinding, piReviewer } from "./agent-role-adapters.mjs";
 import { clients, fields, need, roleConfig, sha256Pattern, token, verifyEffectiveRole } from "./role-config.mjs";
+import { requireTier, tierFields, tierIdentity } from "./containment-tier.mjs";
 import { auditVersion } from "./runtime-version.mjs";
 
 const candidates = {
@@ -55,12 +56,14 @@ function matches(actual, expected, label) {
 
 function qualificationSubject(role, binding, actual, context) {
   fields(context, ["runtimeSha256", "configurationSha256", "constraintsSha256",
-    ...(role === "reviewer" ? ["relaySha256"] : [])], [], "trusted qualification context");
-  need(Object.values(context).every((value) => typeof value === "string" && sha256Pattern.test(value)),
+    ...(role === "reviewer" ? ["relaySha256"] : [])], tierFields, "trusted qualification context");
+  const tier = tierIdentity(context);
+  if (tier.osDriver) requireTier(tier, role, binding.client);
+  need(Object.entries(context).filter(([name]) => !tierFields.includes(name)).every(([, value]) => typeof value === "string" && sha256Pattern.test(value)),
     "Missing independent runtime, configuration, constraints or relay pin");
   const subject = { ...context, roleBindingSha256: hashBytes(jsonBytes(binding)) };
-  const effective = Object.fromEntries(["client", "provider", "model", "reasoningEffort", "profile", "transport"]
-    .filter((name) => binding[name] !== undefined).map((name) => [name, binding[name]]));
+  const effective = { ...tier, ...Object.fromEntries(["client", "provider", "model", "reasoningEffort", "profile", "transport"]
+    .filter((name) => binding[name] !== undefined).map((name) => [name, binding[name]])) };
   return { subject, effective: { ...effective, version: actual, executableSha256: binding.executable.sha256 } };
 }
 

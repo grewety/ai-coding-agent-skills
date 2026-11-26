@@ -273,3 +273,39 @@ test("setup allows a distinct XDG application directory and refuses a live profi
   assert.throws(() => previewSetup(request, { workspace }), /live profile/);
   assert.deepEqual(readdirSync(separate), []);
 });
+
+test("explicit tier setup previews exact bytes, binds confirmation and refuses unsafe dedicated auth", (t) => {
+  const { input, workspace, root, command, executable } = fixture(t);
+  const relay = path.join(root, "relay.json");
+  const relayBytes = Buffer.from("{}\n");
+  writeFileSync(relay, relayBytes, { mode: 0o600 });
+  const { timeoutMs, ...choices } = input.reviewer;
+  input.reviewer = { ...choices, runtime: { node: { path: command }, libraries: [],
+    relayConfiguration: { path: relay, sha256: hashBytes(relayBytes) } } };
+  const a = previewSetup(input, { workspace, tier: "a" });
+  assert.deepEqual(readdirSync(input.directory), []);
+  const host = JSON.parse(a.outputs[0].utf8);
+  assert.equal(host.timeoutMs, 300000);
+  assert.deepEqual(host.runtime.node, executable);
+  assert.equal(a.configurationSha256, hashBytes(a.outputs[0].utf8));
+  assert.throws(() => applySetup(input, "0".repeat(64), { workspace, tier: "a" }), /confirmation/);
+  assert.equal(applySetup(input, a.confirmationSha256, { workspace, tier: "a" }).status, "verified");
+
+  const directory = path.join(root, "tier-b");
+  const authDirectory = path.join(root, "fixture-auth");
+  mkdirSync(directory, { mode: 0o700 });
+  mkdirSync(authDirectory, { mode: 0o700 });
+  const auth = path.join(authDirectory, "auth.json");
+  writeFileSync(auth, "benign-fixture-only", { mode: 0o600 });
+  const { relay: unusedRelay, ...dedicated } = choices;
+  input.directory = directory;
+  input.reviewer = { ...dedicated, authDirectory, runtime: { node: executable, libraries: [] } };
+  input.roles.reviewer = { ...input.roles.reviewer, client: "grok-build", model: "grok-4.7", provider: "xai-oauth",
+    transport: "provider-https", versionPolicy: "exact", versionCheck: true, exactVersion: "1.0.92" };
+  const b = previewSetup(input, { workspace, tier: "b" });
+  assert.equal(b.qualification.status, "unqualified");
+  assert.ok(!JSON.stringify(b).includes("benign-fixture-only"));
+  assert.deepEqual(readdirSync(directory), []);
+  chmodSync(auth, 0o640);
+  assert.throws(() => previewSetup(input, { workspace, tier: "b" }), /Unsafe dedicated auth/);
+});

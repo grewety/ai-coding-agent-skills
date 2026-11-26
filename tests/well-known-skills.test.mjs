@@ -66,6 +66,7 @@ test("well-known build publishes every skill and all advertised files", async ()
       "scripts/review-admission.mjs",
       "scripts/review-archive.mjs",
       "scripts/review-candidate.mjs",
+      "scripts/review-grok-offline.mjs",
       "scripts/review-inputs.mjs",
       "scripts/review-preflight.mjs",
       "scripts/review-relay.mjs",
@@ -80,6 +81,7 @@ test("well-known build publishes every skill and all advertised files", async ()
     const implementerFiles = [
       "references/run-implementer.md",
       "references/worker-runtime.md",
+      "scripts/containment-linux-offline.mjs",
       "scripts/implementer-bindings.mjs",
       "scripts/implementer-claims.mjs",
       "scripts/implementer-observations.mjs",
@@ -93,7 +95,8 @@ test("well-known build publishes every skill and all advertised files", async ()
       "scripts/worker-runtime-policy.mjs",
     ];
     const roleFiles = ["adapter-qualification", "agent-configuration", "agent-discovery", "agent-pi-runtime",
-      "agent-role-adapters", "agent-role-config", "agent-setup", "detect-agents", "role-config", "runtime-version", "setup"]
+      "agent-role-adapters", "agent-role-config", "agent-setup", "containment-tier", "detect-agents",
+      "role-config", "runtime-version", "setup", "windows-containment-preflight"]
       .map((name) => "scripts/" + name + ".mjs");
     assert.deepEqual(
       [...declaredFiles, ...reviewerFiles, ...implementerFiles].sort(),

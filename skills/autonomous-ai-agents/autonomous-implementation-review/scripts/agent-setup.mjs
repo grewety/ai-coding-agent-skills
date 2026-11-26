@@ -1,3 +1,4 @@
+import { authDirectoryIdentity, defaultReviewerTimeoutMs, grokTierBlocker, maximumReviewerTimeoutMs, requireTier, tierFields } from "./containment-tier.mjs";
 import { validatePiRelease } from "./agent-pi-runtime.mjs";
 import { closeSync, constants, fstatSync, fsyncSync, lstatSync, openSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -51,39 +52,52 @@ function directoryState(directory, workspace) {
 }
 
 export function validatePilotHost(input) {
-  fields(input, ["schemaVersion", "roleBinding", "bubblewrap", "relay", "maxTurns", "interPacketDelayMs",
-    "timeoutMs", "maxBudgetUsd"], ["runtime", "localHarness", "packetConcurrency"], "reviewer pilot host");
-  need(input.schemaVersion === 2, "Invalid reviewer pilot host schema");
+  const tiered = input?.schemaVersion === 4;
+  const dedicated = tiered && input.containmentTier === "b";
+  fields(input, ["schemaVersion", "roleBinding", "bubblewrap", dedicated ? "authDirectory" : "relay",
+    "maxTurns", "interPacketDelayMs", "timeoutMs", "maxBudgetUsd", ...(tiered ? tierFields : [])],
+  ["runtime", "localHarness", "packetConcurrency", ...(tiered ? ["runTimeoutMs"] : [])], "reviewer pilot host");
+  need(tiered || input.schemaVersion === 2, "Invalid reviewer pilot host schema");
   const roleBinding = roleConfig(input.roleBinding);
   const { relay, maxTurns, interPacketDelayMs, timeoutMs, maxBudgetUsd, packetConcurrency } = input;
-  fields(relay, ["route", "credentialRef"], [], "named relay reference");
-  need(["same-uid-key", "dedicated-uid-broker", "openrouter", "openai-compatible", "gemini", "xai-oauth", piReviewer.relay].includes(relay.route) &&
-    token(relay.credentialRef) && !/^(?:sk-|ghp_|github_pat_)/i.test(relay.credentialRef), "Invalid named relay reference");
-  if (relay.route === piReviewer.relay || roleBinding.client === piReviewer.client) {
-    requirePiReviewer(roleBinding);
-    need(relay.route === piReviewer.relay, "Pi reviewer requires the host Hermes proxy xAI OAuth relay");
+  const tier = tiered ? requireTier(input, "reviewer", roleBinding.client) : {};
+  if (dedicated) {
+    need(absolute(input.authDirectory) && roleBinding.provider === "xai-oauth" && roleBinding.model === "grok-4.7" &&
+      roleBinding.transport === "provider-https" && roleBinding.versionPolicy === "exact" &&
+      roleBinding.versionCheck && roleBinding.exactVersion === "1.0.92", "Tier B requires explicit native Grok 1.0.92 xAI OAuth");
+  } else {
+    fields(relay, ["route", "credentialRef"], [], "named relay reference");
+    need(["same-uid-key", "dedicated-uid-broker", "openrouter", "openai-compatible", "gemini", "xai-oauth", piReviewer.relay].includes(relay.route) &&
+      token(relay.credentialRef) && !/^(?:sk-|ghp_|github_pat_)/i.test(relay.credentialRef), "Invalid named relay reference");
+    if (relay.route === piReviewer.relay || roleBinding.client === piReviewer.client) {
+      requirePiReviewer(roleBinding);
+      need(relay.route === piReviewer.relay, "Pi reviewer requires the host Hermes proxy xAI OAuth relay");
+    }
+    if (relay.route === "xai-oauth") need(roleBinding.client === "grok-build" && roleBinding.provider === "xai-oauth" &&
+      roleBinding.model === "grok-4.7" && roleBinding.transport === "unix-socket" &&
+      roleBinding.versionPolicy === "exact" && roleBinding.versionCheck && roleBinding.exactVersion === "1.0.92",
+    "Grok reviewer requires exact 1.0.92, grok-4.7 and host xAI OAuth over a Unix socket");
   }
-  if (relay.route === "xai-oauth") need(roleBinding.client === "grok-build" && roleBinding.provider === "xai-oauth" &&
-    roleBinding.model === "grok-4.7" && roleBinding.transport === "unix-socket" &&
-    roleBinding.versionPolicy === "exact" && roleBinding.versionCheck && roleBinding.exactVersion === "1.0.92",
-  "Grok reviewer requires exact 1.0.92, grok-4.7 and host xAI OAuth over a Unix socket");
+  if (tiered && !dedicated) need(["same-uid-key", piReviewer.relay].includes(relay.route), "Unqualified Tier A relay");
+  need(input.runTimeoutMs === undefined || Number.isSafeInteger(input.runTimeoutMs) &&
+    input.runTimeoutMs >= 1000 && input.runTimeoutMs <= 3600000, "Invalid enclosing reviewer timeout");
   need(maxTurns === 96 && Number.isSafeInteger(interPacketDelayMs) && interPacketDelayMs >= 0 && interPacketDelayMs <= 30000 &&
-    Number.isSafeInteger(timeoutMs) && timeoutMs >= 1000 && timeoutMs <= 300000 &&
+    Number.isSafeInteger(timeoutMs) && timeoutMs >= 1000 && timeoutMs <= (tiered ? maximumReviewerTimeoutMs : defaultReviewerTimeoutMs) &&
     Number.isFinite(maxBudgetUsd) && maxBudgetUsd > 0 && maxBudgetUsd <= 10, "Invalid reviewer limits");
   need(packetConcurrency === undefined || Number.isSafeInteger(packetConcurrency) && packetConcurrency >= 1 &&
-    packetConcurrency <= 3 && (packetConcurrency === 1 || ["same-uid-key", piReviewer.relay].includes(relay.route)),
+    packetConcurrency <= 3 && (packetConcurrency === 1 || ["same-uid-key", piReviewer.relay].includes(relay?.route)),
   "Invalid packetConcurrency or relay without packet isolation");
   fields(input.bubblewrap, ["executable"], ["versionPolicy", "versionCheck", "exactVersion", "minVersion", "maxVersion"],
     "Bubblewrap policy");
   let runtime;
   if (input.runtime !== undefined) {
-    fields(input.runtime, ["node", "libraries", "relayConfiguration",
+    fields(input.runtime, ["node", "libraries", ...(!dedicated ? ["relayConfiguration"] : []),
       ...(roleBinding.client === piReviewer.client ? ["piRelease"] : [])], [], "reviewer runtime pins");
     const { node, libraries, relayConfiguration, piRelease } = input.runtime;
     need(Array.isArray(libraries) && libraries.length <= 64, "Invalid reviewer library pins");
     const targets = new Set();
     runtime = {
-      node: validatePin(node), relayConfiguration: validatePin(relayConfiguration),
+      node: validatePin(node), ...(!dedicated ? { relayConfiguration: validatePin(relayConfiguration) } : {}),
       ...(roleBinding.client === piReviewer.client ? { piRelease: validatePiRelease(piRelease) } : {}),
       libraries: libraries.map((entry) => {
         fields(entry, ["path", "sha256", "target"], [], "runtime library");
@@ -96,9 +110,11 @@ export function validatePilotHost(input) {
     };
   }
   if (input.localHarness != null) validateHarnessBinding(input.localHarness);
-  return { schemaVersion: 2, roleBinding,
+  if (tiered) need(runtime, "Tiered setup requires exact Node and runtime library pins");
+  return { schemaVersion: input.schemaVersion, ...tier, roleBinding,
     bubblewrap: { executable: validatePin(input.bubblewrap.executable), ...versionPolicy(input.bubblewrap, "0.9.0") },
-    relay, maxTurns, interPacketDelayMs, timeoutMs, maxBudgetUsd,
+    ...(dedicated ? { authDirectory: input.authDirectory } : { relay }), maxTurns, interPacketDelayMs, timeoutMs, maxBudgetUsd,
+    ...(input.runTimeoutMs === undefined ? {} : { runTimeoutMs: input.runTimeoutMs }),
     ...(packetConcurrency === undefined ? {} : { packetConcurrency }),
     ...(runtime === undefined ? {} : { runtime }), ...(input.localHarness === undefined ? {} : { localHarness: input.localHarness }) };
 }
@@ -167,26 +183,57 @@ function outputState(file, bytes) {
   return "matching";
 }
 
-export function previewSetup(input, { workspace = process.cwd() } = {}) {
+function pinTierInputs(input, tier, excluded) {
+  const dedicated = tier === "b";
+  const reviewer = input.reviewer;
+  const safePin = (value, options) => {
+    fields(value, ["path"], ["sha256"], "discovery pin");
+    need(absolute(value.path) && !value.path.split(path.sep).some((part) => profileNames.includes(part) ||
+      [".config", ".grok", "auth.json", "credentials.json"].includes(part)), "Runtime discovery path overlaps credential or profile state");
+    return inspectPinnedFile(value, { discover: true, excluded, ...options });
+  };
+  const runtime = reviewer.runtime;
+  fields(runtime, ["node", "libraries", ...(dedicated ? [] : ["relayConfiguration"])],
+    input.roles.reviewer.client === piReviewer.client ? ["piRelease"] : [], "tier runtime");
+  need(Array.isArray(runtime.libraries) && runtime.libraries.length <= 64, "Invalid reviewer library pins");
+  const roles = Object.fromEntries(Object.entries(input.roles).map(([name, role]) => [name, role && {
+    ...role, executable: safePin(role.executable, { executable: true }),
+  }]));
+  return { roles, reviewer: { ...reviewer, runtime: {
+    ...runtime, node: safePin(runtime.node, { executable: true }),
+    ...(!dedicated ? { relayConfiguration: validatePin(runtime.relayConfiguration) } : {}),
+    libraries: runtime.libraries.map(({ target, ...pin }) => ({ ...safePin(pin, { runtime: true }), target })),
+  }, bubblewrap: { ...reviewer.bubblewrap, executable: safePin(reviewer.bubblewrap.executable, { executable: true }) } } };
+}
+
+export function previewSetup(input, { workspace = process.cwd(), tier } = {}) {
   fields(input, ["schemaVersion", "directory", "roles", "reviewer"], ["worksetRoots"], "setup request");
   need(input.schemaVersion === 1, "Unsupported setup schema");
   const directory = input.directory;
   const identity = directoryState(directory, workspace);
-  fields(input.reviewer, ["bubblewrap", "relay", "interPacketDelayMs", "timeoutMs"],
-    ["maxBudgetUsd", "runtime", "localHarness", "packetConcurrency"], "reviewer choices");
-  const reviewer = validatePilotHost({ maxBudgetUsd: 2.50, ...input.reviewer,
-    schemaVersion: 2, maxTurns: 96, roleBinding: input.roles?.reviewer });
+  const dedicated = tier === "b";
+  const choices = input.reviewer;
+  fields(choices, ["bubblewrap", dedicated ? "authDirectory" : "relay", "interPacketDelayMs", ...(tier ? ["runtime"] : ["timeoutMs"])],
+    ["maxBudgetUsd", "localHarness", "packetConcurrency", ...(tier ? ["osDriver", "timeoutMs", "runTimeoutMs"] : ["runtime"])],
+    "reviewer choices");
+  const tierBinding = tier ? { containmentTier: tier, osDriver: choices.osDriver ?? "linux-bwrap" } : {};
+  if (tier) requireTier(tierBinding, "reviewer", input.roles?.reviewer?.client);
+  const authIdentity = dedicated ? authDirectoryIdentity(choices.authDirectory, [directory, realpathSync(workspace)]) : undefined;
+  const pinned = tier ? pinTierInputs(input, tier, [directory, realpathSync(workspace), ...(dedicated ? [choices.authDirectory] : [])]) : input;
+  const { osDriver, ...reviewerChoices } = pinned.reviewer;
+  const reviewer = validatePilotHost({ maxBudgetUsd: 2.50, timeoutMs: defaultReviewerTimeoutMs, ...reviewerChoices,
+    ...tierBinding, schemaVersion: tier ? 4 : 2, maxTurns: 96, roleBinding: pinned.roles?.reviewer });
   const host = jsonBytes(reviewer);
   const configurationSha256 = hashBytes(host);
   const roots = input.worksetRoots ?? [realpathSync(workspace)];
   need(Array.isArray(roots) && roots.length > 0, "Expected approved OpenSpec workset roots");
-  const roles = validateRoleBindings({ schemaVersion: 1, roles: input.roles,
+  const roles = validateRoleBindings({ schemaVersion: 1, roles: pinned.roles,
     reviewerHost: { path: path.join(directory, "host.json"), sha256: configurationSha256 },
     worksetRoots: roots.map(worksetRootIdentity) });
   need(roots.every((root) => [directory, roles.roles.orchestrator.executable.path].every((file) => disjoint(root, file))),
     "Pinned workset inputs overlap an approved root");
   const mappings = Object.fromEntries(Object.entries(roles.roles).map(([role, binding]) =>
-    [role, binding && nativeRoleBinding(binding, role)]));
+    [role, role === "reviewer" && dedicated ? { blocker: grokTierBlocker } : binding && nativeRoleBinding(binding, role)]));
   const opener = mappings.orchestrator;
   need(opener.opener && !opener.blocker, opener.blocker ?? "Unsupported OpenSpec opener");
   const roleBytes = jsonBytes(roles);
@@ -198,12 +245,18 @@ export function previewSetup(input, { workspace = process.cwd() } = {}) {
       const file = path.join(directory, name);
       return { name, path: file, utf8: bytes.toString("utf8"), sha256: hashBytes(bytes), state: outputState(file, bytes) };
     });
-  const details = { schemaVersion: 1, directory, identity, configurationSha256, outputs,
+  const details = { schemaVersion: 1, directory, identity, configurationSha256, outputs, ...(tier ? {
+    ...tierBinding,
+    qualification: dedicated ? { status: "unqualified", reason: grokTierBlocker } :
+      { status: "pending-exact-qualification", reason: "External setup does not qualify an exact runtime" },
+    exposure: dedicated ? "Dedicated auth state and qualified provider HTTPS" : "Zero worker-visible credentials and host relay only",
+    ...(dedicated ? { authIdentity } : {}),
+  } : {}),
     mappingBlockers: { ...Object.fromEntries(Object.entries(mappings).filter(([, item]) => item?.blocker)
       .map(([name, item]) => [name, item.blocker])),
     ...(reviewer.roleBinding.client === piReviewer.client
       ? { reviewer: "Pi requires matching offline controls and separately granted bounded live proof" }
-      : reviewer.roleBinding.client === "grok-build" ? { reviewer: grokReviewerBlocker } : {}),
+      : reviewer.roleBinding.client === "grok-build" ? { reviewer: dedicated ? grokTierBlocker : grokReviewerBlocker } : {}),
     ...(roles.roles.helper ? { helper: "No verified effective binding adapter for optional AI invocation" } : {}) } };
   return { ...details, confirmationSha256: hashBytes(jsonBytes(details)) };
 }
@@ -232,7 +285,8 @@ export function applySetup(input, confirmationSha256, options = {}) {
     }
     fsyncSync(fd);
     const final = previewSetup(input, options);
-    need(final.identity.device === actual.dev && final.identity.inode === actual.ino &&
+    need(JSON.stringify(final.authIdentity) === JSON.stringify(preview.authIdentity) &&
+      final.identity.device === actual.dev && final.identity.inode === actual.ino &&
       final.outputs.every(({ state }) => state === "matching") && final.configurationSha256 === preview.configurationSha256,
     "Setup final directory, file bytes or configuration hash changed");
     return { status: "verified", configurationSha256: final.configurationSha256, outputs: results };

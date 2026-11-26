@@ -1,7 +1,7 @@
 ---
 name: autonomous-implementation-review
 description: Implement changes with an independent review loop.
-version: 0.24.0
+version: 0.25.0
 author: Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]

@@ -9,6 +9,7 @@ import { inspectPinnedFile, parseStrictJson } from "./agent-configuration.mjs";
 import { requireQualifiedPilot } from "./adapter-qualification.mjs";
 import { piReviewer } from "./agent-role-adapters.mjs";
 import { checkRoleIndependence } from "./role-config.mjs";
+import { authDirectoryIdentity, requireTier, tierFields, tierIdentity, wrappedWorkerBlocker } from "./containment-tier.mjs";
 import { maximumAttemptMs } from "./worker-runtime-policy.mjs";
 
 const implementerRoute = "codex-native-named-workspace-write";
@@ -75,7 +76,8 @@ export function effectiveRole(role, roleName, request, session, { source, restri
     "Explicit role violates host client, model or provider restrictions");
     if (review) checkRoleIndependence({ provider: roleAudit.implementer.provider, session: session.implementer },
       { provider: role.provider, session: nativeSession });
-    return { adapter: role.client, client: role.client, version: role.version, provider: role.provider, model: role.model,
+    return { ...(!review ? tierIdentity(roleAudit.implementer) : tierIdentity(roleAudit.reviewer)),
+      adapter: role.client, client: role.client, version: role.version, provider: role.provider, model: role.model,
       session: nativeSession, configurationSource: source, configurationScope: role.configuration.sha256, readOnly: review };
   }
   const binding = resolveRoleConfiguration({
@@ -110,10 +112,11 @@ export async function bindPair(entry, grant, runtimeSha256, registry, prospectiv
     requireQualifiedPilot("implementer", selected.roles.implementer,
       { excluded: roots });
   }
-  const explicit = host.schemaVersion === 2;
-  fields(host, ["schemaVersion", "runtimeSha256", "pair", "override", "restrictions", ...(explicit ? ["roleBindings"] : [])],
+  const tiered = host.schemaVersion === 3;
+  const explicit = host.schemaVersion === 2 || tiered;
+  fields(host, ["schemaVersion", "runtimeSha256", "pair", "override", "restrictions", ...(explicit ? ["roleBindings"] : []), ...(tiered ? tierFields : [])],
     "independent host binding", ["goalFirstTimeoutMs"]);
-  need([1, 2].includes(host.schemaVersion) && host.runtimeSha256 === runtimeSha256, "Host qualification does not name this runtime");
+  need([1, 2, 3].includes(host.schemaVersion) && host.runtimeSha256 === runtimeSha256, "Host qualification does not name this runtime");
   if (Object.hasOwn(host, "goalFirstTimeoutMs")) need(Number.isSafeInteger(host.goalFirstTimeoutMs) &&
     host.goalFirstTimeoutMs > 0 && host.goalFirstTimeoutMs <= maximumAttemptMs, "Invalid finite Goal-First host deadline override");
   fields(host.restrictions, ["allowedClients", "allowedModels", "allowedProviders", "requireDistinctModels"], "paired role restrictions");
@@ -134,8 +137,19 @@ export async function bindPair(entry, grant, runtimeSha256, registry, prospectiv
     roleBindings = host.override.roleBindings;
   } else need(grant.overrideSha256 === null, "Approved override missing");
   const { implementer, reviewer } = pair;
+  const tier = tiered ? requireTier(host, "implementer", implementer.client) : {};
+  if (tiered) {
+    need(implementer.client === "codex", wrappedWorkerBlocker);
+    need(implementer.route === implementerRoute && implementer.version === "0.172.0",
+      "Tier B native Codex requires exact 0.172.0 and named workspace-write");
+  }
   const excludedInputs = [...roots, entry.approval.path, entry.grant.path, entry.host.path];
   const selected = explicit ? readRoleBindings(roleBindings, excludedInputs) : null;
+  if (tiered) {
+    const binding = selected.roles.implementer;
+    need(binding.client === "codex" && binding.versionPolicy === "exact" && binding.versionCheck === true &&
+      binding.exactVersion === "0.172.0", "Tier B native Codex requires an independently pinned exact release");
+  }
   if (selected && selected.roles.implementer.client !== "codex") {
     requireQualifiedPilot("implementer", selected.roles.implementer, { excluded: excludedInputs });
   }
@@ -164,9 +178,10 @@ export async function bindPair(entry, grant, runtimeSha256, registry, prospectiv
     need(profiles.every((root) => separate(root, roleBindings.path) && separate(root, selected.reviewerHost.path)),
       "External role bindings overlap a physical role profile");
     const independentOf = [request.authority.authorSession, request.authority.orchestrator, reviewer.session];
+    if (tiered) authDirectoryIdentity(implementer.codexHome, excludedInputs);
     const manifest = requireQualifiedPilot("implementer", selected.roles.implementer, {
       qualification: implementer.qualification, excluded, independentOf,
-      context: { runtimeSha256, configurationSha256: implementer.configuration.sha256,
+      context: { ...tier, runtimeSha256, configurationSha256: implementer.configuration.sha256,
         constraintsSha256: roleQualificationBinding(implementer) },
     });
     need(equal(selected.reviewerHost, reviewer.configuration), "Paired reviewer configuration differs from external host pin");
@@ -187,10 +202,11 @@ export async function bindPair(entry, grant, runtimeSha256, registry, prospectiv
         observed.explicit.provider === reviewer.provider &&
         observed.explicit.executableSha256 === selected.roles.reviewer.executable.sha256 &&
         observed.explicit.reasoningEffort === selected.roles.reviewer.reasoningEffort), "Approved native route or reviewer version differs from the effective role");
-    roleAudit = { implementer: { provider: manifest.binding.provider, args: manifest.args,
+    if (tiered) need(observed.containmentTier === "a", "Tiered worker requires an exact Tier A reviewer pin");
+    roleAudit = { implementer: { ...tier, provider: manifest.binding.provider, args: manifest.args,
       reasoningEffort: manifest.binding.reasoningEffort, runtimeVersion: manifest.runtimeVersion,
       qualificationSha256: manifest.qualificationSha256, roleBindingsSha256: roleBindings.sha256 },
-    reviewer: observed.explicit };
+    reviewer: { ...tierIdentity(observed), ...observed.explicit } };
   } else {
     cfg = await trustedJson(reviewer.configuration);
     validateHostConfig(cfg);
@@ -209,7 +225,7 @@ export async function bindPair(entry, grant, runtimeSha256, registry, prospectiv
   effectiveRole(reviewer, "reviewer", request, { implementer: launchNonce, implementerModel: implementer.model },
     roleOptions);
   await checkRolePins(pair, roots, cfg);
-  return { pair, ...roleOptions, reviewerConfig: cfg, profileIds,
+  return { pair, ...tier, ...roleOptions, reviewerConfig: cfg, profileIds,
     ...(prospective ? { attemptPolicy: true, goalFirstTimeoutMs: host.goalFirstTimeoutMs ?? null } : {}),
     physicalSlot: profileIds[0], expiresAt: host.override?.expiresAt ?? grant.expiresAt };
 }

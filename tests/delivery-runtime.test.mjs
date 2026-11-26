@@ -351,6 +351,12 @@ test("exclusive delivery verifies the complete transitive inventory before loadi
   await writeFile(helper, files.get("worker-runtime-policy.mjs"));
   await writeFile(runtime, files.get("implementer-runtime.mjs"));
 
+  const tierHelper = "containment-tier.mjs";
+  const missingTierHelper = path.join(scripts, tierHelper);
+  await rm(missingTierHelper);
+  await assert.rejects(readDelegation(input, options), { code: "ENOENT", path: missingTierHelper });
+  await writeFile(missingTierHelper, files.get(tierHelper));
+
   for (const [name, bytes] of files) {
     const file = path.join(scripts, name);
     await writeFile(file, bytes + "\n# synthetic byte mismatch\n");

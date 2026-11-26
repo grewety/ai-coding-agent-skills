@@ -41,8 +41,10 @@ export function trustedHostPath(file) {
   }
 }
 
-export function inspectPinnedFile(input, { executable = false, excluded = [], read = false } = {}) {
-  const pin = validatePin(input);
+export function inspectPinnedFile(input, { executable = false, excluded = [], read = false, discover = false, runtime = false } = {}) {
+  const discovering = discover && !Object.hasOwn(input, "sha256");
+  const pin = discovering ? input : validatePin(input);
+  if (discover) need(trustedHostPath(pin.path) === pin.path, "Untrusted discovery path");
   need(realpathSync(pin.path) === pin.path && excluded.every((root) => disjoint(root, pin.path)), "Unsafe or overlapping pinned file");
   const parent = lstatSync(path.dirname(pin.path));
   need(process.getuid && [0, process.getuid()].includes(parent.uid) && !(parent.mode & 0o022), "Untrusted pin directory");
@@ -52,7 +54,7 @@ export function inspectPinnedFile(input, { executable = false, excluded = [], re
   try {
     const before = fstatSync(fd);
     need(before.isFile() && [0, process.getuid()].includes(before.uid) && !(before.mode & 0o022) &&
-      before.size > 0 && before.size <= (executable ? 512 * 1024 * 1024 : 64 * 1024) &&
+      before.size > 0 && before.size <= (executable || runtime ? 512 * 1024 * 1024 : 64 * 1024) &&
       (executable ? before.mode & 0o111 : before.nlink === 1), "Untrusted pinned file");
     const buffer = Buffer.alloc(64 * 1024);
     let remaining = before.size;
@@ -67,7 +69,10 @@ export function inspectPinnedFile(input, { executable = false, excluded = [], re
     const after = lstatSync(pin.path);
     need(realpathSync(pin.path) === pin.path && after.dev === before.dev && after.ino === before.ino &&
       after.size === before.size && after.ctimeMs === before.ctimeMs, "Pinned file changed during read");
-    need(hash.digest("hex") === pin.sha256, executable ? "Executable SHA-256 pin mismatch" : "Configuration SHA-256 pin mismatch");
+    const sha256 = hash.digest("hex");
+    if (discovering) return { path: pin.path, sha256 };
+    need(sha256 === pin.sha256, executable ? "Executable SHA-256 pin mismatch" : "Configuration SHA-256 pin mismatch");
+    if (discover) return pin;
     return read ? Buffer.concat(chunks) : undefined;
   } finally { closeSync(fd); }
 }

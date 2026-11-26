@@ -4,6 +4,7 @@ import { setTimeout as delay } from "node:timers/promises";
 import { digest, hash, jsonBytes, need, parseStrictJson, separate, absolute } from "./review-inputs.mjs";
 import { requireReviewHost, validateHostConfig, verifyRuntimePins } from "./review-runtime.mjs";
 import { readClosed } from "./worker-handoff.mjs";
+import { tierIdentity } from "./containment-tier.mjs";
 import { packetConcurrency } from "./review-packet-scheduler.mjs";
 
 export async function trustedJson(file, excluded, privateFile = false) {
@@ -21,7 +22,9 @@ export async function offlineHostBinding(file, expect, excluded, exactBytes = tr
   need(concurrency === packetConcurrency(expect.packetConcurrency) &&
     (concurrency === 1 || expect.configurationSha256 === configurationSha256),
   "Review packet concurrency differs from the exact host pin or independent expectation");
-  if (config.schemaVersion === 2) {
+  need(JSON.stringify(tierIdentity(config)) === JSON.stringify(tierIdentity(expect)),
+    "Host tier or driver differs from the independent review expectation");
+  if ([2, 4].includes(config.schemaVersion)) {
     need(configurationSha256 === expect.configurationSha256 && config.roleBinding?.model === expect.model,
       "Explicit host configuration pin or model mismatch");
     const admitted = requireReviewHost(config, excluded, { ...pilotOptions, configurationSha256,

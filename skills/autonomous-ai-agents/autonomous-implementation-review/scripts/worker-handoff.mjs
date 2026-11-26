@@ -5,6 +5,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, link, unlink } from "node:fs/promises";
 import path from "node:path";
+import { requireTier, tierIdentity } from "./containment-tier.mjs";
 import { captureLimit, captureAggregateLimit } from "./bounded-worker.mjs";
 
 const need = (ok, message) => { if (!ok) throw new Error(message); };
@@ -156,7 +157,9 @@ function validateResult(result, expected, runtime) {
   keys(result, ["schemaVersion", "identity", "requestSha256", "runtime", "status", "verdict", "nativeVerdict", "findings", "coverageLimitations", "report", "reportKind", "evidence", "outputs", "completion", "nativeReport"], "result");
   need(result.schemaVersion === 1, "Unsupported result schema");
   need(same(result.identity, expected.request.identity) && result.requestSha256 === expected.requestSha256, "Result request/input identity mismatch");
-  keys(runtime, ["adapter", "client", "version", "session", "provider", "model", "configurationSource", "configurationScope", "readOnly"], "runtime");
+  const tier = tierIdentity(runtime);
+  if (tier.osDriver) requireTier(tier, result.identity.role === "implementer" ? "implementer" : "reviewer", runtime.client);
+  keys(runtime, [...Object.keys(tier), "adapter", "client", "version", "session", "provider", "model", "configurationSource", "configurationScope", "readOnly"], "runtime");
   need(Object.entries(runtime).every(([k, v]) => k === "readOnly" ? typeof v === "boolean" : text(v)) && same(runtime, result.runtime), "Runtime identity mismatch");
   need(runtime.session !== expected.request.authority.orchestrator && (result.identity.role === "implementer" || runtime.readOnly === true), "Invalid worker/read-only runtime");
   if (result.identity.role !== "implementer") need(runtime.session !== expected.request.authority.authorSession, "Reviewer must be independent of the planning author session");
