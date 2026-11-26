@@ -147,7 +147,7 @@ export async function finishPrFixReadiness(input, result, ref, verifyHandover, o
     need(result?.action === "accept-result" && result.independentZeroWaiver === true,
       "Accepted ancestor review or gates differ");
     const { proof, gateAuthority } = await verifyPrFixLineage(input, ref, verifyHandover,
-      { ...options, acceptedAncestorGate: result.gateReference });
+      { ...options, acceptedAncestorGate: result.gateReference, approvedTaskGates: result.approvedTaskGates });
     need(result.head === proof.reviewedAncestor && result.gateReference === proof.ancestorGate &&
       options.reviewReference === proof.ancestorReview.reference, "Accepted ancestor review or gates differ");
     return { ...readiness, prFixLineage: proof, ...(gateAuthority ? { gateAuthority } : {}) };

@@ -283,6 +283,13 @@ file and reason. The result requires separate finish authority. A `closeout`
 request may additionally prove the selected candidate's closure using the
 offline assertions in [evidence-retention.md](evidence-retention.md).
 
+For Task-Guided PR-fix readiness, the accepted result carries
+`approvedTaskGates` from the verified frozen group decision. Lineage
+verification checks those exact ordered argv against both the accepted
+ancestor and final-head captures. A wrapper digest identifies a capture.
+The frozen group decision supplies the gate authority that readiness seals
+for [protected finish and receipt replay](protected-finish.md).
+
 Adopting projects use [integrated low-touch delivery](low-touch.md) for
 exact native inventory closure, the final candidate harness and the
 task-completion child path. The verified integrated parent selects the

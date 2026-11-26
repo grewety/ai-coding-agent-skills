@@ -1,16 +1,15 @@
 import path from "node:path";
-import { lstatSync } from "node:fs";
 import { ancestor, candidate as candidateSnapshot, committedDocument, exactTree, policyContext, proveTaskCompletion, verifyArchive } from "./change-guard.mjs";
 import { retirementInventory } from "./change-workspace.mjs";
 import { evidenceCommand } from "./evidence-cli.mjs";
-import { readBounded, scopedPath, separate, sha256, verifyGateRun, verifyRepresentation } from "./evidence-retention.mjs";
+import { readBounded, sha256, verifyGateRun, verifyRepresentation } from "./evidence-retention.mjs";
 import { verifyLocalHarness } from "./local-harness.mjs";
 import { verifyPrFixIntegration, verifyPrFixLineage } from "./pr-fix-lineage.mjs";
 import { finishReadiness } from "./finish-readiness.mjs";
 import { pushTriggerDecision, standingTriggerDecision, retainedExternalReservation, uiAcceptanceDecision } from "./external-verification.mjs";
 import { finishCreditDecision, finishCreditGrant, finishCreditJournal, paidFinishTrigger,
   settleFinishCredit, zeroCostRetryTrigger } from "./finish-trigger-credits.mjs";
-import { need, observed, same, sealedObservation, text } from "./operator-records.mjs";
+import { need, observed, privateRecords, same, sealedObservation, text } from "./operator-records.mjs";
 
 const sha = (value) => typeof value === "string" && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(value);
 const digest = (value) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
@@ -233,16 +232,15 @@ async function verifyReadyPublication(chapter, remote, records) {
   return chapter;
 }
 
-export async function protectedFinish(input, readiness, now = Date.now(), verifyHandover, triggerCommand) {
+function readFinishCheckpoint(input, now, archiveReplay = false) {
   const checkpoint = sealedObservation(input.finishCheckpoint);
   const { records, identity } = checkpoint;
   const { repo, repository, change, candidate, workspace } = identity;
+  privateRecords(records, [repo, workspace, input.repo]);
   const read = (ref) => retainedFile(records, ref);
-  const directory = lstatSync(scopedPath(records));
   need(checkpoint.schemaVersion === 1 && checkpoint.kind === "protected-finish-checkpoint" && observed(checkpoint) &&
-    directory.isDirectory() && (process.getuid === undefined || directory.uid === process.getuid() && (directory.mode & 0o077) === 0) &&
     input.finishCheckpoint.file.startsWith(records + path.sep) &&
-    separate(records, workspace) && separate(records, repo) && input.repo === repo && input.change === change && input.head === candidate &&
+    (archiveReplay || input.repo === repo) && input.change === change && input.head === candidate &&
     /^[a-zA-Z0-9-]+\/[a-zA-Z0-9_.-]+$/.test(repository) && !repository.split("/").some((part) => part === "." || part === "..") &&
     text(identity.target) && text(identity.branch) && sha(candidate) && sha(identity.plan) &&
     sha(identity.targetRevision) && sha(identity.policyRevision) && digest(identity.planDigest) &&
@@ -268,6 +266,83 @@ export async function protectedFinish(input, readiness, now = Date.now(), verify
       time(keep.observedAt) >= time(grant.startedAt) && time(keep.observedAt) <= time(checkpoint.observedAt),
     "The added keep-worktree restriction is unverified");
   }
+  return { checkpoint, grant, records, identity, read };
+}
+
+function readFinishAnchor({ checkpoint, grant, identity, read }) {
+  const anchor = read(checkpoint.anchor);
+  need(bound(anchor, identity, grant) && anchor.kind === "finish-readiness-readback" && anchor.ready === true &&
+    observed(anchor.implementationReview) && text(anchor.implementationReview.session) &&
+    digest(anchor.implementationGateSha256) && typeof anchor.keepWorktree === "boolean" &&
+    (!anchor.keepWorktree || checkpoint.keepWorktree), "Original finish readiness or worktree restriction is unverified");
+  return anchor;
+}
+
+function readFinishRemote({ checkpoint, grant, identity, read }, ref, now, archiveReplay = false) {
+  const remote = read(ref);
+  need(bound(remote, identity, grant) && time(remote.observedAt) >= time(checkpoint.observedAt) &&
+    time(remote.observedAt) <= now && (archiveReplay || now - time(remote.observedAt) <= readbackWindow),
+  "Finish readback identity or observation time is unverified");
+  return remote;
+}
+
+async function verifyFinishPrFix(request, { checkpoint, records, identity }, anchor, implementationGate, verifyHandover) {
+  need(checkpoint.prs.implementation && digest(anchor.hostConfigurationSha256),
+    "PR-fix finish requires the retained implementation PR and host pin");
+  const lineage = await verifyPrFixLineage(request, anchor.prFixLineage, verifyHandover, { workspace: identity.workspace, records,
+    hostConfigurationSha256: anchor.hostConfigurationSha256, pullRequest: checkpoint.prs.implementation,
+    gateAuthority: anchor.gateAuthority });
+  const { proof } = lineage;
+  need(implementationGate.passed && proof.finalGate === anchor.implementationGateSha256 &&
+    proof.finalGate === implementationGate.reference && proof.reviewedAncestor === anchor.implementationReview.head &&
+    proof.ancestorReview.session === anchor.implementationReview.session &&
+    proof.ancestorReview.reference === anchor.implementationReview.reference, "PR-fix reviews or final gates differ from finish readiness");
+  return lineage;
+}
+
+function integratedFinishGate(repo, state, remote, merged, taskGateAuthority, checkpointSha256) {
+  const { identity, grant, records } = state;
+  const integrated = remote.integrated;
+  if (!bound(integrated, identity, grant) || integrated.mergeCommit !== merged.mergeCommit ||
+      !sha(integrated.head) || !Array.isArray(grant.integratedGates) || !integrated.gate) return;
+  if (taskGateAuthority) {
+    need(remote.checkpointSha256 === checkpointSha256, "Integrated finish readback does not bind the held checkpoint");
+    need(same(grant.integratedGates, taskGateAuthority.gates),
+      "Integrated PR-fix gate commands differ from approved acceptance");
+  }
+  ancestor(repo, merged.mergeCommit, integrated.head);
+  return gatePass(integrated.gate, records, { ...identity, repo }, integrated.head, grant.integratedGates);
+}
+
+export async function replayTaskGuidedFinish(request, {
+  finishCheckpoint, finishRemote, prFixLineage, verifyHandover, issue, pullRequest, integrated, verified,
+}) {
+  need(finishCheckpoint && finishRemote, "Missing independently retained Task-Guided finish checkpoint and readback");
+  const now = Date.now();
+  const state = readFinishCheckpoint({ ...request, finishCheckpoint }, now, true);
+  const { checkpoint, identity, grant, records } = state;
+  need(identity.mode === "task-guided" && identity.plan === request.plan && identity.planDigest === request["expect-plan"] &&
+    identity.policyRevision === request.base && identity.targetRevision === request.target &&
+    identity.issue === issue && checkpoint.prs.implementation === pullRequest, "Receipt differs from the held finish identity");
+  const anchor = readFinishAnchor(state);
+  need(!anchor.taskCompletion && same(anchor.prFixLineage, prFixLineage),
+    "Receipt PR-fix lineage differs from the held checkpoint");
+  const remote = readFinishRemote(state, finishRemote, now, true);
+  need(remote.implementation?.state === "MERGED", "Held finish readback does not establish a protected merge");
+  const { merged } = publication(identity, grant, remote, "implementation", request.head, checkpoint, time(remote.observedAt));
+  need(merged && merged.mergeCommit === integrated && remote.integrated?.head === verified &&
+    await protectedEvidence(merged, records), "Receipt merge or verified SHA differs from protected finish readback");
+  const implementationGate = gatePass(anchor.implementationGate, records, { ...identity, repo: request.repo }, request.head);
+  const lineage = await verifyFinishPrFix(request, state, anchor, implementationGate, verifyHandover);
+  const gate = integratedFinishGate(request.repo, state, remote, merged, lineage.gateAuthority, finishCheckpoint.sha256);
+  need(gate?.passed, "Missing or failed exact verified Task-Guided PR-fix gate run");
+  return lineage;
+}
+
+export async function protectedFinish(input, readiness, now = Date.now(), verifyHandover, triggerCommand) {
+  const state = readFinishCheckpoint(input, now);
+  const { checkpoint, grant, records, identity, read } = state;
+  const { repo, repository, change, candidate, workspace } = identity;
   const creditRef = checkpoint.triggerGrant;
   const journal = finishCreditJournal(records, grant, creditRef?.sha256 ?? null);
   const credits = creditRef && {
@@ -284,11 +359,7 @@ export async function protectedFinish(input, readiness, now = Date.now(), verify
     const { chapter, head, outcome } = credits.journal.pending;
     return stop(outcome ? "FINISH_TRIGGER_OUTCOME_UNCERTAIN" : "FINISH_TRIGGER_OUTCOME_PENDING", { ...triggerStatus, chapter, head });
   }
-  const anchor = read(checkpoint.anchor);
-  need(bound(anchor, identity, grant) && anchor.kind === "finish-readiness-readback" && anchor.ready === true &&
-    observed(anchor.implementationReview) && text(anchor.implementationReview.session) &&
-    digest(anchor.implementationGateSha256) && typeof anchor.keepWorktree === "boolean" &&
-    (!anchor.keepWorktree || checkpoint.keepWorktree), "Original finish readiness or worktree restriction is unverified");
+  const anchor = readFinishAnchor(state);
   const policy = policyContext({ repo, change, plan: identity.plan, target: identity.targetRevision });
   need(policy.ok && policy.parent === identity.policyRevision, "The original integrated policy identity differs");
   const approved = candidateSnapshot({ repo, change, head: candidate, base: identity.policyRevision,
@@ -311,14 +382,9 @@ export async function protectedFinish(input, readiness, now = Date.now(), verify
   const fixRequest = fixRef && { repo, change, head: candidate, base: identity.policyRevision,
     plan: identity.plan, mode: identity.mode, target: identity.targetRevision, "expect-plan": identity.planDigest };
   let fix;
+  let taskGateAuthority;
   if (fixRef) {
-    need(checkpoint.prs.implementation && digest(anchor.hostConfigurationSha256),
-      "PR-fix finish requires the retained implementation PR and host pin");
-    ({ proof: fix } = await verifyPrFixLineage(fixRequest, fixRef, verifyHandover, { workspace, records,
-      hostConfigurationSha256: anchor.hostConfigurationSha256, pullRequest: checkpoint.prs.implementation,
-      gateAuthority: anchor.gateAuthority }));
-    need(fix.finalGate === implementationGate.reference && fix.ancestorReview.session === anchor.implementationReview.session &&
-      fix.ancestorReview.reference === anchor.implementationReview.reference, "PR-fix reviews or final gates differ from finish readiness");
+    ({ proof: fix, gateAuthority: taskGateAuthority } = await verifyFinishPrFix(fixRequest, state, anchor, implementationGate, verifyHandover));
     need(finishReadiness(fixRequest, { action: "accept-result", head: candidate }, undefined, false).ready,
       "PR-fix final head has unverified current-spec promotion");
   }
@@ -376,9 +442,7 @@ export async function protectedFinish(input, readiness, now = Date.now(), verify
       "Exact candidate finish readiness is required before publication");
   }
 
-  const remote = read(input.finishRemote);
-  need(bound(remote, identity, grant) && time(remote.observedAt) >= time(checkpoint.observedAt) &&
-    time(remote.observedAt) <= now && now - time(remote.observedAt) <= readbackWindow, "Fresh finish readback is unverified");
+  const remote = readFinishRemote(state, input.finishRemote, now);
   if (reply) {
     const current = checkpoint.prs.closure ? remote.closure : remote.implementation;
     need(time(remote.observedAt) >= time(reply.observedAt) && time(current?.observedAt) >= time(reply.observedAt),
@@ -408,18 +472,14 @@ export async function protectedFinish(input, readiness, now = Date.now(), verify
   if (!(await protectedEvidence(merged, records))) return observe(stop("PROTECTED_MERGE_EVIDENCE_UNVERIFIED", { pr: merged.url }));
   ancestor(repo, candidate, merged.mergeCommit);
   const integrated = remote.integrated;
-  if (!bound(integrated, identity, grant) || integrated.mergeCommit !== merged.mergeCommit ||
-      !sha(integrated.head) || !Array.isArray(grant.integratedGates) || !integrated.gate) {
+  const integratedGate = integratedFinishGate(repo, state, remote, merged, taskGateAuthority, input.finishCheckpoint.sha256);
+  if (!integratedGate) {
     return observe(result("verify-integrated", "INTEGRATED_GATES_PENDING", { head: merged.head, integratedHead: merged.mergeCommit,
       pr: merged.url, prState: "MERGED" }));
   }
-  ancestor(repo, merged.mergeCommit, integrated.head);
-  const integratedGate = gatePass(integrated.gate, records, identity, integrated.head, grant.integratedGates);
   if (!integratedGate.passed) {
     return observe(stop("INTEGRATED_GATE_FAILED", { head: integrated.head, pr: merged.url }));
   }
-  need(!fix || identity.mode !== "task-guided" || same(integratedGate.gateCommands, anchor.gateAuthority.gates),
-    "Integrated PR-fix gate commands differ from approved acceptance");
   if (fix) verifyPrFixIntegration(fixRequest, fix, merged.mergeCommit, integrated.head);
   const closure = remote.closureCandidate;
   if (!closure && remote.closure?.state === "ABSENT" && bound(remote.closure, identity, grant) &&
@@ -436,8 +496,8 @@ export async function protectedFinish(input, readiness, now = Date.now(), verify
   const archive = { repo, change, verified: integrated.head, archive: closure.archive, receiptSha256: closure.receiptSha256,
     receiptFile: retainedPath(records, closure.receipt), committedReceiptPath: closure.receiptPath,
     issue: identity.issue, policyTarget: identity.targetRevision,
-    integrationReference: merged.url, prFixLineage: fixRef, verifyHandover, gateAuthority: anchor.gateAuthority,
-    verifiedGateRun: fix && identity.mode === "task-guided" ? { ...integrated.gate, file: retainedPath(records, integrated.gate) } : undefined };
+    integrationReference: merged.url, prFixLineage: fixRef, verifyHandover,
+    ...(taskGateAuthority ? { finishCheckpoint: input.finishCheckpoint, finishRemote: input.finishRemote } : {}) };
   need(closure.receipt.sha256 === closure.receiptSha256, "Closure receipt declaration differs");
   const receipt = await verifyArchive({ ...archive, head: closure.head });
   need(receipt.integrated === merged.mergeCommit && receipt.verified === integrated.head && receipt.head === candidate &&

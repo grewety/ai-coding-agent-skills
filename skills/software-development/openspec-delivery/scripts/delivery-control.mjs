@@ -237,5 +237,6 @@ export function deliveryDecision({ phase, policy, identity, contract, approval, 
   return state("accept-result", null, { group: group?.id ?? null, head: candidate.head, commits, eligibleForTaskUpdate: true,
     ...(delegated || candidate.customPlanning ? { gateReference: gates.reference } : {}),
     ...(candidate.customPlanning ? { acceptedTaskIds: goal ? candidate.taskIds : group.taskIds,
+      ...(group ? { approvedTaskGates: group.gates } : {}),
       independentZeroWaiver: Boolean(handoff.reviewSnapshot) && review.waivers === undefined } : {}) });
 }

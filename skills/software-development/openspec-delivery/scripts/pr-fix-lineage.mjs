@@ -107,24 +107,24 @@ export async function verifyPrFixLineage(input, ref, verifyHandover, options = {
     need(run.passed, "PR-fix disposable gates failed");
     return run;
   };
-  const { gateAuthority, acceptedAncestorGate } = options;
+  const { gateAuthority, acceptedAncestorGate, approvedTaskGates } = options;
   const taskGuided = mode === "task-guided";
-  if (taskGuided) {
-    need(digest(gateAuthority?.ancestorGate ?? acceptedAncestorGate), "Missing approved Task-Guided PR-fix gate authority");
-  }
-  const declaredGates = taskGuided ? gateAuthority?.gates :
+  const declaredGates = taskGuided ? (gateAuthority ? gateAuthority.gates : approvedTaskGates) :
     goalSnapshot(repo, head, change, context.parent, planning(repo, head, change, true)).contract.gates;
+  if (taskGuided) {
+    need(digest(gateAuthority ? gateAuthority.ancestorGate : acceptedAncestorGate) &&
+      Array.isArray(declaredGates) && declaredGates.length > 0, "Missing approved Task-Guided PR-fix gate authority");
+  }
   const originalGate = gate(bundle.ancestorGate, original, declaredGates);
-  // Readiness has already checked the accepted wrapper against the approved
-  // group. Later replay requires the independently retained readiness record.
   const authority = taskGuided ? { schemaVersion: 1, kind: "task-guided-pr-fix-gates", change, plan,
-    planDigest: original.planDigest, policyTarget: target, workspace: bundle.workspace, reviewedAncestor: original.head,
-    ancestorGate: originalGate.reference, gates: originalGate.gateCommands } : undefined;
+    planDigest: original.planDigest, policyTarget: target, policyRevision: context.parent,
+    workspace: bundle.workspace, reviewedAncestor: original.head,
+    ancestorGate: originalGate.reference, gates: declaredGates } : undefined;
   if (taskGuided) {
     need(gateAuthority ? same(gateAuthority, authority) : acceptedAncestorGate === originalGate.reference,
       "Task-Guided PR-fix gate authority differs from the accepted ancestor");
   }
-  const finalGate = gate(bundle.finalGate, final, originalGate.gateCommands);
+  const finalGate = gate(bundle.finalGate, final, declaredGates);
   const { ancestorReview, deltaReview } = bundle;
   need([ancestorReview, deltaReview].every((review) => review.kind === "review-candidate" &&
     digest(review.expectFileSha256) && digest(review.requestFileSha256) && review.waivers === undefined) &&

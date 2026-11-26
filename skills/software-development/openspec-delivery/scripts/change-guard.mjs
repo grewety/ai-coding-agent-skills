@@ -7,7 +7,6 @@ import path from "node:path";
 import { parseArgs } from "node:util";
 import { gitEnvironment } from "./git-environment.mjs";
 import { readLowTouchPolicy } from "./low-touch-policy.mjs";
-import { privateRecords, sealedObservation } from "./operator-records.mjs";
 import { planningBudget, planningLayout, planningLimits, safePlanningPath } from "./planning-inventory.mjs";
 import { readBounded, sha256, stableJson, verifyGateRun } from "./evidence-retention.mjs";
 import { goalContractIdentity, readGoalContract, withinScope } from "./delivery-control.mjs";
@@ -612,7 +611,7 @@ function fresh(repo, verified, target, change, limit) {
   if (archives.length) requireThat(![...after.keys()].some((file) => file.startsWith(root(change))), "Both active and archived canonical change exist");
 }
 export async function verifyArchive({ repo, change, verified, head, archive, receiptSha256, receiptFile, committedReceiptPath,
-  issue, policyTarget, integrationReference, prFixLineage, verifyHandover, gateAuthority, verifiedGateRun }) {
+  issue, policyTarget, integrationReference, prFixLineage, verifyHandover, finishCheckpoint, finishRemote }) {
   repository(repo);
   root(change);
   requireThat(archivePattern(change).test(archive + "/"), "Archive identity mismatch");
@@ -626,7 +625,7 @@ export async function verifyArchive({ repo, change, verified, head, archive, rec
     "Committed archive receipt identity mismatch");
   return receipt({ repo, change, target: head, receipt: receiptFile, issue, allowIssueAbsent: true,
     "receipt-path": committedReceiptPath, limit: MAX_CLOSURE_COMMITS, policyTarget, integrationReference, prFixLineage,
-    verifyHandover, gateAuthority, verifiedGateRun }, false);
+    verifyHandover, finishCheckpoint, finishRemote }, false);
 }
 export function exactTree(repo, head) {
   repository(repo);
@@ -658,18 +657,29 @@ async function receipt(o, requireCheckout = true) {
   requireThat(snapshot.tasksComplete, "Incomplete implementation tasks cannot complete a change");
   const completion = record.value.taskCompletion;
   requireThat(!(completion && lineage) && Boolean(lineage) === Boolean(o.prFixLineage), "Receipt PR-fix custody is missing or conflicts with task completion");
+  const integrated = commit(o.repo, record.value.integrated);
+  const verified = commit(o.repo, record.value.verified);
+  const target = commit(o.repo, o.target);
+  ancestor(o.repo, snapshot.head, integrated);
+  ancestor(o.repo, integrated, verified);
+  ancestor(o.repo, verified, target);
   let fix;
   let gateAuthority;
-  let verifyPrFixIntegration;
   if (lineage) {
     const verifier = await import("./pr-fix-lineage.mjs");
-    verifyPrFixIntegration = verifier.verifyPrFixIntegration;
-    ({ proof: fix, gateAuthority } = await verifier.verifyPrFixLineage({ repo: o.repo, change: o.change, head: snapshot.head, base: snapshot.base,
-      plan: snapshot.plan, mode, target: policyTarget, "expect-plan": snapshot.planDigest }, o.prFixLineage,
-    o.verifyHandover, { pullRequest: record.value.integrationReference, gateAuthority: o.gateAuthority }));
+    const request = { repo: o.repo, change: o.change, head: snapshot.head, base: snapshot.base,
+      plan: snapshot.plan, mode, target: policyTarget, "expect-plan": snapshot.planDigest };
+    const pullRequest = record.value.integrationReference;
+    if (mode === "task-guided") {
+      const { replayTaskGuidedFinish } = await import("./protected-finish.mjs");
+      ({ proof: fix, gateAuthority } = await replayTaskGuidedFinish(request, { ...o, pullRequest, integrated, verified }));
+    } else {
+      ({ proof: fix } = await verifier.verifyPrFixLineage(request, o.prFixLineage, o.verifyHandover, { pullRequest }));
+    }
     requireThat(stableJson(fix) === stableJson(lineage), "Receipt PR-fix lineage differs from replay");
     requireThat(record.value.review?.reference === fix.ancestorReview.reference &&
       record.value.review?.reviewer === fix.ancestorReview.session, "Receipt review does not identify the independently reviewed ancestor");
+    verifier.verifyPrFixIntegration(request, fix, integrated, verified);
   }
   if (completion) {
     const proof = proveTaskCompletion({ repo: o.repo, change: o.change, head: snapshot.head, base: snapshot.base, plan: snapshot.plan,
@@ -678,13 +688,6 @@ async function receipt(o, requireCheckout = true) {
       "Receipt task completion differs from Git proof");
   }
   review(record.value.review, { ...snapshot, head: completion?.reviewedParent ?? fix?.reviewedAncestor ?? snapshot.head }, o);
-  const integrated = commit(o.repo, record.value.integrated);
-  const verified = commit(o.repo, record.value.verified);
-  const target = commit(o.repo, o.target);
-  ancestor(o.repo, snapshot.head, integrated);
-  ancestor(o.repo, integrated, verified);
-  ancestor(o.repo, verified, target);
-  if (fix) verifyPrFixIntegration({ ...snapshot, repo: o.repo }, fix, integrated, verified);
   const prPrefix = o.issue === null ? null : o.issue.split("/issues/")[0] + "/pull/";
   requireThat((o.integrationReference === undefined || record.value.integrationReference === o.integrationReference) &&
     (prPrefix === null ? text(o.integrationReference) : typeof record.value.integrationReference === "string" &&
@@ -697,18 +700,11 @@ async function receipt(o, requireCheckout = true) {
   }
   gates(record.value.gates, verified);
   if (gateAuthority) {
-    const { gates: approved, workspace } = gateAuthority;
+    const { gates: approved } = gateAuthority;
     for (const rows of [record.value.review.gates, record.value.gates]) {
       requireThat(stableJson(rows.map(({ argv }) => argv)) === stableJson(approved) &&
         rows.every(({ command }, index) => command === approved[index].join(" ")), "Receipt gate commands differ from approved acceptance");
     }
-    requireThat(o.verifiedGateRun, "Missing exact verified Task-Guided PR-fix gate run");
-    const bytes = readBounded(o.verifiedGateRun.file);
-    requireThat(sha256(bytes) === o.verifiedGateRun.sha256, "Verified gate evidence file identity mismatch");
-    const run = verifyGateRun(JSON.parse(decode(bytes, "Verified gate evidence is not valid UTF-8")), {
-      implementation: workspace, head: verified, tree: exactTree(o.repo, verified), mode, change: o.change,
-      plan: snapshot.plan, planDigest: snapshot.planDigest, gates: approved });
-    requireThat(run.passed, "Failed exact verified Task-Guided PR-fix gate run");
   }
   fresh(o.repo, verified, target, o.change, o.limit);
   if (o["receipt-path"] !== undefined) {
@@ -792,7 +788,7 @@ async function main() {
   const command = process.argv[2];
   requireThat(["planning", "planning-worktree", "policy-context", "candidate", "review", "receipt"].includes(command), "Expected planning, planning-worktree, policy-context, candidate, review or receipt command");
   const args = process.argv.slice(3);
-  const receiptRefs = ["pr-fix-lineage", "gate-authority", "verified-gate-run"];
+  const receiptRefs = ["pr-fix-lineage", "finish-checkpoint", "finish-readback"];
   const receiptOptions = receiptRefs.flatMap((key) => [key, `${key}-sha256`]);
   const names = ["repo", "change", ...(command === "planning-worktree" ? ["parent", "target"] : command === "policy-context" ? ["plan", "target"] : command === "planning" ? ["head", "plan", "target"] : command === "receipt" ? ["target", "receipt", "issue", "receipt-path", "max-closure-commits", ...receiptOptions] : ["base", "head", "plan", "expect-plan", "gate-run", "gate-run-sha256", "mode", "target", ...(command === "review" ? ["issue", "review"] : [])])];
   const seen = new Set();
@@ -829,19 +825,14 @@ async function main() {
   }
   const limit = o["max-closure-commits"] === undefined ? MAX_CLOSURE_COMMITS : Number(o["max-closure-commits"]);
   requireThat(Number.isInteger(limit) && limit > 0 && limit <= MAX_CLOSURE_COMMITS, `--max-closure-commits must be an integer from 1 to ${MAX_CLOSURE_COMMITS}`);
-  const [prFixLineage, authority, verifiedGateRun] = receiptRefs.map((key) => {
+  const [prFixLineage, finishCheckpoint, finishRemote] = receiptRefs.map((key) => {
     const file = o[key];
     const sha256 = o[`${key}-sha256`];
     requireThat(Boolean(file) === Boolean(sha256), `Supply both --${key} and --${key}-sha256`);
     return file && { file, sha256 };
   });
   const verifyHandover = prFixLineage ? (await import("./delivery-cli.mjs")).verifyHandover : undefined;
-  const gateAuthority = authority && sealedObservation(authority);
-  if (authority) {
-    requireThat(text(gateAuthority?.workspace), "Missing Task-Guided PR-fix gate authority workspace");
-    privateRecords(path.dirname(authority.file), [o.repo, gateAuthority.workspace]);
-  }
-  writeFileSync(1, `${JSON.stringify({ ok: true, ...await receipt({ ...o, limit, prFixLineage, verifyHandover, gateAuthority, verifiedGateRun }) })}\n`);
+  writeFileSync(1, `${JSON.stringify({ ok: true, ...await receipt({ ...o, limit, prFixLineage, verifyHandover, finishCheckpoint, finishRemote }) })}\n`);
 }
 function isMain() {
   try { return realpathSync(process.argv[1]) === realpathSync(new URL(import.meta.url)); }

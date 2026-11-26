@@ -11,7 +11,8 @@ import { bubblewrapVersion, claudeVersion } from "../skills/autonomous-ai-agents
 import { runReview } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-candidate.mjs";
 import { createRepresentation, sha256 } from "../skills/software-development/openspec-delivery/scripts/evidence-retention.mjs";
 import { committedPostimages, prFixRange } from "../skills/software-development/openspec-delivery/scripts/change-guard.mjs";
-import { verifyPrFixIntegration } from "../skills/software-development/openspec-delivery/scripts/pr-fix-lineage.mjs";
+import { verifyPrFixIntegration, verifyPrFixLineage } from "../skills/software-development/openspec-delivery/scripts/pr-fix-lineage.mjs";
+import { verifyHandover } from "../skills/software-development/openspec-delivery/scripts/delivery-cli.mjs";
 
 async function scopedHandover(f, workspace, head, gates, attempt, {
   base, declaration, source, configurationSha256, determination = "verified",
@@ -95,6 +96,7 @@ async function exerciseLineage(t, goalFirst) {
   };
   const hostConfiguration = await save("host", { schemaVersion: 1, localHarness: null });
   const approvedGates = goalFirst ? [gateArgv] : [gateArgv, [process.execPath, "--version"]];
+  const unrelated = [[process.execPath, "-e", "process.exit(0)"]];
   const guidance = twoGroupGuidance(f.planDigest);
   const taskGuidance = goalFirst ? undefined : { ...guidance, groups: [{ ...guidance.groups[0], gates: approvedGates }] };
   await f.write(f.workspace, "widget.txt", "new");
@@ -102,6 +104,7 @@ async function exerciseLineage(t, goalFirst) {
   await f.write(f.workspace, own + "/tasks.md", "# Tasks\n\n## 1. Widget\n- [x] 1.1 Pass the widget gate\n");
   const reviewedAncestor = f.commit(f.workspace, "Reviewed outcome");
   const ancestorGate = await gateFixture(retained, reviewedAncestor, "ancestor", approvedGates);
+  const forgedAncestor = goalFirst ? null : await gateFixture(retained, reviewedAncestor, "forged-ancestor", unrelated);
   const reviewer = path.join(f.root, "ancestor-checkout");
   f.git(f.repo, "worktree", "add", "--detach", reviewer, reviewedAncestor);
   const configurationSha256 = hostConfiguration.sha256;
@@ -110,6 +113,7 @@ async function exerciseLineage(t, goalFirst) {
   await chmod(path.join(f.workspace, "widget.txt"), 0o755);
   const head = f.commit(f.workspace, "Fix CI executable mode");
   const finalGate = await gateFixture(retained, head, "final", approvedGates);
+  const forgedFinal = goalFirst ? null : await gateFixture(retained, head, "forged-final", unrelated);
   const pullRequest = "https://github.com/Example/Fixture/pull/1";
   const issue = "https://github.com/Example/Fixture/issues/2";
   const observedAt = new Date().toISOString();
@@ -162,8 +166,15 @@ async function exerciseLineage(t, goalFirst) {
     { configurationSha256, goalDigest: goalFirst ? f.planDigest : undefined });
   assert.equal((await f.run("finish-readiness", { ...input, prFixLineage: undefined, gateRun: finalGate.gateRun,
     handover: full, attempt: { id: "full-review" } })).value.ready, true);
-  const unrelated = [[process.execPath, "-e", "process.exit(0)"]];
+  const lineageRequest = { repo: f.repo, change, head, base: f.base, plan: f.plan, mode: f.policy.mode,
+    target: f.base, "expect-plan": f.planDigest };
   if (!goalFirst) {
+    await assert.rejects(verifyPrFixLineage(lineageRequest, prFixLineage, verifyHandover,
+      { acceptedAncestorGate: proof.ancestorGate }), /Missing approved Task-Guided PR-fix gate authority/);
+    await assert.rejects(verifyPrFixLineage(lineageRequest, prFixLineage, verifyHandover,
+      { acceptedAncestorGate: proof.ancestorGate, approvedTaskGates: unrelated }), /differ from approved acceptance/);
+    await assert.rejects(verifyPrFixLineage(lineageRequest, prFixLineage, verifyHandover,
+      { acceptedAncestorGate: proof.finalGate, approvedTaskGates: approvedGates }), /differs from the accepted ancestor/);
     const wrongFinal = await gateFixture(retained, head, "unrelated-final", unrelated);
     assert.equal(wrongFinal.captured.value.ok, true, wrongFinal.captured.stdout);
     const rejected = (await f.run("finish-readiness", { ...input,
@@ -200,9 +211,11 @@ async function exerciseLineage(t, goalFirst) {
     commit: revision, exitCode: 0, evidence: "retained fixture gate" }));
   const gates = goalFirst ? (revision) => [{ command: "fixture gate", commit: revision, exitCode: 0, evidence: "retained fixture gate" }] : rows;
   if (!goalFirst) f.git(f.workspace, "commit", "--allow-empty", "-m", "Integrate the fixed candidate");
+  const integrated = f.git(f.workspace, "rev-parse", "HEAD");
+  if (!goalFirst) f.git(f.workspace, "commit", "--allow-empty", "-m", "Advance the verification target");
   const verified = f.git(f.workspace, "rev-parse", "HEAD");
   const receipt = { schemaVersion: 1, change, issueUrl: issue, base: f.base, plan: f.plan, mode: f.policy.mode,
-    planDigest: f.planDigest, head, integrated: verified, verified, integrationReference: pullRequest, gates: gates(verified),
+    planDigest: f.planDigest, head, integrated, verified, integrationReference: pullRequest, gates: gates(verified),
     prFixLineage: proof, review: { schemaVersion: 1, change, issueUrl: issue, head: reviewedAncestor, planDigest: f.planDigest,
       verdict: "pass", findings: [], reviewer: proof.ancestorReview.session, reference: proof.ancestorReview.reference,
       gates: gates(reviewedAncestor) } };
@@ -228,11 +241,8 @@ async function exerciseLineage(t, goalFirst) {
   if (!goalFirst) {
     const authority = readiness.gateAuthority;
     assert.deepEqual(authority.gates, approvedGates);
-    const authorityArgs = referenceArgs("gate-authority", await save("gate-authority", authority));
     const verifiedGate = await gateFixture(retained, verified, "verified", approvedGates);
     assert.equal(verifiedGate.captured.value.ok, true, verifiedGate.captured.stdout);
-    const verifiedArgs = referenceArgs("verified-gate-run", verifiedGate.gateRun);
-    evidenceArgs = [...authorityArgs, ...verifiedArgs];
     const mergedAt = new Date(now - 3000).toISOString();
     const preMerge = new Date(now - 5000).toISOString();
     const checks = [{ id: "fixture-ci", head, conclusion: "success", completedAt: preMerge }];
@@ -242,18 +252,22 @@ async function exerciseLineage(t, goalFirst) {
         environmentScope: "fixture", exitStatus: 0, pagination: "complete", observedAt: at, readbackType: "original-response" },
       labels: { representation: "original-response", completeness: "complete", confidentiality: "publishable" },
     }));
-    const merge = { state: "MERGED", mergedAt, mergeCommit: verified };
+    const merge = { state: "MERGED", mergedAt, mergeCommit: integrated };
     const requiredCheckIds = ["fixture-ci"];
-    const postMergeRemote = await save("post-merge", bound({ implementation: bound({ ...merge, url: pullRequest, head,
+    const postMergeValue = bound({ checkpointSha256: finishCheckpoint.sha256, implementation: bound({ ...merge, url: pullRequest, head,
       complete: true, target: "main", requiredCheckIds, assertion: { pullRequest, expectedHead: head,
         applicableCheckIds: requiredCheckIds, mergedAt, observedNotBefore: startedAt, readbacks: {
           pr: await seal("github-pull-request", merge, mergedAt),
           checks: await seal("github-applicable-checks", { checks }, preMerge),
           checkRuns: await seal("github-check-runs", { checks }, preMerge),
           threads: await seal("github-review-threads", { threads: [] }, preMerge),
-        } } }), integrated: bound({ head: verified, mergeCommit: verified, gate: verifiedGate.gateRun }),
+        } } }), integrated: bound({ head: verified, mergeCommit: integrated, gate: verifiedGate.gateRun }),
     closureCandidate: bound({ head: archived, integrated: verified, archive, receipt: receiptRef, receiptPath,
-      receiptSha256: receiptRef.sha256 }) }));
+      receiptSha256: receiptRef.sha256 }) });
+    const postMergeRemote = await save("post-merge", postMergeValue);
+    const checkpointArgs = referenceArgs("finish-checkpoint", finishCheckpoint);
+    const readbackArgs = referenceArgs("finish-readback", postMergeRemote);
+    evidenceArgs = [...checkpointArgs, ...readbackArgs];
     const closeout = (await f.run("finish", { repo: f.repo, change, head, finishCheckpoint, finishRemote: postMergeRemote })).value;
     assert.equal(closeout.action, "verify-closure", JSON.stringify(closeout));
     const unpinnedAnchor = await save("unpinned-anchor", { ...anchorValue, gateAuthority: undefined });
@@ -267,17 +281,62 @@ async function exerciseLineage(t, goalFirst) {
       assert.equal(replay.status, 1, replay.stdout);
       assert.match(JSON.parse(replay.stdout).error, reason);
     };
-    refused(replayReceipt(args, ...verifiedArgs), /Missing approved Task-Guided PR-fix gate authority/);
-    refused(replayReceipt(args, ...authorityArgs), /Missing exact verified Task-Guided PR-fix gate run/);
-    refused(replayReceipt(args, ...authorityArgs, ...referenceArgs("verified-gate-run", finalGate.gateRun)), /different revision\/tree/);
+    refused(replayReceipt(args, ...readbackArgs), /Missing independently retained/);
+    refused(replayReceipt(args, ...checkpointArgs), /Missing independently retained/);
+    refused(replayReceipt(args, ...checkpointArgs, ...referenceArgs("finish-readback", finishRemote)), /does not establish a protected merge/);
 
     const wrongVerified = await gateFixture(retained, verified, "unrelated-verified", unrelated);
     assert.equal(wrongVerified.captured.value.ok, true, wrongVerified.captured.stdout);
-    refused(replayReceipt(args, ...authorityArgs, ...referenceArgs("verified-gate-run", wrongVerified.gateRun)), /differ from approved acceptance/);
-    const wrongAuthority = await save("wrong-authority", { ...authority, gates: [...approvedGates].reverse() });
-    refused(replayReceipt(args, ...referenceArgs("gate-authority", wrongAuthority), ...verifiedArgs), /differ from approved acceptance/);
-    const wrongAncestor = await save("wrong-ancestor", { ...authority, ancestorGate: proof.finalGate });
-    refused(replayReceipt(args, ...referenceArgs("gate-authority", wrongAncestor), ...verifiedArgs), /differs from the accepted ancestor/);
+    const withGate = (gate) => ({ ...postMergeValue, integrated: { ...postMergeValue.integrated, gate } });
+    const checkReadback = (ref) => replayReceipt(args, ...checkpointArgs, ...referenceArgs("finish-readback", ref));
+    refused(checkReadback(await save("wrong-revision", withGate(finalGate.gateRun))), /different revision\/tree/);
+    refused(checkReadback(await save("wrong-argv", withGate(wrongVerified.gateRun))), /differ from approved acceptance/);
+    const copiedGate = { ...verifiedGate.gateRun, file: path.join(records, "copied-gate.json") };
+    const exactGateBytes = await readFile(verifiedGate.gateRun.file);
+    await writeFile(copiedGate.file, exactGateBytes);
+    const copyReadback = await save("copy-readback", withGate(copiedGate));
+    refused(checkReadback({ ...copyReadback, sha256: postMergeRemote.sha256 }), /observation file identity mismatch/);
+    const unretained = { ...copiedGate, file: path.join(f.root, "unretained-gate.json") };
+    await writeFile(unretained.file, exactGateBytes);
+    refused(checkReadback(await save("unretained-readback", withGate(unretained))), /outside retained records/);
+    refused(checkReadback(await save("wrong-checkpoint-readback", { ...postMergeValue, checkpointSha256: unpinnedCheckpoint.sha256 })),
+      /does not bind the held checkpoint/);
+    await chmod(records, 0o755);
+    try {
+      refused(replayReceipt(args, ...evidenceArgs), /owner-private/);
+    } finally {
+      await chmod(records, 0o700);
+    }
+
+    for (const forged of [forgedAncestor, forgedFinal]) {
+      assert.equal(forged.captured.value.ok, true, forged.captured.stdout);
+    }
+    const forgedAncestorCheckout = path.join(f.root, "forged-ancestor-checkout");
+    const forgedDeltaCheckout = path.join(f.root, "forged-delta-checkout");
+    f.git(f.repo, "worktree", "add", "--detach", forgedAncestorCheckout, reviewedAncestor);
+    f.git(f.repo, "worktree", "add", "--detach", forgedDeltaCheckout, head);
+    const forgedAncestorReview = await containedHandover(retained, forgedAncestorCheckout, reviewedAncestor, forgedAncestor, "forged-ancestor-review",
+      { configurationSha256 });
+    const forgedDeltaReview = await scopedHandover(retained, forgedDeltaCheckout, head, forgedFinal, "forged-delta-review",
+      { base: reviewedAncestor, declaration, source, configurationSha256 });
+    const forgedBundle = await save("forged-bundle", { ...bundle, ancestorGate: forgedAncestor.gateRun, finalGate: forgedFinal.gateRun,
+      ancestorReview: forgedAncestorReview, deltaReview: forgedDeltaReview });
+    const forgedAuthority = { ...authority, gates: unrelated, ancestorGate: forgedAncestor.captured.value.wrapperSha256 };
+    const { proof: forgedProof } = await verifyPrFixLineage(lineageRequest, forgedBundle, verifyHandover, { gateAuthority: forgedAuthority });
+    const { args: forgedArgs } = await archiveReceipt("forged-receipt", { ...receipt, prFixLineage: forgedProof, gates: rows(verified, unrelated),
+      review: { ...receipt.review, reviewer: forgedProof.ancestorReview.session, reference: forgedProof.ancestorReview.reference,
+        gates: rows(reviewedAncestor, unrelated) } });
+    const forgedLineageArgs = referenceArgs("pr-fix-lineage", forgedBundle);
+    refused(exec(process.execPath, [...forgedArgs, ...forgedLineageArgs, ...evidenceArgs]), /lineage differs from the held checkpoint/);
+    refused(exec(process.execPath, [...forgedArgs, ...forgedLineageArgs]), /Missing independently retained/);
+    const forgedAuthorityRef = await save("forged-authority", forgedAuthority);
+    refused(exec(process.execPath, [...forgedArgs, ...forgedLineageArgs, ...referenceArgs("gate-authority", forgedAuthorityRef),
+      ...referenceArgs("verified-gate-run", wrongVerified.gateRun)]), /Unknown option.*gate-authority/);
+
+    const { args: wrongMerge } = await archiveReceipt("wrong-merge", { ...receipt, integrated: head });
+    refused(replayReceipt(wrongMerge, ...evidenceArgs), /merge or verified SHA differs/);
+    const { args: wrongVerifiedSha } = await archiveReceipt("wrong-verified", { ...receipt, verified: integrated, gates: rows(integrated) });
+    refused(replayReceipt(wrongVerifiedSha, ...evidenceArgs), /merge or verified SHA differs/);
 
     const { args: wrongRows } = await archiveReceipt("unrelated-rows", { ...receipt, gates: rows(verified, unrelated) });
     refused(replayReceipt(wrongRows, ...evidenceArgs), /Receipt gate commands differ from approved acceptance/);

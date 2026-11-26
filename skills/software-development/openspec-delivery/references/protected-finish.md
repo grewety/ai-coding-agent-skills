@@ -45,10 +45,11 @@ Use UTC timestamps with milliseconds.
   and `implementationGateSha256`, the accepted gate wrapper digest. For first publication include the original delivery
   evaluation inputs for live exact candidate finish-readiness verification.
 - For Task-Guided PR fixes, copy `gateAuthority` from accepted finish
-  readiness into the separately sealed anchor. Readiness binds the approved
-  ordered argv to the accepted ancestor gate wrapper, workspace, plan and
-  policy target. Keep this anchor pin independent of the `prFixLineage`
-  bundle. The final-head and integrated runs must use those same ordered gates.
+  readiness into the separately sealed anchor. Readiness verifies the
+  ordered argv from the frozen group against the ancestor and final gate
+  runs. The authority binds the approved argv to the accepted ancestor
+  wrapper, workspace, plan, policy parent and target. The integrated grant
+  and gate run must use those same ordered gates.
 - A contextual `continue` passes a sealed `finishReply`, a bound
   `finish-reply` with `reply: "continue"`, `checkpointSha256`,
   `pullRequest` for the retained active PR, and `observedAt`. Read back the
@@ -99,8 +100,14 @@ Use UTC timestamps with milliseconds.
    `assert-closeout` PR, check, run and thread assertions. Keep their
    original evidence. The bound `integrated` observation identifies actual
    `mergeCommit`, containing `head` and exact disposable `gate` reference.
-   For Task-Guided PR fixes, archive replay uses this same successful gate
-   capture at the receipt's `verified` SHA and the authority from the anchor.
+   For Task-Guided PR fixes, include `checkpointSha256` in the top-level
+   post-merge readback, using the exact checkpoint against which it was
+   verified. Independently retain the exact checkpoint and readback
+   `{file, sha256}` references in orchestrator custody for later archive
+   replay. Those external pins bind the readiness authority and the exact
+   path and hash of the successful gate capture at the receipt's `verified`
+   SHA. Receipt bytes, gate tables and matching capture hashes can be
+   produced by the evidence author and cannot establish that custody.
    Reuse a completed chapter only on verified readback. An unverified merge
    outcome remains pending.
 4. After integrated gates pass, prepare the receipt and record-only archive.
