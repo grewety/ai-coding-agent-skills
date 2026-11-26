@@ -9,12 +9,15 @@ import { allocateReviewScratch, checkSocketLength, defaultReviewScratchRoot } fr
 import { validateHarnessBinding } from "./harness-result.mjs";
 import { upstreamClasses } from "./review-upstream-status.mjs";
 import { safePath, writeClosed } from "./worker-handoff.mjs";
-import { absolute, digest, fields, hash, jsonBytes, need, relative, separate } from "./review-inputs.mjs";
+import { absolute, digest, fields, hash, jsonBytes, need, relative, separate, uuid } from "./review-inputs.mjs";
 import { inspectPinnedFile, parseStrictJson } from "./agent-configuration.mjs";
 import { observeVersion } from "./agent-discovery.mjs";
 import { validatePilotHost } from "./agent-setup.mjs";
-import { requireQualifiedPilot } from "./adapter-qualification.mjs";
+import { pilotDisposition, requireQualifiedPilot } from "./adapter-qualification.mjs";
 import { auditVersion, reportedVersion } from "./runtime-version.mjs";
+import { grokReviewerBlocker, piReviewer } from "./agent-role-adapters.mjs";
+import { verifyPiRelease } from "./agent-pi-runtime.mjs";
+import { verifyHermesProxySocket, validateHermesProxySocket } from "./review-relay.mjs";
 import { packetConcurrency } from "./review-packet-scheduler.mjs";
 
 export const claudeVersion = "2.1.330";
@@ -31,18 +34,20 @@ const pluginSettings = JSON.stringify({ enabledPlugins: {
 } });
 
 export function validateHostConfig(config) {
-  fields(config, ["schemaVersion", "bwrap", "claude", "node", "libraries", "model", "relay",
+  const pi = config?.schemaVersion === 3;
+  fields(config, ["schemaVersion", "bwrap", pi ? "pi" : "claude", "node", "libraries", "model", "relay",
     "timeoutMs", "maxTurns", "maxBudgetUsd", "requirePreExposureAttestation"], "trusted host configuration",
-  ["interPacketDelayMs", "runTimeoutMs", "localHarness", "packetConcurrency"]);
+  ["interPacketDelayMs", "runTimeoutMs", "localHarness", "packetConcurrency", ...(pi ? ["piRelease"] : [])]);
   const concurrency = packetConcurrency(config.packetConcurrency);
   if (config.localHarness !== undefined && config.localHarness !== null) validateHarnessBinding(config.localHarness);
   for (const [name, min, max] of [["interPacketDelayMs", 0, 30000], ["runTimeoutMs", 1000, 3600000]]) {
     need(config[name] === undefined || Number.isSafeInteger(config[name]) && config[name] >= min && config[name] <= max,
       "Invalid host pacing or run deadline");
   }
-  need(config.schemaVersion === 1 && /^claude-[a-z0-9-]{2,100}$/.test(config.model) &&
+  need((pi ? config.model === piReviewer.model && admittedPilots.has(config) :
+    config.schemaVersion === 1 && /^claude-[a-z0-9-]{2,100}$/.test(config.model)) &&
     config.requirePreExposureAttestation === false, "Unsupported host configuration or required pre-exposure attestation");
-  for (const [name, pin] of Object.entries({ bwrap: config.bwrap, claude: config.claude, node: config.node })) {
+  for (const [name, pin] of Object.entries({ bwrap: config.bwrap, client: config.pi ?? config.claude, node: config.node })) {
     fields(pin, ["path", "sha256"], name + " binary pin");
     need(absolute(pin.path) && digest(pin.sha256), "Invalid binary pin");
   }
@@ -60,8 +65,13 @@ export function validateHostConfig(config) {
   }
   need(Number.isFinite(config.maxBudgetUsd) && config.maxBudgetUsd > 0 && config.maxBudgetUsd <= 10, "Invalid finite cost limit");
   const relay = config.relay;
-  need(concurrency === 1 || relay?.route === "same-uid-key", "Review relay has no verified packet isolation");
-  if (relay?.route === "same-uid-key") {
+  need(concurrency === 1 || ["same-uid-key", piReviewer.relay].includes(relay?.route), "Review relay has no verified packet isolation");
+  if (pi) {
+    fields(relay, ["route", "upstreamSocket"], "host Hermes proxy relay");
+    need(relay.route === piReviewer.relay, "Invalid host-only Hermes proxy route");
+    validateHermesProxySocket(relay.upstreamSocket);
+    need(config.piRelease, "Missing pinned Pi release runtime");
+  } else if (relay?.route === "same-uid-key") {
     fields(relay, ["route", "keyFile", "keyFormat"], "same-UID key route");
     need(absolute(relay.keyFile) && ["raw", "assignment"].includes(relay.keyFormat), "Invalid host key source");
   } else if (relay?.route === "dedicated-uid-broker") {
@@ -82,45 +92,60 @@ export function requireReviewHost(config, excluded, options = {}) {
   }
   const pilot = validatePilotHost(config);
   const { executable, ...policy } = pilot.bubblewrap;
+  const pi = pilot.roleBinding.client === piReviewer.client;
   try {
-    need(pilot.relay.route === "same-uid-key", pilot.relay.route === "dedicated-uid-broker"
+    need(pilot.roleBinding.client !== "grok-build", grokReviewerBlocker);
+    need(pi ? pilot.relay.route === piReviewer.relay : pilot.relay.route === "same-uid-key", pilot.relay.route === "dedicated-uid-broker"
       ? "Dedicated UID broker has no verified explicit effort and relay identity readback" : "Selected inference relay is contract-only");
     inspectPinnedFile(executable, { executable: true, excluded });
     const bubblewrapAudit = auditVersion(policy, observeVersion(executable.path, { client: "bubblewrap" }), bubblewrapVersion);
     inspectPinnedFile(executable, { executable: true, excluded });
-    if (options.qualification) need(pilot.runtime, "Missing explicit Node, runtime library and relay configuration pins");
+    if (options.qualification || options.trialOffline) need(pilot.runtime, "Missing explicit Node, runtime library and relay configuration pins");
     const roleOptions = { ...options, excluded };
+    if (pi) {
+      need(pilot.runtime?.piRelease, "Missing pinned Pi release runtime");
+      // The managed shim is provenance only. The closed release is checked before exposure.
+      roleOptions.piReleaseVersion = pilot.runtime.piRelease.version;
+    }
     if (pilot.runtime) roleOptions.context = {
       runtimeSha256: options.runtimeSha256, configurationSha256: options.configurationSha256,
       constraintsSha256: hash(jsonBytes({ runtime: pilot.runtime, bubblewrapAudit })),
       relaySha256: pilot.runtime.relayConfiguration.sha256,
     };
-    const binding = requireQualifiedPilot("reviewer", pilot.roleBinding, roleOptions);
+    const getBinding = () => {
+      if (!options.trialOffline) return requireQualifiedPilot("reviewer", pilot.roleBinding, roleOptions);
+      need(pi && !options.qualification, "Offline-only qualification is confined to the Pi trial");
+      const result = pilotDisposition("reviewer", pilot.roleBinding, roleOptions);
+      need(result.status === "trial-only", result.reason ?? "Missing pinned offline trial controls");
+      return result;
+    };
+    const binding = getBinding();
     need(pilot.runtime, "Missing explicit Node, runtime library and relay configuration pins");
-    const { node, libraries, relayConfiguration } = pilot.runtime;
+    const { node, libraries, relayConfiguration, piRelease } = pilot.runtime;
     const relayFile = parseStrictJson(inspectPinnedFile(relayConfiguration, { excluded, read: true }));
     const { schemaVersion, credentialRef, ...relay } = relayFile;
     need(schemaVersion === 1 && credentialRef === pilot.relay.credentialRef &&
       relay.route === pilot.relay.route, "Pinned relay does not resolve the selected route and credential reference");
     const runtime = {
-      schemaVersion: 1, bwrap: executable, claude: pilot.roleBinding.executable, node, libraries, relay,
+      schemaVersion: pi ? 3 : 1, bwrap: executable, [pi ? "pi" : "claude"]: pilot.roleBinding.executable,
+      node, libraries, relay, ...(piRelease ? { piRelease } : {}),
       model: pilot.roleBinding.model, maxTurns: pilot.maxTurns, timeoutMs: pilot.timeoutMs,
       interPacketDelayMs: pilot.interPacketDelayMs, maxBudgetUsd: pilot.maxBudgetUsd, requirePreExposureAttestation: false,
       ...(pilot.packetConcurrency === undefined ? {} : { packetConcurrency: pilot.packetConcurrency }),
       ...(pilot.localHarness === undefined ? {} : { localHarness: pilot.localHarness }),
     };
-    validateHostConfig(runtime);
     admittedPilots.set(runtime, { args: binding.args, role: binding.binding, bubblewrapAudit, relayConfiguration,
       configurationSha256: options.configurationSha256, runtimeSha256: options.runtimeSha256,
-      qualificationSha256: binding.qualificationSha256,
+      qualificationSha256: binding.qualificationSha256, offlineSha256: binding.offlineSha256,
       recheck: async () => {
         need(typeof options.verifyRuntimeIdentity === "function" && await options.verifyRuntimeIdentity() === options.runtimeSha256,
           "Qualified reviewer package bytes changed before launch");
         if (options.hostPin) inspectPinnedFile(options.hostPin, { excluded });
         inspectPinnedFile(relayConfiguration, { excluded });
         inspectPinnedFile(executable, { executable: true, excluded });
-        requireQualifiedPilot("reviewer", pilot.roleBinding, roleOptions);
+        getBinding();
       } });
+    validateHostConfig(runtime);
     return runtime;
   } catch (cause) {
     if (cause.disposition) throw cause;
@@ -131,29 +156,39 @@ export function requireReviewHost(config, excluded, options = {}) {
   }
 }
 
-export function containmentArgs(config, exportDirectory, socket, runtime) {
+export function containmentArgs(config, exportDirectory, socket, runtime, piSnapshot) {
+  const pi = config.schemaVersion === 3;
+  if (pi) need(absolute(piSnapshot) && uuid(runtime.session), "Missing verified Pi release snapshot or session");
   return [
     "--unshare-all", "--unshare-user", "--die-with-parent", "--new-session", "--disable-userns", "--cap-drop", "ALL",
     "--clearenv", "--proc", "/proc", "--remount-ro", "/proc", "--dev", "/dev", "--remount-ro", "/dev",
     "--tmpfs", "/scratch", "--ro-bind", exportDirectory, "/review",
     "--ro-bind", socket, "/control/inference.sock", "--ro-bind", bridge, "/control/bridge.mjs",
-    "--ro-bind", config.claude.path, "/control/claude", "--ro-bind", config.node.path, "/control/node",
+    ...(pi ? ["--ro-bind", path.join(piSnapshot, "node_modules"), "/control/node_modules"] :
+      ["--ro-bind", config.claude.path, "/control/claude"]),
+    "--ro-bind", config.node.path, "/control/node",
     ...config.libraries.flatMap((mount) => ["--ro-bind", mount.path, mount.target]),
     ...Object.entries({
       PATH: "/control", HOME: "/scratch/home", TMPDIR: "/scratch/tmp",
       XDG_CONFIG_HOME: "/scratch/config", XDG_DATA_HOME: "/scratch/data", XDG_CACHE_HOME: "/scratch/cache",
-      XDG_STATE_HOME: "/scratch/state", CLAUDE_CONFIG_DIR: "/scratch/config/claude",
-      LANG: "C.UTF-8", CI: "1", DISABLE_AUTOUPDATER: "1", CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
+      XDG_STATE_HOME: "/scratch/state", LANG: "C.UTF-8", CI: "1",
+      ...(pi ? { PI_OFFLINE: "1", PI_TELEMETRY: "0", PI_CODING_AGENT_DIR: "/scratch/config/pi" } : {
+      CLAUDE_CONFIG_DIR: "/scratch/config/claude", DISABLE_AUTOUPDATER: "1", CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
       DISABLE_TELEMETRY: "1", DISABLE_ERROR_REPORTING: "1", DISABLE_BUG_COMMAND: "1",
       CLAUDE_CODE_DISABLE_BUILTIN_PLUGINS: "1", ANTHROPIC_API_KEY: "relay-managed",
+      }),
     }).flatMap(([name, value]) => ["--setenv", name, value]),
     "--remount-ro", "/", "--chdir", "/review", "--", "/control/node", "/control/bridge.mjs",
+    ...(pi ? ["--pi-review", "--mode", "json", "--offline", "--no-session", "--session-id", runtime.session, "--no-context-files",
+      "--no-approve", "--no-extensions", "--no-skills", "--no-prompt-templates", "--no-themes", "--no-mcp", "--tools", "read",
+      ...admittedPilots.get(config).args] : [
     "--print", "--verbose", "--output-format", "stream-json", "--session-id", runtime.session,
     ...(admittedPilots.get(config)?.args ?? ["--model", config.model]),
     "--permission-mode", "dontAsk", "--tools", "Read", "--allowedTools", "Read",
     "--no-session-persistence", "--setting-sources", "", "--settings", pluginSettings,
     "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}',
     "--disable-slash-commands", "--no-chrome", "--permission-prompts", "none", "--max-turns", String(config.maxTurns), "--max-budget-usd", String(config.maxBudgetUsd),
+    ]),
   ];
 }
 
@@ -174,7 +209,12 @@ async function verifyPin(pin, excluded) {
 }
 
 export async function verifyRuntimePins(config, excluded) {
-  await Promise.all([config.bwrap, config.node, config.claude, ...config.libraries].map((pin) => verifyPin(pin, excluded)));
+  await Promise.all([...[config.bwrap, config.node, config.pi ?? config.claude, ...config.libraries]
+    .map((pin) => verifyPin(pin, excluded)), ...(config.pi ? [verifyPiRelease(config.piRelease, excluded)] : [])]);
+}
+
+export function reviewRelaySource(config) {
+  return config.relay.keyFile ?? config.relay.socket ?? config.relay.upstreamSocket?.path ?? admittedPilots.get(config)?.relayConfiguration.path;
 }
 
 export function runtimeBinding(config, session, configurationSha256 = hash(jsonBytes(config))) {
@@ -187,7 +227,9 @@ export function runtimeBinding(config, session, configurationSha256 = hash(jsonB
     ...(pilot ? { explicit: { provider: pilot.role.provider, reasoningEffort: pilot.role.reasoningEffort,
       executableSha256: pilot.role.executable.sha256, version: pilot.role.runtimeVersion, bubblewrap: pilot.bubblewrapAudit,
       relaySha256: pilot.relayConfiguration.sha256, runtimeSha256: pilot.runtimeSha256,
-      qualificationSha256: pilot.qualificationSha256 } } : {}) };
+      ...(pilot.offlineSha256 ? { offlineSha256: pilot.offlineSha256 } : { qualificationSha256: pilot.qualificationSha256 }),
+      ...(config.pi ? { client: piReviewer.client, timeoutMs: config.timeoutMs, requestLimit: config.maxTurns,
+        piReleaseSha256: config.piRelease.inventorySha256 } : {}) } } : {}) };
 }
 
 async function brokerSocket(relay, excluded) {
@@ -201,7 +243,7 @@ async function brokerSocket(relay, excluded) {
   return relay.socket;
 }
 
-async function sameUidRelay(config, scratch, requestLimit, onFailure) {
+async function sameUidRelay(config, scratch, requestLimit, onFailure, allowedPaths) {
   const socket = path.join(scratch, "inference.sock");
   checkSocketLength(socket);
   const child = spawn(admittedPilots.has(config) ? config.node.path : process.execPath, [moduleFile("./review-relay.mjs")], {
@@ -226,7 +268,9 @@ async function sameUidRelay(config, scratch, requestLimit, onFailure) {
     child.once("exit", () => { clearTimeout(timeout); reject(new Error("Host relay stopped before readiness")); });
   });
   child.stdin?.end(jsonBytes({
-    socket, keyFile: config.relay.keyFile, keyFormat: config.relay.keyFormat, model: config.model, requestLimit, socketMode: 0o600,
+    socket, ...(config.pi ? { route: config.relay.route, upstreamSocket: config.relay.upstreamSocket, allowedPaths } :
+      { keyFile: config.relay.keyFile, keyFormat: config.relay.keyFormat }),
+    model: config.model, requestLimit, socketMode: 0o600,
     timeoutMs: config.timeoutMs,
     ...(admittedPilots.has(config) ? { reasoningEffort: admittedPilots.get(config).role.reasoningEffort } : {}),
   }));
@@ -302,6 +346,10 @@ export async function withReviewRuntime(config, { parent, excluded, packetCount,
   if (config.relay.route === "same-uid-key") {
     need(excluded.every((root) => separate(root, config.relay.keyFile)), "Host key overlaps protected roots");
   }
+  if (config.pi) {
+    need(excluded.every((root) => separate(root, config.relay.upstreamSocket.path)), "Hermes proxy socket overlaps protected roots");
+    await verifyHermesProxySocket(config.relay.upstreamSocket);
+  }
   const root = scratchRoot ?? await defaultReviewScratchRoot();
   const withScratch = async (invocations, onFailure, use) => {
     const owned = await allocateReviewScratch(root, [parent, ...excluded]);
@@ -312,6 +360,8 @@ export async function withReviewRuntime(config, { parent, excluded, packetCount,
       need(workersSettled, "Previous reviewer process has no quiescence proof");
       await recheck();
       await owned.verify();
+      const piSnapshot = config.pi ? path.join(scratch, "pi-release") : undefined;
+      if (piSnapshot) await verifyPiRelease(config.piRelease, excluded, piSnapshot);
       const packet = await mkdtemp(path.join(scratch, "packet-"));
       for (const [name, bytes] of files) {
         need(relative(name), "Unsafe runtime packet path");
@@ -320,8 +370,9 @@ export async function withReviewRuntime(config, { parent, excluded, packetCount,
         await writeClosed(filename, bytes, true);
       }
 
+      if (config.pi) relay = await startRelay(config, scratch, config.maxTurns, onFailure, [...files.keys()]);
       const runtime = runtimeBinding(config, session, configurationSha256);
-      const args = containmentArgs(config, packet, relay.socket, runtime);
+      const args = containmentArgs(config, packet, relay.socket, runtime, piSnapshot);
       const input = Buffer.from(prompt);
       if (begin) {
         timeoutMs = begin();
@@ -342,10 +393,12 @@ export async function withReviewRuntime(config, { parent, excluded, packetCount,
       return observation;
     };
     try {
-      relay = config.relay.route === "same-uid-key"
-        ? await startRelay(config, scratch, Math.min((config.maxTurns + 8) * invocations, 4096), onFailure)
-        : { socket: await brokerSocket(config.relay, excluded), close: async () => {} };
-      checkSocketLength(relay.socket);
+      if (!config.pi) {
+        relay = config.relay.route === "same-uid-key"
+          ? await startRelay(config, scratch, Math.min((config.maxTurns + 8) * invocations, 4096), onFailure)
+          : { socket: await brokerSocket(config.relay, excluded), close: async () => {} };
+        checkSocketLength(relay.socket);
+      }
       return await use(run);
     } catch (error) {
       if (error.relayUnsettled) workersSettled = false;
@@ -356,6 +409,6 @@ export async function withReviewRuntime(config, { parent, excluded, packetCount,
       else throw new Error("Reviewer process has no quiescence proof; private scratch retained");
     }
   };
-  if (packetConcurrency(config.packetConcurrency) === 1) return withScratch(packetCount + 1, undefined, callback);
+  if (!config.pi && packetConcurrency(config.packetConcurrency) === 1) return withScratch(packetCount + 1, undefined, callback);
   return callback((input) => withScratch(1, input.onFailure, (run) => run(input)));
 }

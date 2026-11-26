@@ -92,8 +92,8 @@ test("well-known build publishes every skill and all advertised files", async ()
       "scripts/run-implementer.mjs",
       "scripts/worker-runtime-policy.mjs",
     ];
-    const roleFiles = ["adapter-qualification", "agent-configuration", "agent-discovery", "agent-role-adapters",
-      "agent-role-config", "agent-setup", "detect-agents", "role-config", "runtime-version", "setup"]
+    const roleFiles = ["adapter-qualification", "agent-configuration", "agent-discovery", "agent-pi-runtime",
+      "agent-role-adapters", "agent-role-config", "agent-setup", "detect-agents", "role-config", "runtime-version", "setup"]
       .map((name) => "scripts/" + name + ".mjs");
     assert.deepEqual(
       [...declaredFiles, ...reviewerFiles, ...implementerFiles].sort(),

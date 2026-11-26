@@ -8,7 +8,7 @@ import { applySetup, previewSetup, readWorksetOpener } from "../skills/software-
 import { hashBytes, inspectPinnedFile } from "../skills/software-development/openspec-delivery/scripts/agent-configuration.mjs";
 import { readRoleBindings } from "../skills/software-development/openspec-delivery/scripts/agent-role-config.mjs";
 import { detectAgents, observeVersion } from "../skills/software-development/openspec-delivery/scripts/agent-discovery.mjs";
-import { detectAgents as detectOrchestrationAgents } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/agent-discovery.mjs";
+import { detectAgents as detectOrchestrationAgents, observeVersion as observeOrchestrationVersion } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/agent-discovery.mjs";
 import { nativeRoleBinding } from "../skills/software-development/openspec-delivery/scripts/agent-role-adapters.mjs";
 import { pilotDisposition, qualificationInventory } from "../skills/software-development/openspec-delivery/scripts/adapter-qualification.mjs";
 import { checkRoleIndependence, verifyEffectiveRole } from "../skills/software-development/openspec-delivery/scripts/role-config.mjs";
@@ -109,7 +109,12 @@ test("Grok discovery prefers the current executable and retains the legacy clien
   const { root } = fixture(t);
   const current = path.join(root, "grok");
   const legacy = path.join(root, "grok-build");
-  const run = (file) => ({ status: 0, stdout: file === current ? "grok 1.0.92\n" : "grok-build v1.0.89\n" });
+  const plainVersion = "grok 1.0.92 (b06756fd6256)";
+  let currentVersion = plainVersion;
+  const run = (file, _args, { env }) => {
+    assert.equal(env.NO_COLOR, "1");
+    return { status: 0, stdout: (file === current ? currentVersion : "grok-build v1.0.89") + "\n" };
+  };
   const lookup = (detect) => detect({ searchPath: root, run }).find(({ client }) => client === "grok-build");
   const check = (command, executable) => {
     const selected = lookup(detectAgents);
@@ -126,16 +131,24 @@ test("Grok discovery prefers the current executable and retains the legacy clien
   writeFileSync(current, "#!/bin/sh\n", { mode: 0o600 });
   check("grok-build", legacy);
   chmodSync(current, 0o700);
-  const selected = check("grok", current);
-  if (selected.versionProbe === "untrusted-path") assert.equal(selected.version, null);
-  else assert.equal(selected.version, "1.0.92");
+  for (const observed of [plainVersion, `${plainVersion} [stable]`]) {
+    currentVersion = observed;
+    const selected = check("grok", current);
+    if (selected.versionProbe === "untrusted-path") assert.equal(selected.version, null);
+    else assert.equal(selected.version, "1.0.92");
+    for (const observe of [observeVersion, observeOrchestrationVersion]) {
+      assert.equal(observe(current, { client: "grok-build", searchPath: root, run }), "1.0.92");
+    }
+  }
   rmSync(legacy);
   check("grok", current);
 
   const version = (file, probe = run) => observeVersion(file, { client: "grok-build", searchPath: root, run: probe });
-  assert.equal(version(current), "1.0.92");
   assert.equal(version(legacy), "1.0.89");
   assert.equal(version(current, () => ({ status: 0, stdout: "grok 1.0.92\nunrelated output" })), null);
+  assert.equal(version(current, () => ({ status: 0, stdout: "grok 1.0.92 (not-a-hash) [stable]" })), null);
+  assert.equal(version(current, () => ({ status: 0, stdout: "grok 1.0.92 (b06756fd6256) [dev]" })), null);
+  assert.equal(version(current, () => ({ status: 0, stdout: "grok 1.0.92 (b06756fd6256) [stable]\ngrok 1.0.93" })), null);
   assert.equal(version(current, () => ({ status: 1, stdout: "grok 1.0.92" })), null);
 });
 

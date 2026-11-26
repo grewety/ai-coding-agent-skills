@@ -67,7 +67,7 @@ const versionLabels = {
   kilo: [/^(?:kilo|Kilo Code) v?(\S+)$/],
   pi: [/^pi v?(\S+)$/],
   agy: [/^(?:agy|Antigravity CLI) v?(\S+)$/],
-  "grok-build": [/^grok-build v?(\S+)$/],
+  "grok-build": [/^(?:grok-build|grok) v?(\S+)$/, /^grok v?(\S+) \([0-9a-f]{7,40}\)(?: \[stable\])?$/],
   gemini: [/^gemini(?:-cli)? v?(\S+)$/],
   openspec: [/^openspec v?(\S+)$/],
 };
