@@ -30,6 +30,8 @@ Herdr pane-selection helper.
 
 ## Local Contracts
 
+- Own tier-bound reviewer replay, the native Codex admission path and offline Grok and wrapped Linux probe contracts. Keep provider HTTPS behind exact native qualification.
+
 - The explicit pilot admission reports exact unsupported predicates before dispatch or review export exposure. Preserve legacy frozen bindings and sealed offline review replay.
 
 - Portable core work follows `references/portable-core.md` without Hermes or Herdr. Delivery owns integrated-parent policy, contributor-contract alignment and continuation; qualified terminal adapters (`hermes`, `claude-code`, `codex`, `grok-build`) in `references/terminal-adapters.md` and `scripts/terminal-adapters.mjs` own native worker processes, non-argv prompt transport, process supervision and same-session interaction. Core artifact checks require independently retained request/runtime bindings and protected publisher roots; they never grant worker writes or qualification. With `replacementReadiness` verified, `resolveLegacyRouteRequest` retires `code-tab-phase-roles` and operator-selected Herdr pane dispatch (`status: "retired-route"`), without fallback or `.claude/agents` edits.
@@ -67,8 +69,9 @@ Run `npm test` and `npm run build`. Confirm the generated package advertises
 `scripts/adapter-qualification.mjs`, `scripts/agent-configuration.mjs`,
 `scripts/agent-discovery.mjs`, `scripts/agent-pi-runtime.mjs`, `scripts/agent-role-adapters.mjs`,
 `scripts/agent-role-config.mjs`, `scripts/agent-setup.mjs`,
-`scripts/detect-agents.mjs`, `scripts/role-config.mjs`,
+`scripts/containment-tier.mjs`, `scripts/detect-agents.mjs`, `scripts/role-config.mjs`,
 `scripts/runtime-version.mjs`, `scripts/setup.mjs`,
+`scripts/windows-containment-preflight.mjs`,
 `templates/phase-implementer.md`, and `templates/phase-reviewer.md`.
 
 Verify the implementer CLI, runtime helpers and references alongside the

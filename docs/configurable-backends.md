@@ -152,3 +152,5 @@ An exact reviewer qualification needs a pinned minimal rootfs, a host-only
 Unix relay, an audit of the single allowed Read tool and its complete
 whole-file results, separate sessions and finite bounds. Evaluate each
 credential route and effective role binding under its own live authority.
+
+Use the tier-aware preview for explicit Linux sealed relay or dedicated-auth setup. Review the exact pins, output bytes and qualification disposition before applying a confirmation digest. See [Containment tiers](containment-tiers.md).

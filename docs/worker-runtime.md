@@ -25,9 +25,9 @@ implementation route. Use the contained reviewer for its separate role.
 ## Install and bind
 
 1. Follow the [OpenSpec prerequisites](openspec-installation.md). Install
-   complete delivery 1.10.0 and next 0.8.0 packages from the
-   `openspec-development` 1.10.0 bundle and the separately selected
-   orchestration 0.24.0 package from `autonomous-orchestration` 1.14.0.
+   complete delivery 1.11.0 and next 0.8.0 packages from the
+   `openspec-development` 1.11.0 bundle and the separately selected
+   orchestration 0.25.0 package from `autonomous-orchestration` 1.15.0.
    Check the exact CLI and supporting file bytes outside the workspace before
    enabling the project route. Use the normal collision, backup and fresh
    session checks when updating or removing a package.
@@ -146,3 +146,5 @@ configuration and new candidate under a separate single-run grant.
 [Delegated review session binding](../skills/software-development/openspec-delivery/references/delivery-runtime.md#configured-exclusive-worker-runtime).
 Stale or missing evidence, invalid coverage, a wider correction or exhausted
 authority leaves the result pending or blocked.
+
+A new schemaVersion 3 paired worker host binds Tier B and `linux-codex-native` for the exact 0.172.0 pilot. The executable uses native named workspace-write directly. Dispatch requires matching bounded live evidence. See [Containment tiers](containment-tiers.md).

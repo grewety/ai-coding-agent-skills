@@ -88,39 +88,32 @@ Installation and metadata migration SHALL NOT grant issue-write authority.
 - **THEN** the issue records impact and authorization fields, and does not copy `tasks.md`
 
 ### Requirement: Change name is the identity
-The full change directory name SHALL identify the change in its issue, PR and evidence.
-Adopting projects SHALL derive `<slug>-<lowercase-ulid>` once from the short
-proposal at creation and use `change/<full-name>` through specification,
-implementation and review. Existing names SHALL stay valid and unchanged.
 
-#### Scenario: Short proposal request
-- **WHEN** the operator requests `/openspec-propose add-dark-mode` for a new change
-- **THEN** generate the suffix before scaffolding and reuse the name without asking for a ULID
-- **AND** naming grants no writes. The proposal invocation includes isolated setup, without implementation, commits or publication.
+The full name identifies paths, issues, PRs and evidence. Adopters SHALL generate `<slug>-<lowercase-ulid>` once, use `change/<full-name>` through review and preserve existing names.
 
-#### Scenario: Resume and ambiguous selection
-- **WHEN** an operator resumes by short slug or current change context
-- **THEN** resolve the existing full name without a new suffix
-- **AND** ambiguity requires operator selection. Recency alone cannot resolve it.
+#### Scenario: Short proposal
+- **WHEN** a short proposal starts
+- **THEN** generate the suffix before scaffolding without prompting. Naming grants no writes. Proposal scope includes isolated setup and excludes implementation, commits and publication.
 
-#### Scenario: Read-only naming helper
-- **WHEN** the helper generates an identity or resolves active change directories
-- **THEN** report name, path and branch without writing files, refs or profiles
-- **AND** reject malformed input, repeated options and symlinked discovery paths
+#### Scenario: Resume
+- **WHEN** resuming by slug or context
+- **THEN** reuse the full name and ask on ambiguity.
+
+#### Scenario: Naming helper
+- **WHEN** naming or resolving active changes
+- **THEN** report name, path and branch read-only and reject malformed input, repeated options and discovery symlinks.
 
 #### Scenario: Second clone
-- **WHEN** another checkout edits the same capability spec
-- **THEN** stop for reconciliation even if another change name is available
+- **WHEN** another checkout edits the capability
+- **THEN** stop for reconciliation regardless of name.
 
-#### Scenario: Durable reference across archive movement
-- **WHEN** a ticket or document cites an OpenSpec change
-- **THEN** use the full name and optional artifact role without its moving path
-- **AND** archive lookup preserves the name. An active-only helper cannot claim archive search.
+#### Scenario: Archive reference
+- **WHEN** citing a change
+- **THEN** cite full name and optional artifact role. Claim archive lookup only if performed.
 
-#### Scenario: Proposal-time documentation
-- **WHEN** a proposal creates its documentation issue
-- **THEN** record request, blast radius, risk and authority, with no prospective review, merge or closure evidence
-- **AND** later approval binds retained input revisions. The issue body remains editable.
+#### Scenario: Proposal issue
+- **WHEN** documenting the proposal
+- **THEN** record request, blast radius, risk and authority. Exclude prospective review, merge and closure evidence. Bind approval to retained revisions and keep the issue editable.
 
 ### Requirement: Independent reviewer before merge
 
@@ -194,116 +187,105 @@ The delivery package SHALL supply read-only creation, reuse, location, same-chan
 
 ### Requirement: Prospective proposal-to-freeze adoption
 
-Delivery SHALL enable `propose-to-freeze` only when the verified integrated plan parent selects it explicitly. Within held authority, the orchestrator SHALL produce one plan-only freeze and approval card per accepted draft revision and preserve draft-only operation and narrower restrictions.
+Only explicit verified integrated-parent adoption SHALL enable `propose-to-freeze`, with one authorized plan-only freeze and card per accepted revision.
 
-#### Scenario: Short proposal reaches an approval card
-- **WHEN** an opted-in project receives a short proposal or `/goal draft` with an inline goal or readable note, and selected planning gates pass
-- **THEN** verify the baseline and relevant upstream facts, select Goal-First or Task-Guided from the delivery boundary, prepare the ULID worktree before native scaffolding, bind the authorized proposal-time issue, and validate all native artifacts
-- **AND** run the packaged charter gate when policy selects or permits an explicit request for it, revalidate and re-review grounded corrections under inherited authority and finite budget, and supply newly required native artifacts
-- **AND** freeze only accepted planning inputs in one local plan-only commit and show its full SHA and mode-specific digest. Leave implementation untouched, with no worker launch or branch publication.
+#### Scenario: Freeze a short proposal
+- **WHEN** a short proposal or `/goal draft` with inline goal or readable note passes policy and gates
+- **THEN** verify baseline and upstream facts, select mode, prepare the ULID worktree before scaffolding, bind the authorized issue and validate native artifacts
+- **AND** run the packaged charter when selected or explicitly permitted and requested. Revalidate and re-review grounded corrections and new artifacts within authority and budget.
+- **AND** commit accepted planning only and show full SHA and mode digest. Exclude implementation, launch and publication.
 
 #### Scenario: Draft-only or absent adoption
-- **WHEN** the parent lacks explicit selection, a contract change would adopt the policy for itself, or the operator requests `draft only` or `no commits`
-- **THEN** stop at the applicable uncommitted boundary without a frozen-plan approval card
-- **AND** allow explicitly requested review under its own authority, with a compact stop decision for missing binding, uncovered blockers, scope conflict or exhausted budget
+- **WHEN** adoption is absent or self-selected, or draft-only or no commits applies
+- **THEN** stop uncommitted without a card. Allow separately authorized review and report missing bindings, blockers, scope conflict or exhausted budget.
 
-#### Scenario: Resolve breaking-upgrade assumptions
-- **WHEN** accepted sources leave material breaking-upgrade uncertainty
-- **THEN** use authorized disposable-scratch probes before contract lock, record observations, and distinguish hard invariants from adaptable legacy layouts, flags or assertions
-- **AND** probes neither reuse real profile state nor authorize paid verification or satisfy later exact-candidate gates
+#### Scenario: Breaking upgrade
+- **WHEN** material upgrade uncertainty remains
+- **THEN** record authorized disposable probes before lock to distinguish invariants from adaptable legacy layouts, flags or assertions. Exclude real profiles, paid verification and exact-candidate gate credit.
 
 #### Scenario: Revise a draft
-- **WHEN** an operator answer or `changes: <feedback>` reply gives a clear authorized revision
-- **THEN** revise native planning directly, rerun applicable validation and review, and present a replacement card for an eligible authorized freeze
-- **AND** prior cards cannot authorize the revised plan, and out-of-scope feedback raises a concise decision
+- **WHEN** authorized feedback arrives, including `changes: <feedback>`
+- **THEN** revise, revalidate and re-review native planning. Replace the card at authorized freeze. Ask on scope changes.
 
 ### Requirement: Bound short approval decisions
 
-An approval card SHALL bind exactly one repository, change, mode, integrated policy revision, registered workspace, frozen SHA and mode-specific digest. The displayed card and reply SHALL be retained with scope and restrictions. Short replies SHALL fail closed on ambiguity, stale identity, mismatched context or unverifiable decisions.
+The card SHALL bind repo, change, mode, integrated policy revision, registered worktree, frozen SHA and mode digest. Retain card, reply, scope and restrictions.
 
 #### Scenario: Approval only
-- **WHEN** an authenticated `approve` reply unambiguously follows one current displayed card and HEAD and frozen planning bytes still match
-- **THEN** record exact-plan or exact Goal Contract approval and stop before local execution
+- **WHEN** authenticated `approve` matches one current card, HEAD and frozen bytes
+- **THEN** record exact plan or Goal Contract approval. Stop before execution.
 
-#### Scenario: Approval and local execution
-- **WHEN** the operator replies `approve and run` in the same verified context
-- **THEN** bind exact approval and the separately bounded local grant in distinct durable records before dispatch
-- **AND** reuse matching qualified role bindings and execute approved finite local gates, corrections, independent reviews and previewed commits, stopping before external work
-- **AND** retain `group 1`, `no commits` and other restrictions
+#### Scenario: Approve and run
+- **WHEN** `approve and run` matches that context
+- **THEN** durably record exact approval and a separate bounded local grant before dispatch
+- **AND** reuse qualified bindings for finite local gates, corrections, independent review and previewed commits within restrictions. Stop before external work.
 
-#### Scenario: Stale, unbound or cross-change reply
-- **WHEN** no card was displayed, the reply is ambiguous, identity, planning bytes or HEAD changed, or competing changes prevent unique binding
-- **THEN** record no approval or grant and start no worker
-- **AND** state the failed predicate and retain the explicit exact-identity approval route
+#### Scenario: Invalid reply
+- **WHEN** a reply is unbound, ambiguous, stale, mismatched or unverifiable
+- **THEN** withhold approval, grant and dispatch. Report the predicate and retain the exact-identity approval route.
 
 ### Requirement: Context-aware next steps
 
-Each non-terminal stop SHALL include a compact Next-Step Footer from packaged versioned status and retained observations, with one ready-to-send input or two to four concrete choices for a genuine decision and no routine policy relay.
+Non-terminal stops SHALL use versioned status and retained observations for a compact Next-Step Footer with one ready input or two to four genuine choices, without policy relay.
 
 #### Scenario: Inspect a checkpoint
-- **WHEN** an operator or another session inspects the change or an authorized phase stops
-- **THEN** deterministically report change, mode, branch, exact HEAD, applicable frozen digest and active attempt, checkpoint or handoff location, applicable PR and check state, P1–P8 observations and first unresolved predicate, restrictions, invariants or drift, and the legal next action
-- **AND** show missing evidence, keep inspect/init read-only, and reserve paid probes and profile updates for separate authority
+- **WHEN** inspecting a change or stopping a phase
+- **THEN** report change, mode, branch, exact HEAD, frozen digest, attempt/checkpoint/handoff location, PR/checks, P1–P8, first unresolved predicate, restrictions, invariants/drift, missing evidence and next action
+- **AND** keep inspect/init read-only. Paid probes and profile updates require separate authority.
 
-#### Scenario: Preserve context on resume
-- **WHEN** a clean phase boundary, context limit or long wait warrants a new session
-- **THEN** offer a short self-contained starter with the exact change and retained state and a supported launch scoped to its worktree and records
-- **AND** rotate an opted-in separately authorized relay only at a safe checkpoint, retaining the predecessor until the successor acknowledges exact HEAD, digest, ownership, pane identity and bounded grant evidence
-- **AND** rotation and new sessions grant no authority and cannot bypass original-attempt settlement
+#### Scenario: Resume in context
+- **WHEN** a phase boundary, context limit or wait needs a new session
+- **THEN** offer a self-contained starter with exact change, state and scoped worktree and record access
+- **AND** retain the predecessor until the successor confirms exact HEAD, digest, ownership, pane and grant. Rotate only at a safe checkpoint with separate authority and original settlement checks.
 
-#### Scenario: Refuse an unqualified route
-- **WHEN** a package is missing or drifted, a role binding is missing or mismatched, or a planning or execution blocker remains
-- **THEN** report the failed predicate, next safe choice and retained evidence reference without substituting a reviewer, creating a local launcher or editing an installed profile
+#### Scenario: Blocked route
+- **WHEN** a package or binding is absent or mismatched, or the phase is blocked
+- **THEN** report predicate, safe choice and evidence. Exclude substitutes, launchers and profile edits.
 
 ### Requirement: Bounded protected closeout resume
 
-With a valid `finish` grant, delivery SHALL wait finitely for protected checks
-on the exact reviewed PR head, reuse PRs and advance eligible approved chapters
-when their predicates pass. Contextual `continue` SHALL reuse the grant and
-verified remote state.
+Under `finish`, delivery SHALL bound waits for exact reviewed PR head checks, reuse PRs and advance eligible chapters once. `continue` reuses grant and verified remote state.
 
 #### Scenario: Same-head checks complete
-- **WHEN** an authorized PR retains the reviewed SHA and applicable checks and required reviews pass
-- **THEN** use the retained grant for protected merge, integrated gates, required scope-bound spec promotion, record-only archive closure, acceptance-bound issue closure and cleanup
-- **AND** run full tests and obtain fresh exact-closure review before publishing the archived closure candidate
-- **AND** run each authorized eligible chapter once. Avoid duplicate PRs and replayed merges.
+- **WHEN** authorized PR checks and reviews pass on the reviewed SHA
+- **THEN** perform protected merge, integrated gates, scope-bound spec promotion, record-only archive, acceptance-bound issue closure and cleanup
+- **AND** run full tests and fresh exact-closure review before archive publication. Skip completed merges.
 
-#### Scenario: Bounded wait encounters a stop
-- **WHEN** a required check fails, a human must review or act, the head changes, a deployment gate fails or time expires
-- **THEN** retain exact head, required checks and review evidence. Pause with an actionable reason.
-- **AND** derive required checks from branch protection and rulesets. Distinguish optional suites. Seek a bounded decision for stalled optional automation requiring disposition. Optional queues confer no protection requirement or automatic rerun.
+#### Scenario: Wait stops
+- **WHEN** a required check or deploy gate fails, human action is needed, head changes or time expires
+- **THEN** pause with exact head, evidence, reason and checks required by protection and rulesets. Seek bounded disposition for optional queues without requiring them or rerunning.
 
 #### Scenario: External verification and preview
-- **WHEN** a push could trigger external automation, an operator requests external or paid tests, or a declared deploy preview needs review
-- **THEN** require a separate per-action grant before activation. Show a compact card with target, cases, built-artifact-only exposure, expected cost or credits and one-run scope.
-- **AND** show the preview URL and preserve declared human review pauses. Use loopback for try-out, tear down authorized temporary tunnels immediately and require fresh retry authority.
+- **WHEN** a push could trigger external automation, external or paid tests are requested, or a deploy preview needs review
+- **THEN** require a per-run grant before activation with target, cases, built-artifact-only exposure and cost/credits
+- **AND** show the preview URL, honor human pauses, use loopback, tear down tunnels immediately and separately authorize retries.
 
 ### Requirement: Retire verified worktrees across resumed runs
 
-Delivery SHALL reconcile live same-change registrations against retained ownership evidence. Authorized `finish` SHALL retire each eligible dedicated worktree, attached or detached, after verified archive and applicable authorized issue closure, preserving evidence, refs and restrictions.
+Authorized `finish` SHALL retire proven eligible same-change worktrees after verified archive and authorized issue closure where applicable, preserving evidence, refs and restrictions.
 
-#### Scenario: Resume closes all eligible worktrees
-- **WHEN** resumed finish finds dedicated worktrees from earlier runs
-- **THEN** match repository, exact change, canonical path, role and ref or detached SHA against creation or handoff evidence and live registration
-- **AND** recheck exact HEAD and reachability from the actual containing closure revision, absence of active writers, tracked and untracked cleanliness, ignored data and submodules. Remove eligible worktrees without force and verify path and registration absence and ref retention.
+#### Scenario: Retire earlier worktrees
+- **WHEN** finish finds earlier dedicated worktrees
+- **THEN** match repository, change, canonical path, role and ref/detached SHA to live registration and creation/handoff evidence
+- **AND** check exact HEAD, containing closure reachability, no writers, tracked/untracked cleanliness, ignored data and submodules. Remove without force, verify path and registration absence and refs.
 
-#### Scenario: Preserve protected or ambiguous worktrees
-- **WHEN** a worktree lacks verified ownership, is primary, an independent clone, unrelated, live, locked, dirty or unmerged, holds valuable ignored files or is retained by operator restriction
-- **THEN** preserve it and its refs. A suffix, role nickname or matching ancestry alone cannot prove ownership.
-- **AND** report removed, retained and blocked paths with reasons separately from accepted archive and issue state. Repeated finish reconciles pending cleanup without reopening publication or creating a replacement checkout.
+#### Scenario: Preserve protected worktrees
+- **WHEN** ownership is unproved, or a worktree is primary, independent, unrelated, live, locked, dirty, unmerged, holds valuable ignored data or is operator-retained
+- **THEN** preserve it and its refs. Suffix, role or ancestry alone cannot prove ownership.
+- **AND** report removed, retained and blocked paths with reasons, separately from archive/issue state. Resume cleanup without publication or new checkouts.
 
 ### Requirement: Separate post-release skill sync
 
-Delivery SHALL offer optional `sync-skills` after relevant canonical skill publication or accepted integration where deployment does not apply. It SHALL require explicit authority identifying client or profile, source revision and scope.
+After canonical release or accepted non-deployed integration, `sync-skills` SHALL require explicit client/profile, revision and scope authority.
 
-#### Scenario: Approved sync respects the installation route
-- **WHEN** the operator authorizes the update
-- **THEN** use the existing supported route with collision checks and backups. Hermes packages retain normal scanner acceptance and native Codex copies retain local-copy provenance.
-- **AND** compare the complete installed package to immutable source, verify skill versions and load it in a fresh session. Use isolated scratch homes and profiles in tests and commit-pin upstream sources.
+#### Scenario: Approved sync
+- **WHEN** authorized
+- **THEN** use the supported route with collision checks, backups and Hermes scanning or Codex copy provenance
+- **AND** verify complete bytes and versions against immutable source and load in a fresh session. Test with scratch profiles/homes and commit-pinned upstream.
 
-#### Scenario: No profile authority or scan failure
-- **WHEN** finish occurs, package drift or curator conflict appears, separate update authority is absent, or scanner or collision checks fail
-- **THEN** preserve the installed package and report update or recovery options. Skills SHALL NOT change a shared installation while operating in a target project.
+#### Scenario: Blocked sync
+- **WHEN** authority is absent or drift, curator conflict, scanning or collisions block sync
+- **THEN** retain installation and report options. Target-project work SHALL NOT edit shared installations.
 
 ### Requirement: Restricted Git child environment
 The evidence and workspace helpers SHALL read and forward inherited environment
@@ -789,3 +771,39 @@ The operator and reviewer guides SHALL show the packaged review runner as a stan
 #### Scenario: Review invocation in Codex
 - **WHEN** an operator follows a documented candidate or approach review example
 - **THEN** the live launch invokes `node …/review-candidate.mjs` directly, without a compound shell wrapper, and retains the separate admission, replay and readback steps. The guidance preserves platform review and permission enforcement.
+
+### Requirement: Confirmed containment setup preview
+
+The packaged setup command SHALL offer a single-command preview for explicit `--tier a` and `--tier b` selection. It SHALL report the tier and driver, exact pins, external outputs, raw host configuration digest, confirmation digest and qualification disposition. It SHALL write only after matching explicit confirmation, within the already supported external setup boundary.
+
+#### Scenario: Preview the default Linux sealed route
+- **WHEN** an operator selects `--tier a` with trusted Linux runtime prerequisites
+- **THEN** the preview resolves the exact pinned runtime and libraries, explains zero-credential sealed operation and reports exact proposed output bytes, selected driver and confirmation digest
+- **AND** preview leaves configuration, credentials and profiles untouched. Matching confirmation admits only reviewed external output bytes.
+
+#### Scenario: Preview dedicated-auth Linux setup
+- **WHEN** an operator selects `--tier b` with an explicitly named dedicated authentication directory
+- **THEN** the preview checks the 0700 auth-only boundary using redacted metadata, reports the provider-connectivity and credential trade-offs, and distinguishes preview readiness from exact route qualification
+- **AND** it refuses unsafe directory identity or contents, missing prerequisites, conflicting outputs and stale confirmation without exposing credential values, copying ambient auth or writing outside the verified destination.
+
+### Requirement: Fail-closed platform driver selection
+
+The runtime SHALL expose `linux-bwrap` as primary and recognize optional `windows-container` and `macos-seatbelt` contracts in that order. Optional driver use SHALL require exact native proof of the advertised OS, filesystem, auth, network and role containment. An unavailable or unqualified driver SHALL be reported without fallback.
+
+#### Scenario: Gate Windows tests before launch
+- **WHEN** an operator explicitly enables an optional Windows integration test from native Windows or WSL2 interop
+- **THEN** preflight verifies the actual Windows host, native AI CLI executables needed for the selected tests, container, job and filesystem controls before any Windows integration test runs
+- **AND** return `missing-windows-client` for absent required clients, `unsupported-on-host` where native Windows or supported interop is unavailable, or `unqualified` when required native controls or exact qualification cannot be established. Linux executables or synthetic fixtures alone do not qualify Windows.
+
+#### Scenario: Recognize the macOS contract
+- **WHEN** an operator selects `macos-seatbelt`
+- **THEN** return `unsupported-on-host` outside native macOS and `unqualified` until a matching native trial proves profile and network controls, scoped review or worktree access and the correct tier-specific auth boundary.
+
+### Requirement: Synchronized containment distribution
+
+Both affected complete skills and their Claude bundles SHALL ship synchronized role setup, supported and unsupported routes, compatibility and operator guidance. Their versions SHALL reflect bundled changes. Qualification claims SHALL reference exact evidence and distinguish local packaging, native discovery, and live qualification.
+
+#### Scenario: Verify all affected packaging and documentation
+- **WHEN** the candidate is built from its exact committed revision
+- **THEN** the package inventories and shared setup stay synchronized and the new driver and verification materials are included wherever their owning package requires them
+- **AND** verify the documentation scope explicitly covers `docs/containment-tiers.md`, `docs/configurable-backends.md`, `docs/claude-reviewer.md`, `docs/worker-runtime.md`, `docs/claude-installation.md`, `docs/openspec-installation.md`, `docs/openspec-workflow.md`, `docs/openspec-review-configuration.md`, `README.md`, `AGENTS.md` and owning child contributor contracts.

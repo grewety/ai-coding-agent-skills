@@ -300,3 +300,5 @@ approval. A missing or stale inventory blocks activation.
 [Aikido GitHub PR gating](https://help.aikido.dev/code-scanning/local-code-scanning/pr-gating/github-pr-gating-using-local-scanner),
 [Aikido default-branch scanning](https://help.aikido.dev/code-scanning/miscellaneous/scanned-branches-in-aikido),
 [Aikido Deep Review credits](https://help.aikido.dev/deep-review/configure-deep-review).
+
+New tier-aware hosts and expectations bind `containmentTier` and `osDriver` through qualification, launch and replay. A per-invocation timeout up to 600000 ms still operates within the enclosing run and authority limits. See [Containment tiers](containment-tiers.md).

@@ -17,6 +17,8 @@ Maintain portable AI coding-agent playbooks and publish complete Agent Skills pa
 
 ## Local Contracts
 
+- Keep tier and driver fields bound to admission and replay. Claude remains the sealed Tier A default. Dedicated-auth and optional platform routes require their own matching qualification. See [Containment tiers](docs/containment-tiers.md).
+
 - The external role setup and pilot disposition contract lives in `docs/configurable-backends.md`. Setup writes only confirmed external files. Preserve original approved legacy pins and require separate live qualification for explicit pilots.
 - Claude remains the default contained reviewer with its original host pins and sealed captures. Optional Pi 1.5.2 requires the exact release, private host Hermes proxy xAI OAuth relay and matching offline and bounded live qualification. Keep Grok 1.0.92 unsupported while its host-only OAuth route is unverified. A synthetic trial has its own single-run authority and exposes only the fixed benign fixture. See [contained reviewer setup](docs/claude-reviewer.md).
 

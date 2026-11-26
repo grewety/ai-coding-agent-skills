@@ -15,6 +15,8 @@ Own the portable boundaries OpenSpec does not enforce: one orchestrator for Git 
 
 ## Local Contracts
 
+- Delivery independently verifies the tier-bound worker handover and shares setup and driver selection with orchestration.
+
 - Candidate CLI and MCP harnesses require a verified standalone detached clone before and after invocation.
 - Delivery owns admission of the exact independent review result and preserves integrated phase and spend authority. Share role discovery, Pi release inventory, setup and qualification checks with orchestration. Pi trial authority covers the fixed synthetic packet through the pinned host Hermes proxy xAI OAuth socket. Real review requires matching offline and live qualification. Retain the original Claude bindings for frozen runs.
 

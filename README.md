@@ -781,9 +781,9 @@ no generated skill copies are committed. Its explicit skill lists separate the
 OpenSpec companion workflow from opt-in orchestration. Bump every affected plugin's version when
 its bundled content changes. See the [Claude release checks](docs/claude-installation.md#maintainer-verification).
 
-Current source versions are delivery 1.10.0 and its affected
-`openspec-development` plugin 1.10.0; `openspec-next` is 0.8.0 and
-`autonomous-orchestration` is 1.14.0 (core skill 0.24.0). Complete well-known output,
+Current source versions are delivery 1.11.0 and its affected
+`openspec-development` plugin 1.11.0; `openspec-next` is 0.8.0 and
+`autonomous-orchestration` is 1.15.0 (core skill 0.25.0). Complete well-known output,
 skill ZIPs, workflow plugin ZIP and isolated native copies must retain all support
 files byte-for-byte, including delivery's runtime and evidence commands and next's
 read-only routing script and reference. Include `scripts/delegated-delivery.mjs`
@@ -852,3 +852,5 @@ The build tests cover metadata, workflow contracts, complete inventories, forbid
 The initial collection was extracted from [AI Software Blueprint](https://github.com/forgegod/ai-software-blueprint), preserving skill authors and versions. Skill source, testing, and publication are owned here; the scanner-blocked one-time blueprint initializer remains local to that blueprint for migration.
 
 MIT; see [LICENSE](LICENSE).
+
+The tier-aware setup and verification paths are documented in [Containment tiers](docs/containment-tiers.md). Claude remains the sealed Tier A default. Tier B requires explicit configuration and exact runtime qualification.
