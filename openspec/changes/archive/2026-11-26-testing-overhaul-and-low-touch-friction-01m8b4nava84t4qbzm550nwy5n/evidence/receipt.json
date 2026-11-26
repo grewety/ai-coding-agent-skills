@@ -1,0 +1,640 @@
+{
+  "schemaVersion": 1,
+  "change": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n",
+  "issueUrl": "https://github.com/grewety/ai-coding-agent-skills/issues/65",
+  "mode": "goal-first",
+  "base": "2b5483033e693fbb3cb5402fb8374d085266e755",
+  "head": "b3df1fe3713ed12ff95d8ff75d627cfff73b33b9",
+  "plan": "55bed8033737ac352d01e8ba18f332e76c440a28",
+  "planDigest": "5208fc417077e8c9a0b6081dbc31bf132a871bce6d9695d2e2e113fd0eade2d7",
+  "integrated": "6c76d88e9a173d4efae3fcc97be3940de3051e9d",
+  "verified": "6c76d88e9a173d4efae3fcc97be3940de3051e9d",
+  "mergedAt": "2026-11-26T11:07:21Z",
+  "integrationReference": "https://github.com/grewety/ai-coding-agent-skills/pull/66",
+  "mergeReadback": {
+    "record": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/pr-66.mkADVlkd/merged-pr.json",
+    "sha256": "9cc7026fdd0193d004105afbfb6691deb82917fa8be918fc729ed4ec6aa1839e"
+  },
+  "mainReadback": {
+    "record": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/pr-66.mkADVlkd/merged-main.json",
+    "sha256": "c0b8ec9da10e8f8677e2d927f1b0db182f6a3bf523f7bd52c3a0a2c98e035394"
+  },
+  "implementationReadbackAssertion": {
+    "record": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/implementation-assertion.json",
+    "sha256": "41938ce3dcd38a866351332993a97aaf96255c7eb264559c33e2ac905d64b7d4"
+  },
+  "promotedCurrentSpecs": [
+    {
+      "capability": "contained-independent-review",
+      "requirements": 1
+    },
+    {
+      "capability": "exclusive-worker-runtime",
+      "requirements": 2
+    },
+    {
+      "capability": "openspec-integration",
+      "requirements": 11
+    }
+  ],
+  "candidateGates": [
+    {
+      "command": "npm test",
+      "argv": [
+        "npm",
+        "test"
+      ],
+      "commit": "b3df1fe3713ed12ff95d8ff75d627cfff73b33b9",
+      "exitCode": 0,
+      "observedAt": "2026-11-26T10:43:05.245Z",
+      "evidence": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/successor-gates-host/disposable-gate-run.json",
+      "evidenceSha256": "c63e4cf294ccb171606a43e3c444a6c9d22854e3602975bc2747ba17273e3716",
+      "stdoutSha256": "724bbaad3f848c3af476e8b340ce6b9dbd3c0b593bbef0253b19c9a02e124d36",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "npm run build",
+      "argv": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "commit": "b3df1fe3713ed12ff95d8ff75d627cfff73b33b9",
+      "exitCode": 0,
+      "observedAt": "2026-11-26T10:43:05.728Z",
+      "evidence": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/successor-gates-host/disposable-gate-run.json",
+      "evidenceSha256": "c63e4cf294ccb171606a43e3c444a6c9d22854e3602975bc2747ba17273e3716",
+      "stdoutSha256": "8e06e846cd805b6b136c9e95aa9443a3d3d0248134452f6be4b52b88bf6cc18f",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "openspec validate --all --strict",
+      "argv": [
+        "openspec",
+        "validate",
+        "--all",
+        "--strict"
+      ],
+      "commit": "b3df1fe3713ed12ff95d8ff75d627cfff73b33b9",
+      "exitCode": 0,
+      "observedAt": "2026-11-26T10:43:06.038Z",
+      "evidence": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/successor-gates-host/disposable-gate-run.json",
+      "evidenceSha256": "c63e4cf294ccb171606a43e3c444a6c9d22854e3602975bc2747ba17273e3716",
+      "stdoutSha256": "84d1ff9f6dc6f929bf06041faf9c71f783b101a33b43b538f223e6f707349ecb",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "npm run validate:openspec -- --require-issue",
+      "argv": [
+        "npm",
+        "run",
+        "validate:openspec",
+        "--",
+        "--require-issue"
+      ],
+      "commit": "b3df1fe3713ed12ff95d8ff75d627cfff73b33b9",
+      "exitCode": 0,
+      "observedAt": "2026-11-26T10:43:06.286Z",
+      "evidence": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/successor-gates-host/disposable-gate-run.json",
+      "evidenceSha256": "c63e4cf294ccb171606a43e3c444a6c9d22854e3602975bc2747ba17273e3716",
+      "stdoutSha256": "7593d22f0074e51de9b2fcf39de86de0a401ef2315050ac61ff6dc3e3e291f4c",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "git diff --check 2b5483033e693fbb3cb5402fb8374d085266e755 HEAD",
+      "argv": [
+        "git",
+        "diff",
+        "--check",
+        "2b5483033e693fbb3cb5402fb8374d085266e755",
+        "HEAD"
+      ],
+      "commit": "b3df1fe3713ed12ff95d8ff75d627cfff73b33b9",
+      "exitCode": 0,
+      "observedAt": "2026-11-26T10:43:06.333Z",
+      "evidence": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/successor-gates-host/disposable-gate-run.json",
+      "evidenceSha256": "c63e4cf294ccb171606a43e3c444a6c9d22854e3602975bc2747ba17273e3716",
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "review": {
+    "schemaVersion": 1,
+    "change": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n",
+    "issueUrl": "https://github.com/grewety/ai-coding-agent-skills/issues/65",
+    "head": "b3df1fe3713ed12ff95d8ff75d627cfff73b33b9",
+    "planDigest": "5208fc417077e8c9a0b6081dbc31bf132a871bce6d9695d2e2e113fd0eade2d7",
+    "scope": "targeted PR-fix delta",
+    "verdict": "pass",
+    "findings": [],
+    "waivers": 0,
+    "coverageLimitations": [],
+    "reviewer": "Claude Code 2.1.330 / claude-sonnet-4-6 / 75e2acb3-2b75-431e-a18b-6c3c91a1d166",
+    "reference": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/delta-review/output/report.md",
+    "originalReport": {
+      "record": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/delta-review/output/report.md",
+      "sha256": "3119ce6664e30633beafedb52497c5f13e317002191a6c8423f6cfc77457b0cd"
+    },
+    "packetSessions": [
+      "75e2acb3-2b75-431e-a18b-6c3c91a1d166",
+      "f3645641-6f70-4b22-b0c0-fda90c43d049"
+    ],
+    "inferenceAuthorization": {
+      "record": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/operator-two-packet-authorization.json",
+      "sha256": "33472b53ba4f9945740ca3b83ad8a92213b4bde4aa29297d4de3c1c9adde4174"
+    },
+    "replay": {
+      "record": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/delta-review/offline-verified.json",
+      "sha256": "9dd8d7b5ac6a29e8b17d94b6931c9c52ca1a066638807dffb716534b77f89b2e"
+    },
+    "gates": [
+      {
+        "command": "npm test",
+        "argv": [
+          "npm",
+          "test"
+        ],
+        "commit": "b3df1fe3713ed12ff95d8ff75d627cfff73b33b9",
+        "exitCode": 0,
+        "observedAt": "2026-11-26T10:43:05.245Z",
+        "evidence": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/successor-gates-host/disposable-gate-run.json",
+        "evidenceSha256": "c63e4cf294ccb171606a43e3c444a6c9d22854e3602975bc2747ba17273e3716",
+        "stdoutSha256": "724bbaad3f848c3af476e8b340ce6b9dbd3c0b593bbef0253b19c9a02e124d36",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "npm run build",
+        "argv": [
+          "npm",
+          "run",
+          "build"
+        ],
+        "commit": "b3df1fe3713ed12ff95d8ff75d627cfff73b33b9",
+        "exitCode": 0,
+        "observedAt": "2026-11-26T10:43:05.728Z",
+        "evidence": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/successor-gates-host/disposable-gate-run.json",
+        "evidenceSha256": "c63e4cf294ccb171606a43e3c444a6c9d22854e3602975bc2747ba17273e3716",
+        "stdoutSha256": "8e06e846cd805b6b136c9e95aa9443a3d3d0248134452f6be4b52b88bf6cc18f",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "openspec validate --all --strict",
+        "argv": [
+          "openspec",
+          "validate",
+          "--all",
+          "--strict"
+        ],
+        "commit": "b3df1fe3713ed12ff95d8ff75d627cfff73b33b9",
+        "exitCode": 0,
+        "observedAt": "2026-11-26T10:43:06.038Z",
+        "evidence": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/successor-gates-host/disposable-gate-run.json",
+        "evidenceSha256": "c63e4cf294ccb171606a43e3c444a6c9d22854e3602975bc2747ba17273e3716",
+        "stdoutSha256": "84d1ff9f6dc6f929bf06041faf9c71f783b101a33b43b538f223e6f707349ecb",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "npm run validate:openspec -- --require-issue",
+        "argv": [
+          "npm",
+          "run",
+          "validate:openspec",
+          "--",
+          "--require-issue"
+        ],
+        "commit": "b3df1fe3713ed12ff95d8ff75d627cfff73b33b9",
+        "exitCode": 0,
+        "observedAt": "2026-11-26T10:43:06.286Z",
+        "evidence": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/successor-gates-host/disposable-gate-run.json",
+        "evidenceSha256": "c63e4cf294ccb171606a43e3c444a6c9d22854e3602975bc2747ba17273e3716",
+        "stdoutSha256": "7593d22f0074e51de9b2fcf39de86de0a401ef2315050ac61ff6dc3e3e291f4c",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "git diff --check 2b5483033e693fbb3cb5402fb8374d085266e755 HEAD",
+        "argv": [
+          "git",
+          "diff",
+          "--check",
+          "2b5483033e693fbb3cb5402fb8374d085266e755",
+          "HEAD"
+        ],
+        "commit": "b3df1fe3713ed12ff95d8ff75d627cfff73b33b9",
+        "exitCode": 0,
+        "observedAt": "2026-11-26T10:43:06.333Z",
+        "evidence": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/successor-gates-host/disposable-gate-run.json",
+        "evidenceSha256": "c63e4cf294ccb171606a43e3c444a6c9d22854e3602975bc2747ba17273e3716",
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  "lineage": {
+    "kind": "original-contained-review-checkbox-proof-contained-delta",
+    "reviewedAncestor": "b49b232e35e1622c8ee10b946ce61429fd3dadad",
+    "ancestorZeroWaiverReport": {
+      "record": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/execution/candidate-01-clean/review/output/report.md",
+      "sha256": "b69b4e05267bf02d42e453b1b5eb71783e33b6642a0709bee593bc1f5d200689"
+    },
+    "ancestorReplay": {
+      "record": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/ancestor-offline-replay.json",
+      "sha256": "f581ad3b387e0184359a3d319d2b1536ac43d2f85971fe4ec96ca5a82068f3e7"
+    },
+    "ancestorGates": [
+      {
+        "command": "npm test",
+        "argv": [
+          "npm",
+          "test"
+        ],
+        "commit": "b49b232e35e1622c8ee10b946ce61429fd3dadad",
+        "exitCode": 0,
+        "observedAt": "2026-11-26T07:19:17.735Z",
+        "evidence": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/execution/candidate-01-clean/disposable-gate-run.json",
+        "evidenceSha256": "e3820b006d01be79b20221be09345c3896eba2b5e28f84906c7bd9cfbaab4b0e",
+        "stdoutSha256": "91f3408b21d72d17a957343f2bcff19d39e3562b990e55c667c2b47729a0413e",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "npm run build",
+        "argv": [
+          "npm",
+          "run",
+          "build"
+        ],
+        "commit": "b49b232e35e1622c8ee10b946ce61429fd3dadad",
+        "exitCode": 0,
+        "observedAt": "2026-11-26T07:19:18.215Z",
+        "evidence": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/execution/candidate-01-clean/disposable-gate-run.json",
+        "evidenceSha256": "e3820b006d01be79b20221be09345c3896eba2b5e28f84906c7bd9cfbaab4b0e",
+        "stdoutSha256": "7846d5e87e86c1f22a65ca274c586e4d85aec48460859751cc043c169176a476",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "openspec validate --all --strict",
+        "argv": [
+          "openspec",
+          "validate",
+          "--all",
+          "--strict"
+        ],
+        "commit": "b49b232e35e1622c8ee10b946ce61429fd3dadad",
+        "exitCode": 0,
+        "observedAt": "2026-11-26T07:19:18.446Z",
+        "evidence": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/execution/candidate-01-clean/disposable-gate-run.json",
+        "evidenceSha256": "e3820b006d01be79b20221be09345c3896eba2b5e28f84906c7bd9cfbaab4b0e",
+        "stdoutSha256": "84d1ff9f6dc6f929bf06041faf9c71f783b101a33b43b538f223e6f707349ecb",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "npm run validate:openspec -- --require-issue",
+        "argv": [
+          "npm",
+          "run",
+          "validate:openspec",
+          "--",
+          "--require-issue"
+        ],
+        "commit": "b49b232e35e1622c8ee10b946ce61429fd3dadad",
+        "exitCode": 0,
+        "observedAt": "2026-11-26T07:19:18.698Z",
+        "evidence": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/execution/candidate-01-clean/disposable-gate-run.json",
+        "evidenceSha256": "e3820b006d01be79b20221be09345c3896eba2b5e28f84906c7bd9cfbaab4b0e",
+        "stdoutSha256": "7593d22f0074e51de9b2fcf39de86de0a401ef2315050ac61ff6dc3e3e291f4c",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "git diff --check 2b5483033e693fbb3cb5402fb8374d085266e755 HEAD",
+        "argv": [
+          "git",
+          "diff",
+          "--check",
+          "2b5483033e693fbb3cb5402fb8374d085266e755",
+          "HEAD"
+        ],
+        "commit": "b49b232e35e1622c8ee10b946ce61429fd3dadad",
+        "exitCode": 0,
+        "observedAt": "2026-11-26T07:19:18.744Z",
+        "evidence": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/execution/candidate-01-clean/disposable-gate-run.json",
+        "evidenceSha256": "e3820b006d01be79b20221be09345c3896eba2b5e28f84906c7bd9cfbaab4b0e",
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "checkboxOnlyChild": {
+      "reviewedParent": "b49b232e35e1622c8ee10b946ce61429fd3dadad",
+      "acceptanceChild": "7bef2bb8d5d377d93ad660feba40d2f68f03526b",
+      "taskIds": [
+        "1.1"
+      ]
+    },
+    "checkboxGates": [
+      {
+        "command": "npm test",
+        "argv": [
+          "npm",
+          "test"
+        ],
+        "commit": "7bef2bb8d5d377d93ad660feba40d2f68f03526b",
+        "exitCode": 0,
+        "observedAt": "2026-11-26T07:49:31.355Z",
+        "evidence": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/execution/task-acceptance-child/disposable-gate-run.json",
+        "evidenceSha256": "a064d17294812f5e10ac49aee43d7e2197223419d0fc79f9558ab6effbcb0f5c",
+        "stdoutSha256": "2835d4ea44eab1ede1c582c57678658effcd55a2f331e3973719863f054bb858",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "npm run build",
+        "argv": [
+          "npm",
+          "run",
+          "build"
+        ],
+        "commit": "7bef2bb8d5d377d93ad660feba40d2f68f03526b",
+        "exitCode": 0,
+        "observedAt": "2026-11-26T07:49:31.840Z",
+        "evidence": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/execution/task-acceptance-child/disposable-gate-run.json",
+        "evidenceSha256": "a064d17294812f5e10ac49aee43d7e2197223419d0fc79f9558ab6effbcb0f5c",
+        "stdoutSha256": "07040b16089180d1267d4a5be8e75e6c875f234c132d1991d34bc0b5b6159f8f",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "openspec validate --all --strict",
+        "argv": [
+          "openspec",
+          "validate",
+          "--all",
+          "--strict"
+        ],
+        "commit": "7bef2bb8d5d377d93ad660feba40d2f68f03526b",
+        "exitCode": 0,
+        "observedAt": "2026-11-26T07:49:32.074Z",
+        "evidence": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/execution/task-acceptance-child/disposable-gate-run.json",
+        "evidenceSha256": "a064d17294812f5e10ac49aee43d7e2197223419d0fc79f9558ab6effbcb0f5c",
+        "stdoutSha256": "84d1ff9f6dc6f929bf06041faf9c71f783b101a33b43b538f223e6f707349ecb",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "npm run validate:openspec -- --require-issue",
+        "argv": [
+          "npm",
+          "run",
+          "validate:openspec",
+          "--",
+          "--require-issue"
+        ],
+        "commit": "7bef2bb8d5d377d93ad660feba40d2f68f03526b",
+        "exitCode": 0,
+        "observedAt": "2026-11-26T07:49:32.322Z",
+        "evidence": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/execution/task-acceptance-child/disposable-gate-run.json",
+        "evidenceSha256": "a064d17294812f5e10ac49aee43d7e2197223419d0fc79f9558ab6effbcb0f5c",
+        "stdoutSha256": "7593d22f0074e51de9b2fcf39de86de0a401ef2315050ac61ff6dc3e3e291f4c",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "git diff --check 2b5483033e693fbb3cb5402fb8374d085266e755 HEAD",
+        "argv": [
+          "git",
+          "diff",
+          "--check",
+          "2b5483033e693fbb3cb5402fb8374d085266e755",
+          "HEAD"
+        ],
+        "commit": "7bef2bb8d5d377d93ad660feba40d2f68f03526b",
+        "exitCode": 0,
+        "observedAt": "2026-11-26T07:49:32.367Z",
+        "evidence": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/execution/task-acceptance-child/disposable-gate-run.json",
+        "evidenceSha256": "a064d17294812f5e10ac49aee43d7e2197223419d0fc79f9558ab6effbcb0f5c",
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "deltaBase": "b49b232e35e1622c8ee10b946ce61429fd3dadad",
+    "deltaHead": "b3df1fe3713ed12ff95d8ff75d627cfff73b33b9",
+    "deltaScope": [
+      "openspec/changes/testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/tasks.md",
+      "skills/software-development/AGENTS.md",
+      "skills/software-development/openspec-delivery/references/delivery-runtime.md",
+      "skills/software-development/openspec-delivery/references/guard.md",
+      "skills/software-development/openspec-delivery/references/protected-finish.md",
+      "skills/software-development/openspec-delivery/scripts/change-guard.mjs",
+      "skills/software-development/openspec-delivery/scripts/delivery-control.mjs",
+      "skills/software-development/openspec-delivery/scripts/finish-readiness.mjs",
+      "skills/software-development/openspec-delivery/scripts/finish-trigger-credits.mjs",
+      "skills/software-development/openspec-delivery/scripts/pr-fix-lineage.mjs",
+      "skills/software-development/openspec-delivery/scripts/protected-finish.mjs",
+      "tests/item55-finish-credits.test.mjs",
+      "tests/item55-pr-fix-lineage.test.mjs"
+    ],
+    "packetScope": [
+      "openspec/changes/testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/tasks.md",
+      "skills/software-development/AGENTS.md",
+      "skills/software-development/openspec-delivery/references/delivery-runtime.md",
+      "skills/software-development/openspec-delivery/references/guard.md",
+      "skills/software-development/openspec-delivery/references/protected-finish.md",
+      "skills/software-development/openspec-delivery/scripts/change-guard.mjs",
+      "skills/software-development/openspec-delivery/scripts/delivery-control.mjs",
+      "skills/software-development/openspec-delivery/scripts/finish-readiness.mjs",
+      "skills/software-development/openspec-delivery/scripts/finish-trigger-credits.mjs",
+      "skills/software-development/openspec-delivery/scripts/pr-fix-lineage.mjs",
+      "skills/software-development/openspec-delivery/scripts/protected-finish.mjs",
+      "tests/item55-finish-credits.test.mjs",
+      "tests/item55-pr-fix-lineage.test.mjs"
+    ],
+    "priorDeltaReplay": {
+      "record": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/prior-delta-offline-replay.json",
+      "sha256": "cca3c15090970cf0e10a583b6c34d5ec3ae29088e15a3cf77416b88340cb3231"
+    },
+    "deltaRequest": {
+      "record": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/delta-review/request.json",
+      "sha256": "7dc6d4d1ada26d71ecd8dafe4d6e7f91168f5a2846bd130c644a680786846577"
+    },
+    "findings": [
+      4705447513,
+      4705464712,
+      4705866964,
+      4705872055
+    ],
+    "successorBinding": {
+      "record": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/successor-finish-binding.json",
+      "sha256": "35c4b3800d4cb2673fdce199771270c43e02da6e5b27f8fcde22371450700ea2"
+    }
+  },
+  "earlierProtectedFindings": [
+    {
+      "record": {
+        "record": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/protected-finish-blocked.json",
+        "sha256": "b83907646cf78290a0bc65149ca475dcdcd41c304306d7f02ee2af52ea0f0e7d"
+      },
+      "candidate": "7bef2bb8d5d377d93ad660feba40d2f68f03526b"
+    },
+    {
+      "record": {
+        "record": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-correction.ytZEQhmC/successor-finish-blocked.json",
+        "sha256": "fd36161dd1981ba890fa5c8dd6aab0825acd7f6cf705b705aa0e06a59486b1f0"
+      },
+      "candidate": "4c52f249f735ae0a69e9dc5ca09e24a06040d21e"
+    }
+  ],
+  "operatorDisposition": {
+    "acceptedScope": "standalone local CLI trust boundary",
+    "approval": {
+      "record": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/operator-pr66-disposition.json",
+      "sha256": "03eddbcd3f0efa65359dc68620c26da579fcb45973438e664c47cc369da3e165"
+    },
+    "threadReply": {
+      "record": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/operator-pr66-thread-reply-response.json",
+      "sha256": "dddf6d6365b2b4fb5252e3b71d557623e0db0583ac8897d012879eaa4a3dc183"
+    },
+    "protectedDecision": {
+      "record": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/pr-66.mkADVlkd/decision.json",
+      "sha256": "ec9339ef95af098977dc0def82d56a790428e5325386a5077db830ba55f70b3d"
+    },
+    "optionalCheck": 139861261410,
+    "conclusion": "failure"
+  },
+  "exactPrChecks": [
+    {
+      "id": 139861261410,
+      "name": "Aikido Security: Deep Review",
+      "appId": 898896,
+      "status": "completed",
+      "conclusion": "failure",
+      "completedAt": "2026-11-26T11:00:49Z",
+      "url": "https://github.com/grewety/ai-coding-agent-skills/runs/139861261410"
+    },
+    {
+      "id": 139861253697,
+      "name": "verify",
+      "appId": 15368,
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-26T10:59:31Z",
+      "url": "https://github.com/grewety/ai-coding-agent-skills/actions/runs/45805988069/job/139861253697"
+    },
+    {
+      "id": 139861249675,
+      "name": "Aikido Security: check code",
+      "appId": 898896,
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-26T10:57:39Z",
+      "url": "https://github.com/grewety/ai-coding-agent-skills/runs/139861249675"
+    },
+    {
+      "id": 139861215029,
+      "name": "verify",
+      "appId": 15368,
+      "status": "completed",
+      "conclusion": "success",
+      "completedAt": "2026-11-26T10:59:26Z",
+      "url": "https://github.com/grewety/ai-coding-agent-skills/actions/runs/45805976194/job/139861215029"
+    }
+  ],
+  "gates": [
+    {
+      "command": "npm test",
+      "argv": [
+        "npm",
+        "test"
+      ],
+      "commit": "6c76d88e9a173d4efae3fcc97be3940de3051e9d",
+      "exitCode": 0,
+      "observedAt": "2026-11-26T11:08:45.636Z",
+      "evidence": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/integrated-gates/disposable-gate-run.json",
+      "evidenceSha256": "e7a40ae6c717f1ab05bd4380ffb6c8e760080649c37586430970b60042d217a0",
+      "stdoutSha256": "d56cb2d0a0c22fb34e37aa2f16c57dbd7faed2f08e8a7669e27c2fcc703569f0",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "npm run build",
+      "argv": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "commit": "6c76d88e9a173d4efae3fcc97be3940de3051e9d",
+      "exitCode": 0,
+      "observedAt": "2026-11-26T11:08:46.112Z",
+      "evidence": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/integrated-gates/disposable-gate-run.json",
+      "evidenceSha256": "e7a40ae6c717f1ab05bd4380ffb6c8e760080649c37586430970b60042d217a0",
+      "stdoutSha256": "71952625c784360a9450bda272612913f2a579458b7c7ffaaa2c759c1b0e7de5",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "openspec validate --all --strict",
+      "argv": [
+        "openspec",
+        "validate",
+        "--all",
+        "--strict"
+      ],
+      "commit": "6c76d88e9a173d4efae3fcc97be3940de3051e9d",
+      "exitCode": 0,
+      "observedAt": "2026-11-26T11:08:46.423Z",
+      "evidence": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/integrated-gates/disposable-gate-run.json",
+      "evidenceSha256": "e7a40ae6c717f1ab05bd4380ffb6c8e760080649c37586430970b60042d217a0",
+      "stdoutSha256": "84d1ff9f6dc6f929bf06041faf9c71f783b101a33b43b538f223e6f707349ecb",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "npm run validate:openspec -- --require-issue",
+      "argv": [
+        "npm",
+        "run",
+        "validate:openspec",
+        "--",
+        "--require-issue"
+      ],
+      "commit": "6c76d88e9a173d4efae3fcc97be3940de3051e9d",
+      "exitCode": 0,
+      "observedAt": "2026-11-26T11:08:46.662Z",
+      "evidence": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/integrated-gates/disposable-gate-run.json",
+      "evidenceSha256": "e7a40ae6c717f1ab05bd4380ffb6c8e760080649c37586430970b60042d217a0",
+      "stdoutSha256": "7593d22f0074e51de9b2fcf39de86de0a401ef2315050ac61ff6dc3e3e291f4c",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "git diff --check 2b5483033e693fbb3cb5402fb8374d085266e755 HEAD",
+      "argv": [
+        "git",
+        "diff",
+        "--check",
+        "2b5483033e693fbb3cb5402fb8374d085266e755",
+        "HEAD"
+      ],
+      "commit": "6c76d88e9a173d4efae3fcc97be3940de3051e9d",
+      "exitCode": 0,
+      "observedAt": "2026-11-26T11:08:46.706Z",
+      "evidence": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/integrated-gates/disposable-gate-run.json",
+      "evidenceSha256": "e7a40ae6c717f1ab05bd4380ffb6c8e760080649c37586430970b60042d217a0",
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "pages": {
+    "url": "https://grewety.github.io/ai-coding-agent-skills/",
+    "verifiedFiles": 129,
+    "liveArtifactVerification": {
+      "record": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/pages-verification.json",
+      "sha256": "0ed52dbfa316b202d5ecf6a0f5d715d4c1b14d7ec35c7e53a4fa01836514930d"
+    },
+    "deployment": {
+      "record": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/pages-acceptance.json",
+      "sha256": "7700d748f3d415467ee1c888a060a0a9692bf8985dd760fcc56c6ed933f1b326"
+    }
+  },
+  "finishAuthority": {
+    "record": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/pr66-provenance.H3ikgRLI/operator-correction-grant.json",
+    "sha256": "cbfe2a3223e88b800f2b2fb6964b004d10049824b576e31dd2f38697df5a46b4"
+  },
+  "triggerAuthority": {
+    "record": "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n/finish.35AlplEL/supplemental-operator-trigger-readback.json",
+    "sha256": "e68645a1922373d07a39f08ba82102cfdbe1b9d1b7c4da0c922bb5b9434748d1"
+  },
+  "futureAcceptance": [
+    "Exact archived-tree gates and factual closure review",
+    "Protected record-only closure PR",
+    "Explicit documentation issue closure"
+  ]
+}
