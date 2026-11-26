@@ -53,6 +53,7 @@ async function deltaDirectory(change) {
 const adoptedDelivery = "low-touch-autonomous-delivery-01m88zpkktr16z02dh3wne3ppy";
 const configurableBackends = "configurable-worker-and-reviewer-backends-01m8a1cfak28znhgw126kzxye4";
 const testingOverhaul = "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n";
+const tier1Reviewer = "tier1-non-claude-contained-reviewer-01m8by1bvkhr053edzgtt5t0cm";
 const currentSpecs = path.join(root, "openspec", "specs");
 
 function readCapabilitySpec(specsRoot, capability) {
@@ -118,8 +119,10 @@ test("low-touch delivery retains requirements until explicitly superseded, with 
 });
 
 test("configurable worker and reviewer backends retain exact requirements until explicitly superseded", async () => {
-  const [deltaRoot, overhaulRoot] = await Promise.all([configurableBackends, testingOverhaul].map(deltaDirectory));
-  for (const [capability, expected] of [["contained-independent-review", 2], ["exclusive-worker-runtime", 2], ["openspec-integration", 3]]) {
+  const [deltaRoot, overhaulRoot, tier1Root] = await Promise.all(
+    [configurableBackends, testingOverhaul, tier1Reviewer].map(deltaDirectory),
+  );
+  for (const [capability, expected] of [["contained-independent-review", 1], ["exclusive-worker-runtime", 2], ["openspec-integration", 3]]) {
     let [delta, current] = await Promise.all([
       readCapabilitySpec(deltaRoot, capability),
       readCapabilitySpec(currentSpecs, capability),
@@ -128,19 +131,45 @@ test("configurable worker and reviewer backends retain exact requirements until 
       const overhaul = await readCapabilitySpec(overhaulRoot, capability);
       delta = withoutSupersededRequirements(delta, overhaul, "Operator workflow guidance", "Moderated external host discovery and setup");
     }
+    if (capability === "contained-independent-review") {
+      const newerDelta = await readCapabilitySpec(tier1Root, capability);
+      delta = withoutSupersededRequirements(delta, newerDelta, "Contained Reviewer adapter and relay qualification");
+    }
     assert.ok(current.startsWith(header("spec", `capability: ${capability}\n`)));
     assert.equal(checkPromotion({ capability, delta, current }), expected, capability);
   }
 });
 
 test("Item 5.5 promotes every frozen requirement with its exact body and capability metadata", async () => {
-  const deltaRoot = await deltaDirectory(testingOverhaul);
+  const [deltaRoot, tier1Root] = await Promise.all([testingOverhaul, tier1Reviewer].map(deltaDirectory));
   for (const [capability, expected] of [["contained-independent-review", 1], ["exclusive-worker-runtime", 2], ["openspec-integration", 11]]) {
+    let [delta, current] = await Promise.all([
+      readCapabilitySpec(deltaRoot, capability),
+      readCapabilitySpec(currentSpecs, capability),
+    ]);
+    if (capability === "openspec-integration") {
+      const discovery = /^### Requirement: Moderated external host discovery and setup\n[\s\S]*?(?=^#{1,3} |(?![\s\S]))/m;
+      const newerDelta = await readCapabilitySpec(tier1Root, capability);
+      const original = discovery.exec(delta)?.[0]?.trimEnd();
+      const extended = discovery.exec(newerDelta)?.[0]?.trimEnd();
+      assert.ok(original && extended?.startsWith(`${original}\n\n#### Scenario: `),
+        "Tier 1 must preserve the entire Item 5.5 discovery requirement before its new scenarios");
+      delta = delta.replace(original, () => extended);
+    }
+    assert.equal(checkPromotion({ capability, delta, current }), expected, capability);
+    assert.ok(current.startsWith(header("spec", `capability: ${capability}\n`)));
+    assert.ok(Buffer.byteLength(current) <= 65536, `${capability} must fit the pinned review export`);
+  }
+});
+
+test("Tier 1 reviewer promotes both frozen deltas exactly within the review export limit", async () => {
+  const deltaRoot = await deltaDirectory(tier1Reviewer);
+  for (const capability of ["contained-independent-review", "openspec-integration"]) {
     const [delta, current] = await Promise.all([
       readCapabilitySpec(deltaRoot, capability),
       readCapabilitySpec(currentSpecs, capability),
     ]);
-    assert.equal(checkPromotion({ capability, delta, current }), expected, capability);
+    assert.equal(checkPromotion({ capability, delta, current }), 1, capability);
     assert.ok(current.startsWith(header("spec", `capability: ${capability}\n`)));
     assert.ok(Buffer.byteLength(current) <= 65536, `${capability} must fit the pinned review export`);
   }
