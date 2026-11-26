@@ -43,7 +43,7 @@ records the observed version with comparison disabled. Executable and raw
 configuration hashes, route qualification, containment, independent session
 and provider identities, and provider-run authority are separate predicates.
 
-The `reviewer` choices include `bubblewrap` with the same executable and
+Tier A `reviewer` choices include `bubblewrap` with the same executable and
 version policy fields, `relay` with `route` and a nonsecret `credentialRef`
 name, `interPacketDelayMs` and `timeoutMs`. New setup uses 96 turns and
 defaults to USD 2.50 per invocation. Set `maxBudgetUsd` to choose a different
@@ -112,13 +112,14 @@ for the exact independent runtime and provider readback, paid grant and replay.
 
 | Route | Current disposition |
 | --- | --- |
-| Verified legacy Claude reviewer | Original package, host and authority pins govern the frozen review. Retained captures replay under the same schema. |
+| Pinned Claude Tier A reviewer | Claude Code 2.1.330 remains the default. Original package, host and authority pins govern the frozen review. Retained captures replay under the same schema. |
 | Codex Implementer pilot | Admission supports exact-binding offline and bounded live manifests. Fresh live proof must cover the current runtime bytes, effective settings, native workspace-write, protected paths and sealed handover. |
 | Claude Code Implementer pilot | Requires native OS workspace-write and protected-path denial evidence. |
 | Hermes, OpenCode, Pi, agy, grok-build Implementer pilots | Discovery reports local absence where applicable. A present tool still needs effective settings, native isolation and original-attempt handover evidence. |
-| Claude Code contained Reviewer pilot | Admission supports independently pinned same-UID Anthropic relay and whole-file stream readback. Fresh live proof must cover the actual native effort request, containment, full Read results and receipt replay. The dedicated UID broker lacks verified explicit effort readback. |
-| Grok 1.0.92 contained Reviewer pilot | Unsupported. `streaming-messages-json` has no verified host-only xAI OAuth routing through `inference.sock`. Admission stops before export exposure. The version probe was credential-free and made no live xAI call. |
-| Pi 1.5.2 contained Reviewer pilot | Opt-in via `hermes-proxy-xai-oauth`, model `grok-4.7`, thinking `off`. An offline synthetic SSE control proved native parallel `read` stream replay. Real review requires independently pinned offline and bounded live qualification for the release inventory, host, exact socket, provider and limits. This is the only fallback eligible for a separate trial grant for this change. |
+| Claude Code Tier A Reviewer pilot | Admission supports independently pinned same-UID Anthropic relay and whole-file stream readback. Fresh live proof must cover the actual native effort request, containment, full Read results and receipt replay. The dedicated UID broker lacks verified explicit effort readback. |
+| Grok 1.0.92 Tier A Reviewer pilot | Unsupported. `streaming-messages-json` has no verified host-only xAI OAuth routing through `inference.sock`. Admission stops before export exposure. The version probe was credential-free and made no live xAI call. |
+| Grok 1.0.92 Tier B Reviewer pilot | Explicit opt-in on `linux-bwrap` via dedicated `xai-oauth` and `provider-https`, with `grok-4.7`. Offline preview is available. Real review stays blocked pending exact offline and separately authorized bounded live qualification of the auth layout, provider-only HTTPS, sole `read_file`, whole-file stream audit and receipt replay. |
+| Pi 1.5.2 Tier A Reviewer pilot | Opt-in via the host relay `hermes-proxy-xai-oauth`, model `grok-4.7`, thinking `off`. An offline synthetic SSE control proved native parallel `read` stream replay. Real review requires independently pinned offline and bounded live qualification for the release inventory, host, exact socket, provider and limits. |
 | Codex contained Reviewer pilot | Requires a qualified host relay and stream-proved whole-file audit and receipt mapping. |
 | Kilo, Gemini, OpenRouter and generic OpenAI-compatible relays | Discovery or adapter contract only. |
 
@@ -127,30 +128,35 @@ when disabled. Enabled AI helpers and AI harnesses declare the same role
 tuple, with a harness using `aiRole`. Their execution stops at the
 effective-binding gate until a native adapter is verified.
 Separately authorize bounded live positive and negative controls on benign
-inputs. Preserve native capture, exact executable/configuration/relay pins,
-settlement and readback, and the exact unsupported predicate for each
-unavailable or failing route. A legacy binding follows its original frozen
-authority.
+inputs. Preserve native capture, exact executable and configuration pins,
+tier-specific auth evidence and relay pins where applicable, settlement and
+readback, and the exact unsupported predicate for each unavailable or failing
+route. A legacy binding follows its original frozen authority.
 
 ## Observed backend suitability
 
-These are portable conclusions from the 2026-11-26 host observations.
-Role fit describes where an exact route is worth qualifying. The contained
-reviewer baseline is the pinned Claude Code 2.1.330 route.
+Role fit reflects the 2026-11-26 host observations. The pinned Claude Code
+2.1.330 Tier A route remains the default contained reviewer.
 
 | Backend and observed version | Contained reviewer | Implementer | Orchestrator |
 | --- | --- | --- | --- |
-| Claude Code 2.1.330 and 2.1.332 | 2.1.330 is the qualified pinned baseline. The route uses a single executable, `stream-json`, `dontAsk`, Read as the sole tool, no session persistence, empty settings sources, strict MCP configuration and finite turn and spend limits. A version change needs exact qualification. | Strong candidate with OS workspace-write proof. | Strong. |
-| Grok 1.0.92 | Unsupported for the contained Tier 1 route. The observed CLI has native headless streaming and tool and turn controls. Host-only subscription inference through the Unix relay remains unverified. | Strong candidate with OS workspace-write proof. | Strong. |
-| Pi 1.5.2 | Tier 1 candidate with synthetic offline evidence. The pinned release runs JSON streaming with only `read` and disabled ambient discovery. The host relay supplies the 96-request limit and the supervisor supplies the deadline. Live qualification needs the exact host Hermes proxy xAI OAuth binding. See [Pi host setup and qualification](claude-reviewer.md#prepare-and-qualify-the-pi-route). | Medium. | Strong. |
+| Claude Code 2.1.330 and 2.1.332 | 2.1.330 is the qualified pinned Tier A baseline. The route uses a single executable, `stream-json`, `dontAsk`, Read as the sole tool, no session persistence, empty settings sources, strict MCP configuration and finite turn and spend limits. A version change needs exact qualification. | Strong candidate with OS workspace-write proof. | Strong. |
+| Grok 1.0.92 | The observed CLI has native headless streaming and tool and turn controls. Tier A is unsupported because host-only xAI OAuth inference through the Unix relay remains unverified. The explicit Tier B dedicated OAuth route is blocked pending exact offline and bounded live qualification. | Strong candidate with OS workspace-write proof. | Strong. |
+| Pi 1.5.2 | Opt-in Tier A host-relay candidate with synthetic offline evidence. The pinned release runs JSON streaming with only `read` and disabled ambient discovery. The host relay enforces the 96-request limit and the supervisor enforces the deadline. Real review requires independently pinned offline and bounded live evidence for the exact host Hermes proxy xAI OAuth binding. See [Pi host setup and qualification](claude-reviewer.md#prepare-and-qualify-the-pi-route). | Medium. | Strong. |
 | Hermes 0.23.4 | Medium. The Python environment and toolset granularity complicate the minimal rootfs and single-tool boundary. A host-only proxy may help a separately qualified route. | Medium. | Strong. |
 | Codex 0.172.0 | Medium, pending a compatible relay and exact whole-file Read audit. | Native workspace-write is appropriate under its qualified route. | Strong. |
-| OpenCode 2.3.2 and Kilo 7.8.27 | Unsuitable for the current minimal rootfs. Client/server and state dependencies, with insufficient single-Read allowlist and turn controls. | Requires separate qualification. | Requires separate qualification. |
-| agy 1.5.16 | Unsuitable for the current minimal rootfs. Relies on a local daemon and lacks the single-Read and finite-turn controls. | Requires separate qualification. | Requires separate qualification. |
+| OpenCode 2.3.2 and Kilo 7.8.27 | Unsuitable for the observed Tier A minimal rootfs. Client/server and state dependencies, with insufficient single-Read allowlist and turn controls. | Requires separate qualification. | Requires separate qualification. |
+| agy 1.5.16 | Unsuitable for the observed Tier A minimal rootfs. Relies on a local daemon and lacks the single-Read and finite-turn controls. | Requires separate qualification. | Requires separate qualification. |
 
-An exact reviewer qualification needs a pinned minimal rootfs, a host-only
-Unix relay, an audit of the single allowed Read tool and its complete
-whole-file results, separate sessions and finite bounds. Evaluate each
-credential route and effective role binding under its own live authority.
+Both tiers require a pinned runtime, read-only review inputs, private scratch,
+separate sessions, finite bounds and a native-stream audit of the single
+allowed read tool and its complete whole-file results. Tier A uses a minimal
+rootfs and a host-only Unix relay with zero reviewer-visible credentials and no
+direct networking. Tier B masks ambient home and profiles and limits auth to a
+private 0700 dedicated directory and networking to qualified provider-only
+HTTPS. Bind the exact tier, driver and effective role in qualification and
+replay. Evaluate each route under its own live authority.
 
-Use the tier-aware preview for explicit Linux sealed relay or dedicated-auth setup. Review the exact pins, output bytes and qualification disposition before applying a confirmation digest. See [Containment tiers](containment-tiers.md).
+Use `setup.mjs --tier a` for a Linux sealed relay preview or `--tier b` for a
+dedicated-auth preview. Review the exact pins, output bytes and qualification
+disposition before applying a confirmation digest. See [Containment tiers](containment-tiers.md).
