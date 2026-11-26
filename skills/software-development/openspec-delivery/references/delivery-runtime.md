@@ -177,6 +177,14 @@ or local grant can also require it with `delegatedRuntime: true`. Include a
   phase and preserve its verified native progress hash with the on-track
   check. The same-action attempt reserves the available cap allowance.
   Its actual distinct native session is checked on settlement.
+- For a productive Goal-First supervisor timeout under adopting integrated
+  policy, retain the prior `boundary` observation with `SUPERVISOR_TIMEOUT`.
+  Use its `progressSha256` with the protected `supervisor-timeout` continuation
+  record and the original settlement, result and slot-release identities.
+  One successor may inherit the exact verified dirty checkout. Delivery
+  checks the retained authority and on-track observation before advising
+  dispatch. The runtime rechecks scope, remaining time and corrections, and
+  slot ownership before native preflight. Keep the native outcome pending.
 
 `dispatch` for this route is advisory and returns
 `requiresExclusiveAdmission: true`. Run the pinned implementer under its

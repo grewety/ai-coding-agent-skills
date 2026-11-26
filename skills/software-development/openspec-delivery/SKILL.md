@@ -1,7 +1,7 @@
 ---
 name: openspec-delivery
 description: Automate setup, execution and closeout of OpenSpec changes.
-version: 1.8.0
+version: 1.9.0
 author: Raphael (forgegod), Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -23,6 +23,20 @@ Read [integrated low-touch delivery](references/low-touch.md) for the
 prospective planning, result review, paid authority, local harness and finish
 contracts. Exact approval, bounded local execution and protected finish remain
 separate operator decisions.
+
+For Codex Auto-review under adopting integrated policy, use the standalone Node
+command after preparing and checking the sealed export offline. Set
+`review_cli` to the absolute packaged `scripts/review-candidate.mjs` path, and
+substitute the absolute artifact paths. This invokes the authorized probe and
+paid candidate review under the retained admission.
+
+```text
+node "$review_cli" --mode candidate --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --admission ADMISSION --output OUTPUT
+```
+
+Replay the sealed result offline before candidate readback. Follow
+[the operator workflow](references/operator-workflow.md#launch-contained-review)
+for approach review and authority.
 Use the local capture, seal and offline readback interfaces for byte-preserving
 gate, readback and review evidence. [Evidence retention](references/evidence-retention.md).
 

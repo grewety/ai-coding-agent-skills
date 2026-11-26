@@ -119,7 +119,7 @@ export function auditCodexCapture(state, captured, limits) {
   return reduce("completed", null, report, turns);
 }
 
-export async function verifyPostWorker(request, grant, expectedGitState) {
+export async function verifyPostWorker(request, grant, expectedGitState, { includeModes = false } = {}) {
   const workspace = request.identity.workspace;
   need(equal(checkoutIdentity(workspace), { head: grant.head, branch: grant.branch }), "Worker changed Git HEAD or branch");
   need(equal(await gitState(workspace), expectedGitState), "Worker changed protected Git metadata");
@@ -137,7 +137,8 @@ export async function verifyPostWorker(request, grant, expectedGitState) {
       const filename = path.join(workspace, name);
       const st = await lstat(filename);
       need(st.nlink === 1 && st.isFile(), "Unsafe worker output alias");
-      outputs[name] = hash(await readClosed(filename, captureLimit));
+      const sha256 = hash(await readClosed(filename, captureLimit));
+      outputs[name] = includeModes ? { sha256, mode: st.mode & 0o777 } : sha256;
     }
   }
   return outputs;

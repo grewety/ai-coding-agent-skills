@@ -61,6 +61,11 @@ model, or permission fallback.
 
 ### Supported client keys, flags, presets, and profile paths
 
+Discovery prefers the `grok` executable and falls back to a trusted
+`grok-build` executable. Both map to the existing `grok-build` client key.
+Keep the executable selected by each retained role pin. Discovery alone does
+not qualify a new contained-review route.
+
 | Advertised client | Supported versions (probed) | Role / client / provider / model selectors & profile paths |
 | --- | --- | --- |
 | `hermes` | `>=0.23.0 <1.0.0` (`0.23.2`) | Launch argv `--profile <verified-profile> chat --query-file <-\|prompt.md> --oneshot --format stream-json --pass-session-id --in <workspace> -t <file\|file,terminal>` (`cliMode: "chat --oneshot"`); profile keys `model.default`, `model.provider`, `display.busy_input_mode = queue` in `<hermes-home>/profiles/<verified-profile>/` ([profile-preparation.md](profile-preparation.md)); declarative skill frontmatter keys `autonomous_ai_agents.implementer` and `autonomous_ai_agents.reviewer`; scratch isolation via `HOME=<scratchRoot>` and `TMPDIR=<scratchRoot>`. |

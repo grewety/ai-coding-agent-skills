@@ -127,7 +127,7 @@ export function pushTriggerDecision({ candidate, pushGrant, observed, external }
 
 // Call only with the context re-read from the exact frozen plan's integrated parent.
 export function standingTriggerDecision({ candidate, pushGrant, observed, external, policy, event, target, repository, finishReference,
-  notBefore, now = Date.now() }) {
+  notBefore, now = Date.now(), bundledTrigger, strictInventory = false }) {
   const stop = (reason, action = "stop") => ({ action, reason });
   if (!sha(candidate) || pushGrant?.verified !== true || pushGrant.candidate !== candidate ||
       !text(pushGrant.reference) || pushGrant.target !== repository || pushGrant.finishReference !== finishReference ||
@@ -140,6 +140,7 @@ export function standingTriggerDecision({ candidate, pushGrant, observed, extern
       !Array.isArray(observed.triggers) || observed.triggers.length > 128) return stop("TRIGGER_INVENTORY_UNVERIFIED");
   const identities = new Set();
   const standing = [];
+  const bundle = [];
   for (const entry of observed.triggers) {
     if (!entry || !text(entry.id) || identities.has(entry.id) || entry.repository !== repository ||
         entry.event !== event || entry.target !== target || entry.verified !== true ||
@@ -147,8 +148,15 @@ export function standingTriggerDecision({ candidate, pushGrant, observed, extern
         !(entry.configurationSha256 === null || digest(entry.configurationSha256)) ||
         !(entry.exposure === null || text(entry.exposure)) ||
         !(entry.costUsd === null || Number.isFinite(entry.costUsd) && entry.costUsd >= 0)) return stop("TRIGGER_INVENTORY_UNVERIFIED");
+    if (strictInventory && (entry.kind === "unknown" || entry.costUsd === null ||
+        entry.configurationSha256 === null || entry.exposure === null)) return stop("TRIGGER_INVENTORY_UNVERIFIED");
     identities.add(entry.id);
     const { verified, ...live } = entry;
+    const bundled = bundledTrigger?.(entry, { notBefore, now, inventoryReference: observed.reference });
+    if (bundled) {
+      bundle.push(bundled);
+      continue;
+    }
     if (zeroTrigger(live) && policy.standingTriggers.some((allowed) => same(allowed, live))) {
       standing.push(entry.id);
       continue;
@@ -165,7 +173,7 @@ export function standingTriggerDecision({ candidate, pushGrant, observed, extern
       return stop("PUSH_TRIGGER_AUTHORITY_PENDING", "queue");
     }
   }
-  return { action: "proceed", reason: null, inventoryReference: observed.reference, event, target, standing };
+  return { action: "proceed", reason: null, inventoryReference: observed.reference, event, target, standing, ...(bundle.length ? { bundle } : {}) };
 }
 
 export function triggerScope({ id, repository, event, target, configurationSha256, exposure, costUsd, kind }) {

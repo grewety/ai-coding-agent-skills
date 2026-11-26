@@ -18,6 +18,7 @@ import { auditVersion } from "./runtime-version.mjs";
 import { upstreamClasses } from "./review-upstream-status.mjs";
 import { auditClaudeStream } from "./review-stream.mjs";
 import { createAttempt, publishResult, readClosed, readHandoff, requestBytes as workerRequestBytes, writeClosed } from "./worker-handoff.mjs";
+import { packetConcurrency, replayPacketSchedule, schedulePackets } from "./review-packet-scheduler.mjs";
 
 const probePrompt = "Do not call any tools. Reply with exactly REVIEW_PROBE_OK.";
 const supervisorFields = ["code", "signal", "outcome", "quiescent"];
@@ -64,7 +65,8 @@ async function loadInputs(requestFile, expectFile) {
   validateReviewRequest(request);
   const expect = await readJson(expectFile);
   fields(expect, ["schemaVersion", "requestSha256", "exportSha256", "configurationSha256", "model"],
-    "independent expectation", ["statusSha256", "harness", "qualification", "generator", "explicit"]);
+    "independent expectation", ["statusSha256", "harness", "qualification", "generator", "explicit", "packetConcurrency"]);
+  packetConcurrency(expect.packetConcurrency);
   need(expect.schemaVersion === 1 && expect.requestSha256 === hash(jsonBytes(request)) &&
     (expect.exportSha256 === null || digest(expect.exportSha256)) && digest(expect.configurationSha256) &&
     typeof expect.model === "string" && /^claude-[a-z0-9-]{2,100}$/.test(expect.model) &&
@@ -88,10 +90,10 @@ async function capture(dir, index, observation) {
   const [out, err, metadata] = attemptNames(index);
   const { runtime, proc } = observation;
   const supervisor = Object.fromEntries(supervisorFields.map((name) => [name, proc[name]]));
-  const { upstreamStatus } = observation;
+  const { upstreamStatus, runtimeFailure } = observation;
   need(upstreamStatus === undefined || upstreamClasses.includes(upstreamStatus), "Invalid private upstream status");
   const captures = { [out]: proc.stdout, [err]: proc.stderr, [metadata]: jsonBytes({ runtime, supervisor,
-    ...(upstreamStatus ? { upstreamStatus } : {}) }) };
+    ...(upstreamStatus ? { upstreamStatus } : {}), ...(runtimeFailure ? { runtimeFailure } : {}) }) };
   for (const [name, bytes] of Object.entries(captures)) await writeClosed(path.join(dir, name), bytes, true);
 }
 
@@ -101,24 +103,42 @@ async function replayCapture(directory, index, expect) {
     readSealed(directory, metadata, 4096)]);
   const value = await readJson(path.join(directory, metadata), 4096, true);
   need(files[2].equals(jsonBytes(value)), "Noncanonical capture metadata");
-  fields(value, ["runtime", "supervisor"], "capture metadata", ["upstreamStatus"]);
+  fields(value, ["runtime", "supervisor"], "capture metadata", ["upstreamStatus", "runtimeFailure"]);
+  need(value.runtimeFailure === undefined || packetConcurrency(expect.packetConcurrency) > 1 && value.runtimeFailure === true,
+    "Invalid private runtime failure");
   need(value.upstreamStatus === undefined || upstreamClasses.includes(value.upstreamStatus), "Invalid private upstream status");
   fields(value.supervisor, supervisorFields, "supervisor observation");
   validateRuntime(value.runtime, expect);
-  return { runtime: value.runtime, upstreamStatus: value.upstreamStatus, proc: { ...value.supervisor, stdout: files[0], stderr: files[1] },
+  return { runtime: value.runtime, upstreamStatus: value.upstreamStatus, runtimeFailure: value.runtimeFailure,
+    proc: { ...value.supervisor, stdout: files[0], stderr: files[1] },
     descriptors: [out, err, metadata].map((name, i) => describeFile(directory, name, files[i])) };
 }
 
 function audit(observation, paths, probe, files) {
-  if (observation.upstreamStatus) return null;
+  if (observation.upstreamStatus || observation.runtimeFailure) return null;
   try { return auditClaudeStream(observation.proc, observation.runtime, paths, probe, files); }
   catch { return null; }
 }
 
-async function replay(directory, request, expect, prepared, count) {
+function inspectPacket(observation, request, context, prepared, index, reference) {
+  const packet = prepared.manifest.packets[index - 1];
+  const report = audit(observation, packet.paths, false, prepared.files);
+  if (report === null) return { failure: "runtime-failed" };
+  try {
+    return { report, receipt: admitReceipt(request, context, report, index - 1, reference, packet,
+      { framedOnly: Boolean(observation.runtime.explicit) }) };
+  } catch {
+    if (request.mode === "approach") return { report, failure: "invalid-receipt" };
+    return { report, failure: "receipt-invalid", rejection: { packet: index, packetSha256: hash(jsonBytes(packet)),
+      target: context.target, session: observation.runtime.session } };
+  }
+}
+
+async function replay(directory, request, expect, prepared, count, schedule) {
   const raw = path.join(directory, "raw");
   const context = receiptContext(request, prepared);
   const packetCount = prepared.manifest.packets.length;
+  const concurrency = packetConcurrency(expect.packetConcurrency);
   need(Number.isSafeInteger(count) && count >= 1 && count <= packetCount + 1, "Invalid capture count");
   const expectedNames = Array.from({ length: count }, (_, index) => attemptNames(index)).flat().sort();
   need(equal((await readdir(raw)).sort(), expectedNames), "Raw capture inventory mismatch");
@@ -130,11 +150,12 @@ async function replay(directory, request, expect, prepared, count) {
   const upstream = probe.upstreamStatus ? [{ packet: 0, classification: probe.upstreamStatus }] : [];
   const receipts = [];
   const reports = [];
+  const packets = [];
   const sessions = [probeSession];
   let rejection = null;
   let phase = audit(probe, [], true) === null ? "probe-failed" : "complete";
   for (let index = 1; index < count; index++) {
-    need(phase === "complete", "Capture exists after a failed launch");
+    if (concurrency === 1) need(phase === "complete", "Capture exists after a failed launch");
     const observation = await replayCapture(raw, index, expect);
     const { session, ...runPin } = observation.runtime;
     need(equal(runPin, pin) && !sessions.includes(session) &&
@@ -143,29 +164,33 @@ async function replay(directory, request, expect, prepared, count) {
     sessions.push(session);
     captures.push(...observation.descriptors);
     if (observation.upstreamStatus) upstream.push({ packet: index, classification: observation.upstreamStatus });
-    const packet = prepared.manifest.packets[index - 1];
-    const report = audit(observation, packet.paths, false, prepared.files);
-    if (report === null) { phase = "runtime-failed"; continue; }
-    reports.push(report);
-    try {
-      receipts.push(admitReceipt(request, context, report, index - 1, path.join(directory, "report.md"), packet,
-        { framedOnly: Boolean(observation.runtime.explicit) }));
-    } catch {
-      phase = request.mode === "candidate" ? "receipt-invalid" : "invalid-receipt";
-      if (request.mode === "candidate") {
-        rejection = { packet: index, packetSha256: hash(jsonBytes(packet)), target: context.target, session };
-      }
+    const inspected = inspectPacket(observation, request, context, prepared, index, path.join(directory, "report.md"));
+    packets.push(inspected);
+    if (inspected.report !== undefined) reports.push({ index, report: inspected.report });
+    if (inspected.receipt) receipts.push(inspected.receipt);
+    if (concurrency === 1 && inspected.failure) {
+      phase = inspected.failure;
+      rejection = inspected.rejection ?? null;
+    }
+  }
+  if (concurrency > 1) {
+    const failure = replayPacketSchedule(schedule, concurrency, packets, phase === "complete");
+    if (failure) {
+      phase = failure.failure;
+      rejection = failure.rejection ?? null;
     }
   }
   if (phase === "complete" && count !== packetCount + 1) phase = "incomplete-packets";
   const native = reports.length
-    ? Buffer.from(reports.map((report, index) => reports.length === 1 ? report : `Packet ${index + 1}\n${report}`).join("\n\n") + "\n")
+    ? Buffer.from(reports.map(({ index, report }) => concurrency === 1 && reports.length === 1 ? report :
+      `Packet ${index}\n${report}`).join("\n\n") + "\n")
     : Buffer.from("No extracted native report. See the retained raw captures.\n");
-  return { phase, rejection, sessions, captures, upstream, receipts, native, runtime: attemptRuntime({ ...probe.runtime, session: request.session }) };
+  return { phase, rejection, sessions, captures, upstream, receipts, native, schedule,
+    runtime: attemptRuntime({ ...probe.runtime, session: request.session }) };
 }
 
-async function outcome(directory, request, expect, prepared, count, expected) {
-  const observed = await replay(directory, request, expect, prepared, count);
+async function outcome(directory, request, expect, prepared, count, expected, schedule) {
+  const observed = await replay(directory, request, expect, prepared, count, schedule);
   const files = {};
   const describe = (name, bytes) => describeFile(directory, name, bytes);
   let result;
@@ -191,6 +216,8 @@ function statusFor(directory, expect, count, outcome, resultBytes, requestBytes)
   return {
     schemaVersion: 1, requestSha256: expect.requestSha256, exportSha256: expect.exportSha256,
     configurationSha256: expect.configurationSha256, model: expect.model, phase: outcome.observed.phase, count,
+    ...(packetConcurrency(expect.packetConcurrency) > 1 ?
+      { packetConcurrency: expect.packetConcurrency, schedule: outcome.observed.schedule } : {}),
     ...(outcome.observed.rejection ? { rejection: outcome.observed.rejection } : {}),
     ...(outcome.observed.upstream.length ? { upstream: outcome.observed.upstream } : {}),
     sessions: outcome.observed.sessions, captures: outcome.observed.captures, deliveryAccepted: false,
@@ -213,7 +240,7 @@ async function verify(directory, request, expect, prepared) {
   const requestBytes = await readSealed(directory, "request.md", totalLimit);
   need(requestBytes.equals(workerRequestBytes(request.worker)), "Worker request differs from independent identity");
   const expected = expectedAttempt(directory, request, requestBytes);
-  const reconstructed = await outcome(directory, request, expect, prepared, status.count, expected);
+  const reconstructed = await outcome(directory, request, expect, prepared, status.count, expected, status.schedule);
   const resultBytes = await readSealed(directory, "result.json", totalLimit);
   if (reconstructed.handoff) {
     const handoff = await readHandoff({ expected, runtime: reconstructed.observed.runtime });
@@ -241,6 +268,7 @@ async function checkPrior(request, expect, prepared) {
   const retained = await loadInputs(prior.request, prior.expect);
   need(retained.request.mode === "approach" && retained.request.snapshot.priorLaunches.length === 0 &&
     retained.expect.configurationSha256 === expect.configurationSha256 && retained.expect.model === expect.model &&
+    packetConcurrency(retained.expect.packetConcurrency) === packetConcurrency(expect.packetConcurrency) &&
     equal(retained.expect.explicit, expect.explicit) && equal(retained.expect.generator, expect.generator) &&
     equal(retained.request.worker.identity.inputs, request.worker.identity.inputs) &&
     equal(retained.request.attachments, request.attachments) && equal(retained.request.limits, request.limits) &&
@@ -264,6 +292,8 @@ async function checkPrior(request, expect, prepared) {
 
 export async function runReview({ request, expect, prepared, directory, excluded, run, clock }) {
   const context = receiptContext(request, prepared);
+  const concurrency = packetConcurrency(expect.packetConcurrency);
+  need(concurrency === 1 || clock, "Concurrent packet review needs a bounded launch clock");
   need(separate(directory, request.worker.identity.workspace) && excluded.every((root) => separate(directory, root)),
     "Output overlaps review inputs or host authority");
   await protectedParent(directory);
@@ -271,8 +301,12 @@ export async function runReview({ request, expect, prepared, directory, excluded
   const raw = path.join(directory, "raw");
   await mkdir(raw, { mode: 0o700 });
   let count = 0;
+  let schedule = [];
   const probeSession = randomUUID();
-  const probe = await run({ files: new Map(), prompt: probePrompt, session: probeSession, ...(clock ? { timeoutMs: clock.remaining() } : {}) });
+  const probeInput = { files: new Map(), prompt: probePrompt, session: probeSession,
+    ...(clock ? { timeoutMs: clock.remaining() } : {}) };
+  const probe = await run(concurrency > 1 ? { ...probeInput, begin: () => clock.remaining() } : probeInput);
+  need(probe, "Review deadline expired before the automatic probe");
   validateRuntime(probe.runtime, expect);
   need(probe.runtime.session === probeSession, "Probe runtime session mismatch");
   await capture(raw, count++, probe);
@@ -280,25 +314,65 @@ export async function runReview({ request, expect, prepared, directory, excluded
     const { session: unusedProbeSession, ...probePin } = probe.runtime;
     const sessions = new Set([probe.runtime.session, request.worker.identity.implementerSession,
       request.worker.authority.authorSession, request.worker.authority.orchestrator]);
-    for (const [index, packet] of prepared.manifest.packets.entries()) {
-      if (clock && !await clock.next(index)) break;
+    const reference = path.join(directory, "report.md");
+    const packetInput = (index) => {
+      const packet = prepared.manifest.packets[index];
       const session = index === 0 ? request.session : randomUUID();
       need(!sessions.has(session), "Packet session reused");
       sessions.add(session);
-      const reference = path.join(directory, "report.md");
-      const observation = await run({ session, files: new Map(packet.paths.map((name) => [name, prepared.files.get(name)])),
-        prompt: reviewPrompt(request, context, packet, index, prepared.manifest.packets.length, reference),
-        ...(clock ? { timeoutMs: clock.remaining() } : {}) });
-      await capture(raw, count++, observation);
+      return { session, files: new Map(packet.paths.map((name) => [name, prepared.files.get(name)])),
+        prompt: reviewPrompt(request, context, packet, index, prepared.manifest.packets.length, reference) };
+    };
+    const checkPacket = (observation, session, packet) => {
       const { session: observedSession, ...pin } = observation.runtime;
       need(observedSession === session && equal(pin, probePin), "Packet runtime differs from probe");
-      const report = audit(observation, packet.paths, false, prepared.files);
-      if (report === null) break;
-      try { admitReceipt(request, context, report, index, reference, packet, { framedOnly: Boolean(observation.runtime.explicit) }); }
-      catch { break; }
+      return inspectPacket(observation, request, context, prepared, packet, reference);
+    };
+    if (concurrency === 1) {
+      for (const index of prepared.manifest.packets.keys()) {
+        if (clock && !await clock.next(index)) break;
+        const input = packetInput(index);
+        const observation = await run({ ...input, ...(clock ? { timeoutMs: clock.remaining() } : {}) });
+        await capture(raw, count++, observation);
+        if (checkPacket(observation, input.session, index + 1).failure) break;
+      }
+    } else {
+      schedule = await schedulePackets(prepared.manifest.packets.length, concurrency, clock, async (packet, begin, halt) => {
+        const input = packetInput(packet - 1);
+        let retained;
+        let upstreamStatus;
+        let launched = false;
+        let observation;
+        try {
+          observation = await run({ ...input, begin: () => {
+            const remaining = begin();
+            launched = remaining > 0;
+            return remaining;
+          }, onFailure: (status) => {
+            if (!upstreamClasses.includes(status)) return;
+            upstreamStatus ??= status;
+            halt();
+          }, retain: (value) => { retained = value; } });
+        } catch {
+          observation = { runtime: { ...probePin, session: input.session },
+            proc: { code: null, signal: null, outcome: "runtime-error", quiescent: false, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) },
+            ...retained, runtimeFailure: true };
+        }
+        if (!launched) {
+          need(!observation || observation.runtimeFailure, "Concurrent runtime did not confirm its packet launch");
+          return false;
+        }
+        need(observation, "Missing observation for a launched packet");
+        if (upstreamStatus) observation = { ...observation, upstreamStatus };
+        const passed = !checkPacket(observation, input.session, packet).failure;
+        if (!passed) halt();
+        await capture(raw, packet, observation);
+        count++;
+        return passed;
+      });
     }
   }
-  const reconstructed = await outcome(directory, request, expect, prepared, count, expected);
+  const reconstructed = await outcome(directory, request, expect, prepared, count, expected, schedule);
   if (reconstructed.handoff) {
     await publishResult({ expected, runtime: reconstructed.observed.runtime, result: reconstructed.handoff, files: reconstructed.files });
   } else {
@@ -326,9 +400,10 @@ const commands = {
 function cli(argv) {
   const [command, ...arguments_] = argv;
   need(Object.hasOwn(commands, command), "Invalid CLI option");
+  const budgetOptions = ["budget-extension", "operator-key", "operator-key-sha256"];
   const optional = {
-    "--prepare": ["host-config"], "--check": ["host-config", "admission"],
-    "--mode": ["admission"], "--verify": [], "--probe": ["qualification", "qualification-sha256"],
+    "--prepare": ["host-config"], "--check": ["host-config", "admission", ...budgetOptions],
+    "--mode": ["admission", ...budgetOptions], "--verify": [], "--probe": ["qualification", "qualification-sha256"],
   }[command];
   const args = arguments_.slice();
   const mode = command === "--mode" ? args.shift() : null;
@@ -339,11 +414,14 @@ function cli(argv) {
     const key = flag.startsWith("--") ? flag.slice(2) : "";
     const value = args.shift();
     need([...commands[command], ...optional].includes(key) && !Object.hasOwn(options, key) &&
-      (key === "qualification-sha256" ? digest(value) : absolute(value)), "Invalid CLI option or path");
+      (key.endsWith("-sha256") ? digest(value) : absolute(value)), "Invalid CLI option or path");
     options[key] = value;
   }
   need(commands[command].every((key) => Object.hasOwn(options, key)), "Missing CLI option");
   need(Boolean(options.qualification) === Boolean(options["qualification-sha256"]), "Missing independent qualification path or pin");
+  need(Boolean(options["operator-key"]) === Boolean(options["operator-key-sha256"]) &&
+    (!options["operator-key"] || options.admission) && (!options["budget-extension"] || options["operator-key"]),
+  "Review extensions require admission and an independently pinned operator key");
   return { command, mode, options };
 }
 
@@ -437,17 +515,22 @@ export async function reviewCommand(argv, openRuntime = withReviewRuntime) {
   preflight(prepared);
   if (options.admission) need(policy && config, "Admission file requires adopting policy and pinned host.json");
   const spend = options.admission ? await checkReviewSpend({ file: options.admission, policy, request, expect, prepared,
-    config, excluded: [...trustExcluded, options["host-config"]].filter(Boolean) }) : null;
+    config, excluded: [...trustExcluded, options["host-config"], ...(options["operator-key"] ? hostPaths(config) : [])],
+    extensionFiles: options["operator-key"] && { key: options["operator-key"], sha256: options["operator-key-sha256"],
+      record: options["budget-extension"] } }) : null;
   receiptContext(request, prepared);
   await checkPrior(request, expect, prepared);
   if (command === "--check") return { exportSha256: expect.exportSha256, packets: prepared.manifest.packets.length,
     ...(config ? { maxTurns: config.maxTurns } : {}), ...(spend ? { admission: spend.policy.mode, scope: spend.scope } : {}),
+    ...(spend?.ledgerIdentity ? { ledgerIdentity: spend.ledgerIdentity } : {}),
     ...(explicit ? { explicit } : {}) };
   const directory = options.output;
   need([exportDirectory, options.request, options.expect].every((root) => separate(directory, root)), "Output overlaps retained inputs");
   if (command === "--verify") return verify(directory, request, expect, prepared);
   need(expect.statusSha256 === undefined, "Use a fresh output for a new review");
   need(!policy || spend, "Missing trusted admission and durable reservation before review launch");
+  const concurrency = packetConcurrency(config.packetConcurrency);
+  need(concurrency === 1 || spend, "Concurrent review requires durable reservation of the probe and every packet");
   validateRuntime(runtimeBinding(config, request.session, expect.configurationSha256), expect);
   need(request.worker.evidenceRoots.includes(directory) &&
     [request.worker.identity.workspace, options["host-config"], ...hostPaths(config)]
@@ -457,9 +540,12 @@ export async function reviewCommand(argv, openRuntime = withReviewRuntime) {
   const parent = await protectedParent(directory);
   await newAttemptPath(directory);
   if (options.admission) excluded.push(options.admission);
+  if (options["operator-key"]) excluded.push(options["operator-key"]);
+  if (options["budget-extension"]) excluded.push(options["budget-extension"]);
   if (spend) await claimReviewRun(spend);
   const packetCount = prepared.manifest.packets.length;
-  const clock = policy || config.interPacketDelayMs || config.runTimeoutMs ? reviewClock(config, packetCount) : undefined;
+  const clock = policy || concurrency > 1 || config.interPacketDelayMs || config.runTimeoutMs
+    ? reviewClock(config, packetCount) : undefined;
   return openRuntime(config, { parent, excluded: [request.worker.identity.workspace, exportDirectory, directory],
     packetCount, configurationSha256: expect.configurationSha256 },
   (run) => runReview({ request, expect, prepared, directory, excluded, run, clock }));

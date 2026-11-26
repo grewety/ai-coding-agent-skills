@@ -1,6 +1,7 @@
 # Exclusive OpenSpec worker runtime
 
-See [external AI roles and backend pilots](configurable-backends.md) for explicit role settings and route dispositions.
+See [external AI roles and backend pilots](configurable-backends.md) for explicit role settings and the
+[observed backend suitability matrix](configurable-backends.md#observed-backend-suitability).
 
 For a new explicit deployment, use a schema 2 pair backed by the pinned
 `roles.json` and the exact qualification manifests. The standalone Goal-First
@@ -24,9 +25,9 @@ implementation route. Use the contained reviewer for its separate role.
 ## Install and bind
 
 1. Follow the [OpenSpec prerequisites](openspec-installation.md). Install
-   complete delivery 1.8.0 and next 0.8.0 packages from the
-   `openspec-development` 1.8.0 bundle and the separately selected
-   orchestration 0.22.0 package from `autonomous-orchestration` 1.12.0.
+   complete delivery 1.9.0 and next 0.8.0 packages from the
+   `openspec-development` 1.9.0 bundle and the separately selected
+   orchestration 0.23.0 package from `autonomous-orchestration` 1.13.0.
    Check the exact CLI and supporting file bytes outside the workspace before
    enabling the project route. Use the normal collision, backup and fresh
    session checks when updating or removing a package.
@@ -119,7 +120,12 @@ surviving writer blocks replacement and advancement. Keep the original
 evidence, even after settlement and release. Use the same pair for an eligible
 successor, retain elapsed time and correction history, and verify the fresh
 session at handover. A verified native turn cap can allow one same-action
-continuation under retained budget and authority.
+continuation under retained budget and authority. Where the integrated policy
+has adopted the new requirements, Goal-First defaults to 30 minutes subject to
+the pinned host setting and tighter held limits. One productive supervisor
+timeout can lead to a fresh attempt after sealed checkout progress, original
+process settlement and slot release are verified. The assignment retains its
+wall-clock and correction usage. See the [timeout evidence contract](../skills/autonomous-ai-agents/autonomous-implementation-review/references/worker-runtime.md#goal-first-supervisor-timeout).
 
 The dedicated implementer makes the scoped edits. Delivery checks sealed output
 scope before the orchestrator prepares the exact candidate. The orchestrator

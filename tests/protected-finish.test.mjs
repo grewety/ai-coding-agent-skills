@@ -3,13 +3,13 @@ import { execFile, execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, chmodSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { test } from "node:test";
+import { fixtureTest as test } from "./test-shards.mjs";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { deliveryCommand } from "../skills/software-development/openspec-delivery/scripts/delivery-cli.mjs";
 import { planning } from "../skills/software-development/openspec-delivery/scripts/change-guard.mjs";
 import { createRepresentation, sha256, stableJson } from "../skills/software-development/openspec-delivery/scripts/evidence-retention.mjs";
-import { skillSyncDecision } from "../skills/software-development/openspec-delivery/scripts/protected-finish.mjs";
+import { protectedFinish, skillSyncDecision } from "../skills/software-development/openspec-delivery/scripts/protected-finish.mjs";
 
 const next = fileURLToPath(new URL("../skills/software-development/openspec-next/scripts/next.mjs", import.meta.url));
 const run = promisify(execFile);
@@ -143,6 +143,114 @@ function fixture(t, standingTriggers, localHarness) {
   const call = (verb, args) => deliveryCommand(verb === "inspect" ? "status" : verb, request(args));
   return { root, repo, workspace, records, change, active, head, identity, request, call, pr, gate, save, bound, url, issue, now, hostConfiguration };
 }
+
+test("protected publication reserves the paid PR trigger after both event inventories pass", async (t) => {
+  const f = fixture(t);
+  const { repository, target } = f.identity;
+  const sourceRef = "refs/heads/" + f.identity.branch;
+  const scope = { chapter: "implementation", id: "aikido:7:deep-review", target,
+    configurationSha256: "d".repeat(64), exposure: "source", costUsd: 4 };
+  const triggerGrant = f.save("trigger-grant", verified("named-paid-grant", {
+    schemaVersion: 1, kind: "protected-finish-trigger-grant", identity: f.identity, finishReference: "finish-1",
+    startedAt: iso(f.now - 20_000), deadline: iso(f.now + 50_000),
+    maxDeepReviewCredits: 1, maxZeroCostCiRetries: 0, deepReview: [scope], retry: null,
+  }));
+  const { chapter, ...entry } = scope;
+  const trigger = { ...entry, kind: "app-trigger", event: "pull_request", repository, installation: "7", verified: true,
+    providerProof: verified("provider-record", { observedAt: iso(f.now - 100), source: "provider-installation-and-billing",
+      provider: "aikido", product: "deep-review", installation: "7", credits: 1, unit: "credits",
+      scope: { ...scope, event: "pull_request", kind: "app-trigger", repository, candidate: f.head } }) };
+  const inventory = (event, target, triggers) => ({
+    pushGrant: verified("event-grant-" + event, { candidate: f.head, event, target: repository,
+      targetRef: target, finishReference: "finish-1" }),
+    observed: verified("event-inventory-" + event, { candidate: f.head, event, repository, target,
+      triggers, complete: true, observedAt: iso(f.now - 100) }),
+  });
+  const implementation = f.bound("absent", { target, state: "ABSENT", head: f.head, url: null, complete: true, sourceRef,
+    beforePublication: f.bound("target-read", { sourceRef, target, head: f.head, targetRevision: f.identity.targetRevision,
+      complete: true, routeVerified: true, specsReconciled: true }),
+    eventInventories: { push: inventory("push", sourceRef, []), pull_request: inventory("pull_request", target, [trigger]) },
+  });
+  const request = () => f.request({ prs: { implementation: null, closure: null }, remote: { implementation }, phase: { triggerGrant } });
+  const readiness = { ...f.identity, ready: true, head: f.head };
+  implementation.eventInventories.push.observed.complete = false;
+  assert.equal((await protectedFinish(request(), readiness, f.now)).reason, "TRIGGER_INVENTORY_UNVERIFIED");
+  implementation.eventInventories.push.observed.complete = true;
+  const input = request();
+  const preview = await protectedFinish(input, readiness, f.now);
+  assert.equal(preview.reason, "FINISH_TRIGGER_RESERVATION_REQUIRED");
+  const selected = { ...input, finishTriggerSelection: preview.finishTriggerSelection };
+  const ready = await protectedFinish(selected, readiness, f.now, undefined, "reserve");
+  assert.equal(ready.action, "publish-ready");
+  assert.equal(ready.finishTriggerReservation.chapter, chapter);
+  assert.equal(ready.finishTriggerReservation.triggers[0].credits, 1);
+  assert.equal((await protectedFinish(selected, readiness, f.now, undefined, "reserve")).reason, "FINISH_TRIGGER_OUTCOME_PENDING");
+});
+
+test("protected finish reserves and settles one retry before requiring a fresh exact rerun", async (t) => {
+  const f = fixture(t);
+  const { repository, target } = f.identity;
+  const pr = f.pr(1, f.head, "OPEN");
+  const { checks } = pr.protectionReadback;
+  const configurationSha256 = "c".repeat(64);
+  const retry = { chapter: "implementation", id: "ci@github", target, configurationSha256, exposure: "repository-ci", costUsd: 0 };
+  const triggerGrant = f.save("trigger-grant", verified("named-credit-grant", {
+    schemaVersion: 1, kind: "protected-finish-trigger-grant", identity: f.identity, finishReference: "finish-1",
+    startedAt: iso(f.now - 20_000), deadline: iso(f.now + 50_000),
+    maxDeepReviewCredits: 0, maxZeroCostCiRetries: 1, deepReview: [], retry,
+  }));
+  const request = (phase = { triggerGrant }) => f.request({ remote: { implementation: pr }, phase });
+  const checkEntry = checks.entries[0];
+  Object.assign(checkEntry, { state: "failed", runId: "41", attempt: 1 });
+  const { chapter, ...trigger } = retry;
+  const normalized = { candidate: f.head, repository, target, event: "retry", observedAt: pr.observedAt };
+  const scope = { ...trigger, ...normalized, kind: "repository-check" };
+  delete scope.observedAt;
+  const eventInventory = (event, triggers) => ({
+    pushGrant: verified("event-grant-" + event, { event, candidate: f.head, target: repository, targetRef: target, finishReference: "finish-1" }),
+    observed: verified("event-inventory-" + event, { ...normalized, event, complete: true, observedAt: pr.observedAt, triggers }),
+  });
+  pr.eventInventories = { retry: eventInventory("retry", [verified("ci-trigger", { ...scope, installation: "7",
+    providerProof: verified("ci-installation", { observedAt: pr.observedAt, source: "provider-workflow-and-billing",
+      provider: "github-actions", product: "repository-ci", installation: "7", scope: { ...scope, chapter } }),
+  })]) };
+  const detail = { observedAt: pr.observedAt, source: "github-actions", repository, head: f.head, id: retry.id,
+    configurationSha256, workflow: "ci", executionSha256: "a".repeat(64) };
+  pr.retryEvidence = {
+    failure: verified("run-failure", { ...detail, event: "pull_request", pullRequest: pr.url, state: "failed", runId: "41",
+      attempt: 1, classification: "runner-lost", testFailure: false }),
+    push: verified("passing-push", { ...detail, event: "push", runId: "40", state: "passed", equivalent: true }),
+  };
+  const options = request();
+  const preview = await deliveryCommand("finish", options);
+  assert.equal(preview.reason, "FINISH_TRIGGER_RESERVATION_REQUIRED");
+  const reserved = await deliveryCommand("reserve-finish-trigger", { ...options, finishTriggerSelection: preview.finishTriggerSelection });
+  assert.equal(reserved.action, "retry-check-ready");
+  assert.equal(reserved.finishTriggerReservation.triggers[0].runId, "41");
+  assert.equal((await deliveryCommand("finish", request())).reason, "FINISH_TRIGGER_OUTCOME_PENDING");
+  assert.equal((await deliveryCommand("finish", request({}))).reason, "FINISH_OBSERVATIONS_UNVERIFIED");
+  const { sha256: reservationSha256, reference, operation, readbackSha256 } = reserved.finishTriggerReservation;
+  const observedAt = iso(Date.now());
+  const finishTriggerOutcome = f.save("outcome", verified("provider-retry-accepted", {
+    kind: "finish-trigger-outcome", observedAt, state: "consumed", grantReference: reference, reservationSha256,
+    scope: { chapter, operation, head: f.head, readbackSha256 },
+  }));
+  assert.equal((await deliveryCommand("settle-finish-trigger", { ...options, finishTriggerOutcome })).action, "finish-trigger-settled");
+  assert.equal((await deliveryCommand("finish", request())).reason, "FINISH_TRIGGER_RETRY_READBACK_REQUIRED");
+  const fresh = iso(Date.now());
+  const freshRequest = () => f.request({ remote: { implementation: pr, observedAt: fresh }, phase: { triggerGrant } });
+  pr.observedAt = fresh;
+  for (const item of [checks, pr.protectionReadback.protection, pr.protectionReadback.protection.branchProtection,
+    pr.protectionReadback.protection.rulesets, pr.protectionReadback.review]) item.observedAt = fresh;
+  Object.assign(checkEntry, { state: "pending", attempt: 2 });
+  assert.equal((await deliveryCommand("finish", freshRequest())).action, "watch");
+  checkEntry.state = "failed";
+  assert.equal((await deliveryCommand("finish", freshRequest())).reason, "REQUIRED_CHECK_FAILED");
+  checkEntry.state = "passed";
+  pr.eventInventories.merge = eventInventory("merge", []);
+  pr.eventInventories.push = eventInventory("push", []);
+  assert.equal((await deliveryCommand("finish", freshRequest())).action, "merge-ready");
+});
 
 test("protected finish checks adoption, exact current per-event inventory and standing cost before merge", async (t) => {
   const repository = "example/sample";

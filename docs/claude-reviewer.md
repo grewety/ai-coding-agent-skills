@@ -1,9 +1,10 @@
 # Contained Claude reviewer
 
-See [external AI roles and backend pilots](configurable-backends.md) for explicit role settings and route dispositions.
+See [external AI roles and backend pilots](configurable-backends.md) for explicit role settings and the
+[observed backend suitability matrix](configurable-backends.md#observed-backend-suitability).
 
-The optional `autonomous-implementation-review` 0.22.0 skill and
-`autonomous-orchestration` 1.12.0 bundle ship a standalone command for candidate
+The optional `autonomous-implementation-review` 0.23.0 skill and
+`autonomous-orchestration` 1.13.0 bundle ship a standalone command for candidate
 review and charter-v1 approach review. Use the complete package from a reviewed
 checkout or the [Claude installation guide](claude-installation.md). Resolve
 `scripts/review-candidate.mjs` inside that package. This command runs locally
@@ -38,7 +39,9 @@ approved exposure and single-run exceptions.
   `model` and explicit `relay` to the approved configuration. Set
   `timeoutMs` (1,000–300,000), `maxTurns` (1–128) and `maxBudgetUsd`
   (greater than zero, up to 10) within the live grant. These are per-launch
-  settings. Account for the probe and every packet when granting spending.
+  settings. New setup uses 96 turns and defaults to USD 2.50 per invocation.
+  Keep the exact host pin for an existing change. Account for the probe and
+  every packet when granting spending.
 - Set `requirePreExposureAttestation` to false only if policy permits a
   synthetic probe followed by a post-run audit of each data-bearing process.
   If policy requires attestation of that process before exposure, stop.
@@ -81,22 +84,24 @@ runtime readback hash as `explicitRuntimeSha256` in the probe grant.
 Replay uses the retained expectation, export and captures, including the
 original version audit. Older runs use their original bindings.
 
-Replace uppercase operands with absolute paths, including `REVIEW_CLI` for
-the packaged script and `NODE` for Node 22+. These examples describe the
-command's effects. Run live forms only within the applicable exact review
-authority. For adopting plans add `--host-config HOST` to the two offline
-commands and `--admission ADMISSION` to the mode command.
+Use Node 22+ and substitute the absolute packaged
+`scripts/review-candidate.mjs` path in each command. Use absolute paths for the
+uppercase operands. The mode examples apply to adopting integrated policy. Include
+`--host-config HOST` on `--prepare` and `--check` for these requests. Run a
+live mode only within the exact review authority verified by `ADMISSION`.
+For Codex Auto-review, run the mode line directly as a standalone Node command
+with platform permission checks in effect.
 The mode lines are alternatives. For each run, `OUTPUT` is a fresh absolute
 path declared in that request's `worker.evidenceRoots`. Use the same request,
 sealed export and original `OUTPUT` path for `--verify`.
 
 ```text
-NODE REVIEW_CLI --prepare --request REQUEST --expect EXPECT --export EXPORT
-NODE REVIEW_CLI --check --request REQUEST --expect EXPECT --export EXPORT
-NODE REVIEW_CLI --probe --host-config HOST --admission PROBE_GRANT --output PROBE_OUTPUT
-NODE REVIEW_CLI --mode candidate --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --output OUTPUT
-NODE REVIEW_CLI --mode approach --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --output OUTPUT
-NODE REVIEW_CLI --verify --request REQUEST --expect EXPECT --export EXPORT --output OUTPUT
+node review-candidate.mjs --prepare --request REQUEST --expect EXPECT --export EXPORT
+node review-candidate.mjs --check --request REQUEST --expect EXPECT --export EXPORT
+node review-candidate.mjs --probe --host-config HOST --admission PROBE_GRANT --output PROBE_OUTPUT
+node review-candidate.mjs --mode candidate --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --admission ADMISSION --output OUTPUT
+node review-candidate.mjs --mode approach --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --admission ADMISSION --output OUTPUT
+node review-candidate.mjs --verify --request REQUEST --expect EXPECT --export EXPORT --output OUTPUT
 ```
 
 1. Independently approve and pin the request and host configuration hashes.
@@ -111,6 +116,12 @@ NODE REVIEW_CLI --verify --request REQUEST --expect EXPECT --export EXPORT --out
    Each packet can assign at most `maxTurns - 10` whole-file reads. The host
    schema still accepts 1–128 for standalone probes and retained legacy runs. Configure optional `interPacketDelayMs`
    from 0 to 30000 and `runTimeoutMs` from 1000 to 3600000 in the pinned host.
+   Optional `packetConcurrency` accepts integers 1 through 3 and defaults to 1.
+   For 2 or 3, pin the raw host bytes, match the value in the independent
+   expectation, and use the same-UID relay and durable full-run admission.
+   Each invocation gets a separate relay, scratch directory and supervised
+   process. Pacing applies between settlement and the next serial packet,
+   or between launches for concurrent packets.
 2. With a separately authorized `PROBE_GRANT`, `--probe` first reserves the
    approved host configuration and single-invocation cost in the host-owned
    ledger. It then sends a synthetic prompt with an empty packet and records
@@ -120,6 +131,9 @@ NODE REVIEW_CLI --verify --request REQUEST --expect EXPECT --export EXPORT --out
    any packet. It checks the model and session, only `Read` in the tool
    inventory, empty plugin, MCP, skill and slash-command inventories, and 100%
    successful whole-file Read coverage for every assigned packet.
+   After a failure, active siblings settle and queued packets stop. Offline
+   verification checks the sealed launch and settlement order and each
+   packet's capture. A failed or incomplete run cannot be accepted.
 3. Retain the reported `statusSha256` independently and add it to the
    expectation used for offline `--verify`. Keep the sealed export, request,
    expectation and complete output. Mode output contains raw captures under

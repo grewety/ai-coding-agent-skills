@@ -1,4 +1,5 @@
 import { candidate, committedDocument, planning, proveTaskCompletion } from "./change-guard.mjs";
+import { verifyPrFixLineage } from "./pr-fix-lineage.mjs";
 import { planningLayout } from "./planning-inventory.mjs";
 
 const need = (condition, message) => { if (!condition) throw new Error(message); };
@@ -103,7 +104,7 @@ export function checkPromotion({ capability, delta, current, previous }) {
   return changes.length;
 }
 
-export function finishReadiness(input, result, completion) {
+export function finishReadiness(input, result, completion, requireCheckout = true) {
   const { repo, change, head } = input;
   const report = (predicate, issue, promoted = []) => ({ schemaVersion: 1, change, head, ready: false, predicate, issue, promoted });
   if (result?.action !== "accept-result" || result.head !== (completion?.reviewedParent ?? head))
@@ -111,7 +112,7 @@ export function finishReadiness(input, result, completion) {
   let snapshot;
   let taskCompletion;
   try {
-    snapshot = candidate(input);
+    snapshot = candidate(input, requireCheckout);
     if (completion) {
       need(result.independentZeroWaiver === true && input["gate-run"] && input["gate-run-sha256"],
         "Task completion requires sealed independent review and fresh exact child gates");
@@ -137,4 +138,18 @@ export function finishReadiness(input, result, completion) {
   }
   return { schemaVersion: 1, change, head, ready: true, predicate: null, issue: null, promoted,
     ...(taskCompletion ? { taskCompletion } : {}), authority: "separate-finish-grant-required" };
+}
+
+export async function finishPrFixReadiness(input, result, ref, verifyHandover, options) {
+  const readiness = finishReadiness(input, { action: "accept-result", head: input.head });
+  if (!readiness.ready) return readiness;
+  try {
+    const proof = await verifyPrFixLineage(input, ref, verifyHandover, options);
+    need(result?.action === "accept-result" && result.head === proof.reviewedAncestor &&
+      result.independentZeroWaiver === true && result.gateReference === proof.ancestorGate &&
+      options.reviewReference === proof.ancestorReview.reference, "Accepted ancestor review or gates differ");
+    return { ...readiness, prFixLineage: proof };
+  } catch (error) {
+    return { ...readiness, ready: false, predicate: "FULL_EXACT_HEAD_REVIEW_REQUIRED", issue: error.message };
+  }
 }

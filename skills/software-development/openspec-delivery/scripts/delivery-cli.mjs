@@ -3,7 +3,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import path from "node:path";
 import { writeFileSync } from "node:fs";
 import { parseArgs } from "node:util";
-import { ancestor, candidate, checkoutObservation, commit, draftPolicyContext, goalSnapshot, integratedPolicyContext, planning, planningWorktree, policyContext } from "./change-guard.mjs";
+import { ancestor, candidate, checkoutObservation, commit, draftPolicyContext, goalSnapshot, integratedPolicyContext, planning, planningWorktree, policyContext, prFixRange, committedPostimages } from "./change-guard.mjs";
 import { reconcileWorkspace, sourceObservation, workspacePreview } from "./change-workspace.mjs";
 import { contractChangePaths, resolveDeliveryPolicy, workerContinuationDecision } from "./delivery-policy.mjs";
 import { deliveryDecision, goalContractIdentity, readGoalContract, withinScope } from "./delivery-control.mjs";
@@ -11,7 +11,7 @@ import { deliveryStatus, preflight } from "./delivery-status.mjs";
 import { evidenceCommand } from "./evidence-cli.mjs";
 import { readBounded, readJson, scopedPath, separate, sha256, stableJson } from "./evidence-retention.mjs";
 import { planningLayout } from "./planning-inventory.mjs";
-import { finishReadiness } from "./finish-readiness.mjs";
+import { finishPrFixReadiness, finishReadiness } from "./finish-readiness.mjs";
 import { discovery, externalVerificationDecision, pushTriggerDecision, reserveExternalRun, uiAcceptanceDecision } from "./external-verification.mjs";
 import { readDelegation, verifyPairedReview, verifyWorkerScope } from "./delegated-delivery.mjs";
 import { proposalInput, charterObservation, proposalFreeze } from "./operator-planning.mjs";
@@ -19,6 +19,7 @@ import { cardDisplay, currentCard, narrowRestrictions, observed, recordCard, rec
   readPlanningFeedback, readSeparateGrant, readShortAuthority, same, sealedObservation, verifyShortRoles } from "./operator-records.mjs";
 import { checkpointObservation, operatorStatus, relayCheckpoint, resumeCheckpoint } from "./operator-status.mjs";
 import { runLocalHarness, verifyLocalHarness } from "./local-harness.mjs";
+import { readPrFixBundle } from "./pr-fix-lineage.mjs";
 import { protectedFinish } from "./protected-finish.mjs";
 
 const need = (condition, message) => { if (!condition) throw new Error(message); };
@@ -258,7 +259,8 @@ async function inspectPredecessor(input, delegation, implementation, taskGroups,
     "Predecessor observations must be independently retained");
   const prior = await state.trustedJson(pin);
   const cap = control.reason === "native-turn-cap";
-  need(prior.deliveryPhase === (cap ? "boundary" : "result") && prior.repo === input.repo && prior.plan === id.plan &&
+  const timeout = control.reason === "supervisor-timeout";
+  need(prior.deliveryPhase === (cap || timeout ? "boundary" : "result") && prior.repo === input.repo && prior.plan === id.plan &&
     prior.target === input.target && prior.change === id.change && prior.workspace === id.workspace &&
     prior.delegation?.runtimeSha256 === input.delegation.runtimeSha256 &&
     prior.delegation?.verifier === input.delegation.verifier &&
@@ -281,14 +283,23 @@ async function inspectPredecessor(input, delegation, implementation, taskGroups,
   const { session: nextSession, ...nextReviewer } = newReviewer;
   need(originalSession !== nextSession && stableJson(originalReviewer) === stableJson(nextReviewer) &&
     stableJson(previous.roles.pair.implementer) === stableJson(delegation.roles.pair.implementer) &&
-    Object.entries(grant.limits).every(([key, value]) => value <= previous.grant.limits[key]) &&
+    Object.entries(grant.limits).every(([key, value]) =>
+      value <= (previous.grant.limits[key] ?? (key === "timeoutMs" ? Infinity : -1))) &&
+    (!Object.hasOwn(previous.grant.limits, "timeoutMs") || Object.hasOwn(grant.limits, "timeoutMs")) &&
     grant.expiresAt <= previous.grant.expiresAt &&
     evaluated.policy.mode === grant.mode &&
     ["minutesUsed", "correctionsUsed"].every((key) => input.observed?.[key] >= prior.observed?.[key]) &&
     (previous.id.task !== id.task || input.observed?.groupMinutesUsed >= prior.observed?.groupMinutesUsed) &&
     (!previous.verifiedGrant.commits ? !delegation.verifiedGrant.commits : true) &&
     (previous.noCommits !== true || delegation.noCommits === true), "Successor widened its retained role, limits or restrictions");
-  if (control.reason === "ordered-successor") {
+  if (timeout) {
+    const observed = input.observed;
+    need(delegation.timeoutContinuation && evaluated.decision.reason === "SUPERVISOR_TIMEOUT" &&
+      previous.id.task === id.task && observed?.onTrack === true && observed.failedGate === false &&
+      observed.stopReached === false && observed.correctionsUsed < grant.limits.corrections &&
+      observed.minutesUsed * 60000 < grant.limits.totalMs && observed.groupMinutesUsed * 60000 < grant.limits.groupMs,
+    "Verified timeout progress or retained execution authority is unavailable");
+  } else if (control.reason === "ordered-successor") {
     const predecessor = taskGroups?.find((group) => group.taskIds.includes(previous.id.task));
     const acceptance = input.taskGuidance?.acceptedGroups?.find((entry) => entry.id === predecessor?.id);
     need(predecessor?.completed && evaluated.decision.action === "accept-result" && previous.id.task !== id.task &&
@@ -513,7 +524,10 @@ async function deliveryEvaluation(input, options) {
           await verifyWorkerScope(delegation, snapshot, implementation, options?.reviewedParent);
         } catch (error) { delegationFailure = { action: "stop", reason: "POST_WORKER_SCOPE_UNVERIFIED", detail: error.message }; }
         if (!delegationFailure && delegation.result.status !== "completed") delegationFailure = { action: "stop",
-          reason: delegation.reason === "native-turn-cap" ? "NATIVE_TURN_CAP" : "DELEGATED_WORKER_STOPPED", detail: delegation.reason };
+          reason: delegation.reason === "native-turn-cap" ? "NATIVE_TURN_CAP" :
+            delegation.timeoutProgress ? "SUPERVISOR_TIMEOUT" : "DELEGATED_WORKER_STOPPED", detail: delegation.reason,
+          ...(delegation.timeoutProgress ?
+            { progressSha256: sha256(stableJson(delegation.timeoutProgress) + "\n") } : {}) };
       }
     }
   }
@@ -528,7 +542,8 @@ async function deliveryEvaluation(input, options) {
   else if (awaitingApproval) decision = { action: "queue", reason: "EXACT_APPROVAL_PENDING" };
   else if (input.shortDecision && !shortAuthority?.grant) decision = { action: "queue", reason: "LOCAL_AUTHORITY_PENDING" };
   else if (!implementation) decision = { action: "queue", reason: "DEDICATED_WORKSPACE_PENDING" };
-  else if (input.deliveryPhase === "dispatch" && implementation.dirty) decision = { action: "stop", reason: "WORKSPACE_DIRTY" };
+  else if (input.deliveryPhase === "dispatch" && implementation.dirty && !delegation?.timeoutContinuation)
+    decision = { action: "stop", reason: "WORKSPACE_DIRTY" };
   else if (candidateFailure) {
     decision = /Goal Contract|Approved plan digest|Planning content|Native outcome task/.test(candidateFailure) ?
       { action: "stop", reason: "DIRECTION_DRIFT_CHOICE", clause: /scope/.test(candidateFailure) ? "scope" :
@@ -583,6 +598,9 @@ async function deliveryEvaluation(input, options) {
       restrictions: input.restrictions, observed: observations, taskGroups: groups, candidate: snapshot,
       gateRun, handoff, delegated: delegation };
     decision = deliveryDecision(decisionInput);
+    if (decision.action === "dispatch" && delegation?.roles.attemptPolicy === true) {
+      decision = { ...decision, timeoutMs: delegation.timeoutMs };
+    }
     if (delegated && input.handover && decision.reason === "EXACT_REVIEW_PENDING") {
       try {
         handoff = await readDeliveryHandover(input, reviewContext);
@@ -601,13 +619,18 @@ async function deliveryEvaluation(input, options) {
 
 async function evaluateFinishReadiness(input, options) {
   const completion = input.taskCompletion;
+  const fix = input.prFixLineage;
+  need(!(completion && fix), "Task-only and PR-fix lineage are separate finish routes");
+  const bundle = fix ? readPrFixBundle(fix, input.repo, input.workspace) : null;
+  if (bundle) need(same(bundle.ancestorReview, input.handover) && same(bundle.ancestorGate, input.gateRun),
+    "PR-fix lineage must replay the original accepted review and gate evidence");
   if (completion) {
     need(typeof completion.reviewedParent === "string" &&
       completion.childGate && completion.reviewedParent !== input.head && input.handover?.kind === "review-candidate" &&
       input.handover.waivers === undefined && digest(input.handover.expectFileSha256),
       "A task-completion request requires an independently sealed parent review and exact child gate");
   }
-  const e = await deliveryEvaluation(input, { ...options, observationsOnly: true, reviewedParent: completion?.reviewedParent });
+  const e = await deliveryEvaluation(input, { ...options, observationsOnly: true, reviewedParent: completion?.reviewedParent ?? bundle?.reviewedAncestor });
   if (!e.candidateRequest) return { e, readiness: null };
   const request = completion ? { ...e.candidateRequest, "gate-run": completion.childGate.file,
     "gate-run-sha256": completion.childGate.sha256 } : e.candidateRequest;
@@ -618,12 +641,15 @@ async function evaluateFinishReadiness(input, options) {
     need(same(parentCommands.slice(parentBootstrap).map(({ argv }) => argv), childCommands.slice(childBootstrap).map(({ argv }) => argv)),
       "The exact child gates differ from the accepted parent's declared gates");
   }
-  const checked = finishReadiness(request, e.decision, completion);
+  const reviewReference = e.handoff?.result?.report?.sha256;
+  const checked = fix ? await finishPrFixReadiness(request, e.decision, fix, verifyHandover,
+    { hostConfigurationSha256: input.hostConfiguration?.sha256, reviewReference, workspace: request.repo }) :
+    finishReadiness(request, e.decision, completion);
   return { e, readiness: { ...checked, plan: e.context.plan, planDigest: e.identity.planDigest,
     mode: e.policy.mode, policyRevision: e.policy.policyRevision, workspace: e.implementation?.workspace,
     branch: e.implementation?.branch, targetRevision: e.context.target, keepWorktree: e.restrictions?.keepWorktree,
-    gateReference: completion && checked.ready ? retainedJson(completion.childGate).wrapperSha256 : e.decision.gateReference,
-    reviewReference: e.handoff?.result?.report?.sha256,
+    gateReference: checked.prFixLineage?.finalGate ?? (completion && checked.ready ? retainedJson(completion.childGate).wrapperSha256 : e.decision.gateReference),
+    reviewReference,
     ...(checked.taskCompletion ? { reviewedGateReference: e.decision.gateReference, acceptedTaskIds: e.decision.acceptedTaskIds } : {}) } };
 }
 
@@ -638,16 +664,19 @@ function decorateStatus(base, input, evaluation, extras = {}) {
 export async function deliveryCommand(command, input, options) {
   switch (command) {
     case "finish":
+    case "reserve-finish-trigger":
+    case "settle-finish-trigger":
     case "sync-skills":
     case "continue": {
       let closeout;
       try {
         let readiness;
-        if (command === "finish" && input.plan) {
+        if (["finish", "reserve-finish-trigger"].includes(command) && input.plan) {
           ({ readiness } = await evaluateFinishReadiness(input, options));
         }
         closeout = await protectedFinish({ ...input, resume: command === "continue" ? "continue" : null },
-          readiness, Date.now(), verifyHandover);
+          readiness, Date.now(), verifyHandover,
+          { "reserve-finish-trigger": "reserve", "settle-finish-trigger": "settle" }[command]);
         if (command === "sync-skills") {
           closeout = closeout.sync ? { ...closeout, cleanupAction: closeout.action, action: "sync-assessment", reason: null } :
             { ...closeout, action: "pause", reason: "SYNC_RELEASE_OR_CLOSEOUT_PENDING" };
@@ -696,6 +725,10 @@ export async function deliveryCommand(command, input, options) {
       return { schemaVersion: 1, context, policy, planDigest, goalContractDigest: goal?.digest ?? null };
     }
     case "workspace": return reconcileWorkspace(input);
+    case "pr-fix-range": {
+      const range = prFixRange(input.repo, input.reviewedAncestor, input.head);
+      return { range, postimages: committedPostimages(input.repo, input.head, [...range.files, ...(input.impacted ?? [])].sort()) };
+    }
     case "preflight": {
       let policy;
       try {
@@ -731,7 +764,7 @@ export async function deliveryCommand(command, input, options) {
         if (input.proposal) return (await deliveryCommand("proposal", input, options)).status;
         return decorateStatus(deliveryStatus({ change: input.change }), input);
       }
-      if (command === "finish-readiness" && input.taskCompletion) {
+      if (command === "finish-readiness" && (input.taskCompletion || input.prFixLineage)) {
         const { readiness } = await evaluateFinishReadiness(input, options);
         return readiness ?? { schemaVersion: 1, change: input.change, head: input.head, ready: false,
           predicate: "CANDIDATE_IDENTITY_UNVERIFIED", issue: null, promoted: [] };
@@ -739,7 +772,7 @@ export async function deliveryCommand(command, input, options) {
       let e;
       let completionReadiness;
       try {
-        if (statusCommand && input.taskCompletion) {
+        if (statusCommand && (input.taskCompletion || input.prFixLineage)) {
           ({ e, readiness: completionReadiness } = await evaluateFinishReadiness(input,
             { ...options, observationsOnly: true }));
         } else e = await deliveryEvaluation((statusCommand || command === "checkpoint-relay") && input.restrictions?.inspect === true ?
@@ -756,7 +789,7 @@ export async function deliveryCommand(command, input, options) {
       if (command === "finish-readiness") return finish ?? { schemaVersion: 1, change: e.identity.change, head: null,
         ready: false, predicate: "CANDIDATE_IDENTITY_UNVERIFIED", issue: null, promoted: [] };
       let closure;
-      let snapshot = completionReadiness?.ready && completionReadiness.taskCompletion ?
+      let snapshot = completionReadiness?.ready && (completionReadiness.taskCompletion || completionReadiness.prFixLineage) ?
         { ...e.snapshot, head: completionReadiness.head, tasksComplete: true } : e.snapshot;
       const closeout = input.closeout;
       if (closeout && closeout.expectedHead === input.head &&

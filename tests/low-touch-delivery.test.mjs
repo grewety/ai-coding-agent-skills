@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import test from "node:test";
+import { fixtureTest as test } from "./test-shards.mjs";
 import { candidate, draftPolicyContext, planning, policyContext, proveTaskCompletion } from
   "../skills/software-development/openspec-delivery/scripts/change-guard.mjs";
 import { proposalFreeze } from "../skills/software-development/openspec-delivery/scripts/operator-planning.mjs";

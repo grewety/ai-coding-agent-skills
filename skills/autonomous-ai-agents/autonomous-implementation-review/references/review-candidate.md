@@ -5,8 +5,11 @@ separate authority for the exact export and paid inference. Use an independently
 retained request, runtime and export binding, then replay the sealed handover
 offline. Apply the existing candidate or charter admission rules before any
 delivery decision. Run the standalone Linux command by absolute path with
-Node 22 or later. Keep the export, publisher output and trusted host
-configuration outside the reviewed checkout and separate from each other. Use a
+Node 22 or later. For Codex Auto-review, invoke the live command directly and
+retain platform permission checks. Substitute the absolute path of
+this package's `scripts/review-candidate.mjs` in each command. Keep the export, publisher
+output and trusted host configuration outside the reviewed checkout and
+separate from each other. Use a
 private, existing parent for new directories. The command reports execution
 and receipt admission. The orchestrator retains authority for plan approval,
 candidate acceptance, task state and publication.
@@ -15,12 +18,14 @@ candidate acceptance, task state and publication.
 node review-candidate.mjs --prepare --request REQUEST --expect EXPECT --export EXPORT
 node review-candidate.mjs --check --request REQUEST --expect EXPECT --export EXPORT
 node review-candidate.mjs --probe --host-config HOST --admission PROBE_GRANT --output PROBE_OUTPUT
-node review-candidate.mjs --mode candidate --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --output OUTPUT
-node review-candidate.mjs --mode approach --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --output OUTPUT
+node review-candidate.mjs --mode candidate --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --admission ADMISSION --output OUTPUT
+node review-candidate.mjs --mode approach --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --admission ADMISSION --output OUTPUT
 node review-candidate.mjs --verify --request REQUEST --expect EXPECT --export EXPORT --output OUTPUT
 ```
 
-All uppercase substitutions are absolute paths. Prepare reads the approved
+All uppercase substitutions are absolute paths. The example mode commands
+apply to adopting integrated policy. Include `--host-config HOST` on
+`--prepare` and `--check` for these requests. Prepare reads the approved
 inputs, writes a fresh export and returns its manifest SHA-256. Check validates
 the current inputs and every sealed manifest member offline. Probe makes a
 bounded inference call with a synthetic prompt and empty export. Either mode
@@ -28,9 +33,10 @@ makes an automatic separate probe, then sends only the assigned packet data
 under the matching launch policy. The mode lines are alternatives. For offline
 verify, reuse the same request, sealed export and original absolute `OUTPUT`
 path bound to that run's request. Verify reads the complete sealed handover
-and replays the native stream and receipt checks offline. Obtain a separate
-explicit grant for the approved export and paid inference before either
-live mode or a standalone probe.
+and replays the native stream and receipt checks offline. Verify the exact
+phase and applicable paid authority in the admission record before launching
+either mode. An inherited parent uses the original single-run grant procedure.
+A standalone probe uses its own grant.
 
 For standalone `--probe`, `PROBE_GRANT` is the separately authorized
 host-owned JSON record for one synthetic invocation. Keep it outside the
@@ -241,10 +247,35 @@ procedure for legacy parents. Standalone diagnostic probes use the separate
 probe grant above.
 A refused automatic claim grants no fallback.
 
+New setup uses 96 turns and defaults to USD 2.50 per invocation. Preserve
+the raw pin for an existing host. For automatic candidate execution under a
+verified parent, use the direct Node command with `--operator-key KEY
+--operator-key-sha256 SHA256` to bind the independently supplied operator
+verification key. An offline `--check` with those options and the usual
+host and admission files reads the existing `ledgerIdentity`. To consume an
+operator-signed grant, add `--budget-extension GRANT` to the authorized
+launch. The host verifies the Ed25519 signature over the canonical grant,
+the exact change, plan commit and digest, integrated parent, approval and
+execution references, existing ledger identity, lower caps and validity
+window. The ledger seals the grant once with its first reservation, subject
+to the integrated ceilings. Later execution launches use only the key options
+with the same approved identity and lower caps to apply the retained grant
+until expiry. Every prior charge or hold carries forward.
+
+Optional `packetConcurrency` is an integer from 1 through 3 and defaults to 1.
+For 2 or 3, pin the raw host bytes and retain the same `packetConcurrency`
+in the independent expectation. This route requires durable reservation
+for the automatic probe and all packets, and uses one scratch directory,
+private same-UID relay and supervised process per invocation. A dedicated
+UID broker is eligible only for the legacy serial route. The automatic
+probe must pass and settle before any packet starts.
+
 Optional `interPacketDelayMs` (0–30000) and `runTimeoutMs` (1000–3600000)
-are part of the host pin. The bounded delay applies only before a successive
-packet and consumes the same run deadline. Same-UID relay HTTP 429, 529
-and 401/403 map to allowlisted private failure classes; the sandbox receives
-the same generic refusal. Classification alone supplies no retry or
-acceptance. The separately operated dedicated broker interface needs its
-own qualification and private diagnostic evidence.
+are part of the host pin. At concurrency 1 the delay starts after settlement
+and applies before a successor. At 2 or 3 the delay spaces packet launches
+within the same run deadline. Same-UID relay HTTP 429, 529 and 401/403 map
+to allowlisted private failure classes. The sandbox receives the generic
+refusal. A failure stops queued launches and drains active siblings.
+Sealed status records launch, halt and settlement order, and offline
+verification audits every retained capture by packet identity. Acceptance
+requires all packets to verify. A failed run requires separate retry authority.

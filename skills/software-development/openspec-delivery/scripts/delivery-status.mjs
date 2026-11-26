@@ -49,7 +49,8 @@ export function deliveryStatus({ change, policy, identity, candidate, decision, 
   const mode = selected && ["goal-first", "task-guided"].includes(policy?.mode) && sha(policy.policyRevision) ? policy.mode : null;
   const pinned = candidate?.change === selected && sha(candidate?.head) ? candidate.head : null;
   const planDigest = mode && identity?.change === selected && digest(identity.planDigest) ? identity.planDigest : null;
-  const reviewed = finish?.taskCompletion?.acceptanceChild === pinned ? finish.taskCompletion.reviewedParent : pinned;
+  const reviewed = finish?.prFixLineage?.head === pinned ? finish.prFixLineage.reviewedAncestor :
+    finish?.taskCompletion?.acceptanceChild === pinned ? finish.taskCompletion.reviewedParent : pinned;
   const id = handoff?.result?.identity ?? handoff?.active?.identity;
   const boundAttempt = selected && id?.change === selected && (id.planDigest === planDigest || handoff.goalContractDigest === planDigest) &&
     (id.role === "reviewer" ? reviewed && id.candidate === reviewed : id.candidate === null) ? id.attempt : null;

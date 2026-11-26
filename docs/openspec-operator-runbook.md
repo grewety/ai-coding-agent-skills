@@ -48,6 +48,27 @@ resuming. For a qualified Herdr relay, use the separately authorized
 [checkpoint rotation](../skills/software-development/openspec-delivery/references/operator-workflow.md#read-only-status-and-checkpoint-relay)
 with the predecessor preserved through successor acknowledgement.
 
+## Launch contained review
+
+For Codex Auto-review under adopting integrated policy, prepare and check
+the sealed export offline. Set `review_cli` to the absolute packaged
+`scripts/review-candidate.mjs` path and replace the uppercase operands with
+absolute paths. Run the selected line as a standalone Node command.
+
+```text
+node "$review_cli" --mode candidate --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --admission ADMISSION --output OUTPUT
+node "$review_cli" --mode approach --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --admission ADMISSION --output OUTPUT
+```
+
+The live launch runs the automatic probe and sends scoped export packets for
+paid inference under the exact phase and cost authority verified by
+`ADMISSION`. Codex still applies its permission checks. Replay the sealed
+result offline before reading back acceptance. See the [reviewer runbook](claude-reviewer.md)
+for inputs, inherited single-run authority and replay.
+If automatic candidate execution reaches a lower review cap, a signed
+extension can raise that cap within the original integrated limits and
+existing ledger. Follow the [signed extension procedure](openspec-review-configuration.md#signed-execution-cap-extension).
+
 ## Finish and recover
 
 After exact-candidate finish readiness, enter
@@ -62,23 +83,31 @@ authority. From another host use the equivalent activation syntax above.
    rulesets, mergeability and review status. Inspect external trigger
    inventory immediately before each authorized push, PR event or merge.
    Only an exact verified $0 standing match under the integrated policy can
-   proceed without another trigger grant. A paid or unknown trigger, external
-   test, retry, preview or tunnel needs its own single-run card and permission. See target,
+   proceed on standing authority. A separately authorized bundled finish
+   grant can cover named events at their verified cost. Reserve each event
+   by chapter and exact head before activation. Other paid or unknown triggers,
+   external tests, retries, previews and tunnels need their own permission. See target,
    cases, approved built-artifact exposure, cost or credits, and one run
    before approving. Use loopback for local try-out. For an authorized
    tunnel, expose the built artifact only and verify immediate teardown.
 2. Watch applicable required checks within the retained deadline. A pending
    optional app suite does not hold required protection. Resolve a stalled
    optional suite by recording an exact disposition or separately
-   authorizing one retry. A required failure, unknown protection, human
+   authorizing one retry. A bundled retry entry covers one verified transient
+   $0 failure when the same check passed in a verified equivalent push run
+   for the identical SHA. A required failure, unknown protection, human
    review, changed head, failed deployment or elapsed deadline pauses. Review
    the exact preview at the displayed URL when declared.
 3. When the footer asks for `continue`, reply in the verified finish context.
    The orchestrator checks the same exact PR/head and grant against a new
    remote readback. Preserve the original deadline and restrictions. If it
    expired, authorize a new bounded wait for the same PR and head. A changed
-   head needs fresh applicable gates and review and a matching grant. Unknown
-   write outcomes require readback before any retry.
+   head needs fresh applicable gates and review and a matching grant.
+   For a scoped PR fix after a zero-waiver review, verify the exact reviewed
+   ancestor, ordered fix range and independent final-head disposition with
+   complete coverage. Retain the lineage through integration and archive.
+   Use full exact-head review when the targeted evidence is insufficient.
+   Unknown write outcomes require readback before any retry.
 4. Once protected merge is verified, run the declared integrated gates on
    the actual containing revision. Prepare the receipt and record-only
    archive. Run full `npm test` on the exact archived tree using the packaged

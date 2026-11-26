@@ -7,7 +7,8 @@ import test from "node:test";
 import { applySetup, previewSetup, readWorksetOpener } from "../skills/software-development/openspec-delivery/scripts/agent-setup.mjs";
 import { hashBytes, inspectPinnedFile } from "../skills/software-development/openspec-delivery/scripts/agent-configuration.mjs";
 import { readRoleBindings } from "../skills/software-development/openspec-delivery/scripts/agent-role-config.mjs";
-import { detectAgents } from "../skills/software-development/openspec-delivery/scripts/agent-discovery.mjs";
+import { detectAgents, observeVersion } from "../skills/software-development/openspec-delivery/scripts/agent-discovery.mjs";
+import { detectAgents as detectOrchestrationAgents } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/agent-discovery.mjs";
 import { nativeRoleBinding } from "../skills/software-development/openspec-delivery/scripts/agent-role-adapters.mjs";
 import { pilotDisposition, qualificationInventory } from "../skills/software-development/openspec-delivery/scripts/adapter-qualification.mjs";
 import { checkRoleIndependence, verifyEffectiveRole } from "../skills/software-development/openspec-delivery/scripts/role-config.mjs";
@@ -104,6 +105,40 @@ test("discovery reports untrusted executables without probing and filters the pr
   assert.equal(observed.find(({ client }) => client === "hermes").version, null);
 });
 
+test("Grok discovery prefers the current executable and retains the legacy client and executable fallback", (t) => {
+  const { root } = fixture(t);
+  const current = path.join(root, "grok");
+  const legacy = path.join(root, "grok-build");
+  const run = (file) => ({ status: 0, stdout: file === current ? "grok 1.0.92\n" : "grok-build v1.0.89\n" });
+  const lookup = (detect) => detect({ searchPath: root, run }).find(({ client }) => client === "grok-build");
+  const check = (command, executable) => {
+    const selected = lookup(detectAgents);
+    assert.deepEqual(lookup(detectOrchestrationAgents), selected);
+    assert.equal(selected.command, command);
+    assert.equal(selected.executable, executable);
+    assert.equal(selected.status, executable ? "present" : "unavailable");
+    return selected;
+  };
+
+  check("grok", null);
+  writeFileSync(legacy, "#!/bin/sh\n", { mode: 0o700 });
+  check("grok-build", legacy);
+  writeFileSync(current, "#!/bin/sh\n", { mode: 0o600 });
+  check("grok-build", legacy);
+  chmodSync(current, 0o700);
+  const selected = check("grok", current);
+  if (selected.versionProbe === "untrusted-path") assert.equal(selected.version, null);
+  else assert.equal(selected.version, "1.0.92");
+  rmSync(legacy);
+  check("grok", current);
+
+  const version = (file, probe = run) => observeVersion(file, { client: "grok-build", searchPath: root, run: probe });
+  assert.equal(version(current), "1.0.92");
+  assert.equal(version(legacy), "1.0.89");
+  assert.equal(version(current, () => ({ status: 0, stdout: "grok 1.0.92\nunrelated output" })), null);
+  assert.equal(version(current, () => ({ status: 1, stdout: "grok 1.0.92" })), null);
+});
+
 test("accepts unambiguous native version output without treating an arbitrary version mention as identity", () => {
   for (const [client, text, expected] of [
     ["codex", "codex-cli 0.171.0\n", "0.171.0"],
@@ -128,6 +163,11 @@ test("setup previews exact bytes, refuses drift and reads back independent role 
   assert.ok(nativeRoleBinding(codex, "orchestrator").args.includes('model_reasoning_effort="high"'));
   assert.ok(JSON.parse(preview.outputs[2].utf8).openers.codex.args.includes('model_provider="openai"'));
   assert.equal(JSON.parse(preview.outputs[0].utf8).maxTurns, 96);
+  assert.equal(JSON.parse(preview.outputs[0].utf8).maxBudgetUsd, 1);
+  const { maxBudgetUsd, ...defaultReviewer } = input.reviewer;
+  const defaultHost = JSON.parse(previewSetup({ ...input, reviewer: defaultReviewer }, options).outputs[0].utf8);
+  assert.equal(defaultHost.maxBudgetUsd, 2.50);
+  assert.equal(defaultHost.maxTurns, 96);
   assert.throws(() => applySetup(input, "0".repeat(64), options), /confirmation/);
   const alias = path.join(root, "alias");
   symlinkSync(input.directory, alias);

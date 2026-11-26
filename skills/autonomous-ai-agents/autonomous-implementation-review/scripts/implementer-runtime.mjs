@@ -7,11 +7,12 @@ import { digest, equal, hash, jsonBytes, need, separate, sha } from "./review-in
 import { bindPair } from "./implementer-bindings.mjs";
 import { acquireClaim, claimPath, defaultRegistry, exclusiveOperation, openRegistry, repositoryIdentity, reserveSlot,
   retireReservation, serializedOperation, slotPath } from "./implementer-claims.mjs";
-import { currentAttempt, handoffFor, supervisorBinding } from "./implementer-recovery.mjs";
+import { verifyPostWorker } from "./implementer-observations.mjs";
+import { currentAttempt, handoffFor, supervisorBinding, verifyTimeoutContinuation } from "./implementer-recovery.mjs";
 import { buildCodexLaunch, smokeCheck } from "./implementer-sandbox.mjs";
 import { cancelSupervisor, operationProcess, startSupervisor } from "./implementer-supervisor.mjs";
 import { identifier, newDirectory, privateDirectory, readState, syncDirectory, trustedJson, writeState } from "./implementer-state.mjs";
-import { checkCheckout, checkoutProtectedPaths, gitState, loadAuthority, maximumBatch, validateInvocation } from "./worker-runtime-policy.mjs";
+import { attemptWindow, checkCheckout, checkoutProtectedPaths, gitState, loadAuthority, maximumBatch, validateInvocation } from "./worker-runtime-policy.mjs";
 
 const packageRoot = fileURLToPath(new URL("../", import.meta.url)).replace(/\/$/, "");
 // Keep this inventory in sync with the delivery verifier and its transitive inventory test.
@@ -21,7 +22,7 @@ const runtimeSources = [
   "bounded-worker.mjs", "bounded-worker.py", "implementer-bindings.mjs", "implementer-claims.mjs",
   "implementer-observations.mjs", "implementer-recovery.mjs", "implementer-runtime.mjs", "implementer-sandbox.mjs",
   "implementer-state.mjs", "implementer-supervisor.mjs", "implementer-supervisor.py", "orchestration-core.mjs",
-  "review-admission.mjs", "review-archive.mjs", "review-candidate.mjs", "review-inputs.mjs", "review-relay.mjs",
+  "review-admission.mjs", "review-archive.mjs", "review-candidate.mjs", "review-inputs.mjs", "review-packet-scheduler.mjs", "review-relay.mjs",
   "review-runtime-scratch.mjs", "review-runtime.mjs", "review-sandbox-bridge.mjs", "review-stream.mjs",
   "harness-result.mjs", "low-touch-policy.mjs", "planning-inventory.mjs", "review-preflight.mjs",
   "review-spend.mjs", "review-upstream-status.mjs",
@@ -54,7 +55,11 @@ const historyNames = async (directory) => {
 };
 
 async function readHistory(directory) {
-  return Promise.all((await historyNames(directory)).map((name) => readState(path.join(directory, name), "launch.json")));
+  const history = (await Promise.all((await historyNames(directory)).map((name) =>
+    readState(path.join(directory, name), "launch.json")))).sort((a, b) => a.sequence - b.sequence);
+  need(history.every((launch, index) => launch.sequence === index &&
+    launch.predecessor === (history[index - 1]?.attempt ?? null)), "Retained attempt order is uncertain");
+  return history;
 }
 
 async function noConcurrentScope(registry, claimDirectory, repository, request) {
@@ -72,30 +77,17 @@ async function noConcurrentScope(registry, claimDirectory, repository, request) 
   }
 }
 
-function checkRemaining(request, grant, owner, history, expiresAt) {
-  const now = Date.now();
-  const { timeoutMs, totalMs, groupMs } = grant.limits;
-  const previous = history.toSorted((a, b) => a.sequence - b.sequence).at(-1);
-  need(!previous || (Object.entries(grant.limits).every(([name, limit]) => limit <= previous.limits[name]) &&
-    grant.expiresAt <= previous.grantExpiresAt), "A successor cannot widen retained limits");
-  const priorGroup = history.filter((launch) => launch.task === request.identity.task);
-  const groupStart = Math.min(now, ...priorGroup.map((launch) => launch.startedAt));
-  need(now + timeoutMs + smokeBudgetMs <= Math.min(grant.expiresAt, expiresAt, owner.createdAt + totalMs, groupStart + groupMs),
-    "Finite grant, assignment or group deadline cannot admit the worker");
-  return Math.min(grant.expiresAt, expiresAt, owner.createdAt + totalMs, groupStart + groupMs);
-}
-
 function pinnedPair(pair) {
   const { session, ...reviewer } = pair.reviewer;
   return { implementer: pair.implementer, reviewer };
 }
 
-async function predecessorCheck(entry, grant, roles, claimDirectory, history) {
+export async function predecessorCheck(entry, grant, roles, registry, claimDirectory, history) {
   const { predecessor, task, attempt, change, plan, planDigest } = entry.request.identity;
-  const latest = history.toSorted((a, b) => a.sequence - b.sequence).at(-1);
+  const latest = history.at(-1);
   if (predecessor === null) {
     need(!latest && grant.continuation === null, "Original attempt exists or continuation lacks its original predecessor");
-    return "initial";
+    return { transition: "initial" };
   }
   need(latest?.attempt === predecessor && predecessor !== attempt && grant.continuation, "Attempt predecessor or fresh continuation authority differs");
   const previousDir = path.join(claimDirectory, "attempt-" + predecessor);
@@ -116,6 +108,15 @@ async function predecessorCheck(entry, grant, roles, claimDirectory, history) {
     equal(roles.roleAudit, latest.roleAudit) &&
     !history.some((launch) => launch.pair.reviewer.session === roles.pair.reviewer.session),
   "Continuation is not bound to the original settled role pair or a fresh reviewer session");
+  if (control.reason === "supervisor-timeout") {
+    const timeoutContinuation = await verifyTimeoutContinuation({ request: entry.request, grant, roles, registry, history,
+      previousDir, latest, settlement, publication, released, control });
+    return { transition: control.reason, timeoutContinuation };
+  }
+  const timeoutUsed = history.some((launch) => launch.transition === "supervisor-timeout");
+  if (timeoutUsed) need(history.filter(({ transition }) =>
+    ["review-correction", "native-turn-cap", "supervisor-timeout"].includes(transition)).length < grant.limits.corrections,
+  "Retained correction budget exhausted");
   if (control.reason === "native-turn-cap") {
     need(latest.task === task && publication.reason === "native-turn-cap" &&
       !history.some((launch) => launch.task === task && launch.transition === "native-turn-cap") &&
@@ -132,7 +133,7 @@ async function predecessorCheck(entry, grant, roles, claimDirectory, history) {
       grant.accepted.some((prior) =>
       prior.task === latest.task && prior.candidate === control.acceptedCandidate), "Ordered accepted dependency is missing");
   }
-  return control.reason;
+  return { transition: control.reason };
 }
 
 async function dimensions(context) {
@@ -153,7 +154,6 @@ function physicalReservation(claimId, attempt, roles) {
     profiles: [codexHome, home, xdg].map((name, i) => ({ path: name, id: roles.profileIds[i] })) };
 }
 
-const smokeBudgetMs = 28000;
 const delay = (time) => new Promise((resolve) => setTimeout(resolve, time));
 const milestone = (emit, request, phase, detail = {}) => emit({ attempt: request.identity.attempt, change: request.identity.change, phase, ...detail });
 
@@ -178,12 +178,12 @@ async function prepareAttempt(entry, registry, runtimeSha256, batchSize, emit, r
   await safePath(workspace);
   const repository = repositoryIdentity(workspace);
   const claimDirectory = claimPath(registry, repository, change);
-  const { grant, inference } = await loadAuthority(entry, repository);
+  const { grant, inference, prospective } = await loadAuthority(entry, repository);
   if (standalone) need(grant.mode === "goal-first", "Standalone Implementer requires an approved Goal-First grant");
   need(batchSize <= grant.limits.batchSize && (batchSize === 1 || (predecessor === null && grant.accepted.length === 0)),
     "Batch must contain independently admitted initial assignments");
   need(predecessor !== null || grant.continuation === null, "Continuation lacks its original predecessor");
-  const roles = await bindPair(entry, grant, runtimeSha256, registry);
+  const roles = await bindPair(entry, grant, runtimeSha256, registry, prospective);
   if (standalone) need(roles.roleAudit, "Standalone Implementer requires a qualified explicit pair");
   const context = { entry, grant, roles, registry, repository, claimDirectory, runtimeSha256 };
   await dimensions(context);
@@ -197,37 +197,47 @@ async function prepareAttempt(entry, registry, runtimeSha256, batchSize, emit, r
     throw new Error("Attempt evidence already exists");
   } catch (error) { if (error.code !== "ENOENT") throw error; }
   const expiry = Math.min(roles.expiresAt, inference.expiresAt);
-  checkRemaining(request, grant, { createdAt: Date.now() }, [], expiry);
+  attemptWindow(request, grant, roles, [], Date.now(), expiry);
   // Check the checkout under the repository lock before publishing a launch.
-  const prepare = async (directory, owner, history, transition) => {
+  const prepare = async (directory, owner, history, { transition, timeoutContinuation }) => {
     const refreshed = await loadAuthority(entry, repository);
     need(equal(refreshed.grant, grant) && equal(refreshed.inference, inference), "Execution authority changed at claim admission");
-    await checkCheckout(request, grant);
-    const deadline = checkRemaining(request, grant, owner, history, expiry);
+    await checkCheckout(request, grant, { allowRetainedProgress: Boolean(timeoutContinuation) });
+    const now = Date.now();
+    const { deadline, timeoutMs } = attemptWindow(request, grant, roles, history, owner.createdAt, expiry, now);
     const binding = physicalReservation(owner.claimId, attempt, roles);
     const launch = { schemaVersion: 1, repository, workspace, change, task, attempt, predecessor, transition,
-      claimId: owner.claimId, nonce: randomUUID(), startedAt: Date.now(), sequence: history.length, deadline,
+      claimId: owner.claimId, nonce: randomUUID(), startedAt: now, sequence: history.length, deadline,
       limits: grant.limits, grantExpiresAt: grant.expiresAt,
       requestSha256: hash(requestBytes(request)), invocationSha256: hash(jsonBytes(entry)), runtimeSha256,
       pair: roles.pair, mutablePaths: request.mutablePaths, reservation: binding, slot: roles.physicalSlot, evidence,
-      ...(roles.roleAudit ? { roleAudit: roles.roleAudit } : {}) };
+      ...(roles.roleAudit ? { roleAudit: roles.roleAudit } : {}),
+      ...(prospective ? { attemptPolicy: true, timeoutMs, hostTimeoutMs: roles.goalFirstTimeoutMs,
+        commits: grant.commits === true } : {}),
+      ...(timeoutContinuation ? { timeoutContinuation: { ...timeoutContinuation,
+        remainingMs: deadline - now, elapsedWallMs: now - owner.createdAt } } : {}) };
     const name = "attempt-" + attempt;
     const destination = path.join(directory, name);
     const staging = path.join(directory, ".attempt-" + launch.nonce);
     await newDirectory(staging);
+    let slotDirectory;
     try {
       await writeState(staging, "launch.json", launch);
+      if (timeoutContinuation) {
+        slotDirectory = await reserveSlot(registry, roles.physicalSlot, binding);
+        if (!slotDirectory) return { phase: "occupied", resource: "physical-role-slot", claimId: owner.claimId };
+      }
       await rename(staging, destination);
       await syncDirectory(directory);
     } finally { await rm(staging, { recursive: true, force: true }); }
-    return { launch, binding, owner, attemptDirectory: path.join(claimDirectory, name) };
+    return { launch, binding, owner, slotDirectory, attemptDirectory: path.join(claimDirectory, name) };
   };
   const prepared = await withRepositoryLock(registry, repository, async () => {
     await noConcurrentScope(registry, claimDirectory, repository, request);
     let admission;
     if (predecessor === null) {
       const claim = await acquireClaim(registry, retainedIdentity(entry, repository),
-        (staging, owner) => prepare(staging, owner, [], "initial"));
+        (staging, owner) => prepare(staging, owner, [], { transition: "initial" }));
       if (claim.occupied) return { phase: "occupied", resource: "repository-change" };
       admission = claim.prepared;
     } else {
@@ -235,13 +245,14 @@ async function prepareAttempt(entry, registry, runtimeSha256, batchSize, emit, r
       admission = await exclusiveOperation(claimDirectory, async () => {
         need(await readState(claimDirectory, "claim-release.json", true) === null, "Original assignment has closed");
         const history = await readHistory(claimDirectory);
-        const transition = await predecessorCheck(entry, grant, roles, claimDirectory, history);
+        const transition = await predecessorCheck(entry, grant, roles, registry, claimDirectory, history);
         return prepare(claimDirectory, owner, history, transition);
       });
     }
+    if (admission.phase === "occupied") return admission;
     const { owner, binding } = admission;
     milestone(emit, request, "claim-held", { claimId: owner.claimId });
-    const slotDirectory = await reserveSlot(registry, roles.physicalSlot, binding);
+    const slotDirectory = admission.slotDirectory ?? await reserveSlot(registry, roles.physicalSlot, binding);
     if (!slotDirectory) return { phase: "occupied", resource: "physical-role-slot", claimId: owner.claimId };
     await createAttempt({ directory: evidence, request, excludedRoots });
     return { ...admission, slotDirectory, evidence };
@@ -249,22 +260,32 @@ async function prepareAttempt(entry, registry, runtimeSha256, batchSize, emit, r
   if (prepared.phase === "occupied") return prepared;
   const { owner, launch, attemptDirectory } = prepared;
   milestone(emit, request, "slot-held", { claimId: owner.claimId });
-  const smokeDeadline = launch.deadline - grant.limits.timeoutMs;
+  const smokeDeadline = launch.deadline - (prospective ? 0 : grant.limits.timeoutMs);
+  const { smokeBudgetMs } = attemptWindow(request, grant, roles, [], owner.createdAt, expiry);
   need(Date.now() + smokeBudgetMs <= smokeDeadline, "Finite preflight budget cannot admit native sandbox checks");
   const smoke = await runProbe({ request, role: roles.pair.implementer, registry, attemptDirectory: evidence,
     protectedFile: entry.grant.path, controlDirectory: attemptDirectory, pilot: roles.roleAudit?.implementer });
   await writeState(attemptDirectory, "smoke.json", smoke);
-  await checkCheckout(request, grant);
+  await checkCheckout(request, grant, { allowRetainedProgress: Boolean(launch.timeoutContinuation) });
   const refreshed = await loadAuthority(entry, repository);
   need(equal(refreshed.grant, grant) && equal(refreshed.inference, inference), "Execution authority changed after preflight");
-  const checkedRoles = await bindPair(entry, grant, runtimeSha256, registry);
+  const checkedRoles = await bindPair(entry, grant, runtimeSha256, registry, prospective);
   need(equal(checkedRoles, roles), "Paired role runtime changed after native preflight");
-  await writeState(attemptDirectory, "git-state.json", await gitState(workspace));
+  const protectedGit = await gitState(workspace);
+  if (prospective) {
+    const baseline = await verifyPostWorker(request, grant, protectedGit, { includeModes: true });
+    need(equal(baseline, launch.timeoutContinuation?.outputs ?? {}), "Retained progress changed during native preflight");
+    await writeState(attemptDirectory, "baseline-outputs.json", baseline);
+  }
+  await writeState(attemptDirectory, "git-state.json", protectedGit);
   const native = await buildCodexLaunch(request, roles.pair.implementer, registry, attemptDirectory, launch.nonce, roles.roleAudit?.implementer);
-  need(Date.now() + grant.limits.timeoutMs <= launch.deadline &&
-    await runtimeIdentity() === runtimeSha256, "Dispatch deadline or packaged runtime changed before prompt delivery");
-  milestone(emit, request, "supervisor-armed", { claimId: owner.claimId });
-  const supervisor = await startSupervisor(attemptDirectory, native, supervisorBinding(launch), grant.limits);
+  need(await runtimeIdentity() === runtimeSha256, "Packaged runtime changed before prompt delivery");
+  const remaining = launch.deadline - Date.now();
+  const timeoutMs = prospective ? Math.min(launch.timeoutMs, remaining) : grant.limits.timeoutMs;
+  need(timeoutMs > 0 && timeoutMs <= remaining, "Dispatch deadline expired before prompt delivery");
+  milestone(emit, request, "supervisor-armed", { claimId: owner.claimId, ...(prospective ? { timeoutMs } : {}) });
+  const supervisor = await startSupervisor(attemptDirectory, native, supervisorBinding(launch),
+    { ...grant.limits, timeoutMs }, prospective ? launch.deadline : undefined);
   return { ...context, ...prepared, supervisor };
 }
 
@@ -279,7 +300,7 @@ async function finish(context) {
   const { attemptDirectory, launch, roles, entry, grant, runtimeSha256, registry } = context;
   const view = await currentAttempt(attemptDirectory, launch);
   if (view.phase !== "settled") return summarize(view);
-  const currentRoles = await bindPair(entry, grant, runtimeSha256, registry);
+  const currentRoles = await bindPair(entry, grant, runtimeSha256, registry, launch.attemptPolicy === true);
   need(equal(currentRoles, roles), "Role settings, package inventory or profile drifted during the attempt");
   return exclusiveOperation(context.claimDirectory, async () => handoffFor(context, view.state));
 }
@@ -291,7 +312,7 @@ async function foreground(context, emit) {
   let lastPhase;
   let lastUpdate = 0;
   // A foreground failure never starts another process. The original supervisor owns its deadline.
-  const until = Math.min(launch.deadline, Date.now() + grant.limits.timeoutMs) + 4000;
+  const until = Math.min(launch.deadline, Date.now() + (launch.timeoutMs ?? grant.limits.timeoutMs)) + 4000;
   while (!finished && Date.now() <= until) {
     const view = await currentAttempt(attemptDirectory, launch);
     if (view.phase !== lastPhase || Date.now() - lastUpdate >= 15000) {
@@ -345,8 +366,8 @@ async function retainedContext(entry, registry) {
   need(launch.repository === repository && launch.claimId === owner.claimId && launch.attempt === attempt &&
     launch.requestSha256 === hash(requestBytes(entry.request)) && launch.invocationSha256 === hash(jsonBytes(entry)) &&
     launch.runtimeSha256 === runtimeSha256, "Original retained attempt, runtime or request differs");
-  const { grant } = await loadAuthority(entry, repository);
-  const roles = await bindPair(entry, grant, runtimeSha256, registry);
+  const { grant, prospective } = await loadAuthority(entry, repository);
+  const roles = await bindPair(entry, grant, runtimeSha256, registry, prospective);
   need(equal(roles.pair, launch.pair) && equal(roles.roleAudit, launch.roleAudit) && equal(roles.physicalSlot, launch.slot) &&
     equal(physicalReservation(launch.claimId, attempt, roles), launch.reservation), "Original pinned role or physical slot differs");
   return { entry, registry, repository, claimDirectory, attemptDirectory, owner, launch, grant, roles, runtimeSha256 };

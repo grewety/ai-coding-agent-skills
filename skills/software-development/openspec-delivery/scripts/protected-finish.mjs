@@ -5,8 +5,11 @@ import { retirementInventory } from "./change-workspace.mjs";
 import { evidenceCommand } from "./evidence-cli.mjs";
 import { readBounded, scopedPath, separate, sha256, verifyGateRun, verifyRepresentation } from "./evidence-retention.mjs";
 import { verifyLocalHarness } from "./local-harness.mjs";
+import { verifyPrFixIntegration, verifyPrFixLineage } from "./pr-fix-lineage.mjs";
 import { finishReadiness } from "./finish-readiness.mjs";
 import { pushTriggerDecision, standingTriggerDecision, retainedExternalReservation, uiAcceptanceDecision } from "./external-verification.mjs";
+import { finishCreditDecision, finishCreditGrant, finishCreditJournal, paidFinishTrigger,
+  settleFinishCredit, zeroCostRetryTrigger } from "./finish-trigger-credits.mjs";
 import { need, observed, same, sealedObservation, text } from "./operator-records.mjs";
 
 const sha = (value) => typeof value === "string" && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(value);
@@ -98,18 +101,24 @@ function closureReviewPass(review, identity, grant, closure, implementationRevie
     text(review.session) && review.session !== implementationReview.session && review.reference !== implementationReview.reference;
 }
 
-function eventInventory(entry, identity, grant, head, policy, events, notBefore, now) {
+function eventInventory(entry, identity, grant, head, policy, events, notBefore, now, bundledTrigger) {
   return events.map(([event, target]) => standingTriggerDecision({ ...entry.eventInventories?.[event],
-    candidate: head, repository: identity.repository, policy, event, target, finishReference: grant.reference, notBefore, now }));
+    candidate: head, repository: identity.repository, policy, event, target, finishReference: grant.reference,
+    notBefore, now, bundledTrigger, strictInventory: !!bundledTrigger || policy.strictInventory === true }));
 }
 
-function publication(identity, grant, remote, chapter, head, retained, now, policy) {
+function publication(identity, grant, remote, chapter, head, retained, now, policy, credits) {
   const entry = remote?.[chapter];
   const state = (action, reason, fields) => ({ decision: result(action, reason, { chapter, head, prState: entry?.state, ...fields }) });
   if (!bound(remote, identity, grant) || !bound(entry, identity, grant) || entry.complete !== true ||
       entry.target !== identity.target || !(time(entry.observedAt) <= now && time(entry.observedAt) >= time(retained.observedAt) &&
         now - time(entry.observedAt) <= readbackWindow)) {
     return state("pause", "REMOTE_INVENTORY_UNVERIFIED");
+  }
+  const reservations = credits?.journal.reservations.filter((reservation) => reservation.chapter === chapter) ?? [];
+  const published = reservations.find((reservation) => reservation.operation === "publish-ready");
+  if (published && (entry.head !== published.head || entry.state === "ABSENT" || !(time(entry.observedAt) >= time(published.outcome?.at)))) {
+    return state("pause", "FINISH_TRIGGER_PUBLICATION_READBACK_REQUIRED");
   }
   if (entry.state === "ABSENT" && entry.head === head && entry.url === null && !retained.prs[chapter]) {
     if (now >= time(retained.deadline)) return state("pause", "PROTECTED_WAIT_EXPIRED");
@@ -125,7 +134,8 @@ function publication(identity, grant, remote, chapter, head, retained, now, poli
         target.sourceRef === entry.sourceRef && (chapter !== "implementation" || entry.sourceRef === (identity.branch.startsWith("refs/heads/") ? identity.branch : "refs/heads/" + identity.branch)),
       "Exact protected source ref is unverified");
       const matches = eventInventory(entry, identity, grant, head, policy,
-        [["push", entry.sourceRef], ["pull_request", identity.target]], time(target.observedAt), now);
+        [["push", entry.sourceRef], ["pull_request", identity.target]], time(target.observedAt), now,
+        credits && ((trigger, context) => paidFinishTrigger(trigger, { ...context, grant: credits.grant, chapter, candidate: head })));
       const failure = matches.find(({ action }) => action !== "proceed");
       return failure ? state("pause", failure.reason) : state("publish-ready", null, { triggerInventories: matches });
     }
@@ -138,10 +148,44 @@ function publication(identity, grant, remote, chapter, head, retained, now, poli
     return state("pause", "PR_IDENTITY_UNVERIFIED");
   }
   if (entry.head !== head) return state("pause", "PR_HEAD_CHANGED", { pr: entry.url, observedHead: entry.head });
-  if (entry.state === "MERGED" && sha(entry.mergeCommit)) return { merged: entry };
+  const checkInput = { ...entry.protectionReadback, pr: entry, head, deadline: retained.deadline, now };
+  const retried = reservations.find((reservation) => reservation.operation === "retry-check-ready");
+  if (retried) {
+    const [{ check, runId, attempt, pullRequest }] = retried.triggers;
+    const current = checkInput.checks?.entries?.find(({ id }) => id === check);
+    if (entry.url !== pullRequest || entry.head !== retried.head || !(time(checkInput.checks?.observedAt) >= time(retried.outcome?.at) && time(checkInput.checks.observedAt) <= now) ||
+        current?.runId !== runId || !Number.isSafeInteger(current.attempt) || current.attempt !== attempt + 1) {
+      return state("pause", "FINISH_TRIGGER_RETRY_READBACK_REQUIRED", { pr: entry.url });
+    }
+  }
+  if (entry.state === "MERGED" && sha(entry.mergeCommit)) {
+    if (retried) {
+      const retriedCheck = checkInput.checks.entries.find(({ id }) => id === retried.triggers[0].check);
+      if (!observed(checkInput.checks) || checkInput.checks.complete !== true || checkInput.checks.pullRequest !== entry.url ||
+          checkInput.checks.head !== head || retriedCheck.head !== head || retriedCheck.state !== "passed") {
+        return state("pause", "FINISH_TRIGGER_RETRY_READBACK_REQUIRED", { pr: entry.url });
+      }
+    }
+    return { merged: entry };
+  }
   if (entry.state !== "OPEN") return state("pause", "PR_STATE_UNVERIFIED");
-  const checks = protectedCheckDecision({ ...entry.protectionReadback, pr: entry, head, deadline: retained.deadline, now });
+  const checks = protectedCheckDecision(checkInput);
   const protectedDecision = { ...checks, chapter, prState: entry.state };
+  if (checks.reason === "REQUIRED_CHECK_FAILED" && credits && !retried && now < time(retained.deadline)) {
+    const [failed, ...others] = checks.required.filter(({ state }) => state === "failed");
+    const failedCheck = checkInput.checks.entries.find(({ id }) => id === failed.id);
+    const entries = checkInput.checks.entries.map((check) => check === failedCheck ? { ...check, state: "pending" } : check);
+    if (!others.length && protectedCheckDecision({ ...checkInput, checks: { ...checkInput.checks, entries } }).action === "watch") {
+      const matches = eventInventory(entry, identity, grant, head, policy, [["retry", identity.target]],
+        time(checkInput.checks.observedAt), now, (trigger, context) => zeroCostRetryTrigger(trigger, {
+          ...context, grant: credits.grant, chapter, candidate: head, pr: entry.url, failedCheck,
+          checksReference: checkInput.checks.reference, retryEvidence: entry.retryEvidence,
+        }));
+      if (matches[0].action === "proceed" && matches[0].bundle?.length === 1) {
+        return state("retry-check-ready", null, { pr: entry.url, triggerInventories: matches });
+      }
+    }
+  }
   if (checks.action === "pause") return { decision: protectedDecision };
   if (chapter === "implementation" && grant.uiDeclaration !== null) {
     let preview = remote.preview;
@@ -189,7 +233,7 @@ async function verifyReadyPublication(chapter, remote, records) {
   return chapter;
 }
 
-export async function protectedFinish(input, readiness, now = Date.now(), verifyHandover) {
+export async function protectedFinish(input, readiness, now = Date.now(), verifyHandover, triggerCommand) {
   const checkpoint = sealedObservation(input.finishCheckpoint);
   const { records, identity } = checkpoint;
   const { repo, repository, change, candidate, workspace } = identity;
@@ -224,6 +268,22 @@ export async function protectedFinish(input, readiness, now = Date.now(), verify
       time(keep.observedAt) >= time(grant.startedAt) && time(keep.observedAt) <= time(checkpoint.observedAt),
     "The added keep-worktree restriction is unverified");
   }
+  const creditRef = checkpoint.triggerGrant;
+  const journal = finishCreditJournal(records, grant, creditRef?.sha256 ?? null);
+  const credits = creditRef && {
+    grant: finishCreditGrant(read(creditRef), checkpoint, grant),
+    journal,
+  };
+  const triggerStatus = { identity, grantReference: grant.reference, checkpoint: input.finishCheckpoint.file,
+    deadline: checkpoint.deadline, records, keepWorktree: checkpoint.keepWorktree || input.restrictions?.keepWorktree === true };
+  if (triggerCommand === "settle") {
+    return result("pause", null, { ...triggerStatus,
+      ...settleFinishCredit(credits, read(input.finishTriggerOutcome), input.finishTriggerOutcome.sha256, now) });
+  }
+  if (credits?.journal.pending) {
+    const { chapter, head, outcome } = credits.journal.pending;
+    return stop(outcome ? "FINISH_TRIGGER_OUTCOME_UNCERTAIN" : "FINISH_TRIGGER_OUTCOME_PENDING", { ...triggerStatus, chapter, head });
+  }
   const anchor = read(checkpoint.anchor);
   need(bound(anchor, identity, grant) && anchor.kind === "finish-readiness-readback" && anchor.ready === true &&
     observed(anchor.implementationReview) && text(anchor.implementationReview.session) &&
@@ -245,8 +305,25 @@ export async function protectedFinish(input, readiness, now = Date.now(), verify
   need(implementationGate.passed && implementationGate.reference === anchor.implementationGateSha256,
     "Original implementation gate evidence mismatch");
   const completion = anchor.taskCompletion;
+  const fixRef = anchor.prFixLineage;
+  need(!(completion && fixRef) && (!input.prFixLineage || same(input.prFixLineage, fixRef)),
+    "Protected finish lineage differs from the retained checkpoint");
+  const fixRequest = fixRef && { repo, change, head: candidate, base: identity.policyRevision,
+    plan: identity.plan, mode: identity.mode, target: identity.targetRevision, "expect-plan": identity.planDigest };
+  let fix;
+  if (fixRef) {
+    need(checkpoint.prs.implementation && digest(anchor.hostConfigurationSha256),
+      "PR-fix finish requires the retained implementation PR and host pin");
+    fix = await verifyPrFixLineage(fixRequest, fixRef, verifyHandover, { workspace, records,
+      hostConfigurationSha256: anchor.hostConfigurationSha256, pullRequest: checkpoint.prs.implementation,
+      gates: implementationGate.gateCommands });
+    need(fix.finalGate === implementationGate.reference && fix.ancestorReview.session === anchor.implementationReview.session &&
+      fix.ancestorReview.reference === anchor.implementationReview.reference, "PR-fix reviews or final gates differ from finish readiness");
+    need(finishReadiness(fixRequest, { action: "accept-result", head: candidate }, undefined, false).ready,
+      "PR-fix final head has unverified current-spec promotion");
+  }
   if (policy.lowTouch) {
-    need(anchor.implementationReview.head === (completion?.reviewedParent ?? candidate),
+    need(anchor.implementationReview.head === (completion?.reviewedParent ?? fix?.reviewedAncestor ?? candidate),
       "Readiness anchor does not identify the actual reviewed SHA");
   }
   if (completion) {
@@ -309,15 +386,24 @@ export async function protectedFinish(input, readiness, now = Date.now(), verify
   }
   const observe = (value) => ({ ...value, identity, checkpoint: input.finishCheckpoint.file, checkpointSha256: input.finishCheckpoint.sha256,
     records, grantReference: grant.reference, deadline: checkpoint.deadline,
-    readback: input.finishRemote.file, keepWorktree: checkpoint.keepWorktree || input.restrictions?.keepWorktree === true });
+    readback: input.finishRemote.file, ...(fix ? { prFixLineage: fix } : {}), keepWorktree: checkpoint.keepWorktree || input.restrictions?.keepWorktree === true });
+  const triggerPolicy = credits ? { standingTriggers: [], ...policy.lowTouch, strictInventory: true } : policy.lowTouch;
+  const checkedDecision = (decision) => {
+    if (triggerCommand === "reserve" && !["publish-ready", "retry-check-ready"].includes(decision.action)) {
+      return observe(stop(decision.reason ?? "FINISH_TRIGGER_SELECTION_UNVERIFIED", { chapter: decision.chapter, head: decision.head }));
+    }
+    if (!["publish-ready", "retry-check-ready"].includes(decision.action)) return observe(decision);
+    const selection = triggerCommand === "reserve" ? input.finishTriggerSelection ?? {} : null;
+    return observe({ ...decision, ...finishCreditDecision(credits, decision, input.finishRemote.sha256, selection, now) });
+  };
   if (policy.lowTouch && remote.implementation?.state === "ABSENT") {
     verifyLocalHarness({ hostConfiguration: input.hostConfiguration, harness: remote.implementation.harness,
       candidate, excluded: [repo, workspace], now });
     need(input.hostConfiguration.sha256 === anchor.hostConfigurationSha256, "Finish host binding changed");
   }
-  const implementation = await verifyReadyPublication(publication(identity, grant, remote, "implementation", candidate, checkpoint, now, policy.lowTouch),
+  const implementation = await verifyReadyPublication(publication(identity, grant, remote, "implementation", candidate, checkpoint, now, triggerPolicy, credits),
     remote.implementation, records);
-  if (implementation.decision) return observe(implementation.decision);
+  if (implementation.decision) return checkedDecision(implementation.decision);
   const merged = implementation.merged;
   if (!(await protectedEvidence(merged, records))) return observe(stop("PROTECTED_MERGE_EVIDENCE_UNVERIFIED", { pr: merged.url }));
   ancestor(repo, candidate, merged.mergeCommit);
@@ -331,6 +417,7 @@ export async function protectedFinish(input, readiness, now = Date.now(), verify
   if (!gatePass(integrated.gate, records, identity, integrated.head, grant.integratedGates).passed) {
     return observe(stop("INTEGRATED_GATE_FAILED", { head: integrated.head, pr: merged.url }));
   }
+  if (fix) verifyPrFixIntegration(fixRequest, fix, merged.mergeCommit, integrated.head);
   const closure = remote.closureCandidate;
   if (!closure && remote.closure?.state === "ABSENT" && bound(remote.closure, identity, grant) &&
       remote.closure.complete === true && remote.closure.target === identity.target &&
@@ -346,12 +433,12 @@ export async function protectedFinish(input, readiness, now = Date.now(), verify
   const archive = { repo, change, verified: integrated.head, archive: closure.archive, receiptSha256: closure.receiptSha256,
     receiptFile: retainedPath(records, closure.receipt), committedReceiptPath: closure.receiptPath,
     issue: identity.issue, policyTarget: identity.targetRevision,
-    integrationReference: merged.url };
+    integrationReference: merged.url, prFixLineage: fixRef, verifyHandover };
   need(closure.receipt.sha256 === closure.receiptSha256, "Closure receipt declaration differs");
-  const receipt = verifyArchive({ ...archive, head: closure.head });
+  const receipt = await verifyArchive({ ...archive, head: closure.head });
   need(receipt.integrated === merged.mergeCommit && receipt.verified === integrated.head && receipt.head === candidate &&
     receipt.planDigest === identity.planDigest && receipt.plan === identity.plan && receipt.base === identity.policyRevision &&
-    receipt.receiptSha256 === closure.receiptSha256 &&
+    receipt.receiptSha256 === closure.receiptSha256 && same(receipt.prFixLineage, fix) &&
     (completion ? same(receipt.taskCompletion, { reviewedParent: completion.reviewedParent,
       acceptanceChild: completion.acceptanceChild, taskIds: completion.taskIds }) : !receipt.taskCompletion), "Closure receipt does not bind the accepted implementation and integrated gates");
   if (!closure.gate) return observe(result("verify-closure", "FULL_ARCHIVE_TEST_PENDING", { head: closure.head }));
@@ -372,14 +459,14 @@ export async function protectedFinish(input, readiness, now = Date.now(), verify
       (!harness || remote.closureReview.harnessSha256 === harness.sha256 &&
         time(harness.observedAt) <= time(remote.closureReview.observedAt)), "Closure review host or harness binding differs");
   }
-  const closed = await verifyReadyPublication(publication(identity, grant, remote, "closure", closure.head, checkpoint, now, policy.lowTouch),
+  const closed = await verifyReadyPublication(publication(identity, grant, remote, "closure", closure.head, checkpoint, now, triggerPolicy, credits),
     remote.closure, records);
-  if (closed.decision) return observe(closed.decision);
+  if (closed.decision) return checkedDecision(closed.decision);
   if (!(await protectedEvidence(closed.merged, records))) {
     return observe(stop("PROTECTED_MERGE_EVIDENCE_UNVERIFIED", { pr: closed.merged.url }));
   }
   ancestor(repo, closure.head, closed.merged.mergeCommit);
-  verifyArchive({ ...archive, head: closed.merged.mergeCommit });
+  await verifyArchive({ ...archive, head: closed.merged.mergeCommit });
   const issue = remote.issue;
   const acceptance = { archive: closure.archive, closureMerge: closed.merged.mergeCommit, receiptSha256: closure.receiptSha256 };
   const archived = { ...acceptance, archiveAccepted: true, pr: closed.merged.url, prState: "MERGED", head: closure.head,

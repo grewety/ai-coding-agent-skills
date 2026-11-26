@@ -286,8 +286,10 @@ A verified immediate `approve` records exact approval only. `approve and run`
 also records a separate bounded local grant for the displayed scope, gates,
 role pair and restrictions. Both records must read back before combined
 dispatch. This authorizes bounded local execution under the selected contract.
-Finish publication, each paid or external run, retry, tunnel and preview, and
-any profile write need their applicable separate authority.
+Finish publication, paid or external runs, retries, tunnels, previews and
+profile writes need applicable authority. Use the [finish runbook](openspec-operator-runbook.md#finish-and-recover)
+for verified standing triggers, separately granted bundled events and
+post-review PR-fix evidence.
 
 Use `$openspec-next inspect <full-name>` in Codex for read-only inspection. Use
 the rendered Next-Step Footer to find the current stop, retained evidence and
@@ -800,6 +802,10 @@ Contract and single outcome. Missing qualification, uncertain ownership or
 stale evidence keeps the boundary closed. Exact approval and the bounded
 local grant govern delivery. A verified adopting parent can select bounded
 contained reviews. Finish requires its own authorized invocation.
+Where the verified parent adopts the new attempt rules, Goal-First defaults
+to 30 minutes subject to the exact override and a tighter grant. One
+productive supervisor timeout may continue only after original settlement
+and independent verification of preserved, in-scope progress.
 [Qualification, setup and operator recovery](worker-runtime.md).
 
 ## Packages
@@ -813,9 +819,9 @@ Orchestration is optional. It requires the workflow plugin, explicit role and
 model configuration, and a supported host. Package installation does not create
 those roles.
 
-Current source versions are delivery 1.8.0 and `openspec-next` 0.8.0 in
-`openspec-development` 1.8.0, and core skill 0.22.0 in
-`autonomous-orchestration` 1.12.0.
+Current source versions are delivery 1.9.0 and `openspec-next` 0.8.0 in
+`openspec-development` 1.9.0, and core skill 0.23.0 in
+`autonomous-orchestration` 1.13.0.
 Representation support adds no upstream workflow, runtime dependency or
 installation route. Package availability/byte checks do not establish account
 sync, host execution, native client discovery, Desktop acceptance or scanner approval.
@@ -823,19 +829,23 @@ sync, host execution, native client discovery, Desktop acceptance or scanner app
 The [contained Claude reviewer](claude-reviewer.md) is an opt-in transport for exact candidate
 and charter-v1 approach review. Check the exact approved export and applicable
 review authority before paid inference. A verified low-touch parent selects
-the per-change defaults and the explicit override. Replay the original
-request-bound output offline before applying candidate or charter admission.
+the per-change defaults and the explicit override. The [operator runbook](openspec-operator-runbook.md#launch-contained-review)
+shows the direct packaged Node invocations. A host pin selects concurrency
+from one through three, with serial execution as the default. Replay the
+original request-bound output offline before applying candidate or charter
+admission.
 [External AI role configuration and backend pilots](configurable-backends.md).
 
 [Review authority and configured harness](openspec-review-configuration.md).
 
 Complete copies and generated packages preserve delivery's policy/task-authoring
-references, `scripts/delivery-policy.mjs` and `scripts/delegated-delivery.mjs`, plus orchestration's
+references, `scripts/delivery-policy.mjs`, `scripts/delegated-delivery.mjs`,
+`scripts/finish-trigger-credits.mjs` and `scripts/pr-fix-lineage.mjs`, plus orchestration's
 `references/portable-core.md`, `scripts/orchestration-core.mjs`,
 `references/worker-handoff.md`, `scripts/worker-handoff.mjs`,
 `references/terminal-adapters.md`, `scripts/terminal-adapters.mjs` and
-`references/profile-preparation.md`, `scripts/run-implementer.mjs` and
-its runtime helpers.
+`references/profile-preparation.md`, `scripts/run-implementer.mjs`,
+its runtime helpers and `scripts/review-packet-scheduler.mjs`.
 The handoff pair is required portable support; it does not qualify a client or
 replace protected publication, independent review or delivery acceptance.
 

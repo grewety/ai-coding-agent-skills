@@ -24,7 +24,7 @@ SHALL NOT create a second CAP/CHG task tracker or infer authority from installat
 
 ### Requirement: Immutable review identity
 
-The guard SHALL bind approval to committed Task-Guided planning content or an immutable Goal-First contract and bind result review to the exact reviewed candidate in both modes. A verified native task-completion child can satisfy finish admission solely under the Native task completion admission requirement.
+The guard SHALL bind approval to committed Task-Guided planning content or an immutable Goal-First contract and bind result review to the exact reviewed candidate in both modes. Finish admission SHALL use an explicitly scoped verified task-completion or post-review PR-fix lineage proof when applicable.
 
 #### Scenario: Changed task definition
 - **WHEN** a task or gate changes after Task-Guided plan approval
@@ -34,7 +34,7 @@ The guard SHALL bind approval to committed Task-Guided planning content or an im
 #### Scenario: Changed candidate
 - **WHEN** the candidate SHA changes after review
 - **THEN** the previous review cannot satisfy the new SHA's candidate gate
-- **AND** finish admission can use the original review and its original SHA only with the independent task-completion proof
+- **AND** finish admission can retain the original review and SHA only with the independent Native task completion admission or Verified post-review PR-fix lineage proof, as applicable
 
 #### Scenario: Changed Goal Contract
 - **WHEN** an approved goal outcome, allowed scope, hard invariant, non-goal, acceptance gate, or local authority boundary changes
@@ -125,7 +125,7 @@ implementation and review. Existing names SHALL remain valid and unchanged.
 
 ### Requirement: Independent reviewer before merge
 
-A pull request SHALL require an independent review with dispositioned findings for the exact candidate SHA before merge or branch deletion. A verified native task-completion child can satisfy finish admission using the independently reviewed parent solely under the Native task completion admission requirement.
+A pull request SHALL require an independent review with dispositioned findings for the exact candidate SHA before merge or branch deletion. Finish admission using a prior reviewed SHA SHALL verify the Native task completion admission or Verified post-review PR-fix lineage requirements, as applicable.
 
 #### Scenario: Implementer reviews itself
 - **WHEN** the only available reviewer is the session that implemented the candidate
@@ -195,66 +195,66 @@ The delivery package SHALL supply read-only creation, reuse, location, same-chan
 
 ### Requirement: Prospective proposal-to-freeze adoption
 
-Delivery SHALL enable `propose-to-freeze` only when the verified integrated plan parent explicitly selects it. The orchestrator SHALL produce one plan-only freeze and approval card per accepted draft revision within the held authority and SHALL preserve the existing draft-only path and all narrower restrictions.
+Delivery SHALL enable `propose-to-freeze` only when the verified integrated plan parent selects it explicitly. Within held authority, the orchestrator SHALL produce one plan-only freeze and approval card per accepted draft revision and preserve draft-only operation and narrower restrictions.
 
 #### Scenario: Short proposal reaches an approval card
-- **WHEN** an opted-in project receives a short proposal or `/goal draft` with an inline goal or a readable note, and the selected planning gates pass
-- **THEN** the orchestrator verifies the baseline and relevant upstream facts, selects Goal-First or Task-Guided from the actual delivery boundary, prepares the ULID worktree before native scaffolding, binds the proposal-time issue where authorized, and validates the complete native artifacts
-- **AND** it runs the packaged charter gate when selected or explicitly requested under the applicable policy, revalidates and re-reviews grounded corrections within the inherited authority and finite budget, and supplies any newly required native artifacts
-- **AND** it freezes only the exact accepted planning inputs in one local plan-only commit and displays its full SHA and mode-specific digest. Planning leaves implementation untouched and does not launch an implementation worker or publish a branch
+- **WHEN** an opted-in project receives a short proposal or `/goal draft` with an inline goal or readable note, and selected planning gates pass
+- **THEN** verify the baseline and relevant upstream facts, select Goal-First or Task-Guided from the delivery boundary, prepare the ULID worktree before native scaffolding, bind the authorized proposal-time issue, and validate all native artifacts
+- **AND** run the packaged charter gate when policy selects or permits an explicit request for it, revalidate and re-review grounded corrections under inherited authority and finite budget, and supply newly required native artifacts
+- **AND** freeze only accepted planning inputs in one local plan-only commit and show its full SHA and mode-specific digest. Leave implementation untouched, with no worker launch or branch publication.
 
 #### Scenario: Draft-only or absent adoption
 - **WHEN** the parent lacks explicit selection, a contract change would adopt the policy for itself, or the operator requests `draft only` or `no commits`
-- **THEN** the proposal stops at the applicable uncommitted boundary without issuing an approval card for a frozen plan
-- **AND** an explicitly requested review can proceed within its own authority, with a compact stop decision on a missing binding, uncovered blocker, scope conflict, or exhausted budget
+- **THEN** stop at the applicable uncommitted boundary without a frozen-plan approval card
+- **AND** allow explicitly requested review under its own authority, with a compact stop decision for missing binding, uncovered blockers, scope conflict or exhausted budget
 
 #### Scenario: Resolve breaking-upgrade assumptions
-- **WHEN** accepted sources leave material uncertainty about a breaking upgrade
-- **THEN** the orchestrator uses authorized disposable-scratch empirical probes before contract lock, records observed behavior, and keeps hard invariants distinct from adaptable legacy layouts, flags or assertions
-- **AND** a probe does not reuse real profile state, grant paid verification, or satisfy a later exact-candidate gate
+- **WHEN** accepted sources leave material breaking-upgrade uncertainty
+- **THEN** use authorized disposable-scratch probes before contract lock, record observations, and distinguish hard invariants from adaptable legacy layouts, flags or assertions
+- **AND** probes neither reuse real profile state nor authorize paid verification or satisfy later exact-candidate gates
 
 #### Scenario: Revise a draft
-- **WHEN** the operator answers a planning question or replies `changes: <feedback>` with a clear, authorized revision
-- **THEN** the orchestrator directly revises the planning artifacts, runs applicable validation and review again, and presents a replacement card for the newly authorized freeze when eligible
-- **AND** an earlier card cannot authorize the revised plan, and feedback outside the existing scope raises a concise decision
+- **WHEN** an operator answer or `changes: <feedback>` reply gives a clear authorized revision
+- **THEN** revise native planning directly, rerun applicable validation and review, and present a replacement card for an eligible authorized freeze
+- **AND** prior cards cannot authorize the revised plan, and out-of-scope feedback raises a concise decision
 
 ### Requirement: Bound short approval decisions
 
-An approval card SHALL identify exactly one repository, change, mode, integrated policy revision, registered workspace, frozen SHA, and mode-specific digest. The displayed card and operator reply SHALL be retained with scope and restrictions. Short replies SHALL fail closed on ambiguity, stale identity, mismatched context or an unverifiable operator decision.
+An approval card SHALL bind exactly one repository, change, mode, integrated policy revision, registered workspace, frozen SHA and mode-specific digest. The displayed card and reply SHALL be retained with scope and restrictions. Short replies SHALL fail closed on ambiguity, stale identity, mismatched context or unverifiable decisions.
 
 #### Scenario: Approval only
-- **WHEN** an authenticated operator reply `approve` unambiguously follows one current displayed card and the frozen planning bytes and HEAD still match
-- **THEN** delivery records exact-plan or exact Goal Contract approval and stops without starting local execution
+- **WHEN** an authenticated `approve` reply unambiguously follows one current displayed card and HEAD and frozen planning bytes still match
+- **THEN** record exact-plan or exact Goal Contract approval and stop before local execution
 
 #### Scenario: Approval and local execution
-- **WHEN** the operator replies `approve and run` to the same verified context
-- **THEN** delivery binds exact approval and the separately bounded local execution grant as distinct durable records before dispatch
-- **AND** local execution reuses matching qualified role bindings, proceeds through the already approved finite local gates, corrections, independent reviews and previewed commits, and stops before external work
-- **AND** `group 1`, `no commits`, and other retained restrictions continue to govern the run
+- **WHEN** the operator replies `approve and run` in the same verified context
+- **THEN** bind exact approval and the separately bounded local grant in distinct durable records before dispatch
+- **AND** reuse matching qualified role bindings and execute approved finite local gates, corrections, independent reviews and previewed commits, stopping before external work
+- **AND** retain `group 1`, `no commits` and other restrictions
 
 #### Scenario: Stale, unbound or cross-change reply
-- **WHEN** the card was not displayed, the reply is ambiguous, identity or planning bytes changed, the HEAD differs, or competing changes prevent unique binding
-- **THEN** the reply records neither approval nor an execution grant and starts no worker
-- **AND** delivery explains the exact failed predicate and preserves the explicit exact-identity approval route for recovery
+- **WHEN** no card was displayed, the reply is ambiguous, identity, planning bytes or HEAD changed, or competing changes prevent unique binding
+- **THEN** record no approval or grant and start no worker
+- **AND** state the failed predicate and retain the explicit exact-identity approval route
 
 ### Requirement: Context-aware next steps
 
-Every non-terminal operator stop SHALL include a compact Next-Step Footer derived from the packaged versioned status output and retained observations. It SHALL offer one ready-to-send next input or two to four concrete choices for a genuine decision, with no routine policy relay.
+Each non-terminal stop SHALL include a compact Next-Step Footer from packaged versioned status and retained observations, with one ready-to-send input or two to four concrete choices for a genuine decision and no routine policy relay.
 
 #### Scenario: Inspect a checkpoint
-- **WHEN** the operator or another session inspects the selected change or an authorized phase stops
-- **THEN** deterministic output reports change, mode, branch and exact HEAD, frozen digest and active attempt when applicable, checkpoint or handoff location, PR and check state when applicable, P1–P8 observations and first unresolved predicate, restriction and invariant or drift state, and the legal next action
-- **AND** absent evidence is visible, inspect/init perform read-only assessment, and any paid probe or profile update stays pending separate authority
+- **WHEN** an operator or another session inspects the change or an authorized phase stops
+- **THEN** deterministically report change, mode, branch, exact HEAD, applicable frozen digest and active attempt, checkpoint or handoff location, applicable PR and check state, P1–P8 observations and first unresolved predicate, restrictions, invariants or drift, and the legal next action
+- **AND** show missing evidence, keep inspect/init read-only, and reserve paid probes and profile updates for separate authority
 
 #### Scenario: Preserve context on resume
-- **WHEN** a clean phase boundary, context limit, or long wait warrants a new session
-- **THEN** the footer offers a short self-contained starter citing the exact change and retained state plus a supported host launch example scoped to the change worktree and records
-- **AND** an opted-in, separately authorized relay rotates only at a safe checkpoint and retains the predecessor until the successor acknowledges exact HEAD, digest, ownership, pane identity, and bounded grant evidence
-- **AND** rotation or a new session grants no new authority and cannot bypass original-attempt settlement
+- **WHEN** a clean phase boundary, context limit or long wait warrants a new session
+- **THEN** offer a short self-contained starter with the exact change and retained state and a supported launch scoped to its worktree and records
+- **AND** rotate an opted-in separately authorized relay only at a safe checkpoint, retaining the predecessor until the successor acknowledges exact HEAD, digest, ownership, pane identity and bounded grant evidence
+- **AND** rotation and new sessions grant no authority and cannot bypass original-attempt settlement
 
 #### Scenario: Refuse an unqualified route
-- **WHEN** a selected package is missing or drifted, a role binding is missing or mismatched, or a real planning or execution blocker remains
-- **THEN** the footer supplies the failed predicate, next safe choice, and retained evidence reference without silently substituting a reviewer, creating a local launcher, or editing an installed profile
+- **WHEN** a package is missing or drifted, a role binding is missing or mismatched, or a planning or execution blocker remains
+- **THEN** report the failed predicate, next safe choice and retained evidence reference without substituting a reviewer, creating a local launcher or editing an installed profile
 
 ### Requirement: Bounded protected closeout resume
 
@@ -278,30 +278,30 @@ Under a valid `finish` grant, delivery SHALL watch applicable protected checks f
 
 ### Requirement: Retire verified worktrees across resumed runs
 
-Delivery SHALL reconcile all live same-change registrations against retained ownership evidence before terminal cleanup. An authorized `finish` SHALL retire each eligible dedicated attached or detached worktree after verified archive and applicable authorized issue closure, while preserving evidence, refs, and operator restrictions.
+Delivery SHALL reconcile live same-change registrations against retained ownership evidence. Authorized `finish` SHALL retire each eligible dedicated worktree, attached or detached, after verified archive and applicable authorized issue closure, preserving evidence, refs and restrictions.
 
 #### Scenario: Resume closes all eligible worktrees
-- **WHEN** a resumed finish finds dedicated worktrees from earlier runs
-- **THEN** delivery matches repository, exact change identity, canonical path, role and ref or detached SHA against creation or handoff evidence and current registration
-- **AND** it rechecks exact HEAD and reachability from the actual containing closure revision, absence of active writers, tracked and untracked cleanliness, ignored data and submodules, then removes eligible worktrees without force and verifies registration and path absence and retained refs
+- **WHEN** resumed finish finds dedicated worktrees from earlier runs
+- **THEN** match repository, exact change, canonical path, role and ref or detached SHA against creation or handoff evidence and live registration
+- **AND** recheck exact HEAD and reachability from the actual containing closure revision, absence of active writers, tracked and untracked cleanliness, ignored data and submodules. Remove eligible worktrees without force and verify path and registration absence and ref retention.
 
 #### Scenario: Preserve protected or ambiguous worktrees
-- **WHEN** a worktree is outside verified ownership, is primary, an independent clone, unrelated, live, locked, dirty or unmerged, contains valuable ignored files, or is retained by operator restriction
-- **THEN** delivery leaves it and its refs intact. A path suffix, role nickname, or matching ancestry alone does not establish ownership
-- **AND** it reports removed, retained and blocked paths with reasons separately from accepted archive and issue state. Repeated finish reconciles pending cleanup without reopening publication or creating a replacement checkout
+- **WHEN** a worktree lacks verified ownership, is primary, an independent clone, unrelated, live, locked, dirty or unmerged, holds valuable ignored files or is retained by operator restriction
+- **THEN** preserve it and its refs. A suffix, role nickname or matching ancestry alone cannot prove ownership.
+- **AND** report removed, retained and blocked paths with reasons separately from accepted archive and issue state. Repeated finish reconciles pending cleanup without reopening publication or creating a replacement checkout.
 
 ### Requirement: Separate post-release skill sync
 
-Delivery SHALL offer optional `sync-skills` after relevant canonical skill publication or accepted integration when deployment is inapplicable. It SHALL require explicit authority naming the client or profile, source revision and update scope.
+Delivery SHALL offer optional `sync-skills` after relevant canonical skill publication or accepted integration where deployment does not apply. It SHALL require explicit authority identifying client or profile, source revision and scope.
 
 #### Scenario: Approved sync respects the installation route
-- **WHEN** the operator authorizes a selected post-release update
-- **THEN** the operator-controlled update uses the existing supported path with collision checks and backups. Hermes scanner-managed packages retain normal scanner acceptance and Codex native copies retain local-copy provenance
-- **AND** verification compares the complete installed package with the immutable source, checks relevant skill version metadata and loads it in a fresh session. Tests use isolated scratch homes and profiles, and upstream skill sources are commit-pinned
+- **WHEN** the operator authorizes the update
+- **THEN** use the existing supported route with collision checks and backups. Hermes packages retain normal scanner acceptance and native Codex copies retain local-copy provenance.
+- **AND** compare the complete installed package to immutable source, verify skill versions and load it in a fresh session. Use isolated scratch homes and profiles in tests and commit-pin upstream sources.
 
 #### Scenario: No profile authority or scan failure
-- **WHEN** delivery reaches finish, finds package drift or a curator conflict, lacks separate update authorization, or the selected update fails its scanner or collision checks
-- **THEN** delivery leaves the installed package untouched and reports the available update or recovery choice. A shared installed package is never changed by the skill while it runs in a target project
+- **WHEN** finish occurs, package drift or curator conflict appears, separate update authority is absent, or scanner or collision checks fail
+- **THEN** preserve the installed package and report update or recovery options. Skills SHALL NOT change a shared installation while operating in a target project.
 
 ### Requirement: Restricted Git child environment
 The evidence and workspace helpers SHALL read and forward inherited environment
@@ -601,7 +601,7 @@ Under an adopting integrated parent, delivery SHALL default to `auto-approved` f
 #### Scenario: Default mode and configured ceilings
 - **WHEN** the applicable integrated parent adopts this policy and supplies no overrides
 - **THEN** `auto-approved` applies with `maxReviews: 10` and `maxTotalUsd: 25` per change, shared across `["planning", "execution", "finish"]`
-- **AND** permitted overrides stay within integrated ceilings, and unreviewed candidate files and host settings cannot expand authority or raise those ceilings.
+- **AND** permitted overrides stay within integrated ceilings, and unreviewed candidate files and host settings cannot expand authority or raise those ceilings. New setup guidance defaults to 96 turns and USD 2.50 per launch. The upper bound includes the probe and every applicable packet. Existing pins keep their configured values. An explicitly adopted higher project ceiling applies prospectively.
 
 #### Scenario: Concurrent or resumed automatic use
 - **WHEN** an eligible automatic paid review is proposed
@@ -610,7 +610,7 @@ Under an adopting integrated parent, delivery SHALL default to `auto-approved` f
 
 #### Scenario: Missing or exceeded automatic bounds
 - **WHEN** the phase is ineligible, the host is unpinned or mismatched, effective caps are absent, invalid or exceeded, or an upper cost or durable reservation cannot be verified
-- **THEN** automatic admission stops before launch and grants no fallback or cap increase.
+- **THEN** automatic admission stops before launch and grants no fallback or cap increase. Only Operator-signed review cap extension can grant an eligible prospective increase.
 
 #### Scenario: Single-run authority
 - **WHEN** `explicit` is selected for the run, or the verified integrated parent predates the adoption of this policy
@@ -628,7 +628,7 @@ Under separately granted protected finish, delivery SHALL recognize only named, 
 
 #### Scenario: Scope or cost is unknown
 - **WHEN** any live trigger differs from the verified standing entry or is paid, unknown, a tunnel, or a deploy preview
-- **THEN** it needs separate single-run authority before activation. Missing or stale inventory blocks activation.
+- **THEN** it needs separate single-run authority before activation unless the exact action qualifies under Bundled finish trigger reservations. Missing or stale inventory blocks activation.
 
 ### Requirement: Optional candidate-bound local pre-PR harness
 
@@ -663,7 +663,7 @@ The distribution SHALL publish a top-level index of active guides and a visual t
 #### Scenario: Current role and schema setup
 - **WHEN** an operator configures a workset opener, standalone or exclusive Implementer, optional AI helper or harness, or contained Reviewer host
 - **THEN** synchronized guides show explicit client, provider, model, reasoning-effort and version configuration, the supported and unsupported route matrix, native argument or config examples, moderated setup and separately authorized decisions using the maintained lifecycle diagram, chat sequence and reply examples
-- **AND** optional custom schemas remain governed by the same frozen identity and evidence requirements. Active upgrade guidance is preserved when obsolete history is pruned.
+- **AND** optional custom schemas remain governed by the same frozen identity and evidence requirements. Active upgrade guidance is preserved when obsolete history is pruned. The repository suitability matrix identifies Claude as the qualified Tier 1 baseline, Grok and Pi as Tier 1 candidates, Hermes and Codex as medium, and OpenCode, Kilo and agy as unsuitable for the current minimal-rootfs contained route, with dated evidence and qualification limits.
 
 #### Scenario: Review and closeout text
 - **WHEN** an operator follows the protected finish guidance
@@ -702,9 +702,9 @@ External role configuration SHALL apply a default `versionPolicy: "gte"` with an
 `detect-agents` SHALL report read-only, redacted host observations. `setup` SHALL preview exact external role configuration and the reviewer host file SHA-256 before any operator-confirmed write. Discovery and setup SHALL avoid credential values, inference, automatic installation, and repository or live-profile mutation.
 
 #### Scenario: Discover installed or unavailable tools
-- **WHEN** discovery checks Codex, Claude Code, Gemini, Hermes, OpenCode, Kilo, Pi, `grok-build`, `agy`, Bubblewrap and OpenSpec
+- **WHEN** discovery checks Codex, Claude Code, Gemini, Hermes, OpenCode, Kilo, Pi, `grok`, legacy `grok-build` references, `agy`, Bubblewrap and OpenSpec
 - **THEN** report presence, executable path and observed version where available, and safe local evidence for auth readiness, containment and supported model and reasoning options
-- **AND** mark unobservable capabilities unknown and absent binaries unavailable. Discovery status neither authenticates a provider nor qualifies a route.
+- **AND** mark unobservable capabilities unknown and absent binaries unavailable. Discovery status neither authenticates a provider nor qualifies a route. Resolve the real `grok` executable through supported discovery paths, retain the legacy client identity, and report absence or ambiguity without installation, inference or profile changes.
 
 #### Scenario: Dry-run approved role choices before writing
 - **WHEN** an operator selects role tuples and reviewer limits
@@ -714,3 +714,64 @@ External role configuration SHALL apply a default `versionPolicy: "gte"` with an
 #### Scenario: Refuse conflicting or changed destinations
 - **WHEN** a preview changes, a destination aliases a repository or live profile, a symlink redirects an output, or an existing file would be overwritten without matching confirmation
 - **THEN** refuse the write and report the conflict without exposing credentials or presenting unverified configuration as usable.
+
+### Requirement: Deterministic isolated distribution verification
+
+The local and CI test gates SHALL preserve existing assertions, test inventory, isolated mutable fixture state and explicit fixture HOME. The launcher recovery test SHALL prove the original supervisor can settle and publish exactly one handover after its launcher is killed.
+
+#### Scenario: Recovery under repeated execution
+- **WHEN** isolated runs exercise launcher startup, termination, original-attempt recovery and replay
+- **THEN** test synchronization distinguishes a live launcher from one that has already exited, the same supervisor publishes one sealed late handover, and recovery replay returns the same result without an `ESRCH` failure or a false pass.
+
+#### Scenario: Isolated performance comparison
+- **WHEN** the seven slow suites are scheduled across parallel or sharded isolated fixture runs
+- **THEN** the gate retains every assertion, aggregates all failures and completes once for each required test
+- **AND** comparable baseline and candidate timings on the same documented runner class test the approximately 8–12 second target. If optimization cannot preserve deterministic isolation, retain serial scheduling for the affected component and record the blocker.
+
+### Requirement: Operator-signed review cap extension
+
+The integrated workflow SHALL accept a host-retained operator-signed grant for mid-execution review count or USD cap extension only against the exact approved plan, change and durable ledger. The extension SHALL operate prospectively within the original integrated ceilings and retained scope.
+
+#### Scenario: Extend a partially consumed cap
+- **WHEN** the host verifies a trusted operator signature, grant identity, validity window, exact frozen plan and digest, change, execution authority and ledger identity, and requested count or USD cap
+- **THEN** admission records the extension once and applies the new caps to subsequent reservations within the verified integrated ceilings
+- **AND** previous reservations, uncertain spend, original authority, existing restrictions and exact-candidate evidence requirements carry forward, with no plan refreeze.
+
+#### Scenario: Refuse invalid or competing extensions
+- **WHEN** the signature or authority is invalid, the grant is expired, stale, replayed or cross-change, ledger state is missing or ambiguous, the plan or ledger binding differs, or caps exceed permitted bounds
+- **THEN** refuse any increase. Competing reservations and claims are serialized, and unavailable budget stops inference with ledger evidence. Each retry still needs its applicable separate authority.
+
+### Requirement: Bundled finish trigger reservations
+
+A separate named finish grant SHALL support finite, explicitly selected credit reservations for verified paid triggers across both protected PR chapters and at most one authorized zero-cost CI retry for the same SHA under the verified transient-failure predicate.
+
+#### Scenario: Reserve paid PR trigger credits
+- **WHEN** a finish grant specifies a positive finite credit cap for an identified paid trigger and current complete inventory confirms identity, configuration, exposure, repository, chapter, event, target, exact SHA and cost
+- **THEN** durably reserve the matching credits before activation and account for both implementation and closure PRs against the same cap, including across resume and uncertain outcomes.
+- **AND** a grant can cover two Aikido Deep Review credits across the two PRs if the observed inventory matches. Membership in the cap supplies no authority for unrelated triggers or other product operations.
+
+#### Scenario: Retry a proved transient CI failure
+- **WHEN** the grant includes `maxZeroCostCiRetries: 1`, a known zero-cost check has a verified transient failure, and a verified equivalent push run for the identical expected SHA has passed
+- **THEN** reserve and perform one specifically scoped retry of that check and verify exact-head results before progress. A changed SHA, unknown cost, exceeded balance, repeated retry, missing evidence or deterministic test failure blocks the bundled action.
+
+### Requirement: Verified post-review PR-fix lineage
+
+Protected finish SHALL verify post-review PR corrections through exact non-waived review coverage, Git ancestry and candidate evidence. The original reviewed SHA SHALL remain truthful through finish readiness, protected finish and archived receipt readback.
+
+#### Scenario: Exact-head disposition or delta re-review
+- **WHEN** a narrowly scoped PR security or CI fix follows an independently accepted zero-waiver ancestor on the same approved plan
+- **THEN** verify the exact ancestor and ordered SHA chain, real fix reasons and finding dispositions, and an independent evidence-backed determination for the exact delta and final head
+- **AND** require complete postimage coverage and re-review of changed or impacted evidence where necessary, zero unresolved or waived findings, the actual final head's disposable gates, promoted specs and separately held finish authority for that head
+- **AND** retain the exact ancestor, final head, range and verification references in the finish and receipt chain, and replay them against actual integration and archive custody.
+
+#### Scenario: Insufficient or mismatched lineage
+- **WHEN** ancestry is ambiguous, changes escape the fix scope, a disposition tries to waive a finding, or exact evidence or coverage cannot be verified
+- **THEN** the targeted route fails closed. An eligible changed head requires ordinary full exact-candidate re-review before it can advance.
+
+### Requirement: Direct contained review launch guidance
+
+The operator and reviewer guides SHALL show the packaged review runner as a standalone Node command with its exact inputs and existing authority prerequisites.
+
+#### Scenario: Review invocation in Codex
+- **WHEN** an operator follows a documented candidate or approach review example
+- **THEN** the live launch invokes `node …/review-candidate.mjs` directly, without a compound shell wrapper, and retains the separate admission, replay and readback steps. The guidance preserves platform review and permission enforcement.

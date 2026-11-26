@@ -64,7 +64,12 @@ must be in force before a paid review. For an adopting parent, the contained
 runner uses the external host configuration hash and a durable pre-launch
 claim shared across that change's configured phases. A run can select
 `explicit` with its own separate exact single-run grant. A retry always
-requires a fresh distinct grant. See `references/review-candidate.md` inside the separate
+requires a fresh distinct grant. During automatic candidate execution, an
+operator-signed grant can raise lower caps under the original plan parent's
+ceilings. The reviewer verifies the independent operator key pin and binds
+the grant to the exact approval, execution authority, plan and existing
+ledger. Reservations and uncertain charges carry across extension and expiry.
+See `references/review-candidate.md` inside the separate
 `autonomous-implementation-review` package.
 
 For an adopting parent, the protected-finish remote readback supplies

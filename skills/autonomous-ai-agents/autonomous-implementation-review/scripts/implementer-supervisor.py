@@ -49,6 +49,10 @@ class Attempt:
         self.spec = json.loads(raw)
         self.binding = self.spec.pop("binding")
         self.limit = self.spec.pop("maxTurns")
+        deadline_ms = self.spec.pop("deadlineMs", None)
+        if deadline_ms is not None:
+            remaining = (deadline_ms - time.time_ns() // 1_000_000) / 1000
+            self.spec["monotonicDeadline"] = time.monotonic() + remaining
         self.identity = identity(os.getpid())
         self.session = None
         self.turns = 0

@@ -52,6 +52,7 @@ async function deltaDirectory(change) {
 
 const adoptedDelivery = "low-touch-autonomous-delivery-01m88zpkktr16z02dh3wne3ppy";
 const configurableBackends = "configurable-worker-and-reviewer-backends-01m8a1cfak28znhgw126kzxye4";
+const testingOverhaul = "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n";
 const currentSpecs = path.join(root, "openspec", "specs");
 
 function readCapabilitySpec(specsRoot, capability) {
@@ -95,8 +96,10 @@ test("exclusive worker runtime requirements keep exact content until superseded 
 });
 
 test("low-touch delivery retains requirements until explicitly superseded, with capability metadata", async () => {
-  const [deltaRoot, backendsRoot] = await Promise.all([deltaDirectory(adoptedDelivery), deltaDirectory(configurableBackends)]);
-  for (const [capability, expected] of [["contained-independent-review", 5], ["openspec-integration", 8]]) {
+  const [deltaRoot, backendsRoot, overhaulRoot] = await Promise.all(
+    [adoptedDelivery, configurableBackends, testingOverhaul].map(deltaDirectory),
+  );
+  for (const [capability, expected] of [["contained-independent-review", 4], ["openspec-integration", 4]]) {
     let delta = await readCapabilitySpec(deltaRoot, capability);
     const current = await readCapabilitySpec(currentSpecs, capability);
     assert.ok(current.startsWith(header("spec", `capability: ${capability}\n`)));
@@ -105,19 +108,41 @@ test("low-touch delivery retains requirements until explicitly superseded, with 
       delta = withoutSupersededRequirements(delta, newerDelta,
         "Optional candidate-bound local pre-PR harness", "Operator workflow guidance");
     }
+    const overhaul = await readCapabilitySpec(overhaulRoot, capability);
+    delta = withoutSupersededRequirements(delta, overhaul, ...(capability === "contained-independent-review"
+      ? ["Bounded inter-packet pacing and private diagnostics"]
+      : ["Immutable review identity", "Independent reviewer before merge",
+        "Bounded paid contained-review authorization", "Standing zero-cost finish triggers"]));
     assert.equal(checkPromotion({ capability, delta, current }), expected, capability);
   }
 });
 
-test("configurable worker and reviewer backends promote all nine native requirements with capability metadata", async () => {
-  const deltaRoot = await deltaDirectory(configurableBackends);
-  for (const [capability, expected] of [["contained-independent-review", 2], ["exclusive-worker-runtime", 2], ["openspec-integration", 5]]) {
+test("configurable worker and reviewer backends retain exact requirements until explicitly superseded", async () => {
+  const [deltaRoot, overhaulRoot] = await Promise.all([configurableBackends, testingOverhaul].map(deltaDirectory));
+  for (const [capability, expected] of [["contained-independent-review", 2], ["exclusive-worker-runtime", 2], ["openspec-integration", 3]]) {
+    let [delta, current] = await Promise.all([
+      readCapabilitySpec(deltaRoot, capability),
+      readCapabilitySpec(currentSpecs, capability),
+    ]);
+    if (capability === "openspec-integration") {
+      const overhaul = await readCapabilitySpec(overhaulRoot, capability);
+      delta = withoutSupersededRequirements(delta, overhaul, "Operator workflow guidance", "Moderated external host discovery and setup");
+    }
+    assert.ok(current.startsWith(header("spec", `capability: ${capability}\n`)));
+    assert.equal(checkPromotion({ capability, delta, current }), expected, capability);
+  }
+});
+
+test("Item 5.5 promotes every frozen requirement with its exact body and capability metadata", async () => {
+  const deltaRoot = await deltaDirectory(testingOverhaul);
+  for (const [capability, expected] of [["contained-independent-review", 1], ["exclusive-worker-runtime", 2], ["openspec-integration", 11]]) {
     const [delta, current] = await Promise.all([
       readCapabilitySpec(deltaRoot, capability),
       readCapabilitySpec(currentSpecs, capability),
     ]);
-    assert.ok(current.startsWith(header("spec", `capability: ${capability}\n`)));
     assert.equal(checkPromotion({ capability, delta, current }), expected, capability);
+    assert.ok(current.startsWith(header("spec", `capability: ${capability}\n`)));
+    assert.ok(Buffer.byteLength(current) <= 65536, `${capability} must fit the pinned review export`);
   }
 });
 async function fixture(t) {
