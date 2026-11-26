@@ -1,10 +1,13 @@
 // Runs inside the isolated network namespace. Only the mounted Unix socket has host egress.
 import { spawn } from "node:child_process";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { connect, createServer } from "node:net";
 import { constants } from "node:os";
 
 for (const dirname of ["home", "config", "cache", "data", "state", "tmp"]) mkdirSync("/scratch/" + dirname, { mode: 0o700 });
+const args = process.argv.slice(2);
+const pi = args[0] === "--pi-review";
+if (pi) args.shift();
 const sockets = new Set();
 let fault = false;
 const server = createServer((local) => {
@@ -19,12 +22,23 @@ const server = createServer((local) => {
 server.maxConnections = 8;
 server.once("error", () => { process.exitCode = 125; });
 server.listen(0, "127.0.0.1", () => {
-  const child = spawn("/control/claude", process.argv.slice(2), {
-    stdio: "inherit",
-    env: { ...process.env, ANTHROPIC_BASE_URL: "http://127.0.0.1:" + server.address().port },
+  const base = "http://127.0.0.1:" + server.address().port;
+  if (pi) {
+    mkdirSync("/scratch/config/pi", { mode: 0o700 });
+    writeFileSync("/scratch/config/pi/models.json", JSON.stringify({ providers: {
+      "xai-oauth": { api: "openai-completions", baseUrl: base + "/v1", apiKey: "relay-managed",
+        models: [{ id: "grok-4.7", name: "grok-4.7", reasoning: false, input: ["text"], compat: { supportsStore: false },
+          contextWindow: 131072, maxTokens: 16384, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } }] },
+    } }), { mode: 0o600, flag: "wx" });
+  }
+  const child = spawn(pi ? "/control/node" : "/control/claude", pi ?
+    ["/control/node_modules/@earendil-works/pi-coding-agent/dist/bundle/cli.js", ...args] : args, {
+    stdio: pi ? ["inherit", "inherit", "pipe"] : "inherit",
+    env: pi ? process.env : { ...process.env, ANTHROPIC_BASE_URL: base },
   });
+  if (pi) child.stderr.on("data", () => { fault = true; });
   child.once("error", () => { server.close(); process.exitCode = 125; });
-  child.once("exit", (code, signal) => {
+  child.once(pi ? "close" : "exit", (code, signal) => {
     for (const socket of sockets) socket.destroy();
     server.close();
     if (signal) {

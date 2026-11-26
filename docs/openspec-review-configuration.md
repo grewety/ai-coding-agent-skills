@@ -48,6 +48,16 @@ the private same-UID relay, and a durable reservation for the probe and all
 packets before launch. A failure stops queued packets while active packets
 settle. Offline verification binds the sealed schedule and audits each packet.
 
+The existing Claude default keeps its original host pins and sealed capture
+schemas. An explicit Pi 1.5.2 reviewer uses a setup-produced schema 2 host with
+a pinned release inventory and private Hermes proxy xAI OAuth relay. Treat
+`maxTurns: 96` as the per-invocation relay request limit for Pi. Keep the
+same durable reservation for the probe and every packet. Synthetic trial
+authority covers only the runner's fixed benign two-file fixture. Real review
+requires matching live qualification and explicit single-run admission for
+the approved export.
+Follow the [host and trial setup](claude-reviewer.md#prepare-and-qualify-the-pi-route).
+
 The following admission shape selects automatic mode by omission. Replace
 the SHA and references with verified values for one exact run. Use one
 stable host-owned mode-0700 ledger per repository across sessions and

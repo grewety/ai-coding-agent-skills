@@ -1,12 +1,13 @@
 import { lstat } from "node:fs/promises";
 import path from "node:path";
 import { absolute, digest, equal, fields, hash, jsonBytes, need, relative, separate, uuid } from "./review-inputs.mjs";
-import { claudeVersion, requireReviewHost, runtimeBinding, validateHostConfig, verifyRuntimePins } from "./review-runtime.mjs";
+import { claudeVersion, requireReviewHost, reviewRelaySource, runtimeBinding, validateHostConfig, verifyRuntimePins } from "./review-runtime.mjs";
 import { CANDIDATE_RECORDS, resolveRoleConfiguration } from "./terminal-adapters.mjs";
 import { privateDirectory, pinnedFile, trustedJson } from "./implementer-state.mjs";
 import { readRoleBindings, validateRoleBindings } from "./agent-role-config.mjs";
 import { inspectPinnedFile, parseStrictJson } from "./agent-configuration.mjs";
 import { requireQualifiedPilot } from "./adapter-qualification.mjs";
+import { piReviewer } from "./agent-role-adapters.mjs";
 import { checkRoleIndependence } from "./role-config.mjs";
 import { maximumAttemptMs } from "./worker-runtime-policy.mjs";
 
@@ -100,7 +101,7 @@ export async function checkRolePins(pair, excluded, reviewerConfig) {
   ]);
 }
 
-export async function bindPair(entry, grant, runtimeSha256, registry, prospective = false) {
+export async function bindPair(entry, grant, runtimeSha256, registry, prospective = false, verifyRuntimeIdentity) {
   const host = await trustedJson(entry.host);
   const request = entry.request;
   const roots = [request.identity.workspace, ...request.evidenceRoots, registry];
@@ -138,7 +139,7 @@ export async function bindPair(entry, grant, runtimeSha256, registry, prospectiv
   if (selected && selected.roles.implementer.client !== "codex") {
     requireQualifiedPilot("implementer", selected.roles.implementer, { excluded: excludedInputs });
   }
-  if (selected && selected.roles.reviewer.client !== "claude-code") {
+  if (selected && !["claude-code", piReviewer.client].includes(selected.roles.reviewer.client)) {
     requireQualifiedPilot("reviewer", selected.roles.reviewer, { excluded: excludedInputs });
   }
   const profiles = [...slotPaths(implementer), reviewer.slot];
@@ -176,11 +177,16 @@ export async function bindPair(entry, grant, runtimeSha256, registry, prospectiv
     need(equal(manifest.binding.executable, implementer.executable) && manifest.runtimeVersion.observedVersion === implementer.version,
       "Approved implementer executable or observed version differs from the effective role");
     cfg = requireReviewHost(parseStrictJson(inspectPinnedFile(reviewer.configuration, { read: true, excluded })), excluded,
-      { qualification: reviewer.qualification, runtimeSha256, independentOf,
+      { qualification: reviewer.qualification, runtimeSha256, independentOf, verifyRuntimeIdentity,
         configurationSha256: reviewer.configuration.sha256, hostPin: reviewer.configuration });
     const observed = runtimeBinding(cfg, reviewer.session, reviewer.configuration.sha256);
-    need(implementer.route === manifest.route && reviewer.route === reviewerRoute &&
-      observed.explicit && observed.version === reviewer.version, "Approved native route or reviewer version differs from the effective role");
+    const resolvedRoute = observed.explicit?.client === piReviewer.client ? piReviewer.route : reviewerRoute;
+    need(implementer.route === manifest.route && reviewer.route === resolvedRoute &&
+      observed.explicit && observed.version === reviewer.version &&
+      (reviewer.client !== piReviewer.client || observed.explicit.client === reviewer.client &&
+        observed.explicit.provider === reviewer.provider &&
+        observed.explicit.executableSha256 === selected.roles.reviewer.executable.sha256 &&
+        observed.explicit.reasoningEffort === selected.roles.reviewer.reasoningEffort), "Approved native route or reviewer version differs from the effective role");
     roleAudit = { implementer: { provider: manifest.binding.provider, args: manifest.args,
       reasoningEffort: manifest.binding.reasoningEffort, runtimeVersion: manifest.runtimeVersion,
       qualificationSha256: manifest.qualificationSha256, roleBindingsSha256: roleBindings.sha256 },
@@ -189,7 +195,7 @@ export async function bindPair(entry, grant, runtimeSha256, registry, prospectiv
     cfg = await trustedJson(reviewer.configuration);
     validateHostConfig(cfg);
   }
-  const relaySource = cfg.relay.keyFile ?? cfg.relay.socket;
+  const relaySource = reviewRelaySource(cfg);
   need([...roots, ...profiles, ...roleInputs.filter((name) => !profiles.includes(name))]
     .every((root) => separate(root, relaySource)), "Reviewer relay source overlaps role, runtime or evidence state");
   need(cfg.model === reviewer.model && (explicit || runtimeBinding(cfg, reviewer.session).configurationSha256 === reviewer.configuration.sha256),

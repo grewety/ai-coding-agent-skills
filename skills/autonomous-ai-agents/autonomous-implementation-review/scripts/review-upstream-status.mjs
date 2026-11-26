@@ -1,4 +1,4 @@
-export const upstreamClasses = Object.freeze(["upstream-rate-limited", "upstream-overloaded", "upstream-auth-failed"]);
+export const upstreamClasses = Object.freeze(["upstream-rate-limited", "upstream-overloaded", "upstream-auth-failed", "inference-relay-refused"]);
 export function classifyUpstream(status) {
   if (status === 429) return upstreamClasses[0];
   if (status === 529) return upstreamClasses[1];

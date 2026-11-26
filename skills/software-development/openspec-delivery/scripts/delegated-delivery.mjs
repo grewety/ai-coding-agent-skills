@@ -28,7 +28,7 @@ const runtimeSources = [
 ];
 
 const configurableRuntimeSources = [
-  "adapter-qualification.mjs", "agent-configuration.mjs", "agent-discovery.mjs", "agent-role-adapters.mjs",
+  "adapter-qualification.mjs", "agent-configuration.mjs", "agent-discovery.mjs", "agent-pi-runtime.mjs", "agent-role-adapters.mjs",
   "agent-role-config.mjs", "agent-setup.mjs", "role-config.mjs", "runtime-version.mjs", "setup.mjs",
 ];
 

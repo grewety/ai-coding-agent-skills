@@ -88,40 +88,39 @@ Installation and metadata migration SHALL NOT grant issue-write authority.
 - **THEN** the issue records impact and authorization fields, and does not copy `tasks.md`
 
 ### Requirement: Change name is the identity
-The full OpenSpec change directory name SHALL identify the change across the issue,
-pull request and evidence. Projects selecting the naming convention SHALL generate
-`<slug>-<lowercase-ulid>` once at creation, automatically from a short proposal
-request. The authorized branch SHALL be `change/<full-name>` through specification,
-implementation and review. Existing names SHALL remain valid and unchanged.
+The full change directory name SHALL identify the change in its issue, PR and evidence.
+Adopting projects SHALL derive `<slug>-<lowercase-ulid>` once from the short
+proposal at creation and use `change/<full-name>` through specification,
+implementation and review. Existing names SHALL stay valid and unchanged.
 
 #### Scenario: Short proposal request
 - **WHEN** the operator requests `/openspec-propose add-dark-mode` for a new change
-- **THEN** the agent generates the suffix before OpenSpec scaffolding and reuses the returned name without requiring the operator to type a ULID
-- **AND** naming alone does not authorize writes; the selected proposal invocation includes isolated setup, not implementation, commits or publication
+- **THEN** generate the suffix before scaffolding and reuse the name without asking for a ULID
+- **AND** naming grants no writes. The proposal invocation includes isolated setup, without implementation, commits or publication.
 
 #### Scenario: Resume and ambiguous selection
-- **WHEN** an operator resumes by a short slug or current change context
-- **THEN** the agent resolves the existing full name without generating another suffix
-- **AND** ambiguous matches require operator selection, never newest-change guessing
+- **WHEN** an operator resumes by short slug or current change context
+- **THEN** resolve the existing full name without a new suffix
+- **AND** ambiguity requires operator selection. Recency alone cannot resolve it.
 
 #### Scenario: Read-only naming helper
 - **WHEN** the helper generates an identity or resolves active change directories
-- **THEN** it emits the full name, path and branch without writing files, refs or installed profiles
-- **AND** malformed input, repeated options and symlinked discovery paths are refused
+- **THEN** report name, path and branch without writing files, refs or profiles
+- **AND** reject malformed input, repeated options and symlinked discovery paths
 
 #### Scenario: Second clone
-- **WHEN** another checkout already edits the same capability spec
-- **THEN** work stops for reconciliation even if a new change name could be chosen
+- **WHEN** another checkout edits the same capability spec
+- **THEN** stop for reconciliation even if another change name is available
 
 #### Scenario: Durable reference across archive movement
-- **WHEN** a ticket or another document refers to an OpenSpec change
-- **THEN** it cites the full change name and optional artifact role, not the moving active/archive path
-- **AND** locating an archived package preserves that identity and does not invent a new name or claim that an active-only helper searches archives
+- **WHEN** a ticket or document cites an OpenSpec change
+- **THEN** use the full name and optional artifact role without its moving path
+- **AND** archive lookup preserves the name. An active-only helper cannot claim archive search.
 
 #### Scenario: Proposal-time documentation
-- **WHEN** the documentation issue is created during a proposal
-- **THEN** it records the request, blast radius, risk and authorization boundary without prospective review, merge or closure evidence
-- **AND** any later approval binds retained input revisions rather than treating an editable issue body as immutable
+- **WHEN** a proposal creates its documentation issue
+- **THEN** record request, blast radius, risk and authority, with no prospective review, merge or closure evidence
+- **AND** later approval binds retained input revisions. The issue body remains editable.
 
 ### Requirement: Independent reviewer before merge
 
@@ -258,23 +257,26 @@ Each non-terminal stop SHALL include a compact Next-Step Footer from packaged ve
 
 ### Requirement: Bounded protected closeout resume
 
-Under a valid `finish` grant, delivery SHALL watch applicable protected checks for a finite period on the exact reviewed PR head, reuse existing PRs, and advance eligible approved closeout chapters when their predicates pass. A contextual `continue` SHALL use the retained grant and verified remote state.
+With a valid `finish` grant, delivery SHALL wait finitely for protected checks
+on the exact reviewed PR head, reuse PRs and advance eligible approved chapters
+when their predicates pass. Contextual `continue` SHALL reuse the grant and
+verified remote state.
 
 #### Scenario: Same-head checks complete
-- **WHEN** an existing authorized PR still targets the exact reviewed SHA and applicable checks and required reviews pass
-- **THEN** delivery continues under the same grant through protected merge, exact integrated gates, necessary scope-bound spec promotion, record-only archive closure, acceptance-bound issue closure, and cleanup
-- **AND** it runs full project tests on the archived closure candidate before publishing that PR and requires fresh exact-closure review
-- **AND** it performs each already authorized eligible chapter once and does not open a duplicate PR or replay a completed merge
+- **WHEN** an authorized PR retains the reviewed SHA and applicable checks and required reviews pass
+- **THEN** use the retained grant for protected merge, integrated gates, required scope-bound spec promotion, record-only archive closure, acceptance-bound issue closure and cleanup
+- **AND** run full tests and obtain fresh exact-closure review before publishing the archived closure candidate
+- **AND** run each authorized eligible chapter once. Avoid duplicate PRs and replayed merges.
 
 #### Scenario: Bounded wait encounters a stop
-- **WHEN** a required check fails, a human must review or perform a task, the head changes, a deployment gate fails, or the deadline expires
-- **THEN** delivery retains exact head and required-check/review evidence and pauses with the actionable reason
-- **AND** it derives applicable required checks from branch protection and rulesets, distinguishes optional external suites, and surfaces stalled optional automation as a bounded operator decision when it needs disposition. It does not treat optional queue state as required protection or automatically rerun it
+- **WHEN** a required check fails, a human must review or act, the head changes, a deployment gate fails or time expires
+- **THEN** retain exact head, required checks and review evidence. Pause with an actionable reason.
+- **AND** derive required checks from branch protection and rulesets. Distinguish optional suites. Seek a bounded decision for stalled optional automation requiring disposition. Optional queues confer no protection requirement or automatic rerun.
 
 #### Scenario: External verification and preview
-- **WHEN** a pending push could trigger external automation, an operator requests external or paid testing, or a declared deploy preview needs review
-- **THEN** delivery enforces the separate per-action grant before activation and presents a compact card for an external test naming target, cases, built-artifact-only exposure, expected cost or credits, and one-run scope
-- **AND** it surfaces the preview URL and preserves a declared human review pause, uses loopback for a local try-out, tears down an authorized temporary tunnel immediately, and requires new authority for a retry
+- **WHEN** a push could trigger external automation, an operator requests external or paid tests, or a declared deploy preview needs review
+- **THEN** require a separate per-action grant before activation. Show a compact card with target, cases, built-artifact-only exposure, expected cost or credits and one-run scope.
+- **AND** show the preview URL and preserve declared human review pauses. Use loopback for try-out, tear down authorized temporary tunnels immediately and require fresh retry authority.
 
 ### Requirement: Retire verified worktrees across resumed runs
 
@@ -714,6 +716,18 @@ External role configuration SHALL apply a default `versionPolicy: "gte"` with an
 #### Scenario: Refuse conflicting or changed destinations
 - **WHEN** a preview changes, a destination aliases a repository or live profile, a symlink redirects an output, or an existing file would be overwritten without matching confirmation
 - **THEN** refuse the write and report the conflict without exposing credentials or presenting unverified configuration as usable.
+
+#### Scenario: Report the observed Grok version
+
+- **WHEN** a trusted installed `grok` reports `grok 1.0.92 (b06756fd6256) [stable]`
+- **THEN** discovery reports version `1.0.92` under the existing `grok-build` configuration identity
+- **AND** supported legacy `grok-build` output still works. Untrusted paths or malformed and ambiguous output stay unverified.
+
+#### Scenario: Stage an explicit alternative reviewer
+
+- **WHEN** an operator selects a non-Claude contained Reviewer binding
+- **THEN** setup validates the exact client, provider, model, relay, effective settings, runtime and limits and reports an explicit qualification disposition
+- **AND** incomplete or mismatched offline and bounded live proof keeps that binding unsupported for real review, without ambient profile fallback or changing the default reviewer.
 
 ### Requirement: Deterministic isolated distribution verification
 

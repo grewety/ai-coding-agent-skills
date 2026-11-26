@@ -9,8 +9,9 @@ Auth readiness, permissions, available models and reasoning controls are
 unknown unless observed. Discovery grants neither qualification nor run authority.
 Grok discovery prefers the `grok` executable and falls back to an executable
 `grok-build` on the discovery path. Both report the existing `grok-build`
-client identifier. Retained role configurations keep their original executable
-and version pins.
+client identifier. For trusted `grok` 1.0.92 the credential-free probe parses
+`grok 1.0.92 (b06756fd6256)` with or without the trailing ` [stable]`.
+Retained role configurations keep their original executable and version pins.
 
 Prepare a JSON setup request with `schemaVersion: 1`, `directory` (an
 existing private external Linux directory), `roles`, and `reviewer`.
@@ -116,6 +117,8 @@ for the exact independent runtime and provider readback, paid grant and replay.
 | Claude Code Implementer pilot | Requires native OS workspace-write and protected-path denial evidence. |
 | Hermes, OpenCode, Pi, agy, grok-build Implementer pilots | Discovery reports local absence where applicable. A present tool still needs effective settings, native isolation and original-attempt handover evidence. |
 | Claude Code contained Reviewer pilot | Admission supports independently pinned same-UID Anthropic relay and whole-file stream readback. Fresh live proof must cover the actual native effort request, containment, full Read results and receipt replay. The dedicated UID broker lacks verified explicit effort readback. |
+| Grok 1.0.92 contained Reviewer pilot | Unsupported. `streaming-messages-json` has no verified host-only xAI OAuth routing through `inference.sock`. Admission stops before export exposure. The version probe was credential-free and made no live xAI call. |
+| Pi 1.5.2 contained Reviewer pilot | Opt-in via `hermes-proxy-xai-oauth`, model `grok-4.7`, thinking `off`. An offline synthetic SSE control proved native parallel `read` stream replay. Real review requires independently pinned offline and bounded live qualification for the release inventory, host, exact socket, provider and limits. This is the only fallback eligible for a separate trial grant for this change. |
 | Codex contained Reviewer pilot | Requires a qualified host relay and stream-proved whole-file audit and receipt mapping. |
 | Kilo, Gemini, OpenRouter and generic OpenAI-compatible relays | Discovery or adapter contract only. |
 
@@ -138,8 +141,8 @@ reviewer baseline is the pinned Claude Code 2.1.330 route.
 | Backend and observed version | Contained reviewer | Implementer | Orchestrator |
 | --- | --- | --- | --- |
 | Claude Code 2.1.330 and 2.1.332 | 2.1.330 is the qualified pinned baseline. The route uses a single executable, `stream-json`, `dontAsk`, Read as the sole tool, no session persistence, empty settings sources, strict MCP configuration and finite turn and spend limits. A version change needs exact qualification. | Strong candidate with OS workspace-write proof. | Strong. |
-| Grok 1.0.92 | Tier 1 candidate pending isolated Unix relay and OAuth separation validation. The actual `grok` executable supports native headless `-p --single`, `streaming-messages-json`, a tool allowlist, finite turns and controls to disable web and search, memory, planning and subagents. | Strong candidate with OS workspace-write proof. | Strong. |
-| Pi 1.5.2 | Tier 1 candidate. JSON streaming, offline mode, no session, read-only tools and disabled context, extensions, MCP and skills fit the model. The observed CLI supplies no turn cap. Qualification needs a relay request limit and deadline plus pinned runtime and base URL. | Medium. | Strong. |
+| Grok 1.0.92 | Unsupported for the contained Tier 1 route. The observed CLI has native headless streaming and tool and turn controls. Host-only subscription inference through the Unix relay remains unverified. | Strong candidate with OS workspace-write proof. | Strong. |
+| Pi 1.5.2 | Tier 1 candidate with synthetic offline evidence. The pinned release runs JSON streaming with only `read` and disabled ambient discovery. The host relay supplies the 96-request limit and the supervisor supplies the deadline. Live qualification needs the exact host Hermes proxy xAI OAuth binding. See [Pi host setup and qualification](claude-reviewer.md#prepare-and-qualify-the-pi-route). | Medium. | Strong. |
 | Hermes 0.23.4 | Medium. The Python environment and toolset granularity complicate the minimal rootfs and single-tool boundary. A host-only proxy may help a separately qualified route. | Medium. | Strong. |
 | Codex 0.172.0 | Medium, pending a compatible relay and exact whole-file Read audit. | Native workspace-write is appropriate under its qualified route. | Strong. |
 | OpenCode 2.3.2 and Kilo 7.8.27 | Unsuitable for the current minimal rootfs. Client/server and state dependencies, with insufficient single-Read allowlist and turn controls. | Requires separate qualification. | Requires separate qualification. |

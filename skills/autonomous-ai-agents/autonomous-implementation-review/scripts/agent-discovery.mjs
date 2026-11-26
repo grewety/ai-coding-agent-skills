@@ -36,11 +36,7 @@ export function observeVersion(file, { run = spawnSync, searchPath = process.env
   const result = run(file, ["--version"], { cwd: "/", env, timeout: 1800, killSignal: "SIGKILL",
     maxBuffer: 4096, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   if (result.status !== 0 || result.error) return null;
-  // Grok kept its legacy configuration identity when the executable name changed.
-  const stdout = client === "grok-build" && typeof result.stdout === "string" && result.stdout.length <= 4096
-    ? result.stdout.trim().replace(/^grok (?=v?\d)/, "grok-build ")
-    : result.stdout;
-  return reportedVersion(stdout, client);
+  return reportedVersion(result.stdout, client);
 }
 
 export function detectAgents(options = {}) {

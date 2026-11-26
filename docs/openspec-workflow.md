@@ -819,16 +819,19 @@ Orchestration is optional. It requires the workflow plugin, explicit role and
 model configuration, and a supported host. Package installation does not create
 those roles.
 
-Current source versions are delivery 1.9.0 and `openspec-next` 0.8.0 in
-`openspec-development` 1.9.0, and core skill 0.23.0 in
-`autonomous-orchestration` 1.13.0.
+Current source versions are delivery 1.10.0 and `openspec-next` 0.8.0 in
+`openspec-development` 1.10.0, and core skill 0.24.0 in
+`autonomous-orchestration` 1.14.0.
 Representation support adds no upstream workflow, runtime dependency or
 installation route. Package availability/byte checks do not establish account
 sync, host execution, native client discovery, Desktop acceptance or scanner approval.
 
-The [contained Claude reviewer](claude-reviewer.md) is an opt-in transport for exact candidate
-and charter-v1 approach review. Check the exact approved export and applicable
-review authority before paid inference. A verified low-touch parent selects
+The contained reviewer is an opt-in transport for exact candidate and charter-v1
+approach review. Claude remains the default. The opt-in Pi 1.5.2 route requires a
+private host Hermes proxy socket for xAI OAuth and matching offline and bounded live
+qualification before real review. Check the exact approved export and applicable
+review authority before paid inference. See the [contained reviewer guide](claude-reviewer.md).
+A verified low-touch parent selects
 the per-change defaults and the explicit override. The [operator runbook](openspec-operator-runbook.md#launch-contained-review)
 shows the direct packaged Node invocations. A host pin selects concurrency
 from one through three, with serial execution as the default. Replay the

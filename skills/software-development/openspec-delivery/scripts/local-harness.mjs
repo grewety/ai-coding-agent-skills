@@ -67,7 +67,7 @@ function invoke(binding, checkout, candidate) {
     if (isMcp) {
       child.stdin.on("error", () => { if (!response) fail("MCP harness input failed"); });
       send(mcpRequest(1, "initialize", { protocolVersion: "2024-11-05", capabilities: {},
-        clientInfo: { name: "openspec-delivery", version: "1.9.0" } }));
+        clientInfo: { name: "openspec-delivery", version: "1.10.0" } }));
     }
     child.on("error", () => fail("Harness launch failed"));
     child.stdout.on("data", (chunk) => {

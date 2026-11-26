@@ -1,10 +1,10 @@
-# Contained Claude reviewer
+# Contained reviewer
 
 See [external AI roles and backend pilots](configurable-backends.md) for explicit role settings and the
 [observed backend suitability matrix](configurable-backends.md#observed-backend-suitability).
 
-The optional `autonomous-implementation-review` 0.23.0 skill and
-`autonomous-orchestration` 1.13.0 bundle ship a standalone command for candidate
+The optional `autonomous-implementation-review` 0.24.0 skill and
+`autonomous-orchestration` 1.14.0 bundle ship a standalone command for candidate
 review and charter-v1 approach review. Use the complete package from a reviewed
 checkout or the [Claude installation guide](claude-installation.md). Resolve
 `scripts/review-candidate.mjs` inside that package. This command runs locally
@@ -20,6 +20,14 @@ Qualification follows the exact published role and host settings.
 Use the [worker runtime](worker-runtime.md) for exclusive worker pairing
 and [review configuration](openspec-review-configuration.md) for policy,
 approved exposure and single-run exceptions.
+
+Claude remains the default. The explicit Pi 1.5.2 route has offline evidence
+against synthetic inference and needs matching live host qualification before
+real review. Grok 1.0.92 is unsupported. The credential-free investigation
+left host-only xAI OAuth routing for `streaming-messages-json` through
+`inference.sock` unverified, so admission refuses the route before export
+exposure. No live xAI call was made with Grok. The only permitted fallback
+for this change is Pi through Hermes proxy xAI OAuth under a separate trial grant.
 
 ## Host setup and credential routes
 
@@ -61,6 +69,79 @@ read from the packet. Approve those bytes before launch and keep secrets and
 unrelated context out of the export, including gate attachments and old file
 versions. Treat raw captures and extracted reports as sensitive review data.
 
+## Prepare and qualify the Pi route
+
+Prepare these inputs on the trusted host outside the checkout, exports, output,
+ledger and live profiles. Use the same private directory protections as the
+Claude route. Pass the resulting pins through the external role setup preview
+and confirm the exact preview only under operator authority.
+
+1. Stage the existing, independently verified `@earendil-works/pi-coding-agent`
+   1.5.2 release and its runtime dependencies in a release-only directory. Its
+   sole top-level entry is `node_modules`. Include the package metadata and
+   `dist/bundle/cli.js`. Use canonical paths, trusted ownership and no group or
+   other write bits. Use only internal relative symlinks. `REVIEW_SCRIPTS` is
+   the absolute packaged scripts directory and `PI_RELEASE` is the absolute
+   directory containing `node_modules`. This command reads the release and
+   prints the pin for `reviewer.runtime.piRelease`.
+
+   ```sh
+   node --input-type=module -e '
+     const { piReleaseInventory } = await import(process.argv[1] + "/agent-pi-runtime.mjs");
+     const path = process.argv[2];
+     console.log(JSON.stringify({ path, ...await piReleaseInventory(path) }));
+   ' "$REVIEW_SCRIPTS" "$PI_RELEASE"
+   ```
+
+   Pin the Pi executable as provenance in `roles.reviewer.executable` and
+   select `client: "pi"`, `provider: "xai-oauth"`, `model: "grok-4.7"`,
+   `reasoningEffort: "off"`, `transport: "unix-socket"`, `versionPolicy: "exact"`,
+   `versionCheck: true` and `exactVersion: "1.5.2"`. The sandbox runs the
+   fixed release entry from a verified read-only snapshot with the pinned Node
+   and libraries. It mounts `/review` read-only and uses disposable state,
+   disabled ambient discovery and only `read`. The host relay caps requests at
+   the schema 2 host's `maxTurns: 96` and the supervisor applies `timeoutMs`.
+
+2. Provision a trusted host-side broker for the selected Hermes xAI OAuth
+   backend. It must serve streamed `POST /v1/chat/completions` for `grok-4.7`
+   on a canonical `hermes-xai.sock` owned by the invoking UID, mode `0600`, in
+   a directory owned by that UID, mode `0700`. Authenticate upstream and keep
+   the credentials and refresh state entirely on the host. An HTTP health
+   response or a local SSE test establishes only transport behavior. Verify
+   upstream protocol and OAuth identity separately. The review runner verifies
+   socket identity and forwards only allowed inference. The isolated process
+   receives the separate per-invocation `inference.sock`.
+
+   With `HERMES_SOCKET` set to the absolute broker socket path, read its pin:
+
+   ```sh
+   node --input-type=module -e '
+     const { lstat } = await import("node:fs/promises");
+     const path = process.argv[1];
+     const stat = await lstat(path, { bigint: true });
+     if (!stat.isSocket()) throw Error("Expected the host Hermes proxy socket");
+     console.log(JSON.stringify({ path, device: String(stat.dev), inode: String(stat.ino) }));
+   ' "$HERMES_SOCKET"
+   ```
+
+   In setup choose `reviewer.relay.route: "hermes-proxy-xai-oauth"` and a
+   nonsecret `credentialRef`. Store the relay JSON with `schemaVersion: 1`,
+   the same `route` and `credentialRef`, and the socket pin as `upstreamSocket`.
+   Pin its exact bytes and path as `reviewer.runtime.relayConfiguration`.
+   A re-created socket changes its inode and requires a matching new pin and
+   evidence for the changed binding.
+
+3. Retain independent offline control evidence for the exact released package,
+   raw schema 2 host bytes, runtime constraints, role and relay. Use the
+   [packaged trial procedure](../skills/autonomous-ai-agents/autonomous-implementation-review/references/review-candidate.md#pi-qualification-trial)
+   with the separate synthetic one-run grant. Replay the sealed trial offline
+   and retain the independent status hash, canonical grant digest and complete
+   captures. The live proof must identify the approved Hermes OAuth route and
+   record actual containment, credential custody, request/deadline bounds,
+   whole-file parallel coverage and strict receipt replay. A matching sealed
+   qualification plus independently pinned `expect.explicit`, `expect.generator`
+   and `expect.qualification` are required before running a real review.
+
 ## Prepare, run and verify
 
 Use the [packaged CLI reference](../skills/autonomous-ai-agents/autonomous-implementation-review/references/review-candidate.md)
@@ -71,7 +152,7 @@ approved attachments. In approach mode, bind the raw plan inputs, charter-v1
 record, correction if present, authority, fixed model and ledger. Use a fresh
 reviewer session and a declared publisher evidence root.
 
-For an explicit Claude pilot, use the setup-produced schema 2 host and
+For an explicitly qualified reviewer, use the setup-produced schema 2 host and
 independently pin the qualification manifest as `expect.qualification`
 (`path` and `sha256`). Also pin the generating `provider` and `session` in
 `expect.generator`. The candidate generator is the settled Implementer.
@@ -113,8 +194,8 @@ node review-candidate.mjs --verify --request REQUEST --expect EXPECT --export EX
    file bytes and packet scopes. Retain the approved hash in the independent
    expectation, then use offline `--check` to confirm the sealed inventory and
    packet count. Set `maxTurns >= 11` for low-touch packet feasibility.
-   Each packet can assign at most `maxTurns - 10` whole-file reads. The host
-   schema still accepts 1–128 for standalone probes and retained legacy runs. Configure optional `interPacketDelayMs`
+   Each packet can assign at most `maxTurns - 10` whole-file reads. Legacy
+   hosts accept 1–128 for standalone probes and retained runs. Configure optional `interPacketDelayMs`
    from 0 to 30000 and `runTimeoutMs` from 1000 to 3600000 in the pinned host.
    Optional `packetConcurrency` accepts integers 1 through 3 and defaults to 1.
    For 2 or 3, pin the raw host bytes, match the value in the independent
@@ -128,9 +209,11 @@ node review-candidate.mjs --verify --request REQUEST --expect EXPECT --export EX
    `probe-passed` or `probe-failed` with separate captures. For
    each approved mode run, use a fresh output root and an expectation without
    `statusSha256`. The mode run performs its own separate probe before sending
-   any packet. It checks the model and session, only `Read` in the tool
-   inventory, empty plugin, MCP, skill and slash-command inventories, and 100%
-   successful whole-file Read coverage for every assigned packet.
+   any packet. The native audit checks the model and session, the pinned
+   startup inventory, and 100% whole-file coverage for every assigned packet.
+   Claude offers only `Read` with empty plugin, MCP, skill and slash-command
+   inventories. Pi offers only `read` and the audit matches each parallel
+   result to its call ID and exact file bytes.
    After a failure, active siblings settle and queued packets stop. Offline
    verification checks the sealed launch and settlement order and each
    packet's capture. A failed or incomplete run cannot be accepted.

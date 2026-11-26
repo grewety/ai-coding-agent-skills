@@ -17,7 +17,7 @@ import { attemptWindow, checkCheckout, checkoutProtectedPaths, gitState, loadAut
 const packageRoot = fileURLToPath(new URL("../", import.meta.url)).replace(/\/$/, "");
 // Keep this inventory in sync with the delivery verifier and its transitive inventory test.
 const runtimeSources = [
-  "adapter-qualification.mjs", "agent-configuration.mjs", "agent-discovery.mjs", "agent-role-adapters.mjs",
+  "adapter-qualification.mjs", "agent-configuration.mjs", "agent-discovery.mjs", "agent-pi-runtime.mjs", "agent-role-adapters.mjs",
   "agent-role-config.mjs", "agent-setup.mjs", "role-config.mjs", "runtime-version.mjs", "setup.mjs",
   "bounded-worker.mjs", "bounded-worker.py", "implementer-bindings.mjs", "implementer-claims.mjs",
   "implementer-observations.mjs", "implementer-recovery.mjs", "implementer-runtime.mjs", "implementer-sandbox.mjs",
@@ -183,7 +183,7 @@ async function prepareAttempt(entry, registry, runtimeSha256, batchSize, emit, r
   need(batchSize <= grant.limits.batchSize && (batchSize === 1 || (predecessor === null && grant.accepted.length === 0)),
     "Batch must contain independently admitted initial assignments");
   need(predecessor !== null || grant.continuation === null, "Continuation lacks its original predecessor");
-  const roles = await bindPair(entry, grant, runtimeSha256, registry, prospective);
+  const roles = await bindPair(entry, grant, runtimeSha256, registry, prospective, runtimeIdentity);
   if (standalone) need(roles.roleAudit, "Standalone Implementer requires a qualified explicit pair");
   const context = { entry, grant, roles, registry, repository, claimDirectory, runtimeSha256 };
   await dimensions(context);
@@ -269,7 +269,7 @@ async function prepareAttempt(entry, registry, runtimeSha256, batchSize, emit, r
   await checkCheckout(request, grant, { allowRetainedProgress: Boolean(launch.timeoutContinuation) });
   const refreshed = await loadAuthority(entry, repository);
   need(equal(refreshed.grant, grant) && equal(refreshed.inference, inference), "Execution authority changed after preflight");
-  const checkedRoles = await bindPair(entry, grant, runtimeSha256, registry, prospective);
+  const checkedRoles = await bindPair(entry, grant, runtimeSha256, registry, prospective, runtimeIdentity);
   need(equal(checkedRoles, roles), "Paired role runtime changed after native preflight");
   const protectedGit = await gitState(workspace);
   if (prospective) {
@@ -300,7 +300,7 @@ async function finish(context) {
   const { attemptDirectory, launch, roles, entry, grant, runtimeSha256, registry } = context;
   const view = await currentAttempt(attemptDirectory, launch);
   if (view.phase !== "settled") return summarize(view);
-  const currentRoles = await bindPair(entry, grant, runtimeSha256, registry, launch.attemptPolicy === true);
+  const currentRoles = await bindPair(entry, grant, runtimeSha256, registry, launch.attemptPolicy === true, runtimeIdentity);
   need(equal(currentRoles, roles), "Role settings, package inventory or profile drifted during the attempt");
   return exclusiveOperation(context.claimDirectory, async () => handoffFor(context, view.state));
 }
@@ -367,7 +367,7 @@ async function retainedContext(entry, registry) {
     launch.requestSha256 === hash(requestBytes(entry.request)) && launch.invocationSha256 === hash(jsonBytes(entry)) &&
     launch.runtimeSha256 === runtimeSha256, "Original retained attempt, runtime or request differs");
   const { grant, prospective } = await loadAuthority(entry, repository);
-  const roles = await bindPair(entry, grant, runtimeSha256, registry, prospective);
+  const roles = await bindPair(entry, grant, runtimeSha256, registry, prospective, runtimeIdentity);
   need(equal(roles.pair, launch.pair) && equal(roles.roleAudit, launch.roleAudit) && equal(roles.physicalSlot, launch.slot) &&
     equal(physicalReservation(launch.claimId, attempt, roles), launch.reservation), "Original pinned role or physical slot differs");
   return { entry, registry, repository, claimDirectory, attemptDirectory, owner, launch, grant, roles, runtimeSha256 };
