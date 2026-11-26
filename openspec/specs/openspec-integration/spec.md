@@ -70,12 +70,12 @@ SHALL NOT be the specification authority, a task list, or an admission lock.
 Independent OpenSpec changes MAY be specified concurrently.
 
 #### Scenario: Offline or unauthorized issue creation
-- WHEN local specification proceeds without authority or connectivity for its required issue
-- THEN the proposal keeps `github_issue: null` and remains pending before plan approval, without creating a pull request or fabricating an issue
+- **WHEN** local specification proceeds without authority or connectivity for its required issue
+- **THEN** the proposal keeps `github_issue: null` and remains pending before plan approval, without creating a pull request or fabricating an issue
 
 #### Scenario: Overlapping specifications
-- WHEN two active changes modify the same capability spec
-- THEN merge waits for explicit reconciliation
+- **WHEN** two active changes modify the same capability spec
+- **THEN** merge waits for explicit reconciliation
 
 ### Requirement: Risk-focused documentation issue
 For projects selecting proposal-time documentation, an authorized new proposal
@@ -84,44 +84,43 @@ follow the risk-focused template and SHALL NOT claim ISO/IEC 27001 conformity.
 Installation and metadata migration SHALL NOT grant issue-write authority.
 
 #### Scenario: Documented request
-- WHEN the operator sends the documentation prompt
-- THEN the issue records impact and authorization fields, and does not copy `tasks.md`
+- **WHEN** the operator sends the documentation prompt
+- **THEN** the issue records impact and authorization fields, and does not copy `tasks.md`
 
 ### Requirement: Change name is the identity
-The full OpenSpec change directory name SHALL identify the change across the issue,
-pull request and evidence. Projects selecting the naming convention SHALL generate
-`<slug>-<lowercase-ulid>` once at creation, automatically from a short proposal
-request. The authorized branch SHALL be `change/<full-name>` through specification,
-implementation and review. Existing names SHALL remain valid and unchanged.
+The full change directory name SHALL identify the change in its issue, PR and evidence.
+Adopting projects SHALL derive `<slug>-<lowercase-ulid>` once from the short
+proposal at creation and use `change/<full-name>` through specification,
+implementation and review. Existing names SHALL stay valid and unchanged.
 
 #### Scenario: Short proposal request
-- WHEN the operator requests `/openspec-propose add-dark-mode` for a new change
-- THEN the agent generates the suffix before OpenSpec scaffolding and reuses the returned name without requiring the operator to type a ULID
-- AND naming alone does not authorize writes; the selected proposal invocation includes isolated setup, not implementation, commits or publication
+- **WHEN** the operator requests `/openspec-propose add-dark-mode` for a new change
+- **THEN** generate the suffix before scaffolding and reuse the name without asking for a ULID
+- **AND** naming grants no writes. The proposal invocation includes isolated setup, without implementation, commits or publication.
 
 #### Scenario: Resume and ambiguous selection
-- WHEN an operator resumes by a short slug or current change context
-- THEN the agent resolves the existing full name without generating another suffix
-- AND ambiguous matches require operator selection, never newest-change guessing
+- **WHEN** an operator resumes by short slug or current change context
+- **THEN** resolve the existing full name without a new suffix
+- **AND** ambiguity requires operator selection. Recency alone cannot resolve it.
 
 #### Scenario: Read-only naming helper
-- WHEN the helper generates an identity or resolves active change directories
-- THEN it emits the full name, path and branch without writing files, refs or installed profiles
-- AND malformed input, repeated options and symlinked discovery paths are refused
+- **WHEN** the helper generates an identity or resolves active change directories
+- **THEN** report name, path and branch without writing files, refs or profiles
+- **AND** reject malformed input, repeated options and symlinked discovery paths
 
 #### Scenario: Second clone
-- WHEN another checkout already edits the same capability spec
-- THEN work stops for reconciliation even if a new change name could be chosen
+- **WHEN** another checkout edits the same capability spec
+- **THEN** stop for reconciliation even if another change name is available
 
 #### Scenario: Durable reference across archive movement
-- WHEN a ticket or another document refers to an OpenSpec change
-- THEN it cites the full change name and optional artifact role, not the moving active/archive path
-- AND locating an archived package preserves that identity and does not invent a new name or claim that an active-only helper searches archives
+- **WHEN** a ticket or document cites an OpenSpec change
+- **THEN** use the full name and optional artifact role without its moving path
+- **AND** archive lookup preserves the name. An active-only helper cannot claim archive search.
 
 #### Scenario: Proposal-time documentation
-- WHEN the documentation issue is created during a proposal
-- THEN it records the request, blast radius, risk and authorization boundary without prospective review, merge or closure evidence
-- AND any later approval binds retained input revisions rather than treating an editable issue body as immutable
+- **WHEN** a proposal creates its documentation issue
+- **THEN** record request, blast radius, risk and authority, with no prospective review, merge or closure evidence
+- **AND** later approval binds retained input revisions. The issue body remains editable.
 
 ### Requirement: Independent reviewer before merge
 
@@ -141,18 +140,18 @@ progress, approval or PR state, and SHALL remain included in the existing planni
 digest.
 
 #### Scenario: Stable proposal association
-- WHEN the proposal's documentation issue is read back successfully
-- THEN its full URL is recorded only on the proposal and remains unchanged by default
-- AND correcting metadata after plan approval requires reapproval
+- **WHEN** the proposal's documentation issue is read back successfully
+- **THEN** its full URL is recorded only on the proposal and remains unchanged by default
+- **AND** correcting metadata after plan approval requires reapproval
 
 #### Scenario: Archive and current spec identities
-- WHEN OpenSpec moves a completed change to its archive and updates current specs
-- THEN archived artifacts retain their original change identity and current specs carry only their capability identity
-- AND a same-files vault can query the new location without a second mutable tracker
+- **WHEN** OpenSpec moves a completed change to its archive and updates current specs
+- **THEN** archived artifacts retain their original change identity and current specs carry only their capability identity
+- **AND** a same-files vault can query the new location without a second mutable tracker
 
 #### Scenario: Invalid metadata
-- WHEN metadata has duplicate YAML keys, wrong types, unsupported fields, identities inconsistent with its native path, or delta-spec frontmatter
-- THEN the read-only metadata check fails without repairing files or bypassing upstream validation
+- **WHEN** metadata has duplicate YAML keys, wrong types, unsupported fields, identities inconsistent with its native path, or delta-spec frontmatter
+- **THEN** the read-only metadata check fails without repairing files or bypassing upstream validation
 
 ### Requirement: Short bounded delivery invocations
 
@@ -184,124 +183,127 @@ Projects explicitly adopting the invocation contract SHALL let the orchestrator 
 The delivery package SHALL supply read-only creation, reuse, location, same-change inventory reconciliation, and retirement previews, leaving execution and exact readback to the authorized orchestrator.
 
 #### Scenario: Automatic workspace preparation
-- WHEN authorized setup begins from a captured clean base without collisions
-- THEN the helper emits exact worktree creation arguments outside existing checkouts without writing files or refs
-- AND preparation precedes parallel proposal scaffolding and bootstrap uses the project's actual documented recipe
+- **WHEN** authorized setup begins from a captured clean base without collisions
+- **THEN** the helper emits exact worktree creation arguments outside existing checkouts without writing files or refs
+- **AND** preparation precedes parallel proposal scaffolding and bootstrap uses the project's actual documented recipe
 
 #### Scenario: Resume and retirement
-- WHEN the selected branch already has one verified registered dedicated worktree
-- THEN the agent reuses it and preserves dirty or interrupted work
-- AND removal requires exact clean head and reachable closure evidence, ignored-file inspection, no force and verified absence. Branch refs remain recoverable and earlier worktrees are individually reconciled against the same-change ownership evidence
+- **WHEN** the selected branch already has one verified registered dedicated worktree
+- **THEN** the agent reuses it and preserves dirty or interrupted work
+- **AND** removal requires exact clean head and reachable closure evidence, ignored-file inspection, no force and verified absence. Branch refs remain recoverable and earlier worktrees are individually reconciled against the same-change ownership evidence
 
 ### Requirement: Prospective proposal-to-freeze adoption
 
 Delivery SHALL enable `propose-to-freeze` only when the verified integrated plan parent selects it explicitly. Within held authority, the orchestrator SHALL produce one plan-only freeze and approval card per accepted draft revision and preserve draft-only operation and narrower restrictions.
 
 #### Scenario: Short proposal reaches an approval card
-- WHEN an opted-in project receives a short proposal or `/goal draft` with an inline goal or readable note, and selected planning gates pass
-- THEN verify the baseline and relevant upstream facts, select Goal-First or Task-Guided from the delivery boundary, prepare the ULID worktree before native scaffolding, bind the authorized proposal-time issue, and validate all native artifacts
-- AND run the packaged charter gate when policy selects or permits an explicit request for it, revalidate and re-review grounded corrections under inherited authority and finite budget, and supply newly required native artifacts
-- AND freeze only accepted planning inputs in one local plan-only commit and show its full SHA and mode-specific digest. Leave implementation untouched, with no worker launch or branch publication.
+- **WHEN** an opted-in project receives a short proposal or `/goal draft` with an inline goal or readable note, and selected planning gates pass
+- **THEN** verify the baseline and relevant upstream facts, select Goal-First or Task-Guided from the delivery boundary, prepare the ULID worktree before native scaffolding, bind the authorized proposal-time issue, and validate all native artifacts
+- **AND** run the packaged charter gate when policy selects or permits an explicit request for it, revalidate and re-review grounded corrections under inherited authority and finite budget, and supply newly required native artifacts
+- **AND** freeze only accepted planning inputs in one local plan-only commit and show its full SHA and mode-specific digest. Leave implementation untouched, with no worker launch or branch publication.
 
 #### Scenario: Draft-only or absent adoption
-- WHEN the parent lacks explicit selection, a contract change would adopt the policy for itself, or the operator requests `draft only` or `no commits`
-- THEN stop at the applicable uncommitted boundary without a frozen-plan approval card
-- AND allow explicitly requested review under its own authority, with a compact stop decision for missing binding, uncovered blockers, scope conflict or exhausted budget
+- **WHEN** the parent lacks explicit selection, a contract change would adopt the policy for itself, or the operator requests `draft only` or `no commits`
+- **THEN** stop at the applicable uncommitted boundary without a frozen-plan approval card
+- **AND** allow explicitly requested review under its own authority, with a compact stop decision for missing binding, uncovered blockers, scope conflict or exhausted budget
 
 #### Scenario: Resolve breaking-upgrade assumptions
-- WHEN accepted sources leave material breaking-upgrade uncertainty
-- THEN use authorized disposable-scratch probes before contract lock, record observations, and distinguish hard invariants from adaptable legacy layouts, flags or assertions
-- AND probes neither reuse real profile state nor authorize paid verification or satisfy later exact-candidate gates
+- **WHEN** accepted sources leave material breaking-upgrade uncertainty
+- **THEN** use authorized disposable-scratch probes before contract lock, record observations, and distinguish hard invariants from adaptable legacy layouts, flags or assertions
+- **AND** probes neither reuse real profile state nor authorize paid verification or satisfy later exact-candidate gates
 
 #### Scenario: Revise a draft
-- WHEN an operator answer or `changes: <feedback>` reply gives a clear authorized revision
-- THEN revise native planning directly, rerun applicable validation and review, and present a replacement card for an eligible authorized freeze
-- AND prior cards cannot authorize the revised plan, and out-of-scope feedback raises a concise decision
+- **WHEN** an operator answer or `changes: <feedback>` reply gives a clear authorized revision
+- **THEN** revise native planning directly, rerun applicable validation and review, and present a replacement card for an eligible authorized freeze
+- **AND** prior cards cannot authorize the revised plan, and out-of-scope feedback raises a concise decision
 
 ### Requirement: Bound short approval decisions
 
 An approval card SHALL bind exactly one repository, change, mode, integrated policy revision, registered workspace, frozen SHA and mode-specific digest. The displayed card and reply SHALL be retained with scope and restrictions. Short replies SHALL fail closed on ambiguity, stale identity, mismatched context or unverifiable decisions.
 
 #### Scenario: Approval only
-- WHEN an authenticated `approve` reply unambiguously follows one current displayed card and HEAD and frozen planning bytes still match
-- THEN record exact-plan or exact Goal Contract approval and stop before local execution
+- **WHEN** an authenticated `approve` reply unambiguously follows one current displayed card and HEAD and frozen planning bytes still match
+- **THEN** record exact-plan or exact Goal Contract approval and stop before local execution
 
 #### Scenario: Approval and local execution
-- WHEN the operator replies `approve and run` in the same verified context
-- THEN bind exact approval and the separately bounded local grant in distinct durable records before dispatch
-- AND reuse matching qualified role bindings and execute approved finite local gates, corrections, independent reviews and previewed commits, stopping before external work
-- AND retain `group 1`, `no commits` and other restrictions
+- **WHEN** the operator replies `approve and run` in the same verified context
+- **THEN** bind exact approval and the separately bounded local grant in distinct durable records before dispatch
+- **AND** reuse matching qualified role bindings and execute approved finite local gates, corrections, independent reviews and previewed commits, stopping before external work
+- **AND** retain `group 1`, `no commits` and other restrictions
 
 #### Scenario: Stale, unbound or cross-change reply
-- WHEN no card was displayed, the reply is ambiguous, identity, planning bytes or HEAD changed, or competing changes prevent unique binding
-- THEN record no approval or grant and start no worker
-- AND state the failed predicate and retain the explicit exact-identity approval route
+- **WHEN** no card was displayed, the reply is ambiguous, identity, planning bytes or HEAD changed, or competing changes prevent unique binding
+- **THEN** record no approval or grant and start no worker
+- **AND** state the failed predicate and retain the explicit exact-identity approval route
 
 ### Requirement: Context-aware next steps
 
 Each non-terminal stop SHALL include a compact Next-Step Footer from packaged versioned status and retained observations, with one ready-to-send input or two to four concrete choices for a genuine decision and no routine policy relay.
 
 #### Scenario: Inspect a checkpoint
-- WHEN an operator or another session inspects the change or an authorized phase stops
-- THEN deterministically report change, mode, branch, exact HEAD, applicable frozen digest and active attempt, checkpoint or handoff location, applicable PR and check state, P1–P8 observations and first unresolved predicate, restrictions, invariants or drift, and the legal next action
-- AND show missing evidence, keep inspect/init read-only, and reserve paid probes and profile updates for separate authority
+- **WHEN** an operator or another session inspects the change or an authorized phase stops
+- **THEN** deterministically report change, mode, branch, exact HEAD, applicable frozen digest and active attempt, checkpoint or handoff location, applicable PR and check state, P1–P8 observations and first unresolved predicate, restrictions, invariants or drift, and the legal next action
+- **AND** show missing evidence, keep inspect/init read-only, and reserve paid probes and profile updates for separate authority
 
 #### Scenario: Preserve context on resume
-- WHEN a clean phase boundary, context limit or long wait warrants a new session
-- THEN offer a short self-contained starter with the exact change and retained state and a supported launch scoped to its worktree and records
-- AND rotate an opted-in separately authorized relay only at a safe checkpoint, retaining the predecessor until the successor acknowledges exact HEAD, digest, ownership, pane identity and bounded grant evidence
-- AND rotation and new sessions grant no authority and cannot bypass original-attempt settlement
+- **WHEN** a clean phase boundary, context limit or long wait warrants a new session
+- **THEN** offer a short self-contained starter with the exact change and retained state and a supported launch scoped to its worktree and records
+- **AND** rotate an opted-in separately authorized relay only at a safe checkpoint, retaining the predecessor until the successor acknowledges exact HEAD, digest, ownership, pane identity and bounded grant evidence
+- **AND** rotation and new sessions grant no authority and cannot bypass original-attempt settlement
 
 #### Scenario: Refuse an unqualified route
-- WHEN a package is missing or drifted, a role binding is missing or mismatched, or a planning or execution blocker remains
-- THEN report the failed predicate, next safe choice and retained evidence reference without substituting a reviewer, creating a local launcher or editing an installed profile
+- **WHEN** a package is missing or drifted, a role binding is missing or mismatched, or a planning or execution blocker remains
+- **THEN** report the failed predicate, next safe choice and retained evidence reference without substituting a reviewer, creating a local launcher or editing an installed profile
 
 ### Requirement: Bounded protected closeout resume
 
-Under a valid `finish` grant, delivery SHALL watch applicable protected checks for a finite period on the exact reviewed PR head, reuse existing PRs, and advance eligible approved closeout chapters when their predicates pass. A contextual `continue` SHALL use the retained grant and verified remote state.
+With a valid `finish` grant, delivery SHALL wait finitely for protected checks
+on the exact reviewed PR head, reuse PRs and advance eligible approved chapters
+when their predicates pass. Contextual `continue` SHALL reuse the grant and
+verified remote state.
 
 #### Scenario: Same-head checks complete
-- WHEN an existing authorized PR still targets the exact reviewed SHA and applicable checks and required reviews pass
-- THEN delivery continues under the same grant through protected merge, exact integrated gates, necessary scope-bound spec promotion, record-only archive closure, acceptance-bound issue closure, and cleanup
-- AND it runs full project tests on the archived closure candidate before publishing that PR and requires fresh exact-closure review
-- AND it performs each already authorized eligible chapter once and does not open a duplicate PR or replay a completed merge
+- **WHEN** an authorized PR retains the reviewed SHA and applicable checks and required reviews pass
+- **THEN** use the retained grant for protected merge, integrated gates, required scope-bound spec promotion, record-only archive closure, acceptance-bound issue closure and cleanup
+- **AND** run full tests and obtain fresh exact-closure review before publishing the archived closure candidate
+- **AND** run each authorized eligible chapter once. Avoid duplicate PRs and replayed merges.
 
 #### Scenario: Bounded wait encounters a stop
-- WHEN a required check fails, a human must review or perform a task, the head changes, a deployment gate fails, or the deadline expires
-- THEN delivery retains exact head and required-check/review evidence and pauses with the actionable reason
-- AND it derives applicable required checks from branch protection and rulesets, distinguishes optional external suites, and surfaces stalled optional automation as a bounded operator decision when it needs disposition. It does not treat optional queue state as required protection or automatically rerun it
+- **WHEN** a required check fails, a human must review or act, the head changes, a deployment gate fails or time expires
+- **THEN** retain exact head, required checks and review evidence. Pause with an actionable reason.
+- **AND** derive required checks from branch protection and rulesets. Distinguish optional suites. Seek a bounded decision for stalled optional automation requiring disposition. Optional queues confer no protection requirement or automatic rerun.
 
 #### Scenario: External verification and preview
-- WHEN a pending push could trigger external automation, an operator requests external or paid testing, or a declared deploy preview needs review
-- THEN delivery enforces the separate per-action grant before activation and presents a compact card for an external test naming target, cases, built-artifact-only exposure, expected cost or credits, and one-run scope
-- AND it surfaces the preview URL and preserves a declared human review pause, uses loopback for a local try-out, tears down an authorized temporary tunnel immediately, and requires new authority for a retry
+- **WHEN** a push could trigger external automation, an operator requests external or paid tests, or a declared deploy preview needs review
+- **THEN** require a separate per-action grant before activation. Show a compact card with target, cases, built-artifact-only exposure, expected cost or credits and one-run scope.
+- **AND** show the preview URL and preserve declared human review pauses. Use loopback for try-out, tear down authorized temporary tunnels immediately and require fresh retry authority.
 
 ### Requirement: Retire verified worktrees across resumed runs
 
 Delivery SHALL reconcile live same-change registrations against retained ownership evidence. Authorized `finish` SHALL retire each eligible dedicated worktree, attached or detached, after verified archive and applicable authorized issue closure, preserving evidence, refs and restrictions.
 
 #### Scenario: Resume closes all eligible worktrees
-- WHEN resumed finish finds dedicated worktrees from earlier runs
-- THEN match repository, exact change, canonical path, role and ref or detached SHA against creation or handoff evidence and live registration
-- AND recheck exact HEAD and reachability from the actual containing closure revision, absence of active writers, tracked and untracked cleanliness, ignored data and submodules. Remove eligible worktrees without force and verify path and registration absence and ref retention.
+- **WHEN** resumed finish finds dedicated worktrees from earlier runs
+- **THEN** match repository, exact change, canonical path, role and ref or detached SHA against creation or handoff evidence and live registration
+- **AND** recheck exact HEAD and reachability from the actual containing closure revision, absence of active writers, tracked and untracked cleanliness, ignored data and submodules. Remove eligible worktrees without force and verify path and registration absence and ref retention.
 
 #### Scenario: Preserve protected or ambiguous worktrees
-- WHEN a worktree lacks verified ownership, is primary, an independent clone, unrelated, live, locked, dirty or unmerged, holds valuable ignored files or is retained by operator restriction
-- THEN preserve it and its refs. A suffix, role nickname or matching ancestry alone cannot prove ownership.
-- AND report removed, retained and blocked paths with reasons separately from accepted archive and issue state. Repeated finish reconciles pending cleanup without reopening publication or creating a replacement checkout.
+- **WHEN** a worktree lacks verified ownership, is primary, an independent clone, unrelated, live, locked, dirty or unmerged, holds valuable ignored files or is retained by operator restriction
+- **THEN** preserve it and its refs. A suffix, role nickname or matching ancestry alone cannot prove ownership.
+- **AND** report removed, retained and blocked paths with reasons separately from accepted archive and issue state. Repeated finish reconciles pending cleanup without reopening publication or creating a replacement checkout.
 
 ### Requirement: Separate post-release skill sync
 
 Delivery SHALL offer optional `sync-skills` after relevant canonical skill publication or accepted integration where deployment does not apply. It SHALL require explicit authority identifying client or profile, source revision and scope.
 
 #### Scenario: Approved sync respects the installation route
-- WHEN the operator authorizes the update
-- THEN use the existing supported route with collision checks and backups. Hermes packages retain normal scanner acceptance and native Codex copies retain local-copy provenance.
-- AND compare the complete installed package to immutable source, verify skill versions and load it in a fresh session. Use isolated scratch homes and profiles in tests and commit-pin upstream sources.
+- **WHEN** the operator authorizes the update
+- **THEN** use the existing supported route with collision checks and backups. Hermes packages retain normal scanner acceptance and native Codex copies retain local-copy provenance.
+- **AND** compare the complete installed package to immutable source, verify skill versions and load it in a fresh session. Use isolated scratch homes and profiles in tests and commit-pin upstream sources.
 
 #### Scenario: No profile authority or scan failure
-- WHEN finish occurs, package drift or curator conflict appears, separate update authority is absent, or scanner or collision checks fail
-- THEN preserve the installed package and report update or recovery options. Skills SHALL NOT change a shared installation while operating in a target project.
+- **WHEN** finish occurs, package drift or curator conflict appears, separate update authority is absent, or scanner or collision checks fail
+- **THEN** preserve the installed package and report update or recovery options. Skills SHALL NOT change a shared installation while operating in a target project.
 
 ### Requirement: Restricted Git child environment
 The evidence and workspace helpers SHALL read and forward inherited environment
@@ -310,18 +312,18 @@ topology and command-config injection overrides before launching Git, even when
 those overrides have empty values.
 
 #### Scenario: Forbidden override presence
-- WHEN any previously refused Git override is present, including an empty value or a Windows case variant
-- THEN either helper fails before launching Git without reading the override value or silently dropping it and continuing
+- **WHEN** any previously refused Git override is present, including an empty value or a Windows case variant
+- **THEN** either helper fails before launching Git without reading the override value or silently dropping it and continuing
 
 #### Scenario: Unrelated inherited values
-- WHEN the inherited environment includes unrelated credential or execution-injection values
-- THEN neither helper reads those values or forwards them to a Git child
-- AND synthetic getter tests and actual child-environment tests demonstrate that restriction without accessing real credentials
+- **WHEN** the inherited environment includes unrelated credential or execution-injection values
+- **THEN** neither helper reads those values or forwards them to a Git child
+- **AND** synthetic getter tests and actual child-environment tests demonstrate that restriction without accessing real credentials
 
 #### Scenario: Platform-specific names
-- WHEN a supported platform resolves inherited allowlisted names
-- THEN Windows matching is case-insensitive and ambiguous aliases are refused; Linux and macOS matching is case-sensitive
-- AND simulated Windows matching alone does not establish native Windows support
+- **WHEN** a supported platform resolves inherited allowlisted names
+- **THEN** Windows matching is case-insensitive and ambiguous aliases are refused; Linux and macOS matching is case-sensitive
+- **AND** simulated Windows matching alone does not establish native Windows support
 
 ### Requirement: Explicit Git configuration compatibility
 Both helpers SHALL retain present `GIT_CONFIG_GLOBAL`, `GIT_CONFIG_SYSTEM` and
@@ -330,13 +332,13 @@ SHALL remain absent. Configuration selection SHALL NOT permit topology or
 command-config injection overrides or be described as a sandbox.
 
 #### Scenario: Explicit fixture configuration
-- WHEN isolated fixtures select synthetic global/system configuration or disable its use through the documented selectors
-- THEN both helpers preserve those values, including empty values, for Git to interpret rather than silently reverting to host configuration
+- **WHEN** isolated fixtures select synthetic global/system configuration or disable its use through the documented selectors
+- **THEN** both helpers preserve those values, including empty values, for Git to interpret rather than silently reverting to host configuration
 
 #### Scenario: Default configuration discovery
-- WHEN configuration selectors are absent
-- THEN both helpers leave them absent and retain documented runtime/home configuration discovery inputs
-- AND executable search paths, home/config locations and Git configuration remain explicit trust inputs
+- **WHEN** configuration selectors are absent
+- **THEN** both helpers leave them absent and retain documented runtime/home configuration discovery inputs
+- **AND** executable search paths, home/config locations and Git configuration remain explicit trust inputs
 
 ### Requirement: Preserved Git integrity controls
 Environment hardening SHALL preserve fixed replacement-object and optional-lock
@@ -345,12 +347,12 @@ dirty-work protections in both helpers. It SHALL NOT turn a refusal into permiss
 to repair, discard or redirect repository state.
 
 #### Scenario: Conflicting inherited controls
-- WHEN inherited values conflict with replacement-object or optional-lock safety settings or the fixed output locale
-- THEN Git children receive `GIT_NO_REPLACE_OBJECTS=1`, `GIT_OPTIONAL_LOCKS=0` and `LC_ALL=C` independently of those values, with fsmonitor still neutralized
+- **WHEN** inherited values conflict with replacement-object or optional-lock safety settings or the fixed output locale
+- **THEN** Git children receive `GIT_NO_REPLACE_OBJECTS=1`, `GIT_OPTIONAL_LOCKS=0` and `LC_ALL=C` independently of those values, with fsmonitor still neutralized
 
 #### Scenario: Existing integrity failure
-- WHEN a repository fails an existing replacement-ref/graft, topology, identity, ancestry or dirty-work check
-- THEN the relevant helper continues to refuse the operation and preserves the work
+- **WHEN** a repository fails an existing replacement-ref/graft, topology, identity, ancestry or dirty-work check
+- **THEN** the relevant helper continues to refuse the operation and preserves the work
 
 ### Requirement: Equivalent workspace path rejection
 Workspace validation SHALL reject C0 control characters and DEL without broadening
@@ -358,9 +360,9 @@ or weakening the existing character restriction. Absolute, normalized and canoni
 path requirements, symlink refusal and workspace-overlap checks SHALL remain intact.
 
 #### Scenario: Control-character equivalence
-- WHEN every UTF-16 code unit and representative multicharacter Unicode paths are compared against the original character restriction
-- THEN the replacement predicate has identical results, rejecting character codes below 32 or equal to 127
-- AND other path-validation failures remain failures independently of the character predicate
+- **WHEN** every UTF-16 code unit and representative multicharacter Unicode paths are compared against the original character restriction
+- **THEN** the replacement predicate has identical results, rejecting character codes below 32 or equal to 127
+- **AND** other path-validation failures remain failures independently of the character predicate
 
 ### Requirement: Complete-package security acceptance
 Hardening acceptance SHALL require safe community verdicts for all five complete
@@ -369,142 +371,142 @@ rely on exclusions, suppressed findings, bypass flags or a prototype-only scan.
 Authorization wording changes SHALL preserve existing side-effect boundaries.
 
 #### Scenario: Safe prototype but blocked distribution
-- WHEN a scratch prototype scans safe but a complete package remains blocked
-- THEN the security gate and hardening acceptance remain incomplete, and historical failures are retained rather than rewritten
+- **WHEN** a scratch prototype scans safe but a complete package remains blocked
+- **THEN** the security gate and hardening acceptance remain incomplete, and historical failures are retained rather than rewritten
 
 #### Scenario: Clarified authorization wording
-- WHEN scanner-flagged issue-authorization prose is clarified
-- THEN explicit project adoption and bounded issue-write authority remain required, and installation or a planning-only request grants no additional side effects
+- **WHEN** scanner-flagged issue-authorization prose is clarified
+- **THEN** explicit project adoption and bounded issue-write authority remain required, and installation or a planning-only request grants no additional side effects
 
 #### Scenario: Candidate acceptance evidence
-- WHEN a hardened candidate is presented for completion
-- THEN its complete package inventory, affected versions/documentation, native Linux/macOS/Windows results, full-package scanner output and independent exact-candidate review are verified
-- AND missing native platform evidence or unresolved findings block completion rather than being replaced with simulated results or release claims
+- **WHEN** a hardened candidate is presented for completion
+- **THEN** its complete package inventory, affected versions/documentation, native Linux/macOS/Windows results, full-package scanner output and independent exact-candidate review are verified
+- **AND** missing native platform evidence or unresolved findings block completion rather than being replaced with simulated results or release claims
 
 ### Requirement: Integrated opt-in for bounded approach review
 
 The bounded approach gate SHALL apply only to a later change whose verified integrated plan parent explicitly selects it. It SHALL preserve the applicable approval, candidate review, publication and operator authority gates.
 
 #### Scenario: Strict path retained
-- WHEN a pre-execution review applies but the integrated parent has not selected convergence, including the change introducing it
-- THEN the existing literal `Verdict: No findings` rule with empty findings and coverage limitations remains in force, and an unintegrated edit cannot select the new gate
+- **WHEN** a pre-execution review applies but the integrated parent has not selected convergence, including the change introducing it
+- **THEN** the existing literal `Verdict: No findings` rule with empty findings and coverage limitations remains in force, and an unintegrated edit cannot select the new gate
 
 #### Scenario: Readiness is not authority
-- WHEN the bounded gate reports freeze-ready for a Task-Guided plan
-- THEN freeze still requires separate commit authority, and exact-plan approval binds the frozen SHA and plan digest without granting execution or remote writes
-- AND an explicitly reviewed Goal-First draft still requires exact Goal Contract approval and a local execution grant before work
+- **WHEN** the bounded gate reports freeze-ready for a Task-Guided plan
+- **THEN** freeze still requires separate commit authority, and exact-plan approval binds the frozen SHA and plan digest without granting execution or remote writes
+- **AND** an explicitly reviewed Goal-First draft still requires exact Goal Contract approval and a local execution grant before work
 
 ### Requirement: Fixed independent approach review and retained finding history
 Before review #1 the orchestrator SHALL fix a review charter, pass rule, budget and qualified independent read-only reviewer binding. It SHALL admit that binding before launch and retain a change-owned record from review #1 with a zero initial correction count. Each accepted receipt SHALL bind the complete, unchanged planning inputs and expected fresh reviewer session.
 
 #### Scenario: Unqualified route or stale evidence
-- WHEN the requested route is a subagent, unknown, or broader than allowed, or the receipt has wrong identity, partial coverage or input drift
-- THEN the route is refused before launch or the receipt is rejected, respectively; no substitute or backfilled credit is allowed
+- **WHEN** the requested route is a subagent, unknown, or broader than allowed, or the receipt has wrong identity, partial coverage or input drift
+- **THEN** the route is refused before launch or the receipt is rejected, respectively; no substitute or backfilled credit is allowed
 
 #### Scenario: Fresh review carries the ledger
-- WHEN a later reviewer receives the retained ledger
-- THEN the reviewer first checks open stable IDs for resolution, persistence or regression, then reports new findings with stable IDs, severity, path and line, impact, trigger and remedy
-- AND an empty verdict does not erase unresolved findings and any applied finding retains its re-review reference
+- **WHEN** a later reviewer receives the retained ledger
+- **THEN** the reviewer first checks open stable IDs for resolution, persistence or regression, then reports new findings with stable IDs, severity, path and line, impact, trigger and remedy
+- **AND** an empty verdict does not erase unresolved findings and any applied finding retains its re-review reference
 
 ### Requirement: Charter-based approach acceptance
 The reviewer SHALL classify each coverage limitation as `packet-gap`, `declared-deferral`, `containment-boundary`, or `unclassified`. The newest complete receipt SHALL pass only for `Verdict: No findings` or a verdict with only advisory Low findings, no open in-scope High or Medium findings, and only verified `declared-deferral` or `containment-boundary` limitations. Neither the operator nor the orchestrator may reclassify a limitation or downgrade a finding.
 
 #### Scenario: Advisory findings and verified exceptions
-- WHEN a fresh receipt reports only Low findings with stable IDs, and all limitations are `declared-deferral` entries citing existing reviewed task IDs or their named executable gates, or `containment-boundary` entries matching the fixed charter
-- THEN retain the Low findings without reopening the loop; retain the deferrals for closure by later task evidence before candidate acceptance and allow freeze readiness
+- **WHEN** a fresh receipt reports only Low findings with stable IDs, and all limitations are `declared-deferral` entries citing existing reviewed task IDs or their named executable gates, or `containment-boundary` entries matching the fixed charter
+- **THEN** retain the Low findings without reopening the loop; retain the deferrals for closure by later task evidence before candidate acceptance and allow freeze readiness
 
 #### Scenario: Out-of-scope observation
-- WHEN a reviewer records a High or Medium observation outside the charter with no violated in-scope clause
-- THEN retain it as advisory in the ledger with original severity and explicit scope disposition; the reviewer records it separately from in-scope verdict findings, and a failing native verdict is not rewritten
+- **WHEN** a reviewer records a High or Medium observation outside the charter with no violated in-scope clause
+- **THEN** retain it as advisory in the ledger with original severity and explicit scope disposition; the reviewer records it separately from in-scope verdict findings, and a failing native verdict is not rewritten
 
 #### Scenario: Blockers and invalid exceptions
-- WHEN an in-scope High or Medium finding remains open, a deferral lacks an existing task or executable gate, a containment boundary is undeclared, a limitation is `unclassified`, or a report contradicts its verdict or classifications
-- THEN readiness is rejected without rewriting the report or weakening the pass rule
+- **WHEN** an in-scope High or Medium finding remains open, a deferral lacks an existing task or executable gate, a containment boundary is undeclared, a limitation is `unclassified`, or a report contradicts its verdict or classifications
+- **THEN** readiness is rejected without rewriting the report or weakening the pass rule
 
 #### Scenario: Packet-only failure
-- WHEN the reviewer classifies a limitation as `packet-gap`: missing packet evidence needed for an in-scope claim, or inconsistent packet-only metadata (for example, conflicting disposition references in the evidence packet rather than in the planning artifacts)
-- THEN readiness stays blocked until a fresh review verifies the repair. Allow one packet-only repair and re-review per unchanged planning snapshot without consuming a plan correction cycle; if the rerun still identifies a packet gap, stop without charging a plan cycle.
+- **WHEN** the reviewer classifies a limitation as `packet-gap`: missing packet evidence needed for an in-scope claim, or inconsistent packet-only metadata (for example, conflicting disposition references in the evidence packet rather than in the planning artifacts)
+- **THEN** readiness stays blocked until a fresh review verifies the repair. Allow one packet-only repair and re-review per unchanged planning snapshot without consuming a plan correction cycle; if the rerun still identifies a packet gap, stop without charging a plan cycle.
 
 ### Requirement: Finite routine planning corrections
 Within an existing grant the orchestrator SHALL apply only grounded routine draft corrections in authorized planning paths, run native strict and metadata validation, re-hash the complete inputs, and re-review without an operator relay. The default ceiling is three automatic plan correction cycles; narrower grants prevail and resuming never resets a count.
 
 #### Scenario: Convergent draft
-- WHEN a synthetic chartered draft has only routine blockers and verified repairs within budget
-- THEN it reaches freeze-ready within three automatic corrections without intervening operator turns
+- **WHEN** a synthetic chartered draft has only routine blockers and verified repairs within budget
+- **THEN** it reaches freeze-ready within three automatic corrections without intervening operator turns
 
 #### Scenario: Stop without fallback
-- WHEN budget is exhausted, a non-routine or repeated unresolved conflict occurs, validation or preflight fails, or the same binding fails to launch twice in succession
-- THEN stop with one decision card and preserve authority restrictions, work and evidence; a failed launch is an attempt, not a correction, and a different route or fourth cycle is not implied
+- **WHEN** budget is exhausted, a non-routine or repeated unresolved conflict occurs, validation or preflight fails, or the same binding fails to launch twice in succession
+- **THEN** stop with one decision card and preserve authority restrictions, work and evidence; a failed launch is an attempt, not a correction, and a different route or fourth cycle is not implied
 
 ### Requirement: Explicit Goal-First adoption
 
 Delivery SHALL derive Goal-First eligibility from the verified integrated parent. It SHALL use Task-Guided for mandated sequence, prescribed method or staged authority, and SHALL preserve existing frozen plan authority.
 
 #### Scenario: Future parent opts in
-- WHEN a later reversible local change has an integrated parent explicitly selecting Goal-First and no ordered or staged boundary
-- THEN Goal-First is the default
-- AND the orchestrator requires an approved Goal Contract and a bounded local execution grant
+- **WHEN** a later reversible local change has an integrated parent explicitly selecting Goal-First and no ordered or staged boundary
+- **THEN** Goal-First is the default
+- **AND** the orchestrator requires an approved Goal Contract and a bounded local execution grant
 
 #### Scenario: Parent lacks opt-in or boundary requires order
-- WHEN opt-in is absent, appears only in the change's own contract edits, or the change requires ordered or staged control
-- THEN exact frozen plan approval and the applicable Task-Guided group gates remain required
-- AND a later review, continuation request or contract edit cannot widen an already frozen change's grant
+- **WHEN** opt-in is absent, appears only in the change's own contract edits, or the change requires ordered or staged control
+- **THEN** exact frozen plan approval and the applicable Task-Guided group gates remain required
+- **AND** a later review, continuation request or contract edit cannot widen an already frozen change's grant
 
 ### Requirement: Bounded Goal Contract
 
 A Goal Contract SHALL state the outcome, allowed scope, hard operator invariants, explicit non-goals, adaptable legacy assumptions, executable acceptance and finite time and correction budgets. Native tasks SHALL hold one local outcome checkbox as the sole mutable progress record, with any explicit external closeout gate kept separate from local authority.
 
 #### Scenario: Valid local approval
-- WHEN the integrated parent permits Goal-First and approval binds every required contract field with an explicit local execution grant
-- THEN the orchestrator can advance the verified outcome with adaptations confined to the approved boundary
+- **WHEN** the integrated parent permits Goal-First and approval binds every required contract field with an explicit local execution grant
+- **THEN** the orchestrator can advance the verified outcome with adaptations confined to the approved boundary
 
 #### Scenario: Missing or altered contract field
-- WHEN a required invariant, exclusion, acceptance gate, budget or exact approval binding is missing or changed
-- THEN execution is refused until the contract and required authority are resolved
+- **WHEN** a required invariant, exclusion, acceptance gate, budget or exact approval binding is missing or changed
+- **THEN** execution is refused until the contract and required authority are resolved
 
 ### Requirement: Goal alignment and correction
 
 Delivery SHALL verify goal alignment at every phase boundary and after each correction. It SHALL enter bounded correction automatically for actionable in-scope routine failures, and SHALL stop for material drift, exhausted budgets, unknown ownership, missing authority or unrecoverable environment failures.
 
 #### Scenario: Routine failure or obsolete assumption
-- WHEN a gate or review finds a correctable in-scope defect, or empirical evidence invalidates an adaptable legacy assumption, and correction budget remains
-- THEN the orchestrator corrects locally, revalidates and re-reviews without an operator turn or refreezing an unchanged Goal Contract
+- **WHEN** a gate or review finds a correctable in-scope defect, or empirical evidence invalidates an adaptable legacy assumption, and correction budget remains
+- **THEN** the orchestrator corrects locally, revalidates and re-reviews without an operator turn or refreezing an unchanged Goal Contract
 
 #### Scenario: Material conflict
-- WHEN continuing would change a hard invariant, exclusion, acceptance boundary or authority
-- THEN delivery returns `DIRECTION_DRIFT_CHOICE` with the affected contract clause and stops before further mutation
+- **WHEN** continuing would change a hard invariant, exclusion, acceptance boundary or authority
+- **THEN** delivery returns `DIRECTION_DRIFT_CHOICE` with the affected contract clause and stops before further mutation
 
 #### Scenario: Result verification
-- WHEN final tests pass but independent review is missing, stale, limited or has unresolved findings
-- THEN the result remains unverified and the outcome checkbox is not completed
-- AND positive verification binds the executable gate evidence and a fresh independent read-only result review to the same exact candidate
+- **WHEN** final tests pass but independent review is missing, stale, limited or has unresolved findings
+- **THEN** the result remains unverified and the outcome checkbox is not completed
+- **AND** positive verification binds the executable gate evidence and a fresh independent read-only result review to the same exact candidate
 
 ### Requirement: Bounded breaking-upgrade discovery
 
 Planning SHALL allow bounded, disposable-scratch empirical verification of declared breaking dependency, runtime and CLI assumptions before contract lock, within local planning authority and disposable configuration.
 
 #### Scenario: Observe real behavior
-- WHEN static sources disagree or are incomplete about a breaking upgrade
-- THEN an authorized bounded probe uses isolated scratch home, configuration and caches, with no repository or installed-profile writes
-- AND observations inform planning and cannot satisfy execution acceptance or grant external action
+- **WHEN** static sources disagree or are incomplete about a breaking upgrade
+- **THEN** an authorized bounded probe uses isolated scratch home, configuration and caches, with no repository or installed-profile writes
+- **AND** observations inform planning and cannot satisfy execution acceptance or grant external action
 
 ### Requirement: Structured preflight and delivery status
 
 Delivery SHALL provide runnable preflight, policy, workspace reconciliation, status and verified handover commands with deterministic JSON results. Read-only inspection SHALL preserve repository, profile, remote and worker state and SHALL report paid or write-dependent checks as explicit pending steps unless separate authority and verified evidence are available.
 
 #### Scenario: Read-only status
-- WHEN an operator or consumer inspects the selected change with `--json`
-- THEN the versioned envelope reports the change, mode, state, candidateSha, planDigest, activeAttemptId, stopPredicate, contextHint and recommendedNextAction from verified observations
-- AND missing or uncertain evidence is explicit, identical observations yield identical output, and no recommendation executes automatically
+- **WHEN** an operator or consumer inspects the selected change with `--json`
+- **THEN** the versioned envelope reports the change, mode, state, candidateSha, planDigest, activeAttemptId, stopPredicate, contextHint and recommendedNextAction from verified observations
+- **AND** missing or uncertain evidence is explicit, identical observations yield identical output, and no recommendation executes automatically
 
 #### Scenario: Startup and recovery
-- WHEN the operator invokes read-only preflight or reconciles resumed work
-- THEN the command reports each P1–P8 observation and readiness, validates integrated-parent and skill identity, and reports candidate, ownership or unfinished-attempt uncertainties before dispatch
-- AND any fresh paid probe stays subject to its separate execution grant
+- **WHEN** the operator invokes read-only preflight or reconciles resumed work
+- **THEN** the command reports each P1–P8 observation and readiness, validates integrated-parent and skill identity, and reports candidate, ownership or unfinished-attempt uncertainties before dispatch
+- **AND** any fresh paid probe stays subject to its separate execution grant
 
 #### Scenario: Sealed handover
-- WHEN a consumer reads role handover or active-attempt evidence
-- THEN it verifies the exact identity and sealed files before reporting state or eligibility, and blocks on incomplete or mismatched evidence
+- **WHEN** a consumer reads role handover or active-attempt evidence
+- **THEN** it verifies the exact identity and sealed files before reporting state or eligibility, and blocks on incomplete or mismatched evidence
 
 ### Requirement: External verification authority and data boundary
 
@@ -547,9 +549,9 @@ Candidate guards SHALL include ignored content in cleanliness assessment and req
 The orchestrator SHALL verify that the candidate's native delta requirements are promoted into the corresponding current specs with valid current-spec identity metadata before declaring finish ready.
 
 #### Scenario: Missing or mismatched promotion
-- WHEN a delta remains unapplied, is semantically mismatched, or its current spec has invalid identity metadata
-- THEN readiness reports the exact deficiency and blocks terminal delivery until the implementation candidate is corrected and reverified
-- AND record-only closure preserves product and current-spec content
+- **WHEN** a delta remains unapplied, is semantically mismatched, or its current spec has invalid identity metadata
+- **THEN** readiness reports the exact deficiency and blocks terminal delivery until the implementation candidate is corrected and reverified
+- **AND** record-only closure preserves product and current-spec content
 
 ### Requirement: Evidence-backed delegated delivery
 
@@ -656,6 +658,20 @@ Delivery SHALL support an optional declarative CLI or MCP harness in external ho
 - **THEN** its guides show Aikido local scan and `aikido_deep_review` using the generic detached-clone and result contracts, including the linked-worktree `git ls-files` failure mode
 - **AND** the portable skills contain no Aikido-specific adapter or dependency.
 
+### Requirement: Operator workflow guidance
+
+The distribution SHALL publish a top-level index of active guides and a visual tutorial covering prompt and authority boundaries, fresh-session checkpoints, external role configuration and native schema interoperability. Protected closure guidance SHALL explain explicit issue closure after accepted integrated verification and record readback.
+
+#### Scenario: Current role and schema setup
+- **WHEN** an operator configures a workset opener, standalone or exclusive Implementer, optional AI helper or harness, or contained Reviewer host
+- **THEN** synchronized guides show explicit client, provider, model, reasoning-effort and version configuration, the supported and unsupported route matrix, native argument or config examples, moderated setup and separately authorized decisions using the maintained lifecycle diagram, chat sequence and reply examples
+- **AND** optional custom schemas remain governed by the same frozen identity and evidence requirements. Active upgrade guidance is preserved when obsolete history is pruned. The repository suitability matrix identifies Claude as the qualified Tier 1 baseline, Grok and Pi as Tier 1 candidates, Hermes and Codex as medium, and OpenCode, Kilo and agy as unsuitable for the current minimal-rootfs contained route, with dated evidence and qualification limits.
+
+#### Scenario: Review and closeout text
+- **WHEN** an operator follows the protected finish guidance
+- **THEN** the guidance explains how to bind the optional local pre-PR harness, verify its sealed exact-candidate evidence and configure the repository-local Aikido examples for the local check and standing $0 triggers
+- **AND** the closure PR template explains deliberate omission of an auto-close keyword and requires explicit issue closure after verified integration and archival evidence.
+
 ### Requirement: Explicit external AI role configuration
 
 The workflow SHALL use a validated external binding for every enabled AI role, including the orchestrator, Implementer, contained Reviewer and optional AI helper or harness. The binding SHALL identify `client`, `provider`, `model`, `reasoningEffort` and version policy.
@@ -682,20 +698,6 @@ External role configuration SHALL apply a default `versionPolicy: "gte"` with an
 - **WHEN** the operator opts out of comparison
 - **THEN** retain the observed version and the disabled check state in audit evidence
 - **AND** refuse unverifiable runtime identity, failed containment or mismatched runtime, relay or configuration pins even under opt-out.
-
-### Requirement: Operator workflow guidance
-
-The distribution SHALL publish a top-level index of active guides and a visual tutorial covering prompt and authority boundaries, fresh-session checkpoints, external role configuration and native schema interoperability. Protected closure guidance SHALL explain explicit issue closure after accepted integrated verification and record readback.
-
-#### Scenario: Current role and schema setup
-- **WHEN** an operator configures a workset opener, standalone or exclusive Implementer, optional AI helper or harness, or contained Reviewer host
-- **THEN** synchronized guides show explicit client, provider, model, reasoning-effort and version configuration, the supported and unsupported route matrix, native argument or config examples, moderated setup and separately authorized decisions using the maintained lifecycle diagram, chat sequence and reply examples
-- **AND** optional custom schemas remain governed by the same frozen identity and evidence requirements. Active upgrade guidance is preserved when obsolete history is pruned. The repository suitability matrix identifies Claude as the qualified Tier 1 baseline, Grok and Pi as Tier 1 candidates, Hermes and Codex as medium, and OpenCode, Kilo and agy as unsuitable for the current minimal-rootfs contained route, with dated evidence and qualification limits.
-
-#### Scenario: Review and closeout text
-- **WHEN** an operator follows the protected finish guidance
-- **THEN** the guidance explains how to bind the optional local pre-PR harness, verify its sealed exact-candidate evidence and configure the repository-local Aikido examples for the local check and standing $0 triggers
-- **AND** the closure PR template explains deliberate omission of an auto-close keyword and requires explicit issue closure after verified integration and archival evidence.
 
 ### Requirement: Moderated external host discovery and setup
 
@@ -727,19 +729,6 @@ The distribution SHALL publish a top-level index of active guides and a visual t
 - **THEN** setup validates the exact client, provider, model, relay, effective settings, runtime and limits and reports an explicit qualification disposition
 - **AND** incomplete or mismatched offline and bounded live proof keeps that binding unsupported for real review, without ambient profile fallback or changing the default reviewer.
 
-### Requirement: Bundled finish trigger reservations
-
-A separate named finish grant SHALL support finite, explicitly selected credit reservations for verified paid triggers across both protected PR chapters and at most one authorized zero-cost CI retry for the same SHA under the verified transient-failure predicate.
-
-#### Scenario: Reserve paid PR trigger credits
-- **WHEN** a finish grant specifies a positive finite credit cap for an identified paid trigger and current complete inventory confirms identity, configuration, exposure, repository, chapter, event, target, exact SHA and cost
-- **THEN** durably reserve the matching credits before activation and account for both implementation and closure PRs against the same cap, including across resume and uncertain outcomes.
-- **AND** a grant can cover two Aikido Deep Review credits across the two PRs if the observed inventory matches. Membership in the cap supplies no authority for unrelated triggers or other product operations.
-
-#### Scenario: Retry a proved transient CI failure
-- **WHEN** the grant includes `maxZeroCostCiRetries: 1`, a known zero-cost check has a verified transient failure, and a verified equivalent push run for the identical expected SHA has passed
-- **THEN** reserve and perform one specifically scoped retry of that check and verify exact-head results before progress. A changed SHA, unknown cost, exceeded balance, repeated retry, missing evidence or deterministic test failure blocks the bundled action.
-
 ### Requirement: Deterministic isolated distribution verification
 
 The local and CI test gates SHALL preserve existing assertions, test inventory, isolated mutable fixture state and explicit fixture HOME. The launcher recovery test SHALL prove the original supervisor can settle and publish exactly one handover after its launcher is killed.
@@ -765,6 +754,19 @@ The integrated workflow SHALL accept a host-retained operator-signed grant for m
 #### Scenario: Refuse invalid or competing extensions
 - **WHEN** the signature or authority is invalid, the grant is expired, stale, replayed or cross-change, ledger state is missing or ambiguous, the plan or ledger binding differs, or caps exceed permitted bounds
 - **THEN** refuse any increase. Competing reservations and claims are serialized, and unavailable budget stops inference with ledger evidence. Each retry still needs its applicable separate authority.
+
+### Requirement: Bundled finish trigger reservations
+
+A separate named finish grant SHALL support finite, explicitly selected credit reservations for verified paid triggers across both protected PR chapters and at most one authorized zero-cost CI retry for the same SHA under the verified transient-failure predicate.
+
+#### Scenario: Reserve paid PR trigger credits
+- **WHEN** a finish grant specifies a positive finite credit cap for an identified paid trigger and current complete inventory confirms identity, configuration, exposure, repository, chapter, event, target, exact SHA and cost
+- **THEN** durably reserve the matching credits before activation and account for both implementation and closure PRs against the same cap, including across resume and uncertain outcomes.
+- **AND** a grant can cover two Aikido Deep Review credits across the two PRs if the observed inventory matches. Membership in the cap supplies no authority for unrelated triggers or other product operations.
+
+#### Scenario: Retry a proved transient CI failure
+- **WHEN** the grant includes `maxZeroCostCiRetries: 1`, a known zero-cost check has a verified transient failure, and a verified equivalent push run for the identical expected SHA has passed
+- **THEN** reserve and perform one specifically scoped retry of that check and verify exact-head results before progress. A changed SHA, unknown cost, exceeded balance, repeated retry, missing evidence or deterministic test failure blocks the bundled action.
 
 ### Requirement: Verified post-review PR-fix lineage
 
