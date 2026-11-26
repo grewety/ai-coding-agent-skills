@@ -6,6 +6,7 @@ import { preparePromptTransport } from "./terminal-adapters.mjs";
 import { requestBytes, safePath, writeClosed } from "./worker-handoff.mjs";
 import { equal, need, relative, within } from "./review-inputs.mjs";
 import { checkoutProtectedPaths, checkoutStatus } from "./worker-runtime-policy.mjs";
+import { reportedVersion } from "./runtime-version.mjs";
 
 const bin = "/usr/bin/python3";
 const executablePath = "/usr/bin:/bin";
@@ -103,12 +104,12 @@ function tomlTable(settings) {
     JSON.stringify(key) + " = " + JSON.stringify(value)).join(", ") + " }";
 }
 
-function commonSettings(filesystem) {
+function commonSettings(filesystem, explicit = false) {
   return [...features, "-c", "default_permissions=\"worker\"",
     "-c", 'project_root_markers=[".git"]',
     "-c", "permissions.worker.filesystem=" + tomlTable(filesystem),
     "-c", "permissions.worker.network.enabled=false",
-    "-c", "approval_policy=\"never\"", "-c", "model_provider=\"openai\"",
+    "-c", "approval_policy=\"never\"", ...(explicit ? [] : ["-c", "model_provider=\"openai\""]),
     "-c", "cli_auth_credentials_store=\"file\"", "-c", "mcp_servers={}",
     "-c", "shell_environment_policy.inherit=\"none\"", "-c", "allow_login_shell=false"];
 }
@@ -130,7 +131,7 @@ async function filesystemPolicy(request, role, registry, writable) {
   return paths;
 }
 
-export async function buildCodexLaunch(request, role, registry, captureDir, launchNonce) {
+export async function buildCodexLaunch(request, role, registry, captureDir, launchNonce, pilot) {
   const { workspace } = request.identity;
   await ensureDedicatedConfiguration(role, workspace);
   // Codex mounts .git protections beneath write roots, which must be directories.
@@ -145,6 +146,12 @@ export async function buildCodexLaunch(request, role, registry, captureDir, laun
     writable.add(directory);
   }
   const filesystem = await filesystemPolicy(request, role, registry, writable);
+  const args = ["exec", "--json", "--ephemeral", "--ignore-user-config", "--ignore-rules", "--color", "never",
+    "-C", workspace, ...commonSettings(filesystem, Boolean(pilot))];
+  if (pilot) {
+    return { command: role.executable.path, input: requestBytes(request), cwd: workspace, env: workerEnvironment(role),
+      args: [...args, ...pilot.args, "-"] };
+  }
   const transport = preparePromptTransport({
     client: "codex", version: role.version, role: "implementer", session: launchNonce,
     workspace, prompt: requestBytes(request).toString("utf8"),
@@ -155,12 +162,12 @@ export async function buildCodexLaunch(request, role, registry, captureDir, laun
   return {
     command: role.executable.path, input: transport.stdinBytes, cwd: workspace,
     env: workerEnvironment(role),
-    args: ["exec", "--json", "--ephemeral", "--ignore-user-config", "--ignore-rules", "--color", "never",
-      "-C", workspace, ...commonSettings(filesystem), "-m", role.model, "-"],
+    args: [...args, "-m", role.model, "-"],
   };
 }
 
-export async function smokeCheck({ request, role, registry, attemptDirectory, protectedFile, controlDirectory, run = runBoundedWorker }) {
+export async function smokeCheck({ request, role, registry, attemptDirectory, protectedFile, controlDirectory, pilot,
+  run = runBoundedWorker }) {
   await ensureDedicatedConfiguration(role, request.identity.workspace);
   const workspace = request.identity.workspace;
   const status = checkoutStatus(workspace);
@@ -168,7 +175,8 @@ export async function smokeCheck({ request, role, registry, attemptDirectory, pr
   const command = role.executable.path;
   const version = await run(command, ["--version"], { cwd: workspace, env, timeoutMs: 4000, stdoutLimit: 4096, stderrLimit: 4096 });
   need(version.quiescent && version.outcome === "exit" && version.code === 0 &&
-    version.stdout.toString().trim() === "codex-cli " + role.version, "Pinned Codex executable version differs");
+    (pilot ? reportedVersion(version.stdout.toString(), "codex") === pilot.runtimeVersion.observedVersion :
+      version.stdout.toString().trim() === "codex-cli " + role.version), "Pinned Codex executable version differs");
   const scratchDirectory = path.join(workspace, ".runtime-probe-" + randomUUID());
   const scratch = path.join(scratchDirectory, "control.txt");
   const evidence = path.join(attemptDirectory, "request.md");

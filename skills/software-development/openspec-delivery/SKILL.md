@@ -1,7 +1,7 @@
 ---
 name: openspec-delivery
 description: Automate setup, execution and closeout of OpenSpec changes.
-version: 1.7.0
+version: 1.8.0
 author: Raphael (forgegod), Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -12,6 +12,8 @@ metadata:
 ---
 
 # OpenSpec Delivery
+
+Use `scripts/detect-agents.mjs` for read-only host observations and `scripts/setup.mjs` for exact external previews and separately confirmed writes. Explicit pilot bindings require independent qualification and run authority. A candidate CLI or MCP harness uses a clean standalone detached clone at the committed SHA.
 
 Preserve a reviewed committed candidate and truthful post-merge evidence for one
 OpenSpec change in a project that explicitly selects this workflow. This is an

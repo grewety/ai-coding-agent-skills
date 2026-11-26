@@ -6,9 +6,10 @@ Portable engineering workflows for AI coding agents that use OpenSpec. This repo
 
 | Guide | Use it for |
 | --- | --- |
-| [Operator tutorial](docs/openspec-operator-tutorial.md) | Lifecycle, exact replies, session handoff, Role 1/2/3 configuration and Intent-Driven planning. |
+| [Operator tutorial](docs/openspec-operator-tutorial.md) | Lifecycle, exact replies, session handoff, four role bindings and Intent-Driven planning. |
 | [Operator runbook](docs/openspec-operator-runbook.md) | Prepare, deliver, resume protected finish and recover. |
 | [OpenSpec workflow](docs/openspec-workflow.md) | Repository SDLC and governing authority. |
+| [External AI roles and backend pilots](docs/configurable-backends.md) | Discovery, previewed external configuration, version policy and qualification status. |
 | [Review and finish configuration](docs/openspec-review-configuration.md) | Paid review modes, host pins, local harness and standing triggers. |
 | [OpenSpec installation](docs/openspec-installation.md) | Upstream prerequisite and upgrade procedures. |
 | [Claude installation](docs/claude-installation.md) | Native marketplace, ZIP installation and host checks. |
@@ -778,9 +779,9 @@ no generated skill copies are committed. Its explicit skill lists separate the
 OpenSpec companion workflow from opt-in orchestration. Bump every affected plugin's version when
 its bundled content changes. See the [Claude release checks](docs/claude-installation.md#maintainer-verification).
 
-Current source versions are delivery 1.7.0 and its affected
-`openspec-development` plugin 1.7.0; `openspec-next` is 0.7.0 and
-`autonomous-orchestration` is 1.11.0 (core skill 0.21.0). Complete well-known output,
+Current source versions are delivery 1.8.0 and its affected
+`openspec-development` plugin 1.8.0; `openspec-next` is 0.8.0 and
+`autonomous-orchestration` is 1.12.0 (core skill 0.22.0). Complete well-known output,
 skill ZIPs, workflow plugin ZIP and isolated native copies must retain all support
 files byte-for-byte, including delivery's runtime and evidence commands and next's
 read-only routing script and reference. Include `scripts/delegated-delivery.mjs`

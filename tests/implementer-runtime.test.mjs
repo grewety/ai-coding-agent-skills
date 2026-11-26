@@ -14,6 +14,10 @@ import { claimPath, slotPath } from "../skills/autonomous-ai-agents/autonomous-i
 import { observeImplementer, runImplementers, runtimeIdentity } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-runtime.mjs";
 import { readState } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-state.mjs";
 import { requestBytes, writeClosed } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/worker-handoff.mjs";
+import { applySetup, previewSetup, validatePilotHost } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/agent-setup.mjs";
+import { hashBytes, jsonBytes as roleBytes } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/agent-configuration.mjs";
+import { roleConfig } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/role-config.mjs";
+import { auditVersion } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/runtime-version.mjs";
 
 const probe = async () => ({ proof: [{ mode: "read-only", quiescent: true }, { mode: "workspace-write", quiescent: true }] });
 const change = "synthetic-runtime-01m84dt53xh6x16nwwqebacz8m";
@@ -27,6 +31,9 @@ const startupWarning = "Under-development features enabled: skip_host_skill_disc
   "To suppress this warning, set `suppress_unstable_features_warning = true` in ";
 const shim = String.raw`#!/usr/bin/python3
 import json, os, subprocess, sys, time, uuid
+if sys.argv[1:] == ["--version"]:
+    print("codex-cli 0.171.0")
+    sys.exit(0)
 assert sys.argv[1] == "exec" and sys.argv[-1] == "-" and "--ephemeral" in sys.argv
 assert "--ignore-user-config" in sys.argv and "--ignore-rules" in sys.argv
 assert "--enable" in sys.argv and "skip_host_skill_discovery" in sys.argv
@@ -35,6 +42,9 @@ assert "VIRTUAL_ENV" not in os.environ and "PYTHONHOME" not in os.environ and "O
 fence = chr(96) * 3
 assignment = json.loads(sys.stdin.read().split(fence + "json\n", 1)[1].split("\n" + fence, 1)[0])
 behavior = assignment["outcome"]
+if any(arg.startswith("model_reasoning_effort=") for arg in sys.argv):
+    assert 'model_reasoning_effort="high"' in sys.argv
+    assert sys.argv.count('model_provider="openai"') == 1
 def emit(event_type, **fields):
     print(json.dumps({"type": event_type, **fields}), flush=True)
 if behavior == "echo":
@@ -196,12 +206,108 @@ async function fixture(t, label = "first", mode = "task-guided") {
     });
     return { request, approval, grant: execution, host: hostPin };
   }
-  return { dir, registry, workspace, evidence, pair, hostValue, host, locator, git, plan, planDigest, assignment, expiresAt };
+  return { dir, registry, workspace, evidence, pair, hostValue, host, locator, pin, git, plan, planDigest, assignment, expiresAt };
+}
+
+const implementerControls = ["effectiveSettings", "workspaceWrite", "isolatedHomeAndXdg", "ambientDiscoverySuppressed",
+  "exclusiveClaim", "protectedPathsDenied", "publicationDenied", "nonInteractive", "originalProcessTreeSettled",
+  "sealedFileHandover", "inventoryUnchanged"];
+const reviewerControls = ["effectiveSettings", "minimalRootfs", "readOnly", "directNetworkDenied", "unixSocketInference",
+  "credentialsAndDiagnosticsHostOnly", "unauthorizedToolsDenied", "wholeFileStreamCoverage", "nativeTerminalResult",
+  "strictReceipt", "offlineReplay", "originalProcessTreeSettled"];
+
+async function explicitHost(f, fault) {
+  const pair = structuredClone(f.pair);
+  const runtimeSha256 = f.hostValue.runtimeSha256;
+  const reviewerExecutable = await f.pin("explicit-reviewer", "#!/bin/sh\nprintf '2.1.331 (Claude Code)\\n'\n", 0o700);
+  const bubblewrap = await f.pin("explicit-bwrap", "#!/bin/sh\nprintf 'bubblewrap 0.9.1\\n'\n", 0o700);
+  const relayConfiguration = await f.locator("explicit-relay.json", { schemaVersion: 1, credentialRef: "fixture-key",
+    route: "same-uid-key", keyFile: f.dir("unneeded-key"), keyFormat: "raw" });
+  const implementer = { client: "codex", provider: "openai", model: pair.implementer.model, reasoningEffort: "high",
+    executable: pair.implementer.executable, versionPolicy: "exact", exactVersion: "0.999.0", versionCheck: false };
+  const reviewer = { client: "claude-code", provider: "anthropic", model: pair.reviewer.model,
+    reasoningEffort: "medium", executable: reviewerExecutable };
+  const directory = f.dir("role-setup");
+  await mkdir(directory, { mode: 0o700 });
+  const setup = { schemaVersion: 1, directory, roles: { orchestrator: implementer, implementer, reviewer, helper: null },
+    reviewer: { bubblewrap: { executable: bubblewrap }, relay: { route: "same-uid-key", credentialRef: "fixture-key" },
+      runtime: { node: reviewerExecutable, libraries: [], relayConfiguration }, interPacketDelayMs: 0, timeoutMs: 2000, maxBudgetUsd: 1 } };
+  const options = { workspace: f.workspace };
+  const preview = previewSetup(setup, options);
+  applySetup(setup, preview.confirmationSha256, options);
+  const [host, roles] = preview.outputs.map(({ path, sha256 }) => ({ path, sha256 }));
+  pair.reviewer.configuration = host;
+  pair.reviewer.version = "2.1.331";
+  const pilotHost = validatePilotHost(JSON.parse(preview.outputs[0].utf8));
+  const bubblewrapAudit = auditVersion(pilotHost.bubblewrap, "0.9.1", "0.9.0");
+  for (const [role, binding, controlNames] of [
+    ["implementer", implementer, implementerControls], ["reviewer", reviewer, reviewerControls],
+  ]) {
+    const worker = pair[role];
+    const subject = {
+      runtimeSha256: role === "implementer" && fault === "runtime" ? "f".repeat(64) : runtimeSha256,
+      configurationSha256: role === "reviewer" && fault === "config" ? "e".repeat(64) : worker.configuration.sha256,
+      constraintsSha256: role === "implementer" ? roleQualificationBinding(worker) :
+        hash(jsonBytes({ runtime: pilotHost.runtime, bubblewrapAudit })),
+      ...(role === "reviewer" ? { relaySha256: fault === "relay" ? "d".repeat(64) : relayConfiguration.sha256 } : {}),
+      roleBindingSha256: hashBytes(roleBytes(roleConfig(binding))),
+    };
+    const effective = { client: worker.client, provider: worker.provider, model: worker.model, version: worker.version,
+      reasoningEffort: role === "implementer" && fault === "effort" ? "low" : binding.reasoningEffort,
+      executableSha256: role === "implementer" && fault === "executable" ? "c".repeat(64) : binding.executable.sha256 };
+    const supervisor = role + "-synthetic-qualification";
+    const shared = { schemaVersion: 1, supervisor, subject, effective };
+    const controls = Object.fromEntries(controlNames.map((id) => [id, true]));
+    const offline = await f.locator(role + "-offline.json", { ...shared, kind: "offline", controls });
+    if (role === "implementer" && fault === "control") controls.protectedPathsDenied = false;
+    const live = await f.locator(role + "-live.json", { ...shared, kind: "live", controls, runGrantReference: "synthetic-reference",
+      attempt: "synthetic-controls", positiveControl: true, negativeControl: true });
+    worker.qualification = await f.locator(role + "-explicit-qualification.json", {
+      ...shared, kind: "explicit-route-qualification", role, route: worker.route, offline, live,
+    });
+  }
+  return f.locator("explicit-assignment-host.json", { ...f.hostValue, schemaVersion: 2, pair, roleBindings: roles });
 }
 
 const run = (f, entries, extra = {}) => runImplementers(entries, { registry: f.registry, runProbe: probe, ...extra });
 const attemptDirectory = (f, attempt) => path.join(claimPath(f.registry, repository, change), "attempt-" + attempt);
 const resultPath = (f, name) => path.join(f.evidence, name, "result.json");
+
+test("explicit pair launches the same sealed native Codex route for standalone Goal-First and exclusive assignments", async (t) => {
+  for (const [mode, standalone] of [["goal-first", true], ["task-guided", false]]) {
+    await t.test(mode, async (t) => {
+      const f = await fixture(t, "explicit", mode);
+      const hostPin = await explicitHost(f);
+      const entry = await f.assignment("explicit-run", "valid", { hostPin });
+      const [result] = await run(f, [entry], { standalone });
+      assert.equal(result.phase, "completed", result.reason);
+      const launch = await readState(attemptDirectory(f, "explicit-run"), "launch.json");
+      assert.equal(launch.roleAudit.implementer.reasoningEffort, "high");
+      assert.equal(launch.roleAudit.implementer.runtimeVersion.observedVersion, "0.171.0");
+      assert.equal(launch.roleAudit.implementer.runtimeVersion.comparison, "disabled");
+      assert.equal(launch.roleAudit.reviewer.version.observedVersion, "2.1.331");
+      assert.equal(launch.roleAudit.reviewer.bubblewrap.observedVersion, "0.9.1");
+      assert.equal((await observeImplementer(entry, { registry: f.registry, action: "recover" })).phase, "completed");
+    });
+  }
+});
+
+test("explicit pair refuses stale readback and failed qualification before native preflight", async (t) => {
+  for (const [fault, reason] of [
+    ["runtime", /runtimeSha256/], ["config", /configurationSha256/], ["relay", /relaySha256/],
+    ["effort", /reasoningEffort/], ["executable", /executableSha256/], ["control", /protectedPathsDenied/],
+  ]) {
+    await t.test(fault, async (t) => {
+      const f = await fixture(t, "stale", "goal-first");
+      const hostPin = await explicitHost(f, fault);
+      const entry = await f.assignment("stale-run", "valid", { hostPin });
+      const [result] = await run(f, [entry], { standalone: true, runProbe: () => assert.fail("native preflight reached") });
+      assert.equal(result.phase, "unsupported", result.reason);
+      assert.match(result.reason, reason);
+      await assert.rejects(lstat(attemptDirectory(f, "stale-run")), { code: "ENOENT" });
+    });
+  }
+});
 
 test("sealed completion, immutable recovery and explicit slot/claim retirement", async (t) => {
   const f = await fixture(t);

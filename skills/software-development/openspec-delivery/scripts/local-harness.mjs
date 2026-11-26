@@ -1,11 +1,14 @@
 import { spawn } from "node:child_process";
 import { constants, lstatSync, openSync, closeSync, fsyncSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { checkoutObservation, commit } from "./change-guard.mjs";
+import { commit, repository, standaloneCheckoutObservation } from "./change-guard.mjs";
 import { readBounded, scopedPath, separate, sha256 } from "./evidence-retention.mjs";
 import { retainedExternalReservation } from "./external-verification.mjs";
 import { need, observed } from "./operator-records.mjs";
 import { checkHarnessExecutable, checkHarnessResult, validateHarnessBinding, verifyHarnessSeal } from "./harness-result.mjs";
+import { requireQualifiedPilot } from "./adapter-qualification.mjs";
+import { parseStrictJson } from "./agent-configuration.mjs";
+import { validatePilotHost } from "./agent-setup.mjs";
 
 const limit = 64 * 1024;
 function hostFile(ref, excluded) {
@@ -20,8 +23,9 @@ function hostFile(ref, excluded) {
 }
 
 export function harnessConfiguration(hostConfiguration, excluded) {
-  const host = JSON.parse(hostFile(hostConfiguration, excluded));
-  need(host?.schemaVersion === 1, "Unsupported host.json version");
+  const host = parseStrictJson(hostFile(hostConfiguration, excluded));
+  need(host?.schemaVersion === 1 || host?.schemaVersion === 2, "Unsupported host.json version");
+  if (host.schemaVersion === 2) validatePilotHost(host);
   const binding = host.localHarness;
   if (binding !== undefined && binding !== null) validateHarnessBinding(binding);
   return binding ?? null;
@@ -45,7 +49,8 @@ function invoke(binding, checkout, candidate) {
   const spawnArgs = isMcp ? binding.args : [...binding.args, "--candidate", candidate];
   return new Promise((resolve, reject) => {
     const child = spawn(binding.executable, spawnArgs, { cwd: checkout, detached: process.platform !== "win32",
-      env: { PATH: "/usr/bin:/bin", LANG: "C.UTF-8", HOME: "/nonexistent", GIT_OPTIONAL_LOCKS: "0" },
+      env: { PATH: "/usr/bin:/bin", LANG: "C.UTF-8", HOME: "/nonexistent", GIT_OPTIONAL_LOCKS: "0",
+        HARNESS_CHECKOUT: checkout },
       stdio: [isMcp ? "pipe" : "ignore", "pipe", "ignore"] });
     let buffer = Buffer.alloc(0);
     let total = 0;
@@ -62,7 +67,7 @@ function invoke(binding, checkout, candidate) {
     if (isMcp) {
       child.stdin.on("error", () => { if (!response) fail("MCP harness input failed"); });
       send(mcpRequest(1, "initialize", { protocolVersion: "2024-11-05", capabilities: {},
-        clientInfo: { name: "openspec-delivery", version: "1.7.0" } }));
+        clientInfo: { name: "openspec-delivery", version: "1.8.0" } }));
     }
     child.on("error", () => fail("Harness launch failed"));
     child.stdout.on("data", (chunk) => {
@@ -112,6 +117,7 @@ export async function runLocalHarness(input, context) {
   const { repo, checkout, candidate, hostConfiguration, output, grant, external } = input;
   need(process.getuid, "Local harness execution requires a POSIX host with verifiable ownership");
   need(context.lowTouch, "Verified integrated parent has not adopted the local harness");
+  repository(repo);
   commit(repo, candidate);
   const excluded = [repo, checkout];
   need(separate(repo, checkout) && separate(output, repo) && separate(output, checkout) &&
@@ -128,10 +134,13 @@ export async function runLocalHarness(input, context) {
       external.card.candidate === candidate && external.card.scope === "harness " + binding.id &&
       ["external-check", "paid-check"].includes(external.card.kind), "Separate harness run authority is required");
   }
-  checkoutObservation(checkout, candidate, { detached: true });
+  const before = standaloneCheckoutObservation(checkout, candidate);
+  const source = lstatSync(repo);
+  need(source.dev !== before.root[0] || source.ino !== before.root[1], "Harness clone aliases the mutable source checkout");
   const parent = lstatSync(scopedPath(path.dirname(output)));
   need(parent.isDirectory() && (parent.mode & 0o077) === 0 && parent.uid === process.getuid(), "Expected private harness evidence root");
   const pinExclusions = [...excluded, hostConfiguration.file, output];
+  if (binding.aiRole) requireQualifiedPilot("helper", binding.aiRole, { excluded: pinExclusions });
   checkHarnessExecutable(binding, pinExclusions);
   // Exclusive output creation claims this local run before invocation.
   const descriptor = openSync(scopedPath(output, true), constants.O_CREAT | constants.O_EXCL | constants.O_WRONLY | constants.O_NOFOLLOW, 0o400);
@@ -139,7 +148,9 @@ export async function runLocalHarness(input, context) {
     const earliest = Date.now();
     const result = checkHarnessResult(await invoke(binding, checkout, candidate),
       { harnessId: binding.id, candidate, earliest });
-    checkoutObservation(checkout, candidate, { detached: true });
+    const after = standaloneCheckoutObservation(checkout, candidate);
+    need(JSON.stringify(after) === JSON.stringify(before), "Harness clone identity changed during invocation");
+    harnessConfiguration(hostConfiguration, excluded);
     checkHarnessExecutable(binding, pinExclusions);
     const bytes = Buffer.from(JSON.stringify({ schemaVersion: 2, configurationSha256: hostConfiguration.sha256,
       executableSha256: binding.executableSha256, harnessId: binding.id, candidate,

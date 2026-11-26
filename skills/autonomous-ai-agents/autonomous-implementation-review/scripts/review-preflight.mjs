@@ -2,7 +2,7 @@ import { lstat } from "node:fs/promises";
 import { performance } from "node:perf_hooks";
 import { setTimeout as delay } from "node:timers/promises";
 import { digest, hash, jsonBytes, need, parseStrictJson, separate, absolute } from "./review-inputs.mjs";
-import { validateHostConfig } from "./review-runtime.mjs";
+import { requireReviewHost, validateHostConfig, verifyRuntimePins } from "./review-runtime.mjs";
 import { readClosed } from "./worker-handoff.mjs";
 
 export async function trustedJson(file, excluded, privateFile = false) {
@@ -14,8 +14,18 @@ export async function trustedJson(file, excluded, privateFile = false) {
   return { value: parseStrictJson(bytes), configurationSha256: hash(bytes) };
 }
 
-export async function offlineHostBinding(file, expect, excluded, exactBytes = true) {
+export async function offlineHostBinding(file, expect, excluded, exactBytes = true, pilotOptions = {}) {
   const { value: config, configurationSha256 } = await trustedJson(file, excluded);
+  if (config.schemaVersion === 2) {
+    need(configurationSha256 === expect.configurationSha256 && config.roleBinding?.model === expect.model,
+      "Explicit host configuration pin or model mismatch");
+    const admitted = requireReviewHost(config, excluded, { ...pilotOptions, configurationSha256,
+      hostPin: { path: file, sha256: configurationSha256 } });
+    await verifyRuntimePins(admitted, excluded);
+    return { config: admitted, configurationSha256 };
+  }
+  need(expect.explicit === undefined && expect.qualification === undefined && expect.generator === undefined,
+    "Explicit reviewer expectation requires schema 2 host configuration");
   validateHostConfig(config);
   need(digest(expect.configurationSha256) &&
     (configurationSha256 === expect.configurationSha256 || !exactBytes && hash(jsonBytes(config)) === expect.configurationSha256) &&

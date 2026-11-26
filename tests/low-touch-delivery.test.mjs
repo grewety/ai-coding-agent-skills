@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -242,16 +242,26 @@ test("host-owned CLI and MCP harnesses both seal the committed SHA and fail clos
   const f = fixture(t);
   const plan = f.save("Freeze plan");
   const checkout = path.join(f.root, "harness-checkout");
-  f.git("worktree", "add", "--detach", checkout, plan);
+  const linked = path.join(f.root, "linked-checkout");
+  f.git("worktree", "add", "--detach", linked, plan);
+  f.git("clone", "--no-local", "--no-checkout", f.repo, checkout);
+  const cloneGit = (...args) => execFileSync("/usr/bin/git", ["-C", checkout, ...args], { stdio: "ignore" });
+  cloneGit("checkout", "--detach", plan);
   for (const kind of ["cli", "mcp"]) {
     const adapter = path.join(f.root, kind + "-adapter");
     const output = path.join(f.root, kind + "-result.json");
     const id = "fixture-" + kind;
     writeFileSync(adapter, `#!/usr/bin/python3
 import json
+import os
 import sys
 from datetime import datetime, timezone
 def result(candidate):
+    assert os.getcwd() == os.environ["HARNESS_CHECKOUT"]
+    assert os.path.isdir(".git")
+    if "--fixture-mutate" in sys.argv:
+        with open("unexpected.txt", "w") as file:
+            file.write("synthetic checkout change")
     return {"schemaVersion": 1, "harnessId": ${JSON.stringify(id)}, "candidate": candidate,
         "verdict": "pass", "findings": [], "observedAt": datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")}
 def send(value):
@@ -263,6 +273,7 @@ def send(value):
     if request.get("id") == 1:
         send({"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{}}}})
     if request.get("id") == 2:
+        assert request["params"]["arguments"]["checkout"] == os.getcwd()
         send({"jsonrpc":"2.0","id":2,"result":{"structuredContent":result(request["params"]["arguments"]["candidate"])}})
 `), { mode: 0o700 });
     const binding = { id, kind, executable: adapter, executableSha256: sha256(readFileSync(adapter)), args: [],
@@ -274,6 +285,37 @@ def send(value):
     const grant = { verified: true, reference: "grant", kind: "local-candidate-harness", policyRevision: f.parent,
       change, candidate: plan, harnessId: id, checkout, exposure: "local-only", exposureVerified: true, configurationSha256: hostConfiguration.sha256 };
     const params = { ...f, plan, checkout, candidate: plan, hostConfiguration, output, grant };
+    await assert.rejects(deliveryCommand("run-harness", { ...params, checkout: linked, grant: { ...grant, checkout: linked } }),
+      /standalone detached clone/);
+    cloneGit("checkout", "-b", "attached-" + kind, plan);
+    await assert.rejects(deliveryCommand("run-harness", params), /detached gate checkout/);
+    cloneGit("checkout", "--detach", f.parent);
+    await assert.rejects(deliveryCommand("run-harness", params), /HEAD changed/);
+    cloneGit("checkout", "--detach", plan);
+    const aiOutput = path.join(f.root, kind + "-ai-result.json");
+    const aiHost = JSON.stringify({ schemaVersion: 1, localHarness: { ...binding,
+      aiRole: { client: "codex", provider: "openai", model: "fixture-model", reasoningEffort: "high",
+        executable: { path: adapter, sha256: binding.executableSha256 } } } });
+    const aiPin = { file, sha256: sha256(aiHost) };
+    writeFileSync(file, aiHost);
+    await assert.rejects(deliveryCommand("run-harness", { ...params, hostConfiguration: aiPin,
+      grant: { ...grant, configurationSha256: aiPin.sha256 }, output: aiOutput }), /effective binding adapter/);
+    assert.equal(existsSync(aiOutput), false);
+    writeFileSync(file, host);
+    const dirty = path.join(checkout, "dirty.txt");
+    writeFileSync(dirty, "synthetic local change");
+    await assert.rejects(deliveryCommand("run-harness", params), /Dirty checkout/);
+    rmSync(dirty);
+    assert.equal(existsSync(output), false);
+    const dirtyHost = JSON.stringify({ schemaVersion: 1, localHarness: { ...binding, args: ["--fixture-mutate"] } });
+    const dirtyPin = { file, sha256: sha256(dirtyHost) };
+    const dirtyOutput = path.join(f.root, kind + "-dirty-result.json");
+    writeFileSync(file, dirtyHost);
+    await assert.rejects(deliveryCommand("run-harness", { ...params, hostConfiguration: dirtyPin,
+      grant: { ...grant, configurationSha256: dirtyPin.sha256 }, output: dirtyOutput }), /Dirty checkout/);
+    assert.equal(readFileSync(dirtyOutput).length, 0);
+    rmSync(path.join(checkout, "unexpected.txt"));
+    writeFileSync(file, host);
     const retained = await deliveryCommand("run-harness", params);
     assert.equal(retained.verdict, "pass");
     const sealed = JSON.parse(readFileSync(retained.harness.file));

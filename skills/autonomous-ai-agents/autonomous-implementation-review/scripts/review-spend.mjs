@@ -20,7 +20,8 @@ export function reviewSpendScope(request, expect, prepared, config, admission) {
   need(Number.isSafeInteger(upperUsdMicros), "Unproved full review cost");
   return { change: identity.change, phase: admission.phase, purpose: request.mode, target,
     requestSha256: expect.requestSha256, exportSha256: expect.exportSha256, configurationSha256: expect.configurationSha256,
-    attempt: identity.attempt, scopeSha256: hash(jsonBytes({ authority, acceptance, scope, nonGoals, fileAcceptance: request.fileAcceptance })),
+    attempt: identity.attempt, scopeSha256: hash(jsonBytes({ authority, acceptance, scope, nonGoals, fileAcceptance: request.fileAcceptance,
+      ...(expect.explicit ? { explicit: expect.explicit, generator: expect.generator } : {}) })),
     upperUsdMicros, invocations };
 }
 
@@ -42,13 +43,14 @@ async function syncDirectory(location) {
   try { await handle.sync(); } finally { await handle.close(); }
 }
 
-export async function checkProbeSpend({ file, configurationSha256, maxBudgetUsd, excluded }) {
+export async function checkProbeSpend({ file, configurationSha256, maxBudgetUsd, excluded, explicitRuntimeSha256 }) {
   const { value: grant } = await trustedJson(file, excluded);
   fields(grant, ["schemaVersion", "kind", "reference", "verified", "runs", "configurationSha256", "upperUsdMicros", "ledger"],
-    "standalone probe grant");
+    "standalone probe grant", explicitRuntimeSha256 ? ["explicitRuntimeSha256"] : []);
   need(grant.schemaVersion === 1 && grant.kind === "standalone-review-probe" && grant.verified === true &&
     grant.runs === 1 && text(grant.reference) && grant.configurationSha256 === configurationSha256 &&
-    grant.upperUsdMicros === usdMicros(maxBudgetUsd), "Missing exact single-run standalone probe authority");
+    grant.upperUsdMicros === usdMicros(maxBudgetUsd) && grant.explicitRuntimeSha256 === explicitRuntimeSha256,
+  "Missing exact single-run standalone probe authority");
   return { grant, excluded: [...excluded, file] };
 }
 
@@ -146,6 +148,7 @@ export async function checkReviewSpend({ file, policy, request, expect, prepared
   await protectedLedger(admission.ledger, excluded);
   const scope = reviewSpendScope(request, expect, prepared, config, admission);
   const authority = reviewAuthority(policy, admission);
+  need(!expect.explicit || authority.mode === "explicit", "Explicit reviewer binding requires an exact single-run grant");
   const grant = admission.phaseGrant;
   fields(grant, ["kind", "verified", "reference", "change", "phase", "policyRevision", "requestSha256", "authorityReference"],
     "review phase grant");

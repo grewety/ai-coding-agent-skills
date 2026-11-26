@@ -46,7 +46,9 @@ export async function readHostKey(filename, format) {
   } finally { await handle.close(); }
 }
 
-export function relayRequest(req, bytes, model, maxRequests) {
+const efforts = ["low", "medium", "high", "max"];
+
+export function relayRequest(req, bytes, model, maxRequests, reasoningEffort) {
   need(req.method === "POST" && ["/v1/messages", "/v1/messages?beta=true",
     "/v1/messages/count_tokens", "/v1/messages/count_tokens?beta=true"].includes(req.url) &&
     req.headers["content-type"]?.split(";")[0] === "application/json" && !req.headers["content-encoding"] &&
@@ -55,6 +57,10 @@ export function relayRequest(req, bytes, model, maxRequests) {
   need(payload?.model === model && Array.isArray(payload.messages) && !Object.hasOwn(payload, "mcp_servers") &&
     (payload.max_tokens === undefined || (Number.isSafeInteger(payload.max_tokens) && payload.max_tokens > 0 && payload.max_tokens <= 32000)),
     "Relay inference payload denied");
+  if (reasoningEffort !== undefined && !req.url.startsWith("/v1/messages/count_tokens")) {
+    need(efforts.includes(reasoningEffort) && payload.output_config?.effort === reasoningEffort,
+      "Relay inference request does not confirm the selected reasoning effort");
+  }
   const headers = { "content-type": "application/json", "content-length": bytes.length, "anthropic-version": "2023-06-01" };
   const beta = req.headers["anthropic-beta"];
   if (beta !== undefined) {
@@ -152,12 +158,14 @@ export function forwardInference(upstream, res, body, timeoutMs, observe = () =>
 }
 
 export function validateRelayConfig(config) {
-  fields(config, ["socket", "keyFile", "keyFormat", "model", "requestLimit", "socketMode", "timeoutMs"], "relay configuration");
+  fields(config, ["socket", "keyFile", "keyFormat", "model", "requestLimit", "socketMode", "timeoutMs"],
+    "relay configuration", ["reasoningEffort"]);
   need(absolute(config.socket) && path.basename(config.socket) === "inference.sock" && absolute(config.keyFile) &&
     ["raw", "assignment"].includes(config.keyFormat) && typeof config.model === "string" &&
     [0o600, 0o660].includes(config.socketMode) && Number.isSafeInteger(config.requestLimit) &&
     config.requestLimit > 0 && config.requestLimit <= 4096 &&
-    Number.isSafeInteger(config.timeoutMs) && config.timeoutMs >= 1000 && config.timeoutMs <= 300000,
+    Number.isSafeInteger(config.timeoutMs) && config.timeoutMs >= 1000 && config.timeoutMs <= 300000 &&
+    (config.reasoningEffort === undefined || efforts.includes(config.reasoningEffort)),
     "Invalid host relay configuration");
 }
 
@@ -179,7 +187,7 @@ async function serve(config) {
         data.push(chunk);
       }
       const body = Buffer.concat(data, size);
-      const headers = relayRequest(req, body, config.model, available + 1);
+      const headers = relayRequest(req, body, config.model, available + 1, config.reasoningEffort);
       const upstream = httpsRequest({
         hostname: destination, servername: destination, port: 443, method: "POST", path: req.url,
         rejectUnauthorized: true, minVersion: "TLSv1.2", agent: false,

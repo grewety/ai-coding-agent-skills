@@ -2,13 +2,14 @@ import { fileLimit, fields, need, parseStrictJson, text, utf8 } from "./review-i
 
 const empty = (value) => Array.isArray(value) && value.length === 0;
 const nonnegativeInteger = (value) => Number.isSafeInteger(value) && value >= 0;
+const normalizedFile = (value) => value.replaceAll("\r\n", "\n").replace(/\n$/, "");
 const blocks = (event) => {
   need(Array.isArray(event.message?.content) && event.message.content.length > 0 && !event.parent_tool_use_id,
     "Invalid native stream message");
   return event.message.content;
 };
 
-export function auditClaudeStream(proc, runtime, assigned, probe) {
+export function auditClaudeStream(proc, runtime, assigned, probe, files) {
   need(proc.quiescent === true && proc.outcome === "exit" && proc.code === 0 && proc.signal === null, "Native process or supervisor did not complete");
   const source = utf8(proc.stdout);
   need(source.endsWith("\n"), "Partial native stream");
@@ -98,6 +99,23 @@ export function auditClaudeStream(proc, runtime, assigned, probe) {
         file.startLine === 1 && nonnegativeInteger(file.numLines) &&
         (file.numLines > 0 || (file.content === "" && pathname.endsWith(".patch"))) &&
         (file.totalLines === undefined || file.numLines === file.totalLines), "Failed or partial Read result");
+      if (runtime.explicit) {
+        const bytes = files?.get(pathname.slice("/review/".length));
+        need(Buffer.isBuffer(bytes), "Missing exact exported bytes for the native Read");
+        const exported = utf8(bytes);
+        const content = normalizedFile(exported);
+        const lines = bytes.length ? content.split("\n") : [];
+        const delivered = normalizedFile(block.content);
+        const numbered = delivered.split("\n");
+        const forms = exported.endsWith("\n") ? [lines, [...lines, ""]] : [lines];
+        const rendered = forms.some((form) => form.length === numbered.length && form.every((line, index) => {
+          const match = /^ *(\d+)[\t→]([\s\S]*)$/.exec(numbered[index]);
+          return match && Number(match[1]) === index + 1 && match[2] === line;
+        }));
+        need(normalizedFile(file.content) === content && forms.some((form) => file.numLines === form.length) &&
+          (delivered === content || rendered),
+          "Native Read differs from the full exported file");
+      }
       seenPaths.add(pathname);
       pending.delete(block.tool_use_id);
     } else {

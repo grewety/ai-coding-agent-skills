@@ -16,6 +16,8 @@ import { checkCheckout, checkoutProtectedPaths, gitState, loadAuthority, maximum
 const packageRoot = fileURLToPath(new URL("../", import.meta.url)).replace(/\/$/, "");
 // Keep this inventory in sync with the delivery verifier and its transitive inventory test.
 const runtimeSources = [
+  "adapter-qualification.mjs", "agent-configuration.mjs", "agent-discovery.mjs", "agent-role-adapters.mjs",
+  "agent-role-config.mjs", "agent-setup.mjs", "role-config.mjs", "runtime-version.mjs", "setup.mjs",
   "bounded-worker.mjs", "bounded-worker.py", "implementer-bindings.mjs", "implementer-claims.mjs",
   "implementer-observations.mjs", "implementer-recovery.mjs", "implementer-runtime.mjs", "implementer-sandbox.mjs",
   "implementer-state.mjs", "implementer-supervisor.mjs", "implementer-supervisor.py", "orchestration-core.mjs",
@@ -111,6 +113,7 @@ async function predecessorCheck(entry, grant, roles, claimDirectory, history) {
     control.orchestrator === entry.request.authority.orchestrator &&
     control.priorResultSha256 === publication.resultSha256 && control.priorSettlementSha256 === publication.settlementSha256 &&
     equal(pinnedPair(roles.pair), pinnedPair(latest.pair)) &&
+    equal(roles.roleAudit, latest.roleAudit) &&
     !history.some((launch) => launch.pair.reviewer.session === roles.pair.reviewer.session),
   "Continuation is not bound to the original settled role pair or a fresh reviewer session");
   if (control.reason === "native-turn-cap") {
@@ -166,7 +169,7 @@ async function withRepositoryLock(registry, repository, callback) {
   return serializedOperation(dir, callback);
 }
 
-async function prepareAttempt(entry, registry, runtimeSha256, batchSize, emit, runProbe) {
+async function prepareAttempt(entry, registry, runtimeSha256, batchSize, emit, runProbe, standalone) {
   validateInvocation(entry);
   const { request } = entry;
   const { workspace, change, attempt, predecessor, task } = request.identity;
@@ -176,10 +179,12 @@ async function prepareAttempt(entry, registry, runtimeSha256, batchSize, emit, r
   const repository = repositoryIdentity(workspace);
   const claimDirectory = claimPath(registry, repository, change);
   const { grant, inference } = await loadAuthority(entry, repository);
+  if (standalone) need(grant.mode === "goal-first", "Standalone Implementer requires an approved Goal-First grant");
   need(batchSize <= grant.limits.batchSize && (batchSize === 1 || (predecessor === null && grant.accepted.length === 0)),
     "Batch must contain independently admitted initial assignments");
   need(predecessor !== null || grant.continuation === null, "Continuation lacks its original predecessor");
   const roles = await bindPair(entry, grant, runtimeSha256, registry);
+  if (standalone) need(roles.roleAudit, "Standalone Implementer requires a qualified explicit pair");
   const context = { entry, grant, roles, registry, repository, claimDirectory, runtimeSha256 };
   await dimensions(context);
   const evidence = request.evidenceRoots[0];
@@ -204,7 +209,8 @@ async function prepareAttempt(entry, registry, runtimeSha256, batchSize, emit, r
       claimId: owner.claimId, nonce: randomUUID(), startedAt: Date.now(), sequence: history.length, deadline,
       limits: grant.limits, grantExpiresAt: grant.expiresAt,
       requestSha256: hash(requestBytes(request)), invocationSha256: hash(jsonBytes(entry)), runtimeSha256,
-      pair: roles.pair, mutablePaths: request.mutablePaths, reservation: binding, slot: roles.physicalSlot, evidence };
+      pair: roles.pair, mutablePaths: request.mutablePaths, reservation: binding, slot: roles.physicalSlot, evidence,
+      ...(roles.roleAudit ? { roleAudit: roles.roleAudit } : {}) };
     const name = "attempt-" + attempt;
     const destination = path.join(directory, name);
     const staging = path.join(directory, ".attempt-" + launch.nonce);
@@ -246,7 +252,7 @@ async function prepareAttempt(entry, registry, runtimeSha256, batchSize, emit, r
   const smokeDeadline = launch.deadline - grant.limits.timeoutMs;
   need(Date.now() + smokeBudgetMs <= smokeDeadline, "Finite preflight budget cannot admit native sandbox checks");
   const smoke = await runProbe({ request, role: roles.pair.implementer, registry, attemptDirectory: evidence,
-    protectedFile: entry.grant.path, controlDirectory: attemptDirectory });
+    protectedFile: entry.grant.path, controlDirectory: attemptDirectory, pilot: roles.roleAudit?.implementer });
   await writeState(attemptDirectory, "smoke.json", smoke);
   await checkCheckout(request, grant);
   const refreshed = await loadAuthority(entry, repository);
@@ -254,7 +260,7 @@ async function prepareAttempt(entry, registry, runtimeSha256, batchSize, emit, r
   const checkedRoles = await bindPair(entry, grant, runtimeSha256, registry);
   need(equal(checkedRoles, roles), "Paired role runtime changed after native preflight");
   await writeState(attemptDirectory, "git-state.json", await gitState(workspace));
-  const native = await buildCodexLaunch(request, roles.pair.implementer, registry, attemptDirectory, launch.nonce);
+  const native = await buildCodexLaunch(request, roles.pair.implementer, registry, attemptDirectory, launch.nonce, roles.roleAudit?.implementer);
   need(Date.now() + grant.limits.timeoutMs <= launch.deadline &&
     await runtimeIdentity() === runtimeSha256, "Dispatch deadline or packaged runtime changed before prompt delivery");
   milestone(emit, request, "supervisor-armed", { claimId: owner.claimId });
@@ -299,14 +305,16 @@ async function foreground(context, emit) {
 }
 
 function stopped(error) {
+  if (error.disposition) return { phase: "unsupported", ...error.disposition };
   return { phase: "blocked", reason: error instanceof Error ? error.message : "Runtime predicate failed" };
 }
 
 export async function runImplementers(entries, {
-  registry = defaultRegistry(), emit = () => {}, runProbe = smokeCheck,
+  registry = defaultRegistry(), emit = () => {}, runProbe = smokeCheck, standalone = false,
 } = {}) {
   need(process.platform === "linux" && Array.isArray(entries) && entries.length > 0 && entries.length <= maximumBatch,
     "Unsupported host or invalid foreground batch bound");
+  need(!standalone || entries.length === 1, "Standalone Implementer requires one exact assignment");
   const identifiers = entries.map((entry) => entry?.request?.identity?.attempt);
   need(identifiers.every(identifier) && new Set(identifiers).size === identifiers.length, "Batch attempt mapping is ambiguous");
   const runtimeSha256 = await runtimeIdentity();
@@ -315,7 +323,7 @@ export async function runImplementers(entries, {
     const { change, task, attempt } = entry.request.identity;
     let result;
     try {
-      const prepared = await prepareAttempt(entry, registry, runtimeSha256, entries.length, emit, runProbe);
+      const prepared = await prepareAttempt(entry, registry, runtimeSha256, entries.length, emit, runProbe, standalone);
       result = prepared.supervisor ? await foreground(prepared, emit) : prepared;
     } catch (error) { result = stopped(error); }
     milestone(emit, entry.request, result.phase, { reason: result.reason ?? null });
@@ -339,7 +347,7 @@ async function retainedContext(entry, registry) {
     launch.runtimeSha256 === runtimeSha256, "Original retained attempt, runtime or request differs");
   const { grant } = await loadAuthority(entry, repository);
   const roles = await bindPair(entry, grant, runtimeSha256, registry);
-  need(equal(roles.pair, launch.pair) && equal(roles.physicalSlot, launch.slot) &&
+  need(equal(roles.pair, launch.pair) && equal(roles.roleAudit, launch.roleAudit) && equal(roles.physicalSlot, launch.slot) &&
     equal(physicalReservation(launch.claimId, attempt, roles), launch.reservation), "Original pinned role or physical slot differs");
   return { entry, registry, repository, claimDirectory, attemptDirectory, owner, launch, grant, roles, runtimeSha256 };
 }

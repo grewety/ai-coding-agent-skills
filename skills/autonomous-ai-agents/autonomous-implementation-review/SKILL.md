@@ -1,7 +1,7 @@
 ---
 name: autonomous-implementation-review
 description: Implement changes with an independent review loop.
-version: 0.21.0
+version: 0.22.0
 author: Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -33,9 +33,9 @@ execution or remote writes.
 
 ## Optional worker runtime and reviewer
 
-The pinned [Linux runtime](references/worker-runtime.md) passed sealed trials.
-[Contained review](references/review-candidate.md) requires separate authority
-for the exact export and paid inference.
+Use `scripts/detect-agents.mjs` and `scripts/setup.mjs` for explicit bindings.
+[Worker runtime](references/worker-runtime.md) and [contained review](references/review-candidate.md)
+require matching qualification and separate inference authority.
 
 ## Legacy host execution
 
@@ -57,8 +57,7 @@ govern only the Herdr interaction fallback.
   Reviewers are read-only.
 - Dispatch roles via an explicitly selected qualified terminal adapter
   (`hermes`, `claude-code`, `codex`, `grok-build`) in `references/terminal-adapters.md`.
-  One client may run all roles sequentially in fresh sessions without distinct
-  models unless `requireDistinctModels: true`. No implicit consent, `delegate_task`,
+  Apply the route's session, provider and model independence rules. No implicit consent, `delegate_task`,
   subagent, or multiplexer fallback.
 - Model keys are session selectors, not executables; never shell-execute them or edit global config.
 - Isolate writers/services; use finite budgets; no secrets or destructive tasks.

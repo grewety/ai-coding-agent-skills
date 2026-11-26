@@ -51,34 +51,70 @@ async function deltaDirectory(change) {
 }
 
 const adoptedDelivery = "low-touch-autonomous-delivery-01m88zpkktr16z02dh3wne3ppy";
+const configurableBackends = "configurable-worker-and-reviewer-backends-01m8a1cfak28znhgw126kzxye4";
+const currentSpecs = path.join(root, "openspec", "specs");
+
+function readCapabilitySpec(specsRoot, capability) {
+  return readFile(path.join(specsRoot, capability, "spec.md"), "utf8");
+}
+
+function withoutSupersededRequirements(delta, newerDelta, ...titles) {
+  const requirement = /^### Requirement: ([^\n]+)\n[\s\S]*?(?=^#{1,3} |(?![\s\S]))/gm;
+  const modified = /^## MODIFIED Requirements\n([\s\S]*?)(?=^#{1,2} |(?![\s\S]))/m.exec(newerDelta);
+  assert.ok(modified, "Expected a MODIFIED Requirements section in the superseding delta");
+  const modifiedTitles = new Set(Array.from(modified[1].matchAll(requirement), ([, title]) => title));
+  for (const title of titles) {
+    assert.ok(modifiedTitles.has(title), `Expected an explicit modification of ${title}`);
+  }
+  const remaining = new Set(titles);
+  const retained = delta.replace(requirement, (block, title) => remaining.delete(title) ? "" : block);
+  assert.equal(remaining.size, 0, `Missing historical requirements: ${[...remaining].join(", ")}`);
+  return retained;
+}
+
 test("exclusive worker runtime requirements keep exact content until superseded by a current delta", async () => {
-  const deltaRoot = await deltaDirectory("exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m");
-  const capabilities = new Map([["contained-independent-review", 3], ["exclusive-worker-runtime", 5], ["openspec-integration", 1]]);
-  const newerDelta = await readFile(path.join(await deltaDirectory(adoptedDelivery), "contained-independent-review", "spec.md"), "utf8");
-  const superseded = /^### Requirement: Verified planning-path relocation for record-only closure\n[\s\S]*?(?=^### Requirement: |^## |(?![\s\S]))/m;
-  assert.match(newerDelta, superseded);
-  for (const [capability, requirements] of capabilities) {
-    let [delta, current] = await Promise.all([
-      readFile(path.join(deltaRoot, capability, "spec.md"), "utf8"),
-      readFile(path.join(root, "openspec", "specs", capability, "spec.md"), "utf8"),
-    ]);
+  const [deltaRoot, adoptedRoot, backendsRoot] = await Promise.all([
+    deltaDirectory("exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m"),
+    deltaDirectory(adoptedDelivery),
+    deltaDirectory(configurableBackends),
+  ]);
+  for (const [capability, expected] of [["contained-independent-review", 2], ["exclusive-worker-runtime", 4], ["openspec-integration", 1]]) {
+    let delta = await readCapabilitySpec(deltaRoot, capability);
+    const current = await readCapabilitySpec(currentSpecs, capability);
     assert.ok(current.startsWith(header("spec", `capability: ${capability}\n`)));
-    let expected = requirements;
     if (capability === "contained-independent-review") {
-      assert.match(delta, superseded);
-      delta = delta.replace(superseded, "");
-      expected--;
+      const newerDelta = await readCapabilitySpec(adoptedRoot, capability);
+      delta = withoutSupersededRequirements(delta, newerDelta, "Verified planning-path relocation for record-only closure");
+    }
+    if (capability === "exclusive-worker-runtime") {
+      const newerDelta = await readCapabilitySpec(backendsRoot, capability);
+      delta = withoutSupersededRequirements(delta, newerDelta, "Qualified paired worker bindings");
     }
     assert.equal(checkPromotion({ capability, delta, current }), expected, capability);
   }
 });
 
-test("low-touch delivery promotes both full native deltas with capability metadata", async () => {
-  const deltaRoot = await deltaDirectory(adoptedDelivery);
-  for (const [capability, expected] of [["contained-independent-review", 5], ["openspec-integration", 10]]) {
+test("low-touch delivery retains requirements until explicitly superseded, with capability metadata", async () => {
+  const [deltaRoot, backendsRoot] = await Promise.all([deltaDirectory(adoptedDelivery), deltaDirectory(configurableBackends)]);
+  for (const [capability, expected] of [["contained-independent-review", 5], ["openspec-integration", 8]]) {
+    let delta = await readCapabilitySpec(deltaRoot, capability);
+    const current = await readCapabilitySpec(currentSpecs, capability);
+    assert.ok(current.startsWith(header("spec", `capability: ${capability}\n`)));
+    if (capability === "openspec-integration") {
+      const newerDelta = await readCapabilitySpec(backendsRoot, capability);
+      delta = withoutSupersededRequirements(delta, newerDelta,
+        "Optional candidate-bound local pre-PR harness", "Operator workflow guidance");
+    }
+    assert.equal(checkPromotion({ capability, delta, current }), expected, capability);
+  }
+});
+
+test("configurable worker and reviewer backends promote all nine native requirements with capability metadata", async () => {
+  const deltaRoot = await deltaDirectory(configurableBackends);
+  for (const [capability, expected] of [["contained-independent-review", 2], ["exclusive-worker-runtime", 2], ["openspec-integration", 5]]) {
     const [delta, current] = await Promise.all([
-      readFile(path.join(deltaRoot, capability, "spec.md"), "utf8"),
-      readFile(path.join(root, "openspec", "specs", capability, "spec.md"), "utf8"),
+      readCapabilitySpec(deltaRoot, capability),
+      readCapabilitySpec(currentSpecs, capability),
     ]);
     assert.ok(current.startsWith(header("spec", `capability: ${capability}\n`)));
     assert.equal(checkPromotion({ capability, delta, current }), expected, capability);

@@ -251,8 +251,9 @@ import { chmod, mkdir, mkdtemp, readFile, realpath, readdir, rename, rm, stat, w
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { hash, jsonBytes, buildExport } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-inputs.mjs";
-import { reviewCommand } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-candidate.mjs";
+import { reviewCommand, runReview } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-candidate.mjs";
 import { containmentArgs, withReviewRuntime } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-runtime.mjs";
+import { auditVersion } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/runtime-version.mjs";
 import * as relay from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-relay.mjs";
 
 const { readHostKey, credentialValue, relayRequest } = relay;
@@ -299,6 +300,10 @@ test("relay policy admits only the bounded pinned inference request and filtered
   assert.throws(() => relayRequest({ ...req, url: "/v1/models" }, body, runtime.model, 1), /route or quota denied/);
   assert.throws(() => relayRequest({ ...req, headers: { ...req.headers, "anthropic-beta": "invalid;value" } },
     body, runtime.model, 1), /feature header/);
+  assert.throws(() => relayRequest(req, body, runtime.model, 1, "high"), /reasoning effort/);
+  assert.throws(() => relayRequest(req, jsonBytes({ ...base, output_config: { effort: "low" } }), runtime.model, 1, "high"),
+    /reasoning effort/);
+  assert.ok(relayRequest(req, jsonBytes({ ...base, output_config: { effort: "high" } }), runtime.model, 1, "high"));
 });
 
 test("relay timeout configuration requires a bounded safe integer", () => {
@@ -849,6 +854,51 @@ test("candidate subprocess fixtures seal a complete multi-packet run against exa
   f.request.snapshot.diffSha256 = "a".repeat(64);
   const wrong = await prepareFixture(f, "wrong", false);
   assert.match(invoke(["--prepare", ...wrong.flags], 1), /diff hash mismatch/);
+});
+
+test("explicit review replays exact delivered file bytes, strict framing and independent pins offline", async (t) => {
+  for (const [variant, phase] of [["complete", "complete"], ["partial", "runtime-failed"], ["bare", "receipt-invalid"]]) {
+    await t.test(variant, async (t) => {
+      const f = await gitCandidate(t);
+      const a = await prepareFixture(f);
+      const prepared = await buildExport(f.request);
+      const qualification = { path: path.join(f.root, "unneeded-qualification.json"), sha256: "1".repeat(64) };
+      const explicit = { provider: "anthropic", reasoningEffort: "high", executableSha256: "2".repeat(64),
+        version: auditVersion({ versionCheck: false }, "2.1.329", "2.1.330"),
+        bubblewrap: auditVersion({}, "0.9.1", "0.9.0"), relaySha256: "3".repeat(64), runtimeSha256: "4".repeat(64),
+        qualificationSha256: qualification.sha256 };
+      Object.assign(a.approval, { qualification, explicit,
+        generator: { session: f.request.worker.identity.implementerSession, provider: "openai" } });
+      const run = ({ session, files, prompt }) => {
+        const events = [{ ...init, model: a.approval.model, claude_code_version: explicit.version.observedVersion }];
+        for (const [name, bytes] of files) {
+          const filePath = "/review/" + name;
+          const content = bytes.toString("utf8").replace(/\n$/, "");
+          const numLines = bytes.length ? content.split("\n").length : 0;
+          const delivered = variant === "partial" ? "Only a fixture excerpt" : content;
+          events.push(assistant([{ type: "tool_use", id: name, name: "Read", input: { file_path: filePath } }]),
+            { type: "user", message: { content: [{ type: "tool_result", tool_use_id: name, content: delivered }] },
+              tool_use_result: { type: "text", file: { filePath, content, startLine: 1, numLines } } });
+        }
+        const trailer = prompt.split("\n").slice(-5);
+        const result = files.size ? (variant === "bare" ? trailer.slice(1, -1) : trailer).join("\n") : "REVIEW_PROBE_OK";
+        events.push(assistant([{ type: "text", text: result }]), { ...end, result });
+        return { runtime: { ...runtime, session, model: a.approval.model, configurationSha256: a.approval.configurationSha256,
+          version: explicit.version.observedVersion, bubblewrapVersion: explicit.bubblewrap.observedVersion,
+          route: "same-uid-key", maxTurns: 96, maxBudgetUsd: 1, explicit },
+        proc: { ...proc(events.map((event) => ({ ...event, session_id: session }))), stderr: Buffer.alloc(0) } };
+      };
+      const launched = await runReview({ request: f.request, expect: a.approval, prepared, directory: f.output, excluded: [], run });
+      assert.equal(launched.phase, phase);
+      await retain(a, launched);
+      assert.equal(invoke(["--verify", ...a.flags, "--output", f.output], phase === "complete" ? 0 : 1).phase, phase);
+      if (phase === "complete") {
+        a.approval.explicit = { ...explicit, relaySha256: "5".repeat(64) };
+        await writeFile(a.expect, jsonBytes(a.approval));
+        assert.match(invoke(["--verify", ...a.flags, "--output", f.output], 1), /explicit review runtime pins/i);
+      }
+    });
+  }
 });
 
 test("candidate seals exact second-packet SHA rejection and replays it without a handover", async (t) => {
