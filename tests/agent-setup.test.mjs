@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -65,6 +65,45 @@ test("discovery redacts raw output and keeps present pilots unsupported", (t) =>
   assert.throws(() => inspectPinnedFile({ ...executable, sha256: "0".repeat(64) }, { executable: true }), /SHA-256/);
 });
 
+test("discovery reports untrusted executables without probing and filters the probe PATH", (t) => {
+  const { root, command } = fixture(t);
+  const shared = path.join(root, "shared");
+  const untrusted = path.join(shared, "bin");
+  const linked = path.join(root, "linked");
+  mkdirSync(untrusted, { recursive: true, mode: 0o700 });
+  chmodSync(shared, 0o770);
+  symlinkSync(untrusted, linked);
+  const claude = path.join(untrusted, "claude");
+  writeFileSync(claude, '#!/bin/sh\nprintf "2.1.330 (Claude Code)\\n"\n', { mode: 0o700 });
+  symlinkSync(claude, path.join(root, "claude"));
+  const hermes = path.join(root, "hermes");
+  writeFileSync(hermes, '#!/bin/sh\nprintf "Hermes Agent v0.11.0\\n"\n', { mode: 0o700 });
+  chmodSync(hermes, 0o770);
+  const searchPath = [linked, root].join(path.delimiter);
+  const probed = [];
+  const detected = detectAgents({ searchPath, run: (entry, _args, options) => {
+    probed.push(entry);
+    assert.ok(options.env.PATH.split(path.delimiter).includes(root));
+    assert.ok(!options.env.PATH.split(path.delimiter).some((directory) => [linked, untrusted].includes(directory)));
+    return { status: 0, stdout: "codex-cli 0.172.0" };
+  } });
+  assert.deepEqual(probed, [command]);
+  for (const [client, executable] of [["claude-code", claude], ["hermes", hermes]]) {
+    const observed = detected.find((agent) => agent.client === client);
+    assert.equal(observed.status, "present");
+    assert.equal(observed.executable, executable);
+    assert.equal(observed.version, null);
+    assert.equal(observed.versionProbe, "untrusted-path");
+  }
+  const cli = spawnSync(process.execPath, [new URL("../skills/software-development/openspec-delivery/scripts/detect-agents.mjs", import.meta.url).pathname],
+    { encoding: "utf8", env: { PATH: root } });
+  assert.equal(cli.status, 0, cli.stderr);
+  const observed = JSON.parse(cli.stdout).agents;
+  assert.equal(observed.find(({ client }) => client === "codex").version, "0.172.0");
+  assert.equal(observed.find(({ client }) => client === "claude-code").versionProbe, "untrusted-path");
+  assert.equal(observed.find(({ client }) => client === "hermes").version, null);
+});
+
 test("accepts unambiguous native version output without treating an arbitrary version mention as identity", () => {
   for (const [client, text, expected] of [
     ["codex", "codex-cli 0.171.0\n", "0.171.0"],
@@ -120,6 +159,47 @@ test("setup previews exact bytes, refuses drift and reads back independent role 
   writeFileSync(preview.outputs[0].path, preview.outputs[0].utf8 + " ");
   assert.throws(() => readRoleBindings(pin), /SHA-256/);
   assert.throws(() => readWorksetOpener(pin, native, { workspace }), /SHA-256/);
+});
+
+test("configured opener requires approved root identities before forwarding attachments", (t) => {
+  const { input, workspace, root } = fixture(t);
+  const approved = path.join(root, "approved");
+  const unrelated = path.join(root, "unrelated");
+  const alias = path.join(root, "alias");
+  mkdirSync(approved, { mode: 0o700 });
+  mkdirSync(unrelated, { mode: 0o700 });
+  symlinkSync(approved, alias);
+  const request = { ...input, worksetRoots: [workspace, approved] };
+  assert.throws(() => previewSetup({ ...request, worksetRoots: [workspace, alias] }, { workspace }), /noncanonical/);
+  const preview = previewSetup(request, { workspace });
+  applySetup(request, preview.confirmationSha256, { workspace });
+  const pin = { path: preview.outputs[1].path, sha256: preview.outputs[1].sha256 };
+  assert.deepEqual(readRoleBindings(pin).worksetRoots.map((entry) => entry.path), [workspace, approved]);
+  const { command, args } = JSON.parse(preview.outputs[2].utf8).openers.codex;
+  const native = [...args.slice(4), "--add-dir", workspace, "--add-dir", approved];
+  const launch = readWorksetOpener(pin, native, { workspace, env: {} });
+  assert.deepEqual(launch.args, native);
+  assert.throws(() => readWorksetOpener(pin, [...native, "--add-dir", alias], { workspace }), /outside the approved/);
+  assert.throws(() => readWorksetOpener(pin, [...native, "--add-dir", workspace], { workspace }), /Duplicate/);
+  assert.throws(() => readWorksetOpener(pin, native, { workspace: unrelated }), /launch directory/);
+  const rejected = spawnSync(command, [...args, "--add-dir", workspace, "--add-dir", unrelated],
+    { cwd: workspace, encoding: "utf8", env: { PATH: "/usr/bin:/bin", HOME: root } });
+  assert.equal(rejected.status, 2);
+  assert.equal(rejected.stdout, "");
+  assert.match(rejected.stderr, /outside the approved workset roots/);
+
+  const legacy = JSON.parse(preview.outputs[1].utf8);
+  delete legacy.worksetRoots;
+  const legacyBytes = JSON.stringify(legacy);
+  const legacyPath = path.join(input.directory, "legacy-roles.json");
+  writeFileSync(legacyPath, legacyBytes, { mode: 0o600 });
+  const legacyPin = { path: legacyPath, sha256: hashBytes(legacyBytes) };
+  assert.equal(readRoleBindings(legacyPin).roles.orchestrator.client, "codex");
+  assert.throws(() => readWorksetOpener(legacyPin, native, { workspace }), /no approved workset roots/);
+
+  renameSync(approved, path.join(root, "original"));
+  mkdirSync(approved, { mode: 0o700 });
+  assert.throws(() => readWorksetOpener(pin, native, { workspace }), /root identity changed/);
 });
 
 test("setup allows a distinct XDG application directory and refuses a live profile alias", (t) => {

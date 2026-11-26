@@ -2,7 +2,7 @@ import { closeSync, constants, fstatSync, fsyncSync, lstatSync, openSync, readFi
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { disjoint, hashBytes, inspectPinnedFile, jsonBytes } from "./agent-configuration.mjs";
+import { disjoint, hashBytes, inspectPinnedFile, jsonBytes, trustedHostPath } from "./agent-configuration.mjs";
 import { observeVersion } from "./agent-discovery.mjs";
 import { nativeRoleBinding } from "./agent-role-adapters.mjs";
 import { readRoleBindings, validateRoleBindings } from "./agent-role-config.mjs";
@@ -84,8 +84,30 @@ export function validatePilotHost(input) {
     ...(runtime === undefined ? {} : { runtime }), ...(input.localHarness === undefined ? {} : { localHarness: input.localHarness }) };
 }
 
+function worksetRootIdentity(directory) {
+  need(absolute(directory) && trustedHostPath(directory) === directory, "Untrusted or noncanonical OpenSpec workset root");
+  const stat = lstatSync(directory, { bigint: true });
+  need(stat.isDirectory() && [0n, BigInt(process.getuid())].includes(stat.uid) && !(stat.mode & 0o022n),
+    "Untrusted OpenSpec workset root");
+  return { path: directory, device: String(stat.dev), inode: String(stat.ino), uid: String(stat.uid) };
+}
+
+function checkWorksetRoots(directories, approved, protectedPaths) {
+  need(new Set(directories).size === directories.length, "Duplicate OpenSpec workset member");
+  for (const directory of directories) {
+    const expected = approved.get(directory);
+    need(expected, "OpenSpec workset member is outside the approved workset roots");
+    need(protectedPaths.every((file) => disjoint(directory, file)), "Pinned workset inputs overlap an attached directory");
+    const actual = worksetRootIdentity(directory);
+    need(actual.device === expected.device && actual.inode === expected.inode && actual.uid === expected.uid,
+      "Approved OpenSpec workset root identity changed");
+  }
+}
+
 export function readWorksetOpener(pin, receivedArgs, { workspace = process.cwd(), env = process.env } = {}) {
-  const configuration = readRoleBindings(pin, [realpathSync(workspace)]);
+  const primary = realpathSync(workspace);
+  const configuration = readRoleBindings(pin, [primary]);
+  need(configuration.worksetRoots, "OpenSpec opener has no approved workset roots. Regenerate and confirm external setup");
   const binding = configuration.roles.orchestrator;
   const mapped = nativeRoleBinding(binding, "orchestrator");
   need(mapped.opener && !mapped.blocker, mapped.blocker ?? "Unsupported OpenSpec opener");
@@ -93,11 +115,13 @@ export function readWorksetOpener(pin, receivedArgs, { workspace = process.cwd()
   need(expected.every((arg, index) => arg === receivedArgs[index]), "OpenSpec opener arguments differ from pinned role");
   const members = receivedArgs.slice(expected.length);
   need(members.length > 0 && members.length % 2 === 0 && members.every((arg, index) =>
-    index % 2 === 0 ? arg === "--add-dir" : absolute(arg) && lstatSync(arg).isDirectory() && realpathSync(arg) === arg),
+    index % 2 === 0 ? arg === "--add-dir" : absolute(arg)),
   "Invalid OpenSpec workset members");
-  need(members.filter((_, index) => index % 2 === 1).every((member) =>
-    [pin.path, configuration.reviewerHost.path, binding.executable.path].every((file) => disjoint(member, file))),
-  "Pinned workset inputs overlap an attached directory");
+  const directories = members.filter((_, index) => index % 2 === 1);
+  need(directories[0] === primary, "Primary OpenSpec workset member must equal the launch directory");
+  const approved = new Map(configuration.worksetRoots.map((root) => [root.path, root]));
+  const protectedPaths = [pin.path, configuration.reviewerHost.path, binding.executable.path];
+  checkWorksetRoots(directories, approved, protectedPaths);
   const providerOverrides = binding.client === "claude-code"
     ? ["ANTHROPIC_BASE_URL", "ANTHROPIC_CUSTOM_HEADERS", "ANTHROPIC_MODEL", "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX",
       "CLAUDE_CODE_USE_FOUNDRY", "CLAUDE_CODE_EFFORT_LEVEL"]
@@ -106,6 +130,7 @@ export function readWorksetOpener(pin, receivedArgs, { workspace = process.cwd()
   inspectPinnedFile(binding.executable, { executable: true });
   const runtimeVersion = auditVersion(binding, observeVersion(binding.executable.path, { client: binding.client }), clients[binding.client].floor);
   inspectPinnedFile(binding.executable, { executable: true });
+  checkWorksetRoots(directories, approved, protectedPaths);
   return { command: binding.executable.path, args: [...expected, ...members], runtimeVersion };
 }
 
@@ -124,7 +149,7 @@ function outputState(file, bytes) {
 }
 
 export function previewSetup(input, { workspace = process.cwd() } = {}) {
-  fields(input, ["schemaVersion", "directory", "roles", "reviewer"], [], "setup request");
+  fields(input, ["schemaVersion", "directory", "roles", "reviewer"], ["worksetRoots"], "setup request");
   need(input.schemaVersion === 1, "Unsupported setup schema");
   const directory = input.directory;
   const identity = directoryState(directory, workspace);
@@ -133,8 +158,13 @@ export function previewSetup(input, { workspace = process.cwd() } = {}) {
   const reviewer = validatePilotHost({ ...input.reviewer, schemaVersion: 2, maxTurns: 96, roleBinding: input.roles?.reviewer });
   const host = jsonBytes(reviewer);
   const configurationSha256 = hashBytes(host);
+  const roots = input.worksetRoots ?? [realpathSync(workspace)];
+  need(Array.isArray(roots) && roots.length > 0, "Expected approved OpenSpec workset roots");
   const roles = validateRoleBindings({ schemaVersion: 1, roles: input.roles,
-    reviewerHost: { path: path.join(directory, "host.json"), sha256: configurationSha256 } });
+    reviewerHost: { path: path.join(directory, "host.json"), sha256: configurationSha256 },
+    worksetRoots: roots.map(worksetRootIdentity) });
+  need(roots.every((root) => [directory, roles.roles.orchestrator.executable.path].every((file) => disjoint(root, file))),
+    "Pinned workset inputs overlap an approved root");
   const mappings = Object.fromEntries(Object.entries(roles.roles).map(([role, binding]) =>
     [role, binding && nativeRoleBinding(binding, role)]));
   const opener = mappings.orchestrator;

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
-import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, realpathSync } from "node:fs";
+import { closeSync, constants, fstatSync, lstatSync, openSync, readlinkSync, readSync, realpathSync } from "node:fs";
 import path from "node:path";
-import { need, validatePin } from "./role-config.mjs";
+import { absolute, need, validatePin } from "./role-config.mjs";
 
 export const hashBytes = (bytes) => createHash("sha256").update(bytes).digest("hex");
 export const jsonBytes = (value) => Buffer.from(JSON.stringify(value, null, 2) + "\n");
@@ -12,6 +12,33 @@ export function disjoint(a, b) {
     return rel === ".." || rel.startsWith(".." + path.sep) || path.isAbsolute(rel);
   };
   return outside(a, b) && outside(b, a);
+}
+
+export function trustedHostPath(file) {
+  if (!absolute(file) || !process.getuid) return null;
+  const uid = process.getuid();
+  const resolve = (entry, links, ancestor = false) => {
+    const parent = path.dirname(entry);
+    const directory = parent === entry ? entry : resolve(parent, links, true);
+    if (!directory) return null;
+    const candidate = parent === entry ? entry : path.join(directory, path.basename(entry));
+    const info = lstatSync(candidate);
+    if (info.uid !== 0 && info.uid !== uid) return null;
+    if (info.isSymbolicLink()) {
+      if (links.has(candidate) || links.size >= 40) return null;
+      return resolve(path.resolve(directory, readlinkSync(candidate)), new Set([...links, candidate]), ancestor);
+    }
+    // A root-owned sticky ancestor cannot be used by another UID to replace a trusted child.
+    const stickyAncestor = ancestor && info.isDirectory() && info.uid === 0 && (info.mode & 0o1000);
+    if ((info.mode & 0o022) && !stickyAncestor) return null;
+    return (ancestor ? info.isDirectory() : info.isDirectory() || info.isFile()) ? candidate : null;
+  };
+  try {
+    const resolved = resolve(file, new Set());
+    return resolved === realpathSync(file) ? resolved : null;
+  } catch {
+    return null;
+  }
 }
 
 export function inspectPinnedFile(input, { executable = false, excluded = [], read = false } = {}) {

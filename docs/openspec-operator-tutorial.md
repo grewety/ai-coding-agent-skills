@@ -92,7 +92,10 @@ OpenSpec **2.1.1** reads `openers.codex.args` from its user-global
 An override replaces the built-in argument list. Generate the complete
 entry with the [external AI role setup](configurable-backends.md).
 Its `args` start with the launcher, `--launch-opener`, roles file path and
-SHA-256. The Codex native argument suffix preserves workspace-write.
+SHA-256. Setup pins the approved directory identities in that roles file.
+For a workset that attaches multiple directories, include each exact
+canonical member in the setup request's `worksetRoots` array. The Codex
+native argument suffix preserves workspace-write.
 
 ```json
 {

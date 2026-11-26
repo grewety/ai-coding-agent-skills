@@ -1,12 +1,18 @@
 # External AI role configuration and backend pilots
 
 Run the delivery or orchestration package's `scripts/detect-agents.mjs` with
-Node. It reports canonical executable paths and bounded version observations.
+Node. It reports canonical executable paths and probes versions only when
+the executable and its path have trusted ownership and write permissions.
+Untrusted matches are reported as present with `versionProbe: "untrusted-path"`
+and an unknown version.
 Auth readiness, permissions, available models and reasoning controls are
 unknown unless observed. Discovery grants neither qualification nor run authority.
 
 Prepare a JSON setup request with `schemaVersion: 1`, `directory` (an
 existing private external Linux directory), `roles`, and `reviewer`.
+The optional `worksetRoots` array lists the exact canonical directories
+approved for attachment. If omitted, setup approves the current workspace
+only. Include the workset's primary directory in any explicit list.
 Under `roles`, specify `orchestrator`, `implementer`, `reviewer` and
 `helper` (null when disabled). Each enabled role uses this shape.
 
@@ -56,8 +62,11 @@ The generated `openers.codex.args` includes the pinned role readback and the
 native model, `model_provider` and `model_reasoning_effort` arguments with
 workspace-write. Claude passes `--model` and `--effort` for Anthropic and
 disables profile settings sources for that launch. The opener checks the raw
-pins, audits the observed executable version and accepts only canonical
-`--add-dir` member pairs appended by OpenSpec. Configure the live OpenSpec
+pins, audits the observed executable version and checks every appended
+`--add-dir` member against the approved directory identities in the pinned
+roles file. The primary member must be the actual launch directory. For an
+older opener or a changed directory identity, preview and confirm fresh
+external setup in a new private directory before updating the live OpenSpec
 profile under separate authority. Hermes needs `hermes --profile <name>`
 with pinned profile provider, model and `agent.reasoning_effort` readback.
 Pi's native mapping is `--provider NAME --model MODEL --thinking LEVEL`.
