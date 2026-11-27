@@ -1,0 +1,441 @@
+{
+  "schemaVersion": 1,
+  "change": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb",
+  "issueUrl": "https://github.com/grewety/ai-coding-agent-skills/issues/71",
+  "mode": "goal-first",
+  "base": "39606f64b148ffad3b7fa7d268f5eb64a7868097",
+  "head": "cb0e1782e3e8e482e95b0fb59737cf112e1b077f",
+  "plan": "4aad9b882b0613185d30fa36059e196489ae011b",
+  "planDigest": "8893b6c9b63cf39fefbe10cd610a1a89ea5cad7a2ba360797c08701eb8f5c61b",
+  "integrated": "04b359f92056a4e8348ef5e047a1e297b0eb4a81",
+  "verified": "04b359f92056a4e8348ef5e047a1e297b0eb4a81",
+  "integrationReference": "https://github.com/grewety/ai-coding-agent-skills/pull/72",
+  "mergedAt": "2026-11-27T02:20:31Z",
+  "mergeReadback": {
+    "record": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/finish-pXS8OGpD/implementation-merged/pr.json",
+    "sha256": "130c9642ee68b013cd8d371b1d22c49b93be16e468400f330f5eb1440c681dc0"
+  },
+  "mainReadback": {
+    "record": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/finish-pXS8OGpD/implementation-merged/main.json",
+    "sha256": "87eaa26f357c4664f8a840c7ed45497b0c20347369e62079fca8d553a84c4c72"
+  },
+  "protectedReadback": {
+    "record": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/finish-pXS8OGpD/implementation-merged/assertion-check.json",
+    "sha256": "d1f2d2b269608bc87b408c5247b9dd56a7ce8dcec6e5679c98280d55e5df8e81"
+  },
+  "promotedCurrentSpecs": [
+    {
+      "capability": "contained-independent-review",
+      "requirements": 4
+    },
+    {
+      "capability": "exclusive-worker-runtime",
+      "requirements": 1
+    },
+    {
+      "capability": "openspec-integration",
+      "requirements": 3
+    }
+  ],
+  "review": {
+    "schemaVersion": 1,
+    "change": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb",
+    "issueUrl": "https://github.com/grewety/ai-coding-agent-skills/issues/71",
+    "head": "cb0e1782e3e8e482e95b0fb59737cf112e1b077f",
+    "planDigest": "8893b6c9b63cf39fefbe10cd610a1a89ea5cad7a2ba360797c08701eb8f5c61b",
+    "verdict": "pass",
+    "nativeVerdict": "Verdict: No findings",
+    "findings": [],
+    "coverageLimitations": [],
+    "waivers": 0,
+    "reviewer": "63dc0c75-f1a2-4ba7-8725-640f146ad58c",
+    "reference": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/finish-pXS8OGpD/pr72-correction/delta-review/output/report.md",
+    "scope": "Exact delta with independently replayed reviewed ancestor and checkbox-only acceptance child",
+    "report": {
+      "record": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/finish-pXS8OGpD/pr72-correction/delta-review/output/report.md",
+      "sha256": "45d940cb2b573e3594cd87c97bb22598e18e6b5e92e65082fc4032c1ef2ae2f0"
+    },
+    "replay": {
+      "record": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/finish-pXS8OGpD/pr72-correction/delta-review/offline-verified.json",
+      "sha256": "aaadf163a15cf882df95504f9d198ae1efd14e5875fd8c6d127983c631f4085a"
+    },
+    "gates": [
+      {
+        "command": "npm test",
+        "argv": [
+          "npm",
+          "test"
+        ],
+        "commit": "cb0e1782e3e8e482e95b0fb59737cf112e1b077f",
+        "exitCode": 0,
+        "observedAt": "2026-11-27T02:14:11.344Z",
+        "evidence": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/finish-pXS8OGpD/successor-gates-final/disposable-gate-run.json",
+        "evidenceSha256": "b8bbd03966f28fe823426434b07fea92a0c8c218ac6c0966828f24aa0f0c6cad",
+        "stdoutSha256": "4290f1a0559a5e08a84f5075692ed43a409e187e94dadb81eaeb5c5ea36fb3d2",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "npm run build",
+        "argv": [
+          "npm",
+          "run",
+          "build"
+        ],
+        "commit": "cb0e1782e3e8e482e95b0fb59737cf112e1b077f",
+        "exitCode": 0,
+        "observedAt": "2026-11-27T02:14:11.850Z",
+        "evidence": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/finish-pXS8OGpD/successor-gates-final/disposable-gate-run.json",
+        "evidenceSha256": "b8bbd03966f28fe823426434b07fea92a0c8c218ac6c0966828f24aa0f0c6cad",
+        "stdoutSha256": "8763662c5fb62d4d74fbe17b5ea106c9913bd7b9e3f84510cbacab9fb4de53d9",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "openspec validate --all --strict",
+        "argv": [
+          "openspec",
+          "validate",
+          "--all",
+          "--strict"
+        ],
+        "commit": "cb0e1782e3e8e482e95b0fb59737cf112e1b077f",
+        "exitCode": 0,
+        "observedAt": "2026-11-27T02:14:12.097Z",
+        "evidence": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/finish-pXS8OGpD/successor-gates-final/disposable-gate-run.json",
+        "evidenceSha256": "b8bbd03966f28fe823426434b07fea92a0c8c218ac6c0966828f24aa0f0c6cad",
+        "stdoutSha256": "35d1b045022166463709717645a5f0108aa460e2f33afa7c575ee86015912760",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "npm run validate:openspec -- --require-issue",
+        "argv": [
+          "npm",
+          "run",
+          "validate:openspec",
+          "--",
+          "--require-issue"
+        ],
+        "commit": "cb0e1782e3e8e482e95b0fb59737cf112e1b077f",
+        "exitCode": 0,
+        "observedAt": "2026-11-27T02:14:12.351Z",
+        "evidence": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/finish-pXS8OGpD/successor-gates-final/disposable-gate-run.json",
+        "evidenceSha256": "b8bbd03966f28fe823426434b07fea92a0c8c218ac6c0966828f24aa0f0c6cad",
+        "stdoutSha256": "462f76981191d3df9a4fd5344e0b9c0be367e0e58783c805200ae4b774d1ee3a",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "git diff --check 39606f64b148ffad3b7fa7d268f5eb64a7868097 HEAD",
+        "argv": [
+          "git",
+          "diff",
+          "--check",
+          "39606f64b148ffad3b7fa7d268f5eb64a7868097",
+          "HEAD"
+        ],
+        "commit": "cb0e1782e3e8e482e95b0fb59737cf112e1b077f",
+        "exitCode": 0,
+        "observedAt": "2026-11-27T02:14:12.392Z",
+        "evidence": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/finish-pXS8OGpD/successor-gates-final/disposable-gate-run.json",
+        "evidenceSha256": "b8bbd03966f28fe823426434b07fea92a0c8c218ac6c0966828f24aa0f0c6cad",
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  "lineage": {
+    "reviewedAncestor": "deb2793e5ff690c793269bb956f45dc4b306af9c",
+    "checkboxOnlyChild": {
+      "reviewedParent": "deb2793e5ff690c793269bb956f45dc4b306af9c",
+      "acceptanceChild": "df71afbbd1aa82911eca015952a914785376a066",
+      "taskIds": [
+        "1.1"
+      ]
+    },
+    "exactFinalHead": "cb0e1782e3e8e482e95b0fb59737cf112e1b077f",
+    "deltaPaths": [
+      "openspec/changes/tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/tasks.md",
+      "skills/autonomous-ai-agents/autonomous-implementation-review/scripts/agent-setup.mjs",
+      "skills/software-development/openspec-delivery/scripts/agent-setup.mjs",
+      "tests/agent-setup.test.mjs"
+    ],
+    "binding": {
+      "record": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/finish-pXS8OGpD/pr72-correction/successor-binding.json",
+      "sha256": "53fd08b2a2c391d10b47a9323848ecd2ca8f98c8b2efb79628217e684ec2d842"
+    },
+    "ancestorReport": {
+      "record": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/execution/candidate-03/review/output/report.md",
+      "sha256": "424dc5a7ca8837d6339b93b01da45298cfc3b1beca5508e117fa060f3758c75c"
+    },
+    "ancestorReplay": {
+      "record": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/finish-pXS8OGpD/pr72-correction/ancestor-offline-replay.json",
+      "sha256": "ab9762bf2c579aed5bb5fca050395715146839d7273c9a21e6fa4af5f44f442d"
+    },
+    "ancestorGates": [
+      {
+        "command": "npm test",
+        "argv": [
+          "npm",
+          "test"
+        ],
+        "commit": "deb2793e5ff690c793269bb956f45dc4b306af9c",
+        "exitCode": 0,
+        "observedAt": "2026-11-26T22:52:27.366Z",
+        "evidence": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/execution/candidate-03/disposable-gate-run.json",
+        "evidenceSha256": "0d55c13322efb3e989adaf9d11f4b7b64816bfbe1a9d41f7b9850047ee383319",
+        "stdoutSha256": "965e5bb74ff8b88ff25112c063bc535d7e81d48848eed92225117d4bf66c9dcb",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "npm run build",
+        "argv": [
+          "npm",
+          "run",
+          "build"
+        ],
+        "commit": "deb2793e5ff690c793269bb956f45dc4b306af9c",
+        "exitCode": 0,
+        "observedAt": "2026-11-26T22:52:27.875Z",
+        "evidence": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/execution/candidate-03/disposable-gate-run.json",
+        "evidenceSha256": "0d55c13322efb3e989adaf9d11f4b7b64816bfbe1a9d41f7b9850047ee383319",
+        "stdoutSha256": "a43e8365b7f962c23d879844654040a72fb8c8201f9f0006419551e91c162a33",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "openspec validate --all --strict",
+        "argv": [
+          "openspec",
+          "validate",
+          "--all",
+          "--strict"
+        ],
+        "commit": "deb2793e5ff690c793269bb956f45dc4b306af9c",
+        "exitCode": 0,
+        "observedAt": "2026-11-26T22:52:28.184Z",
+        "evidence": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/execution/candidate-03/disposable-gate-run.json",
+        "evidenceSha256": "0d55c13322efb3e989adaf9d11f4b7b64816bfbe1a9d41f7b9850047ee383319",
+        "stdoutSha256": "35d1b045022166463709717645a5f0108aa460e2f33afa7c575ee86015912760",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "npm run validate:openspec -- --require-issue",
+        "argv": [
+          "npm",
+          "run",
+          "validate:openspec",
+          "--",
+          "--require-issue"
+        ],
+        "commit": "deb2793e5ff690c793269bb956f45dc4b306af9c",
+        "exitCode": 0,
+        "observedAt": "2026-11-26T22:52:28.436Z",
+        "evidence": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/execution/candidate-03/disposable-gate-run.json",
+        "evidenceSha256": "0d55c13322efb3e989adaf9d11f4b7b64816bfbe1a9d41f7b9850047ee383319",
+        "stdoutSha256": "462f76981191d3df9a4fd5344e0b9c0be367e0e58783c805200ae4b774d1ee3a",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "git diff --check 39606f64b148ffad3b7fa7d268f5eb64a7868097 HEAD",
+        "argv": [
+          "git",
+          "diff",
+          "--check",
+          "39606f64b148ffad3b7fa7d268f5eb64a7868097",
+          "HEAD"
+        ],
+        "commit": "deb2793e5ff690c793269bb956f45dc4b306af9c",
+        "exitCode": 0,
+        "observedAt": "2026-11-26T22:52:28.478Z",
+        "evidence": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/execution/candidate-03/disposable-gate-run.json",
+        "evidenceSha256": "0d55c13322efb3e989adaf9d11f4b7b64816bfbe1a9d41f7b9850047ee383319",
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "checkboxChildGates": [
+      {
+        "command": "npm test",
+        "argv": [
+          "npm",
+          "test"
+        ],
+        "commit": "df71afbbd1aa82911eca015952a914785376a066",
+        "exitCode": 0,
+        "observedAt": "2026-11-26T23:06:04.397Z",
+        "evidence": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/execution/final-task-child/disposable-gate-run.json",
+        "evidenceSha256": "de5b6c4d535ae305c75256d90fd569edafd26e52cb03e59cfbaf7417a36ba7ed",
+        "stdoutSha256": "d564ba8c694f5d91b50a1551a510ff1d28f67534117bf9da611eb6085a4aef23",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "npm run build",
+        "argv": [
+          "npm",
+          "run",
+          "build"
+        ],
+        "commit": "df71afbbd1aa82911eca015952a914785376a066",
+        "exitCode": 0,
+        "observedAt": "2026-11-26T23:06:04.898Z",
+        "evidence": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/execution/final-task-child/disposable-gate-run.json",
+        "evidenceSha256": "de5b6c4d535ae305c75256d90fd569edafd26e52cb03e59cfbaf7417a36ba7ed",
+        "stdoutSha256": "52c95a0cbbabd003578cbe46552913a8eb469d76bdac4f13573723e4a27127d2",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "openspec validate --all --strict",
+        "argv": [
+          "openspec",
+          "validate",
+          "--all",
+          "--strict"
+        ],
+        "commit": "df71afbbd1aa82911eca015952a914785376a066",
+        "exitCode": 0,
+        "observedAt": "2026-11-26T23:06:05.139Z",
+        "evidence": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/execution/final-task-child/disposable-gate-run.json",
+        "evidenceSha256": "de5b6c4d535ae305c75256d90fd569edafd26e52cb03e59cfbaf7417a36ba7ed",
+        "stdoutSha256": "35d1b045022166463709717645a5f0108aa460e2f33afa7c575ee86015912760",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "npm run validate:openspec -- --require-issue",
+        "argv": [
+          "npm",
+          "run",
+          "validate:openspec",
+          "--",
+          "--require-issue"
+        ],
+        "commit": "df71afbbd1aa82911eca015952a914785376a066",
+        "exitCode": 0,
+        "observedAt": "2026-11-26T23:06:05.391Z",
+        "evidence": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/execution/final-task-child/disposable-gate-run.json",
+        "evidenceSha256": "de5b6c4d535ae305c75256d90fd569edafd26e52cb03e59cfbaf7417a36ba7ed",
+        "stdoutSha256": "462f76981191d3df9a4fd5344e0b9c0be367e0e58783c805200ae4b774d1ee3a",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "git diff --check 39606f64b148ffad3b7fa7d268f5eb64a7868097 HEAD",
+        "argv": [
+          "git",
+          "diff",
+          "--check",
+          "39606f64b148ffad3b7fa7d268f5eb64a7868097",
+          "HEAD"
+        ],
+        "commit": "df71afbbd1aa82911eca015952a914785376a066",
+        "exitCode": 0,
+        "observedAt": "2026-11-26T23:06:05.432Z",
+        "evidence": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/execution/final-task-child/disposable-gate-run.json",
+        "evidenceSha256": "de5b6c4d535ae305c75256d90fd569edafd26e52cb03e59cfbaf7417a36ba7ed",
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ],
+    "threadResolution": {
+      "record": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/finish-pXS8OGpD/pr72-correction/thread-resolution.json",
+      "sha256": "37fa7188f82ee265387e35f2efc932d9533250abf8bd5e148e5710840ec086b0"
+    },
+    "correctionAuthority": {
+      "record": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/finish-pXS8OGpD/pr72-correction/operator-correction-grant.json",
+      "sha256": "0598275bc5db008defa6e7e6dcd07b813ec3a482df4e161f8d9f1d4204e7c6c6"
+    }
+  },
+  "gates": [
+    {
+      "command": "npm test",
+      "argv": [
+        "npm",
+        "test"
+      ],
+      "commit": "04b359f92056a4e8348ef5e047a1e297b0eb4a81",
+      "exitCode": 0,
+      "observedAt": "2026-11-27T02:22:12.894Z",
+      "evidence": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/finish-pXS8OGpD/integrated-gates-verified/disposable-gate-run.json",
+      "evidenceSha256": "a93648263a1b7d3c617d43c977b88255db0ced64ff2651a586a1eb8cb9b35be3",
+      "stdoutSha256": "ab745c0e340c423ace6432de4aa491a3005d1d1af1dedeaeee7c2acf23803ae2",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "npm run build",
+      "argv": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "commit": "04b359f92056a4e8348ef5e047a1e297b0eb4a81",
+      "exitCode": 0,
+      "observedAt": "2026-11-27T02:22:13.395Z",
+      "evidence": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/finish-pXS8OGpD/integrated-gates-verified/disposable-gate-run.json",
+      "evidenceSha256": "a93648263a1b7d3c617d43c977b88255db0ced64ff2651a586a1eb8cb9b35be3",
+      "stdoutSha256": "55c20b06c27ab3264b5afc556a8ad845ef6924b9bc3140f0f9d6667592c97e21",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "openspec validate --all --strict",
+      "argv": [
+        "openspec",
+        "validate",
+        "--all",
+        "--strict"
+      ],
+      "commit": "04b359f92056a4e8348ef5e047a1e297b0eb4a81",
+      "exitCode": 0,
+      "observedAt": "2026-11-27T02:22:13.631Z",
+      "evidence": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/finish-pXS8OGpD/integrated-gates-verified/disposable-gate-run.json",
+      "evidenceSha256": "a93648263a1b7d3c617d43c977b88255db0ced64ff2651a586a1eb8cb9b35be3",
+      "stdoutSha256": "35d1b045022166463709717645a5f0108aa460e2f33afa7c575ee86015912760",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "npm run validate:openspec -- --require-issue",
+      "argv": [
+        "npm",
+        "run",
+        "validate:openspec",
+        "--",
+        "--require-issue"
+      ],
+      "commit": "04b359f92056a4e8348ef5e047a1e297b0eb4a81",
+      "exitCode": 0,
+      "observedAt": "2026-11-27T02:22:13.884Z",
+      "evidence": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/finish-pXS8OGpD/integrated-gates-verified/disposable-gate-run.json",
+      "evidenceSha256": "a93648263a1b7d3c617d43c977b88255db0ced64ff2651a586a1eb8cb9b35be3",
+      "stdoutSha256": "462f76981191d3df9a4fd5344e0b9c0be367e0e58783c805200ae4b774d1ee3a",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "git diff --check 39606f64b148ffad3b7fa7d268f5eb64a7868097 HEAD",
+      "argv": [
+        "git",
+        "diff",
+        "--check",
+        "39606f64b148ffad3b7fa7d268f5eb64a7868097",
+        "HEAD"
+      ],
+      "commit": "04b359f92056a4e8348ef5e047a1e297b0eb4a81",
+      "exitCode": 0,
+      "observedAt": "2026-11-27T02:22:13.930Z",
+      "evidence": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/finish-pXS8OGpD/integrated-gates-verified/disposable-gate-run.json",
+      "evidenceSha256": "a93648263a1b7d3c617d43c977b88255db0ced64ff2651a586a1eb8cb9b35be3",
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "pages": {
+    "url": "https://grewety.github.io/ai-coding-agent-skills/",
+    "verifiedFiles": 137,
+    "liveParity": {
+      "record": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/finish-pXS8OGpD/pages-verification.json",
+      "sha256": "980ecce51677aa22baf44dc39ae0617e19004343f989e39282bd99b961ba1046"
+    },
+    "deployment": {
+      "record": "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb/finish-pXS8OGpD/pages-acceptance.json",
+      "sha256": "45585752b33e7e3beab2e9740e630f90b17bb8929c6a04d23e5e0b42e3156129"
+    }
+  },
+  "pendingAtReceipt": [
+    "Exact archive gate run and independent factual review",
+    "Protected closure PR and verified acceptance",
+    "Explicit issue closure and worktree retirement"
+  ]
+}
