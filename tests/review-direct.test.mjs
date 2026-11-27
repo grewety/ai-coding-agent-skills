@@ -468,6 +468,8 @@ test("Claude Direct-CLI stream audit accepts builtin-only plugins and rejects no
     { type: "system", subtype: "api_retry", session_id: session, attempt: 1 },
     { type: "system", subtype: "session_state_changed", session_id: session, state: "running" },
     { type: "system", subtype: "post_turn_summary", session_id: session },
+    { type: "system", subtype: "ui_invalidate", session_id: session },
+    { type: "system", subtype: "turn_duration", session_id: session, duration_ms: 1200 },
     { type: "system", subtype: "status", session_id: session, status: "compacting" },
     { type: "assistant", session_id: session, message: { id: "m1", model: "claude-sonnet-4-6",
       content: [{ type: "tool_use", id: "t1", name: "Read", input: { file_path: path.join(cwd, rel) }, caller: { type: "direct" } }] } },
@@ -479,9 +481,9 @@ test("Claude Direct-CLI stream audit accepts builtin-only plugins and rejects no
   ];
   const sanitized = sanitizeNative({ stdout: Buffer.concat(withAdvisories.map(jsonBytes)), format: "claude-read",
     cwd, files, redactions: [], launch, maxBudgetUsd: 2.5 }).toString();
-  assert.doesNotMatch(sanitized, /rate_limit_event|tool_progress|api_retry|session_state_changed|post_turn_summary|"subtype":"status"/);
+  assert.doesNotMatch(sanitized, /rate_limit_event|tool_progress|api_retry|session_state_changed|post_turn_summary|ui_invalidate|turn_duration|"subtype":"status"/);
   assert.throws(() => sanitizeNative({
-    stdout: Buffer.concat([withAdvisories[0], { type: "system", subtype: "hook_started", session_id: session }, ...withAdvisories.slice(7)].map(jsonBytes)),
+    stdout: Buffer.concat([withAdvisories[0], { type: "system", subtype: "hook_started", session_id: session }, ...withAdvisories.slice(9)].map(jsonBytes)),
     format: "claude-read", cwd, files, redactions: [], launch, maxBudgetUsd: 2.5,
   }), (err) => /Unexpected Claude stream event/.test(err.message) && err.diagnosticDetail === "system/hook_started");
 });

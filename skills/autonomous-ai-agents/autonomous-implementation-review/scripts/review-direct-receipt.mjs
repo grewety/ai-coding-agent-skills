@@ -139,6 +139,8 @@ const claudeAdvisorySystemSubtypes = new Set([
   "api_retry", "away_summary", "checkpoint_done", "compact_boundary", "file_snapshot",
   "informational", "instruction_size_warning", "notification", "per_turn_effort_changed",
   "post_turn_summary", "session_metadata", "session_state_changed", "session_title_changed", "status",
+  "turn_duration", "turn_starting", "ui_focus", "ui_invalidate", "ui_log", "ui_notify",
+  "ui_notify_cancel", "ui_panes", "ui_placed", "ui_scroll", "ui_status", "ui_toast", "vcs_state_changed",
 ]);
 const diagnosticDetailPattern = /^[a-z0-9_/:.-]{1,64}$/;
 

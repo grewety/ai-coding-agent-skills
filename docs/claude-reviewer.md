@@ -1,6 +1,6 @@
 # Direct-CLI independent review
 
-Install core skill 0.26.4 from the optional `autonomous-orchestration` 1.16.4 bundle. The [exclusive worker runtime](worker-runtime.md) keeps its own native qualification.
+Install core skill 0.26.5 from the optional `autonomous-orchestration` 1.16.5 bundle. The [exclusive worker runtime](worker-runtime.md) keeps its own native qualification.
 
 Under an adopting integrated parent, the independent reviewer runs the selected installed CLI in a fresh session for each assigned packet. Prepare, capability checks and replay remain offline. Linux supervises a kernel subreaper. On macOS the launcher starts an unprivileged session with a hard process creation limit of zero before executing the client. The host probe must observe both `fork` and `posix_spawn` refused. Clients that require child processes to start or complete a turn fail on this route. [Darwin kernel process creation](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/kern_fork.c).
 
