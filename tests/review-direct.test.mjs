@@ -459,4 +459,26 @@ test("Claude Direct-CLI stream audit accepts builtin-only plugins and rejects no
   ]) {
     assert.throws(() => runWithPlugins(bad), /Unexpected native startup inventory/);
   }
+  const withAdvisories = [
+    { type: "system", subtype: "init", session_id: session, cwd, tools: ["Read"], mcp_servers: [],
+      skills: [], slash_commands: [], plugins: builtins, permissionMode: "dontAsk",
+      claude_code_version: "2.1.332", model: "claude-sonnet-4-6" },
+    { type: "rate_limit_event", session_id: session, rate_limit_info: { status: "allowed" } },
+    { type: "system", subtype: "api_retry", session_id: session, attempt: 1 },
+    { type: "system", subtype: "status", session_id: session, status: "compacting" },
+    { type: "assistant", session_id: session, message: { id: "m1", model: "claude-sonnet-4-6",
+      content: [{ type: "tool_use", id: "t1", name: "Read", input: { file_path: path.join(cwd, rel) }, caller: { type: "direct" } }] } },
+    { type: "user", session_id: session, message: { content: [{ type: "tool_result", tool_use_id: "t1", content: "1\thello" }] },
+      tool_use_result: { type: "text", file: { filePath: path.join(cwd, rel), content: "hello", startLine: 1, numLines: 1, totalLines: 1 } } },
+    { type: "assistant", session_id: session, message: { id: "m2", model: "claude-sonnet-4-6", content: [{ type: "text", text: "OK" }] } },
+    { type: "result", subtype: "success", session_id: session, is_error: false, permission_denials: [],
+      num_turns: 2, total_cost_usd: 0.02, result: "OK" },
+  ];
+  const sanitized = sanitizeNative({ stdout: Buffer.concat(withAdvisories.map(jsonBytes)), format: "claude-read",
+    cwd, files, redactions: [], launch, maxBudgetUsd: 2.5 }).toString();
+  assert.doesNotMatch(sanitized, /rate_limit_event|api_retry|"subtype":"status"/);
+  assert.throws(() => sanitizeNative({
+    stdout: Buffer.concat([withAdvisories[0], { type: "system", subtype: "hook_started", session_id: session }, ...withAdvisories.slice(4)].map(jsonBytes)),
+    format: "claude-read", cwd, files, redactions: [], launch, maxBudgetUsd: 2.5,
+  }), /Unexpected Claude stream event/);
 });

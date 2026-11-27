@@ -134,6 +134,8 @@ function exactPacketPath(value, cwd, paths) {
   throw new Error("Native Read targeted an unassigned path");
 }
 
+const claudeAdvisorySystemSubtypes = new Set(["api_retry", "status", "compact_boundary"]);
+
 function sanitizeClaude(events, cwd, paths, redactions) {
   const projected = [];
   for (const event of events) {
@@ -166,6 +168,9 @@ function sanitizeClaude(events, cwd, paths, redactions) {
     } else if (type === "system" && subtype === "thinking_tokens") {
       const { estimated_tokens, estimated_tokens_delta } = event;
       projected.push({ ...common, estimated_tokens, estimated_tokens_delta });
+    } else if ((type === "rate_limit_event" || (type === "system" && claudeAdvisorySystemSubtypes.has(subtype))) && !parent_tool_use_id) {
+      need(session_id === undefined || session_id === events[0]?.session_id, "Unexpected Claude advisory session");
+      continue;
     } else {
       throw new Error("Unexpected Claude stream event");
     }
