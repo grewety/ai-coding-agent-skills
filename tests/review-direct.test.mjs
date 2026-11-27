@@ -326,6 +326,10 @@ for (const [behavior, phase] of [["ok", "complete"], ["duplicate", "receipt-inva
       const { launches: [{ process: settlement }] } = JSON.parse(await readFile(path.join(f.output, "launch.json"), "utf8"));
       assert.deepEqual(settlement, { code: 0, signal: null, outcome: "surviving-descendants", quiescent: true });
     }
+    if (behavior === "partial") {
+      const diagnostic = await readFile(path.join(f.output, "stderr.log"), "utf8");
+      assert.deepEqual(JSON.parse(diagnostic), { packet: 1, classification: "invalid-native-output", reason: "unassigned-or-partial-read" });
+    }
     if (behavior === "rate-limited") {
       const diagnostic = await readFile(path.join(f.output, "stderr.log"), "utf8");
       assert.deepEqual(JSON.parse(diagnostic), { packet: 1, classification: "upstream-rate-limited" });

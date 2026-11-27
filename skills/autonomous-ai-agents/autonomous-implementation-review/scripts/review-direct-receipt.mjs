@@ -189,11 +189,33 @@ export function sanitizeNative({ stdout, format, cwd, files, redactions, launch,
   return Buffer.concat(evidenceForReport(format, { ...observed, answer: safeReport(observed.answer, redactions) }).map(jsonBytes));
 }
 
+export const nativeOutputReasons = Object.freeze([
+  "host-path-redaction",
+  "startup-inventory",
+  "unexpected-event",
+  "unassigned-or-partial-read",
+  "read-coverage-or-text",
+  "terminal-result",
+  "stream-schema",
+]);
+
+export function classifyNativeOutputError(error) {
+  const message = String(error?.message ?? "");
+  if (/exposed a host path|secret|disallowed/i.test(message)) return "host-path-redaction";
+  if (/startup inventory|stream identity mismatch/i.test(message)) return "startup-inventory";
+  if (/Unexpected (?:Claude|native) stream event/i.test(message)) return "unexpected-event";
+  if (/whole-file Read|unassigned path|partial Read|Unexpected native Read|Read differs/i.test(message)) return "unassigned-or-partial-read";
+  if (/Read coverage or final stream text mismatch/i.test(message)) return "read-coverage-or-text";
+  if (/Invalid terminal native stream result/i.test(message)) return "terminal-result";
+  return "stream-schema";
+}
+
 const passProcess = (process) => process.quiescent === true && process.code === 0 && process.signal === null && process.outcome === "exit";
 
 export function verifyDirectPacket({ request, context, prepared, index, launch, stdout, runtime, maxBudgetUsd, reference }) {
   fields(launch, ["schemaVersion", "packet", "session", "runtime", "inventorySha256", "invocationSha256", "backend", "timeoutMs",
-    "before", "after", "exportBefore", "exportAfter", "copyBefore", "copyAfter", "process", "diagnostic"], "Direct-CLI launch");
+    "before", "after", "exportBefore", "exportAfter", "copyBefore", "copyAfter", "process", "diagnostic"],
+  "Direct-CLI launch", ["diagnosticReason"]);
   fields(launch.process, ["code", "signal", "outcome", "quiescent"], "Direct-CLI process settlement");
   need(launch.schemaVersion === 1 && launch.packet === index + 1 && uuid(launch.session) &&
     equal(launch.runtime, runtime) && launch.backend === runtime.supervisor.backend &&
@@ -213,9 +235,12 @@ export function verifyDirectPacket({ request, context, prepared, index, launch, 
     need(["integrity-failed", "preflight-failed", "invalid-native-output", "client-failed", "timeout",
       "canceled", "control-failed", "surviving-descendants", "supervisor-failed", "stdout-quota", "stderr-quota",
       "capture-quota", "upstream-rate-limited", "upstream-overloaded", "upstream-auth-failed"].includes(launch.diagnostic) &&
+      (launch.diagnosticReason === undefined ||
+        (launch.diagnostic === "invalid-native-output" && nativeOutputReasons.includes(launch.diagnosticReason))) &&
       stdout.length === 0, "Invalid Direct-CLI failure evidence");
-    return { failure: launch.diagnostic };
+    return { failure: launch.diagnostic, ...(launch.diagnosticReason ? { reason: launch.diagnosticReason } : {}) };
   }
+  need(launch.diagnosticReason === undefined, "Unexpected Direct-CLI diagnostic reason");
   for (const observation of [launch.before, launch.after]) {
     fields(observation, ["head", "statusSha256", "contentSha256"], "worktree observation");
     need(/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(observation.head) &&
