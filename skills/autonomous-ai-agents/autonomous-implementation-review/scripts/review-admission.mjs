@@ -58,7 +58,9 @@ export function reviewPrompt(request, context, packet, index, count, reference, 
       "Check that every hunk addresses a cited fix with no unrelated changes, each disposition is justified, all impacts are identified, and only unaffected ancestor coverage can be retained.",
       'Include prFix with the exact declarationSha256 and determination set to "verified" only when those conditions are established. Otherwise use determination "insufficient" and include the reason in coverageLimitations.',
     ] : []),
-    "End your final assistant message with the exact five-line block below, with each marker on its own line and nothing after END_REVIEW_RECEIPT. Do not use lines beginning with Verdict: outside the block, even if indented.",
+    binding
+      ? "Return ONLY the exact five-line block below as your entire final assistant message, starting on line 1 with BEGIN_REVIEW_RECEIPT and ending with END_REVIEW_RECEIPT. Output no preamble, analysis, or commentary before BEGIN_REVIEW_RECEIPT and nothing after END_REVIEW_RECEIPT."
+      : "End your final assistant message with the exact five-line block below, with each marker on its own line and nothing after END_REVIEW_RECEIPT. Do not use lines beginning with Verdict: outside the block, even if indented.",
     beginReceipt, clean, header, JSON.stringify(receipt), endReceipt,
   ].join("\n");
 }
