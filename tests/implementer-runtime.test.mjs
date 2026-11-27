@@ -234,32 +234,46 @@ async function fixture(t, label = "first", mode = "task-guided", prospective = f
 const implementerControls = ["effectiveSettings", "workspaceWrite", "isolatedHomeAndXdg", "ambientDiscoverySuppressed",
   "exclusiveClaim", "protectedPathsDenied", "publicationDenied", "nonInteractive", "originalProcessTreeSettled",
   "sealedFileHandover", "inventoryUnchanged"];
-async function explicitHost(t, f, fault) {
+async function explicitHost(t, f, fault, client = "claude") {
   const pair = structuredClone(f.pair);
   const runtimeSha256 = f.hostValue.runtimeSha256;
-  const executable = await f.pin("claude", `#!/bin/sh
-case "$1" in
-  --version) printf '2.1.331 (Claude Code)\\n';;
-  --help) printf '%s\\n' '--print --session-id --safe-mode --restricted --strict-mcp-config --permission-prompts --no-session-persistence --tools --effort';;
+  const claude = client === "claude";
+  const version = claude ? "2.1.331 (Claude Code)" : client + " 2.1.0";
+  const flags = claude ? "--print --session-id --safe-mode --restricted --strict-mcp-config --permission-prompts --no-session-persistence --tools --effort" :
+    "--standalone --model --format --file --variant";
+  const executable = await f.pin(client, `#!/bin/sh
+case "$*" in
+  --version) printf '%s\\n' '${version}';;
+  *--help) printf '%s\\n' '${flags}';;
   *) exit 91;;
 esac
 `, 0o700);
   const oldPath = process.env.PATH;
   process.env.PATH = path.dirname(executable.path) + path.delimiter + oldPath;
   t.after(() => { process.env.PATH = oldPath; });
+  if (!claude) {
+    const oldKey = process.env.OPENROUTER_API_KEY;
+    process.env.OPENROUTER_API_KEY = "fx-pair";
+    t.after(() => {
+      if (oldKey === undefined) delete process.env.OPENROUTER_API_KEY;
+      else process.env.OPENROUTER_API_KEY = oldKey;
+    });
+  }
   const implementer = { client: "codex", provider: "openai", model: pair.implementer.model, reasoningEffort: "high",
     executable: pair.implementer.executable, versionPolicy: "exact", exactVersion: "0.999.0", versionCheck: false };
   const directory = f.dir("role-setup");
   await mkdir(directory, { mode: 0o700 });
   const setup = { schemaVersion: 2, directory, roles: { orchestrator: implementer, implementer, helper: null },
-    reviewer: { client: "claude", model: pair.reviewer.model, reasoningEffort: "medium", timeoutMs: 2000 }, maxBudgetUsd: 1 };
+    reviewer: { client, model: claude ? pair.reviewer.model : "openrouter/vendor/fixture-model",
+      reasoningEffort: "medium", timeoutMs: 2000 }, maxBudgetUsd: 1 };
   const options = { workspace: f.workspace };
   const preview = previewSetup(setup, options);
   applySetup(setup, preview.confirmationSha256, options);
   const [host, roles] = preview.outputs.map(({ path, sha256 }) => ({ path, sha256 }));
   const { inventory, session } = pair.reviewer;
-  pair.reviewer = { inventory, session, client: "claude", model: setup.reviewer.model, provider: "anthropic",
-    version: fault === "reviewer" ? "0.1.0" : "2.1.331", route: "direct-cli", configuration: host };
+  pair.reviewer = { inventory, session, client, model: setup.reviewer.model,
+    provider: fault === "provider" ? client : claude ? "anthropic" : "openrouter",
+    version: fault === "reviewer" ? "0.1.0" : claude ? "2.1.331" : "2.1.0", route: "direct-cli", configuration: host };
   const worker = pair.implementer;
   const subject = { runtimeSha256: fault === "runtime" ? "f".repeat(64) : runtimeSha256,
     configurationSha256: fault === "config" ? "e".repeat(64) : worker.configuration.sha256,
@@ -278,7 +292,8 @@ esac
     ...shared, kind: "explicit-route-qualification", role: "implementer", route: worker.route, offline, live,
   });
   return f.locator("explicit-assignment-host.json", { ...f.hostValue, schemaVersion: 4, pair, roleBindings: roles,
-    restrictions: { ...f.hostValue.restrictions, allowedClients: ["codex", "claude"] } });
+    restrictions: { ...f.hostValue.restrictions, allowedClients: ["codex", client],
+      allowedModels: [worker.model, pair.reviewer.model], allowedProviders: [worker.provider, pair.reviewer.provider] } });
 }
 
 const run = (f, entries, extra = {}) => runImplementers(entries, { registry: f.registry, runProbe: probe, ...extra });
@@ -317,6 +332,27 @@ test("explicit pair refuses stale readback and failed qualification before nativ
       assert.equal(result.phase, fault === "reviewer" ? "blocked" : "unsupported", result.reason);
       assert.match(result.reason, reason);
       await assert.rejects(lstat(attemptDirectory(f, "stale-run")), { code: "ENOENT" });
+    });
+  }
+});
+
+test("paired OpenCode and Kilo admission binds the configured model provider", async (t) => {
+  for (const [client, fault] of [["kilo", undefined], ["opencode", "provider"], ["kilo", "provider"]]) {
+    await t.test(`${client} ${fault ? "brand mismatch" : "explicit prefix"}`, async (t) => {
+      const f = await fixture(t, "explicit", "goal-first");
+      const hostPin = await explicitHost(t, f, fault, client);
+      const entry = await f.assignment("qualified-provider", "valid", { hostPin });
+      const [result] = await run(f, [entry], { standalone: true,
+        ...(fault ? { runProbe: () => assert.fail("implementer native preflight reached") } : {}) });
+      if (fault) {
+        assert.equal(result.phase, "blocked", result.reason);
+        assert.match(result.reason, /reviewer effective identity/);
+        await assert.rejects(lstat(attemptDirectory(f, "qualified-provider")), { code: "ENOENT" });
+      } else {
+        assert.equal(result.phase, "completed", result.reason);
+        const { roleAudit } = await readState(attemptDirectory(f, "qualified-provider"), "launch.json");
+        assert.equal(roleAudit.reviewer.provider, "openrouter");
+      }
     });
   }
 });

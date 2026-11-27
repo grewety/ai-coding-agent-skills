@@ -200,6 +200,15 @@ export function verifyDirectPacket({ request, context, prepared, index, launch, 
     Number.isSafeInteger(launch.timeoutMs) && launch.timeoutMs >= 1 && launch.timeoutMs <= runtime.timeoutMs &&
     launch.inventorySha256 === packetIdentity(prepared, index, launch.session).inventorySha256 &&
     [true, false].includes(launch.process.quiescent) && text(launch.process.outcome), "Direct-CLI launch identity differs");
+  const settings = Object.fromEntries(["client", "model", "reasoningEffort", "timeoutMs", "packetConcurrency"]
+    .filter((field) => Object.hasOwn(runtime, field)).map((field) => [field, runtime[field]]));
+  const files = packetBytes(prepared, index);
+  const prompt = directPacketPrompt(request, context, prepared, index, launch.session, settings, maxBudgetUsd);
+  const { format, fingerprint } = invocation({ config: { reviewer: settings, maxBudgetUsd }, session: launch.session,
+    prompt, files, cwd: "packet", promptFile: "packet-prompt.txt", environmentRootsSha256: runtime.environmentRootsSha256 });
+  need(digest(runtime.environmentRootsSha256) && (launch.invocationSha256 === fingerprint ||
+    launch.invocationSha256 === null && launch.diagnostic !== null && launch.process.outcome === "not-started"),
+  "Retained native reviewer invocation differs");
   if (launch.diagnostic !== null) {
     need(["integrity-failed", "preflight-failed", "invalid-native-output", "client-failed", "timeout",
       "canceled", "control-failed", "surviving-descendants", "supervisor-failed", "stdout-quota", "stderr-quota",
@@ -215,13 +224,6 @@ export function verifyDirectPacket({ request, context, prepared, index, launch, 
   need(equal(launch.before, launch.after) && launch.exportBefore === true && launch.exportAfter === true &&
     launch.copyBefore === true && launch.copyAfter === true && passProcess(launch.process),
   "Unproved worktree, export, packet copy, or process settlement");
-  const settings = Object.fromEntries(["client", "model", "reasoningEffort", "timeoutMs", "packetConcurrency"]
-    .filter((field) => Object.hasOwn(runtime, field)).map((field) => [field, runtime[field]]));
-  const files = packetBytes(prepared, index);
-  const prompt = directPacketPrompt(request, context, prepared, index, launch.session, settings, maxBudgetUsd);
-  const { format, fingerprint } = invocation({ config: { reviewer: settings, maxBudgetUsd }, session: launch.session,
-    prompt, files, cwd: "packet", promptFile: "packet-prompt.txt", env: {} });
-  need(launch.invocationSha256 === fingerprint, "Retained native reviewer invocation differs");
   let coverage = "receipt-only";
   let nativeSession;
   let report;

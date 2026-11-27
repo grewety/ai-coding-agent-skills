@@ -1,19 +1,10 @@
+import { lstatSync, realpathSync } from "node:fs";
 import path from "node:path";
 import { resolveInstalledExecutable } from "./agent-discovery.mjs";
 import { directReviewSettings, validateDirectHost } from "./agent-role-adapters.mjs";
 import { hash, jsonBytes, need, utf8 } from "./review-inputs.mjs";
 
 const noMcp = '{"mcpServers":{}}';
-const authVariables = [
-  "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY", "CODEX_API_KEY", "XAI_API_KEY",
-  "OPENROUTER_API_KEY", "NOUS_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY", "KILO_API_KEY",
-  "OPENCODE_API_KEY",
-  "GOOGLE_APPLICATION_CREDENTIALS", "CODEX_HOME", "CLAUDE_CONFIG_DIR", "PI_CODING_AGENT_DIR",
-  "HERMES_HOME", "GROK_HOME", "AGY_HOME",
-];
-const hostVariables = ["PATH", "HOME", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "HOMEDRIVE", "HOMEPATH",
-  "SystemRoot", "SYSTEMDRIVE", "WINDIR", "LANG", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME",
-  "XDG_CACHE_HOME", "SSL_CERT_FILE", "SSL_CERT_DIR", "NODE_EXTRA_CA_CERTS"];
 
 export function directReviewHost(value) {
   const config = validateDirectHost(value);
@@ -22,9 +13,8 @@ export function directReviewHost(value) {
 
 const provider = {
   claude: "anthropic", codex: "openai", grok: "xai", hermes: "hermes",
-  opencode: "opencode", kilo: "kilo", agy: "google", pi: "pi",
+  agy: "google", pi: "pi",
 };
-export const reviewerProvider = (settings) => provider[settings.client];
 
 const effort = (flag, value) => value === undefined ? [] : [flag, value];
 const isolatedClients = new Set(["grok", "opencode", "kilo", "agy"]);
@@ -104,52 +94,103 @@ export function reviewerHelp(settings, version) {
 const providerKeys = { anthropic: "ANTHROPIC_API_KEY", openai: "OPENAI_API_KEY", openrouter: "OPENROUTER_API_KEY",
   xai: "XAI_API_KEY", google: "GEMINI_API_KEY", opencode: "OPENCODE_API_KEY", "opencode-go": "OPENCODE_API_KEY" };
 
+const providerQualified = new Set(["opencode", "kilo"]);
+
+function modelProvider(model) {
+  const slash = model.indexOf("/");
+  return slash > 0 && model[slash + 1] && model[slash + 1] !== "/" ? model.slice(0, slash) : null;
+}
+
+export function reviewerProvider({ client, model }) {
+  if (!providerQualified.has(client)) return provider[client];
+  const prefix = modelProvider(model);
+  need(Object.hasOwn(providerKeys, prefix), `${client} requires a provider/model with supported environment authentication`);
+  return prefix;
+}
+
 export function reviewerAuthVariable(settings) {
   if (settings.client === "grok") return "XAI_API_KEY";
   if (settings.client === "agy") return "GEMINI_API_KEY";
-  if (["opencode", "kilo"].includes(settings.client)) {
-    const slash = settings.model.indexOf("/");
-    const provider = slash > 0 ? settings.model.slice(0, slash) : "";
-    const variable = Object.hasOwn(providerKeys, provider) ? providerKeys[provider] : null;
-    need(variable, `${settings.client} requires a provider/model with supported environment authentication`);
-    return variable;
-  }
+  if (providerQualified.has(settings.client)) return providerKeys[reviewerProvider(settings)];
   return null;
 }
 
-function hosts(env) {
-  return Object.fromEntries([...hostVariables, ...authVariables].flatMap((key) => {
-    const value = env[key];
-    return typeof value === "string" ? [[key, value]] : [];
-  }));
+function authenticationInputs(settings) {
+  const required = reviewerAuthVariable(settings);
+  if (required) return [required];
+  if (settings.client === "claude") return ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"];
+  if (settings.client === "codex") return ["OPENAI_API_KEY", "CODEX_API_KEY"];
+  const prefix = modelProvider(settings.model);
+  if (settings.client === "pi" && ["anthropic", "openai", "openrouter", "xai", "google"].includes(prefix)) {
+    return [providerKeys[prefix]];
+  }
+  return [];
 }
 
-export function scratchProfile(home) {
-  return { HOME: home, USERPROFILE: home, APPDATA: path.join(home, "appdata"), LOCALAPPDATA: path.join(home, "localappdata"),
-    XDG_CONFIG_HOME: path.join(home, "config"), XDG_DATA_HOME: path.join(home, "data"),
-    XDG_STATE_HOME: path.join(home, "state"), XDG_CACHE_HOME: path.join(home, "cache") };
+export function reviewerEnvironmentRoots(executable, python) {
+  const roots = [path.dirname(executable), path.dirname(process.execPath), path.dirname(python)];
+  let system;
+  if (process.platform === "win32") {
+    const root = process.env.SystemRoot;
+    need(root && path.isAbsolute(root), "Missing native Windows system root");
+    const system32 = realpathSync(path.join(root, "System32"));
+    need(path.relative(root, system32).toLowerCase() === "system32" && lstatSync(system32).isDirectory(),
+      "Untrusted native Windows system path");
+    system = { SystemRoot: path.dirname(system32) };
+    roots.push(system32);
+  } else {
+    roots.push("/usr/bin", "/bin");
+  }
+  need(roots.every((root) => path.isAbsolute(root) && !root.includes(path.delimiter)), "Invalid native reviewer PATH root");
+  return { PATH: [...new Set(roots)].join(path.delimiter), ...system };
+}
+
+function scratchProfile(home, paths = path) {
+  return { HOME: home, USERPROFILE: home, APPDATA: paths.join(home, "appdata"), LOCALAPPDATA: paths.join(home, "localappdata"),
+    XDG_CONFIG_HOME: paths.join(home, "config"), XDG_DATA_HOME: paths.join(home, "data"),
+    XDG_STATE_HOME: paths.join(home, "state"), XDG_CACHE_HOME: paths.join(home, "cache") };
+}
+
+function commonEnvironment(scratch) {
+  return { TMPDIR: scratch, TMP: scratch, TEMP: scratch, CI: "1", LC_ALL: "C", NO_COLOR: "1",
+    DISABLE_AUTOUPDATER: "1", DISABLE_TELEMETRY: "1" };
+}
+
+export function reviewerMetadataEnvironment(roots, scratch) {
+  return { ...roots, ...commonEnvironment(scratch), ...scratchProfile(path.join(scratch, "home")) };
+}
+
+function packetEnvironment(client, overrides, scratch, paths = path) {
+  const home = paths.join(scratch, "home");
+  return { ...commonEnvironment(scratch), ...overrides,
+    ...(isolatedClients.has(client) ? scratchProfile(home, paths) : {}),
+    ...(client === "grok" ? { GROK_HOME: paths.join(home, ".grok") } : {}),
+    ...(client === "claude" ? { CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1", CLAUDE_CODE_DISABLE_BUILTIN_PLUGINS: "1",
+      CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1" } : {}) };
 }
 
 const settingsFile = ".gemini/antigravity-cli/settings.json";
 
-export function invocation({ config, executable, session, prompt, files, cwd, promptFile, env = process.env }) {
+export function invocation({ config, executable, session, prompt, files, cwd, promptFile,
+  environmentRoots, environmentRootsSha256, env = process.env }) {
   const adapter = directAdapter(config.reviewer, session, config.maxBudgetUsd);
   const { client } = config.reviewer;
   const args = [...adapter.args];
   const scratch = path.dirname(cwd);
   const home = path.join(scratch, "home");
   const isolated = isolatedClients.has(client);
-  const environment = { ...hosts(env), ...adapter.env, TMPDIR: scratch, TMP: scratch, TEMP: scratch, CI: "1",
-    NO_COLOR: "1", DISABLE_TELEMETRY: "1", DISABLE_AUTOUPDATER: "1", CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1",
-    CLAUDE_CODE_DISABLE_BUILTIN_PLUGINS: "1", CLAUDE_CODE_DISABLE_AUTO_MEMORY: "1" };
-  if (isolated) {
-    Object.assign(environment, scratchProfile(home));
-    delete environment.HOMEDRIVE;
-    delete environment.HOMEPATH;
+  const authentication = authenticationInputs(config.reviewer);
+  const rootsSha256 = environmentRoots ? hash(jsonBytes(environmentRoots)) : environmentRootsSha256;
+  // Replay uses the retained roots digest and symbolic scratch paths. Credential values never enter the fingerprint.
+  const environmentSha256 = hash(jsonBytes({ rootsSha256, authentication,
+    variables: packetEnvironment(client, adapter.env, "<scratch>", path.posix) }));
+  let environment;
+  if (environmentRoots) {
     const credential = reviewerAuthVariable(config.reviewer);
-    for (const name of authVariables) if (name !== credential) delete environment[name];
+    need(!credential || env[credential]?.trim(), `${client} requires ${credential} to avoid ambient profile fallback`);
+    const auth = Object.fromEntries(authentication.filter((name) => typeof env[name] === "string").map((name) => [name, env[name]]));
+    environment = { ...environmentRoots, ...packetEnvironment(client, adapter.env, scratch), ...auth };
   }
-  if (client === "grok") environment.GROK_HOME = path.join(home, ".grok");
   const contents = () => prompt + "\n\nAssigned files encoded as JSON data:\n" +
     JSON.stringify([...files].map(([name, bytes]) => ({ name, text: utf8(bytes) })));
   let input = "";
@@ -178,7 +219,7 @@ export function invocation({ config, executable, session, prompt, files, cwd, pr
   const fingerprint = hash(jsonBytes({ argv: args.map((arg) => portablePaths.get(arg) ?? arg),
     format: adapter.format, stdinSha256: hash(Buffer.from(input)),
     attachmentSha256: attachment === undefined ? null : hash(Buffer.from(attachment)),
-    config: adapter.config ?? null, overrides: adapter.env ?? {}, isolated }));
+    config: adapter.config ?? null, environmentSha256 }));
   return { executable, args, env: environment, input, attachment, format: adapter.format, config: adapter.config,
     home: isolated ? home : null, fingerprint };
 }

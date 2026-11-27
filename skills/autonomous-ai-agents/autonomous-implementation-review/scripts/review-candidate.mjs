@@ -458,13 +458,15 @@ function cli(argv) {
 }
 
 function settingsFromRuntime(runtime) {
-  const { version, executableSha256, capabilitySha256, supervisor, ...settings } = runtime;
-  need(typeof version === "string" && /^\d+\.\d+\.\d+[0-9A-Za-z.+-]*$/.test(version) && digest(executableSha256),
+  const { provider, version, executableSha256, capabilitySha256, environmentRootsSha256, supervisor, ...settings } = runtime;
+  need(typeof version === "string" && /^\d+\.\d+\.\d+[0-9A-Za-z.+-]*$/.test(version) &&
+    digest(executableSha256) && digest(environmentRootsSha256),
     "Invalid independently retained Direct-CLI runtime identity");
   fields(supervisor, ["backend", "executableSha256"], "native supervisor identity");
   need(Object.values(reviewBackends).includes(supervisor.backend) && digest(supervisor.executableSha256),
     "Invalid independently retained native supervisor identity");
   need(equal(settings, directReviewSettings(settings)), "Direct-CLI runtime settings are incomplete");
+  need(provider === reviewerProvider(settings), "Direct-CLI reviewer provider differs from the effective settings");
   need(capabilitySha256 === hash(jsonBytes(reviewerHelp(settings, version))), "Native CLI capability binding differs");
   return settings;
 }
@@ -512,8 +514,8 @@ function directPacket(request, expect, prepared, index, launch, stdout) {
 }
 
 function directRuntime(expect, session) {
-  const { client, model, version } = expect.runtime;
-  return { adapter: client, client, model, version, session, provider: reviewerProvider(expect.runtime),
+  const { client, model, version, provider } = expect.runtime;
+  return { adapter: client, client, model, version, session, provider,
     configurationSource: expect.configurationSha256, configurationScope: "direct-cli", readOnly: true };
 }
 
@@ -718,7 +720,7 @@ async function directCommand(command, mode, options) {
       const files = new Map(packet.paths.map((name) => [name, prepared.files.get(name)]));
       const session = request.session;
       const prompt = directPacketPrompt(request, context, prepared, index, session, config.reviewer, config.maxBudgetUsd);
-      invocation({ config, session, prompt, files, cwd: "packet", promptFile: "packet-prompt.txt", env: {} });
+      invocation({ config, session, prompt, files, cwd: "packet", promptFile: "packet-prompt.txt" });
     }
     if (request.mode !== "candidate") return;
     if (config.localHarness) {

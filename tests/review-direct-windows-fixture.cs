@@ -67,7 +67,11 @@ internal static class ReviewFixture
         string launcher = Assembly.GetExecutingAssembly().Location;
         if (args.Length == 1 && args[0] == "--version")
         {
-            Console.WriteLine(Path.GetFileNameWithoutExtension(launcher) == "agy" ? "agy 1.6.0" : "2.1.330 (Claude Code)");
+            string client = Path.GetFileNameWithoutExtension(launcher);
+            if (client == "kilo")
+                Console.WriteLine("kilo 2.1.0");
+            else
+                Console.WriteLine(client == "agy" ? "agy 1.6.0" : "2.1.330 (Claude Code)");
             return 0;
         }
 

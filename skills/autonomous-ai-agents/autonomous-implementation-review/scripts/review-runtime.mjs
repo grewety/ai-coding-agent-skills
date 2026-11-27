@@ -1,7 +1,8 @@
 import { lstat, mkdir, mkdtemp, readdir, realpath, rm } from "node:fs/promises";
 import path from "node:path";
 import { homedir, tmpdir, userInfo } from "node:os";
-import { installedReviewer, invocation, reviewerAuthVariable, reviewerHelp, scratchProfile } from "./review-direct-adapters.mjs";
+import { installedReviewer, invocation, reviewerAuthVariable, reviewerEnvironmentRoots, reviewerHelp,
+  reviewerMetadataEnvironment, reviewerProvider } from "./review-direct-adapters.mjs";
 import { packetIdentity, sanitizeNative } from "./review-direct-receipt.mjs";
 import { observeSupervisor, reviewBackends, superviseReview, supervisorCommand, unavailableProcess } from "./review-direct-supervisor.mjs";
 import { observeWorktree } from "./review-direct-worktree.mjs";
@@ -18,7 +19,7 @@ const directDiagnostic = (proc) => {
   return proc.outcome === "exit" ? "client-failed" : proc.outcome;
 };
 
-async function rejectAmbientConfiguration(client, scratch) {
+async function rejectAmbientConfiguration(client, scratch, { SystemRoot }) {
   const names = {
     grok: [".grok", "AGENTS.md"],
     opencode: [".opencode", "opencode.json", "opencode.jsonc", ".agents", "AGENTS.md"],
@@ -30,8 +31,7 @@ async function rejectAmbientConfiguration(client, scratch) {
     if (parent === path.dirname(parent)) break;
   }
   if (client === "grok" || client === "opencode") {
-    const programData = process.platform === "win32" && (process.env.ProgramData ??
-      path.join(path.parse(process.env.SystemRoot).root, "ProgramData"));
+    const programData = SystemRoot && path.join(path.parse(SystemRoot).root, "ProgramData");
     found.push(programData ? path.join(programData, client) : path.join("/etc", client));
     if (client === "opencode" && process.platform === "darwin") {
       found.push("/Library/Application Support/opencode", "/Library/Managed Preferences/ai.opencode.managed.plist",
@@ -51,6 +51,7 @@ async function rejectAmbientConfiguration(client, scratch) {
 export async function observeDirectRuntime(config, excluded) {
   const executable = installedReviewer(config, excluded);
   const python = supervisorCommand(excluded);
+  const roots = reviewerEnvironmentRoots(executable, python);
   if (process.platform === "darwin") {
     const modes = await Promise.all([lstat(executable), lstat(python)]);
     need(modes.every(({ mode }) => (mode & 0o6000) === 0), "macOS reviewer executables must be unprivileged");
@@ -64,14 +65,10 @@ export async function observeDirectRuntime(config, excluded) {
   let settled = true;
   try {
     need(excluded.every((root) => separate(scratch, root)) && privatePath(scratch), "Native CLI help requires a private disposable directory");
-    await rejectAmbientConfiguration(config.client, scratch);
+    await rejectAmbientConfiguration(config.client, scratch, roots);
     const home = path.join(scratch, "home");
     await mkdir(home, { mode: 0o700 });
-    const windows = process.platform === "win32";
-    const env = { ...scratchProfile(home), PATH: [path.dirname(executable), path.dirname(process.execPath),
-      ...(windows ? [path.join(process.env.SystemRoot, "System32")] : ["/usr/bin", "/bin"])].join(path.delimiter),
-    ...(windows ? { SystemRoot: process.env.SystemRoot } : {}), TMPDIR: scratch, TMP: scratch, TEMP: scratch,
-    CI: "1", LC_ALL: "C", NO_COLOR: "1", DISABLE_AUTOUPDATER: "1", DISABLE_TELEMETRY: "1" };
+    const env = reviewerMetadataEnvironment(roots, scratch);
     const metadata = async (args, label) => {
       const proc = await superviseReview(python, { executable, args, env, input: "" },
         { cwd: scratch, timeoutMs: 5000, noFork: process.platform === "darwin" });
@@ -90,7 +87,8 @@ export async function observeDirectRuntime(config, excluded) {
     const missing = flags.filter((flag) => !supported.has(flag));
     need(missing.length === 0, `${config.client} native help lacks required options: ${missing.join(", ")}`);
     need(pinFile().sha256 === executableSha256, "Installed reviewer changed during native capability preflight");
-    return { executable, python, runtime: { ...config.reviewer, version, executableSha256,
+    return { executable, python, runtime: { ...config.reviewer, provider: reviewerProvider(config.reviewer), version, executableSha256,
+      environmentRootsSha256: hash(jsonBytes(roots)),
       capabilitySha256: hash(jsonBytes({ args, flags })), supervisor } };
   } finally {
     if (settled) await rm(scratch, { recursive: true, force: true, maxRetries: 2 });
@@ -144,14 +142,16 @@ export async function runDirectPacket({ request, expect, prepared, config, execu
       launch.exportBefore = true;
       need(excluded.every((root) => separate(scratch, root)) && privatePath(scratch), "Disposable workspace is not separate and private");
       await safePath(scratch);
-      await rejectAmbientConfiguration(config.client, scratch);
+      const environmentRoots = reviewerEnvironmentRoots(executable, python);
+      need(hash(jsonBytes(environmentRoots)) === expect.runtime.environmentRootsSha256, "Native reviewer environment roots changed");
+      await rejectAmbientConfiguration(config.client, scratch, environmentRoots);
       await mkdir(cwd, { mode: 0o700 });
       for (const [name, bytes] of files) {
         const file = path.join(cwd, name);
         await mkdir(path.dirname(file), { recursive: true, mode: 0o700 });
         await writeClosed(file, bytes, true);
       }
-      const command = invocation({ config, executable, session, prompt, files, cwd, promptFile });
+      const command = invocation({ config, executable, session, prompt, files, cwd, promptFile, environmentRoots });
       launch.invocationSha256 = command.fingerprint;
       if (command.attachment) supportFiles.set(promptFile, Buffer.from(command.attachment));
       if (command.home) await mkdir(command.home, { mode: 0o700 });

@@ -164,9 +164,10 @@ async function bindDirectPair({ entry, grant, host, runtimeSha256, roots, prospe
     equal(manifest.binding.executable, implementer.executable) && implementer.version === manifest.runtimeVersion.observedVersion,
   "Approved implementer executable or effective settings differ");
   const config = directReviewHost(parseStrictJson(inspectPinnedFile(reviewer.configuration, { read: true, excluded })));
+  need(reviewer.client === config.client && reviewer.model === config.model && reviewer.provider === reviewerProvider(config.reviewer),
+    "Direct-CLI reviewer effective identity changed");
   const { runtime } = await observeDirectRuntime(config, excluded);
-  need(["client", "model", "version"].every((name) => reviewer[name] === runtime[name]) &&
-    reviewer.provider === reviewerProvider(runtime), "Direct-CLI reviewer effective identity changed");
+  need(reviewer.version === runtime.version, "Direct-CLI reviewer effective identity changed");
   await Promise.all([...implementer.inventory, ...reviewer.inventory].map((pin) => pinnedFile(pin)));
   const roleAudit = { implementer: { provider: manifest.binding.provider, args: manifest.args,
     reasoningEffort: manifest.binding.reasoningEffort, runtimeVersion: manifest.runtimeVersion,

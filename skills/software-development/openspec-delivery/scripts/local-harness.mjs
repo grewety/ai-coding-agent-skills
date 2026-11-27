@@ -24,8 +24,7 @@ function hostFile(ref, excluded) {
 
 export function harnessConfiguration(hostConfiguration, excluded) {
   const host = parseStrictJson(hostFile(hostConfiguration, excluded));
-  if (host?.schemaVersion === 3) validateDirectHost(host);
-  else need([1, 2, 4].includes(host?.schemaVersion), "Unsupported host.json version");
+  if (host?.schemaVersion !== 1) return validateDirectHost(host).localHarness ?? null;
   const binding = host.localHarness;
   if (binding !== undefined && binding !== null) validateHarnessBinding(binding);
   return binding ?? null;

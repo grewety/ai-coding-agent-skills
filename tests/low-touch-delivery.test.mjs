@@ -10,7 +10,7 @@ import { proposalFreeze } from "../skills/software-development/openspec-delivery
 import { finishReadiness } from "../skills/software-development/openspec-delivery/scripts/finish-readiness.mjs";
 import { evidenceCommand } from "../skills/software-development/openspec-delivery/scripts/evidence-cli.mjs";
 import { deliveryCommand } from "../skills/software-development/openspec-delivery/scripts/delivery-cli.mjs";
-import { verifyLocalHarness } from "../skills/software-development/openspec-delivery/scripts/local-harness.mjs";
+import { harnessConfiguration, verifyLocalHarness } from "../skills/software-development/openspec-delivery/scripts/local-harness.mjs";
 import { sha256 } from "../skills/software-development/openspec-delivery/scripts/evidence-retention.mjs";
 import { standingTriggerDecision } from "../skills/software-development/openspec-delivery/scripts/external-verification.mjs";
 import { buildExport, changedEntries, git as reviewGit, jsonBytes, tree } from
@@ -238,6 +238,22 @@ function harnessSeal(root, binding, configurationSha256, candidate, overrides = 
   writeFileSync(file, bytes, { mode: 0o400 });
   return { file, sha256: sha256(bytes) };
 }
+
+test("local harness admits only the legacy schema 1 and validated Direct-CLI schema 3 hosts", (t) => {
+  const f = fixture(t);
+  const reviewer = { client: "claude", model: "claude-fixture" };
+  const readHost = (name, settings) => {
+    const file = path.join(f.root, name + ".json");
+    const bytes = jsonBytes(settings);
+    writeFileSync(file, bytes, { mode: 0o600 });
+    return harnessConfiguration({ file, sha256: sha256(bytes) }, [f.repo]);
+  };
+  assert.equal(readHost("legacy", { schemaVersion: 1 }), null);
+  assert.equal(readHost("direct", { schemaVersion: 3, reviewer, maxBudgetUsd: 0.25 }), null);
+  assert.throws(() => readHost("invalid-direct", { schemaVersion: 3, reviewer, maxBudgetUsd: 0 }), /per-session reviewer cost/);
+  assert.throws(() => readHost("retired-pilot", { schemaVersion: 2 }), /Invalid Direct-CLI host configuration fields/);
+  assert.throws(() => readHost("worker-assignment", { schemaVersion: 4, reviewer, maxBudgetUsd: 0.25 }), /per-session reviewer cost/);
+});
 
 test("host-owned CLI and MCP harnesses both seal the committed SHA and fail closed on mismatch", async (t) => {
   const f = fixture(t);

@@ -1,13 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { directAdapter, directReviewHost, installedReviewer, invocation } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-direct-adapters.mjs";
+import { directAdapter, directReviewHost, installedReviewer, invocation,
+  reviewerAuthVariable, reviewerEnvironmentRoots, reviewerProvider } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-direct-adapters.mjs";
+import { resolveInstalledExecutable } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/agent-discovery.mjs";
 import { sanitizeNative } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-direct-receipt.mjs";
 import { superviseReview, supervisorCommand } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-direct-supervisor.mjs";
-import { jsonBytes } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-inputs.mjs";
+import { hash, jsonBytes } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-inputs.mjs";
 import { directFixture, session, windowsDescendant } from "./review-direct-fixture.mjs";
 
 const cli = fileURLToPath(new URL("../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-candidate.mjs", import.meta.url));
@@ -100,17 +102,30 @@ test("all native adapters bind the exact configured model and request fresh sess
   assert.equal(directReviewHost({ schemaVersion: 3, reviewer: { client: "pi", model: "model" }, maxBudgetUsd: 1 }).timeoutMs, 300000);
   assert.equal(directReviewHost({ schemaVersion: 3, reviewer: { client: "pi", model: "model", timeoutMs: 600000 }, maxBudgetUsd: 1 }).timeoutMs, 600000);
   assert.throws(() => directReviewHost({ schemaVersion: 3, reviewer: { client: "pi", model: "model", timeoutMs: 600001 }, maxBudgetUsd: 1 }), /timeoutMs/);
+  for (const client of ["opencode", "kilo"]) {
+    const settings = { client, model: "openrouter/vendor/test-model" };
+    assert.equal(reviewerProvider(settings), "openrouter");
+    assert.equal(reviewerAuthVariable(settings), "OPENROUTER_API_KEY");
+    assert.throws(() => reviewerAuthVariable({ ...settings, model: `${client.toUpperCase()}/test-model` }), /supported environment authentication/);
+    assert.throws(() => reviewerAuthVariable({ ...settings, model: "openrouter/" }), /provider\/model/);
+  }
 });
 
 test("native process passes each adapter argument form and prompt without shell interpretation", async (t) => {
   const f = await directFixture(t);
   const python = supervisorCommand();
+  const roots = reviewerEnvironmentRoots(process.execPath, python);
+  const credentials = { ANTHROPIC_API_KEY: "fx-claude", OPENAI_API_KEY: "fx-openai",
+    XAI_API_KEY: "fx-xai", GEMINI_API_KEY: "fx-gemini", OPENCODE_API_KEY: "fx-opencode" };
+  const key = { claude: "ANTHROPIC_API_KEY", codex: "OPENAI_API_KEY", grok: "XAI_API_KEY", pi: "OPENAI_API_KEY",
+    opencode: "OPENAI_API_KEY", kilo: "OPENAI_API_KEY", agy: "GEMINI_API_KEY" };
   const files = new Map([["target/file.txt", Buffer.from("benign fixture data")]]);
   for (const client of Object.keys(clients)) {
     const config = directReviewHost({ schemaVersion: 3, reviewer: { client, model: "openai/model" }, maxBudgetUsd: 1 });
     const prompt = 'Literal fixture prompt $HOME & "quoted" \\ é';
-    const command = invocation({ config, executable: process.execPath, session, prompt,
-      files, cwd: f.workspace, promptFile: f.file("prompt with spaces.txt"), env: { ...f.env, GROK_HOME: "ambient-ignored" } });
+    const command = invocation({ config, executable: process.execPath, session, prompt, environmentRoots: roots,
+      files, cwd: f.workspace, promptFile: f.file("prompt with spaces.txt"),
+      env: { ...f.env, ...credentials, GROK_HOME: "ambient-ignored" } });
     if (command.attachment) await writeFile(f.file("prompt with spaces.txt"), command.attachment);
     for (const [name, value] of Object.entries(command.config ?? {})) {
       const file = path.join(command.home, name);
@@ -119,7 +134,7 @@ test("native process passes each adapter argument form and prompt without shell 
     }
     const args = ["-e", `const f = require('node:fs'); const args = process.argv.slice(1);
       const fileArgument = (flag) => args.includes(flag) ? f.readFileSync(args[args.indexOf(flag) + 1], 'utf8') : null;
-      f.writeSync(1, JSON.stringify({args, input: f.readFileSync(0, 'utf8'), file: fileArgument('--file'), settings: fileArgument('--settings')}));`,
+      f.writeSync(1, JSON.stringify({args, input: f.readFileSync(0, 'utf8'), file: fileArgument('--file'), settings: fileArgument('--settings'), env: process.env}));`,
       "--", ...command.args];
     const captured = await superviseReview(python, { ...command, args }, { cwd: f.workspace, timeoutMs: 3000 });
     assert.equal(captured.quiescent, true, client);
@@ -128,11 +143,49 @@ test("native process passes each adapter argument form and prompt without shell 
     assert.deepEqual(actual.args, command.args, client);
     assert.equal(actual.input, command.input, client);
     assert.equal(actual.file, command.attachment ?? null, client);
+    assert.equal(actual.env.PATH, roots.PATH, client);
+    for (const [name, value] of Object.entries(credentials)) {
+      assert.equal(actual.env[name], key[client] === name ? value : undefined, `${client}/${name}`);
+    }
+    const offline = { config, session, prompt, files, cwd: "packet", promptFile: "packet-prompt.txt" };
+    assert.equal(command.fingerprint, invocation({ ...offline, environmentRootsSha256: hash(jsonBytes(roots)) }).fingerprint);
+    assert.notEqual(command.fingerprint, invocation({ ...offline, environmentRootsSha256: "0".repeat(64) }).fingerprint);
     if (client === "agy") assert.equal(JSON.parse(actual.settings).toolPermission, "strict");
     if (client === "grok") assert.equal(command.args.at(-1), prompt);
     if (client === "kilo") assert.equal(command.env.KILO_NO_DAEMON, "1");
   }
 });
+
+async function checkQualifiedEnvironment(f) {
+  const windows = process.platform === "win32";
+  const locate = (name) => resolveInstalledExecutable(name, { searchPath: f.env.PATH });
+  const roots = [path.dirname(locate("claude")), path.dirname(process.execPath), path.dirname(locate(windows ? "python" : "python3"))];
+  const system = windows ? await realpath(path.join(f.env.SystemRoot, "System32")) : null;
+  roots.push(...(windows ? [system] : ["/usr/bin", "/bin"]));
+  const expected = { PATH: [...new Set(roots)].join(path.delimiter), ...(windows ? { SystemRoot: path.dirname(system) } : {}) };
+  const ambientPath = f.file("ambient-bin");
+  await mkdir(ambientPath);
+  f.env.PATH = [ambientPath, f.env.PATH].join(path.delimiter);
+  const blocked = ["HOMEDRIVE", "HOMEPATH", "CLAUDE_CONFIG_DIR", "CODEX_HOME", "PI_CODING_AGENT_DIR",
+    "SSL_CERT_FILE", "NODE_EXTRA_CA_CERTS", "OPENAI_API_KEY", "GOOGLE_APPLICATION_CREDENTIALS", "OPENCODE_CONFIG"];
+  for (const name of blocked) f.env[name] = f.file("ambient-value");
+  f.env.ANTHROPIC_API_KEY = "fx-review";
+  const script = f.file("fixture.cjs");
+  await writeFile(script, `{
+    const assert = require('node:assert/strict');
+    const path = require('node:path');
+    const env = process.env;
+    const metadata = process.argv.includes('--version') || process.argv.includes('--help');
+    assert.equal(env.PATH, ${JSON.stringify(expected.PATH)});
+    for (const name of ${JSON.stringify(blocked)}) assert.equal(env[name], undefined, name);
+    assert.equal(env.ANTHROPIC_API_KEY, metadata ? undefined : 'fx-review');
+    assert.equal(env.HOME, metadata ? path.join(process.cwd(), 'home') : undefined);
+    assert.equal(env.XDG_CONFIG_HOME, metadata ? path.join(process.cwd(), 'home', 'config') : undefined);
+    assert.equal(env.TMPDIR, metadata ? process.cwd() : path.dirname(process.cwd()));
+  }
+` + await readFile(script, "utf8"));
+  return hash(jsonBytes(expected));
+}
 
 test("native supervisor captures success, settles timeout, and rejects descendants surviving the leader", async (t) => {
   const f = await directFixture(t);
@@ -236,6 +289,7 @@ for (const [behavior, phase] of [["ok", "complete"], ["duplicate", "receipt-inva
   ["bare", "receipt-invalid"], ["partial", "invalid-native-output"], ["rate-limited", "upstream-rate-limited"]]) {
   test("native synthetic review and offline replay with " + behavior, async (t) => {
     const f = await directFixture(t, behavior);
+    const expectedEnvironment = behavior === "ok" ? await checkQualifiedEnvironment(f) : null;
     const prep = await prepareFixture(f);
     const check = runFixture(f, "--check", ...f.flags, ...f.hostFlags, ...f.admissionFlags);
     assert.equal(check.scope?.invocations, 1, JSON.stringify(check));
@@ -248,7 +302,15 @@ for (const [behavior, phase] of [["ok", "complete"], ["duplicate", "receipt-inva
       assert.equal(verified.result.verdict, "no_findings");
       const evidence = JSON.parse(await readFile(path.join(f.output, "launch.json"), "utf8")).launches[0];
       assert.equal(evidence.backend, prep.runtime.supervisor.backend);
+      assert.equal(evidence.runtime.environmentRootsSha256, expectedEnvironment);
       assert.match(evidence.invocationSha256, /^[a-f0-9]{64}$/);
+      for (const field of ["environmentRootsSha256", "provider"]) {
+        const tampered = structuredClone(f.expect);
+        tampered.runtime[field] = field === "provider" ? "openai" : "0".repeat(64);
+        await writeFile(f.file("expect.json"), jsonBytes(tampered));
+        assert.match(runFixture(f, "--verify", ...f.flags, ...f.evidenceFlags).error ?? "", /evidence|provider|differ/i);
+      }
+      await writeFile(f.file("expect.json"), jsonBytes(f.expect));
       const launchFile = path.join(f.output, "launch.json");
       if (process.platform !== "win32") await chmod(f.output, 0o700);
       await chmod(launchFile, 0o600);
@@ -317,4 +379,38 @@ test("synthetic Antigravity dispatch uses the sealed strict settings and admits 
   assert.equal(verified.coverage, "receipt-only");
   assert.equal(verified.result.status, "blocked");
   assert.match(await readFile(path.join(f.output, "native.txt"), "utf8"), /Verdict: No findings/);
+});
+
+test("synthetic Kilo packet and offline receipt bind the explicit model provider", async (t) => {
+  const f = await directFixture(t, "ok", { client: "kilo" });
+  const hostFile = f.file("host.json");
+  const host = JSON.parse(await readFile(hostFile, "utf8"));
+  host.reviewer.model = f.expect.model = "openrouter/vendor/fixture-model";
+  f.expect.configurationSha256 = hash(jsonBytes(host));
+  await writeFile(hostFile, jsonBytes(host));
+  const admissionFile = f.file("admission.json");
+  const admission = JSON.parse(await readFile(admissionFile, "utf8"));
+  await writeFile(admissionFile, jsonBytes({ ...admission, configurationSha256: f.expect.configurationSha256 }));
+  await writeFile(f.file("expect.json"), jsonBytes(f.expect));
+  Object.assign(f.env, { OPENROUTER_API_KEY: "fx-selected", OPENAI_API_KEY: "fx-unselected" });
+  await writeFile(f.file("fixture.cjs"), `
+    const fs = require('node:fs');
+    const assert = require('node:assert/strict');
+    if (process.argv.includes('--version')) { console.log('kilo 2.1.0'); process.exit(0); }
+    if (process.argv.includes('--help')) { console.log('--model --format --file'); process.exit(0); }
+    const arg = (name) => process.argv[process.argv.indexOf(name) + 1];
+    assert.equal(arg('--model'), 'openrouter/vendor/fixture-model');
+    assert.equal(process.env.OPENROUTER_API_KEY, 'fx-selected');
+    assert.equal(process.env.OPENAI_API_KEY, undefined);
+    const prompt = fs.readFileSync(arg('--file'), 'utf8');
+    const frame = prompt.match(/BEGIN_REVIEW_RECEIPT[\\s\\S]*?END_REVIEW_RECEIPT/g).at(-1);
+    const emit = (type, part) => console.log(JSON.stringify({ type, sessionID: 'fixture-kilo', part: { messageID: 'msg-kilo', ...part } }));
+    emit('text', { text: frame });
+    emit('step_finish', { reason: 'stop' });
+  `);
+  const prep = await prepareFixture(f);
+  assert.equal(prep.runtime.provider, "openrouter");
+  const { verified } = await replayFixture(f, "complete");
+  assert.equal(verified.coverage, "receipt-only");
+  assert.equal(verified.result.runtime.provider, "openrouter");
 });
