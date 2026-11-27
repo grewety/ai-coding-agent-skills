@@ -820,8 +820,8 @@ model configuration, and a supported host. Package installation does not create
 those roles.
 
 Current source versions are delivery 1.12.0 and `openspec-next` 0.9.0 in
-`openspec-development` 1.12.0, and core skill 0.26.3 in
-`autonomous-orchestration` 1.16.3.
+`openspec-development` 1.12.0, and core skill 0.26.4 in
+`autonomous-orchestration` 1.16.4.
 Representation support adds no upstream workflow, runtime dependency or
 installation route. Package availability/byte checks do not establish account
 sync, host execution, native client discovery, Desktop acceptance or scanner approval.

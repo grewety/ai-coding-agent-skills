@@ -464,7 +464,10 @@ test("Claude Direct-CLI stream audit accepts builtin-only plugins and rejects no
       skills: [], slash_commands: [], plugins: builtins, permissionMode: "dontAsk",
       claude_code_version: "2.1.332", model: "claude-sonnet-4-6" },
     { type: "rate_limit_event", session_id: session, rate_limit_info: { status: "allowed" } },
+    { type: "tool_progress", session_id: session, tool_name: "Read" },
     { type: "system", subtype: "api_retry", session_id: session, attempt: 1 },
+    { type: "system", subtype: "session_state_changed", session_id: session, state: "running" },
+    { type: "system", subtype: "post_turn_summary", session_id: session },
     { type: "system", subtype: "status", session_id: session, status: "compacting" },
     { type: "assistant", session_id: session, message: { id: "m1", model: "claude-sonnet-4-6",
       content: [{ type: "tool_use", id: "t1", name: "Read", input: { file_path: path.join(cwd, rel) }, caller: { type: "direct" } }] } },
@@ -476,9 +479,9 @@ test("Claude Direct-CLI stream audit accepts builtin-only plugins and rejects no
   ];
   const sanitized = sanitizeNative({ stdout: Buffer.concat(withAdvisories.map(jsonBytes)), format: "claude-read",
     cwd, files, redactions: [], launch, maxBudgetUsd: 2.5 }).toString();
-  assert.doesNotMatch(sanitized, /rate_limit_event|api_retry|"subtype":"status"/);
+  assert.doesNotMatch(sanitized, /rate_limit_event|tool_progress|api_retry|session_state_changed|post_turn_summary|"subtype":"status"/);
   assert.throws(() => sanitizeNative({
-    stdout: Buffer.concat([withAdvisories[0], { type: "system", subtype: "hook_started", session_id: session }, ...withAdvisories.slice(4)].map(jsonBytes)),
+    stdout: Buffer.concat([withAdvisories[0], { type: "system", subtype: "hook_started", session_id: session }, ...withAdvisories.slice(7)].map(jsonBytes)),
     format: "claude-read", cwd, files, redactions: [], launch, maxBudgetUsd: 2.5,
-  }), /Unexpected Claude stream event/);
+  }), (err) => /Unexpected Claude stream event/.test(err.message) && err.diagnosticDetail === "system/hook_started");
 });
