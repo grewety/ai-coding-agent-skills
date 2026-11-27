@@ -25,7 +25,7 @@ Use Node 22+, native Git and Python 3 on the review host. Linux requires procfs 
 
 ## Prepare and launch
 
-Use [external setup](configurable-backends.md) to preview the client, model, optional effort, timeout and concurrency. The host pin binds the resulting bytes. Start with an independent schema 2 expectation holding `requestSha256`, `exportSha256` (initially null), `configurationSha256` and `model`. Retain `runtime` and `maxBudgetUsd` from offline preparation together with the manifest digest. Retain the expectation separately from the attempt.
+Use [external AI roles and backend setup](configurable-backends.md) to preview the client, model, optional effort, timeout and concurrency. The host pin binds the resulting bytes. Start with an independent schema 2 expectation holding `requestSha256`, `exportSha256` (initially null), `configurationSha256` and `model`. Retain `runtime` and `maxBudgetUsd` from offline preparation together with the manifest digest. Retain the expectation separately from the attempt.
 
 For Codex Auto-review, run these commands with absolute paths and the standalone packaged script. The first two operations prepare and validate the export. The third sends only assigned packet inputs for paid inference after verifying the exact phase grant and claiming the complete reservation. The final command replays the sealed result offline. Add the returned `statusSha256` to the independently retained expectation before replay.
 

@@ -90,7 +90,7 @@ applicable operator decision. A new host session supplies no new authority.
 OpenSpec **2.1.1** reads `openers.codex.args` from its user-global
 `config.json` under `$XDG_CONFIG_HOME/openspec/` or the platform default.
 An override replaces the built-in argument list. Generate the complete
-entry with the [external AI role setup](configurable-backends.md).
+entry with the [external AI roles and backend setup](configurable-backends.md).
 Its `args` start with the launcher, `--launch-opener`, roles file path and
 SHA-256. Setup pins the approved directory identities in that roles file.
 For a workset that attaches multiple directories, include each exact

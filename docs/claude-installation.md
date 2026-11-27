@@ -172,7 +172,7 @@ files plus their generated plugin metadata, README, and license.
 
 Bump the affected plugin version in the catalog whenever its selected skills or
 support files change; skill versions alone do not update the enclosing plugin.
-See [external role configuration](configurable-backends.md) for host setup and qualification status after installation.
+See [external AI roles and backend setup](configurable-backends.md) for host setup and qualification status after installation.
 
 The source catalog's `openspec-development` 1.12.0 includes `openspec-delivery`
 1.12.0 with its shared `scripts/git-environment.mjs` and
