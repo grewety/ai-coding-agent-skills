@@ -2,6 +2,12 @@ import { piReviewer } from "./agent-role-adapters.mjs";
 import { equal, fileLimit, fields, hash, need, parseStrictJson, relative, text, utf8, uuid } from "./review-inputs.mjs";
 
 const empty = (value) => Array.isArray(value) && value.length === 0;
+const builtinPlugin = (plugin) => {
+  if (!plugin || typeof plugin !== "object" || Array.isArray(plugin)) return false;
+  const keys = Object.keys(plugin);
+  return keys.length === 3 && keys.every((key) => ["name", "path", "source"].includes(key)) &&
+    text(plugin.name) && plugin.path === "builtin" && plugin.source === `${plugin.name}@builtin`;
+};
 const nonnegativeInteger = (value) => Number.isSafeInteger(value) && value >= 0;
 const normalizedFile = (value) => value.replaceAll("\r\n", "\n").replace(/\n$/, "");
 const blocks = (event) => {
@@ -24,7 +30,8 @@ export function auditClaudeStream(proc, runtime, assigned, probe, files) {
     init.claude_code_version === runtime.version && init.cwd === "/review" && init.permissionMode === "dontAsk",
     "Native stream identity mismatch");
   need(Array.isArray(init.tools) && init.tools.length === 1 && init.tools[0] === "Read" &&
-    [init.mcp_servers, init.skills, init.slash_commands, init.plugins].every(empty) &&
+    [init.mcp_servers, init.skills, init.slash_commands].every(empty) &&
+    Array.isArray(init.plugins) && init.plugins.every(builtinPlugin) &&
     (init.agents === undefined || (Array.isArray(init.agents) && init.agents.every(text))), "Unexpected native startup inventory");
   need(end.type === "result" && end.subtype === "success" && end.is_error === false &&
     empty(end.permission_denials) && typeof end.result === "string" && end.result.length > 0 &&
