@@ -248,10 +248,15 @@ test("host-owned CLI and MCP harnesses both seal the committed SHA and fail clos
   f.git("clone", "--no-local", "--no-checkout", f.repo, checkout);
   const cloneGit = (...args) => execFileSync("/usr/bin/git", ["-C", checkout, ...args], { stdio: "ignore" });
   cloneGit("checkout", "--detach", plan);
-  for (const kind of ["cli", "mcp"]) {
-    const adapter = path.join(f.root, kind + "-adapter");
-    const output = path.join(f.root, kind + "-result.json");
-    const id = "fixture-" + kind;
+  const directHost = { schemaVersion: 3, reviewer: { client: "claude", model: "claude-fixture" }, maxBudgetUsd: 0.25 };
+  for (const [name, kind, hostSettings] of [
+    ["cli", "cli", { schemaVersion: 1 }],
+    ["mcp", "mcp", { schemaVersion: 1 }],
+    ["direct-cli", "cli", directHost],
+  ]) {
+    const adapter = path.join(f.root, name + "-adapter");
+    const output = path.join(f.root, name + "-result.json");
+    const id = "fixture-" + name;
     writeFileSync(adapter, `#!/usr/bin/python3
 import json
 import os
@@ -279,8 +284,8 @@ def send(value):
 `), { mode: 0o700 });
     const binding = { id, kind, executable: adapter, executableSha256: sha256(readFileSync(adapter)), args: [],
       timeoutMs: 3000, maxAgeMs: 60000, exposure: "local-only", ...(kind === "mcp" ? { tool: "fixture_review" } : {}) };
-    const host = JSON.stringify({ schemaVersion: 1, localHarness: binding });
-    const file = path.join(f.root, kind + "-host.json");
+    const host = JSON.stringify({ ...hostSettings, localHarness: binding });
+    const file = path.join(f.root, name + "-host.json");
     writeFileSync(file, host, { mode: 0o600 });
     const hostConfiguration = { file, sha256: sha256(host) };
     const grant = { verified: true, reference: "grant", kind: "local-candidate-harness", policyRevision: f.parent,
@@ -288,13 +293,13 @@ def send(value):
     const params = { ...f, plan, checkout, candidate: plan, hostConfiguration, output, grant };
     await assert.rejects(deliveryCommand("run-harness", { ...params, checkout: linked, grant: { ...grant, checkout: linked } }),
       /standalone detached clone/);
-    cloneGit("checkout", "-b", "attached-" + kind, plan);
+    cloneGit("checkout", "-b", "attached-" + name, plan);
     await assert.rejects(deliveryCommand("run-harness", params), /detached gate checkout/);
     cloneGit("checkout", "--detach", f.parent);
     await assert.rejects(deliveryCommand("run-harness", params), /HEAD changed/);
     cloneGit("checkout", "--detach", plan);
-    const aiOutput = path.join(f.root, kind + "-ai-result.json");
-    const aiHost = JSON.stringify({ schemaVersion: 1, localHarness: { ...binding,
+    const aiOutput = path.join(f.root, name + "-ai-result.json");
+    const aiHost = JSON.stringify({ ...hostSettings, localHarness: { ...binding,
       aiRole: { client: "codex", provider: "openai", model: "fixture-model", reasoningEffort: "high",
         executable: { path: adapter, sha256: binding.executableSha256 } } } });
     const aiPin = { file, sha256: sha256(aiHost) };
@@ -308,14 +313,22 @@ def send(value):
     await assert.rejects(deliveryCommand("run-harness", params), /Dirty checkout/);
     rmSync(dirty);
     assert.equal(existsSync(output), false);
-    const dirtyHost = JSON.stringify({ schemaVersion: 1, localHarness: { ...binding, args: ["--fixture-mutate"] } });
+    const dirtyHost = JSON.stringify({ ...hostSettings, localHarness: { ...binding, args: ["--fixture-mutate"] } });
     const dirtyPin = { file, sha256: sha256(dirtyHost) };
-    const dirtyOutput = path.join(f.root, kind + "-dirty-result.json");
+    const dirtyOutput = path.join(f.root, name + "-dirty-result.json");
     writeFileSync(file, dirtyHost);
     await assert.rejects(deliveryCommand("run-harness", { ...params, hostConfiguration: dirtyPin,
       grant: { ...grant, configurationSha256: dirtyPin.sha256 }, output: dirtyOutput }), /Dirty checkout/);
     assert.equal(readFileSync(dirtyOutput).length, 0);
     rmSync(path.join(checkout, "unexpected.txt"));
+    if (hostSettings.schemaVersion === 3) {
+      const invalidHost = JSON.stringify({ ...hostSettings, localHarness: binding, maxBudgetUsd: 0 });
+      const invalidPin = { file, sha256: sha256(invalidHost) };
+      writeFileSync(file, invalidHost);
+      await assert.rejects(deliveryCommand("run-harness", { ...params, hostConfiguration: invalidPin,
+        grant: { ...grant, configurationSha256: invalidPin.sha256 } }), /bounded per-session reviewer cost/);
+      assert.equal(existsSync(output), false);
+    }
     writeFileSync(file, host);
     const retained = await deliveryCommand("run-harness", params);
     assert.equal(retained.verdict, "pass");

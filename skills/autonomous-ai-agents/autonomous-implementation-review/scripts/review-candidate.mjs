@@ -6,7 +6,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { convergenceDecision } from "./orchestration-core.mjs";
 import { admitReceipt, candidateResult, describeFile, receiptContext, reviewPrompt } from "./review-admission.mjs";
-import { absolute, checkExport, checkSealedDirectory, digest, equal, fields, fileLimit, hash, jsonBytes, need, newProtectedDirectory, parseStrictJson,
+import { absolute, checkExport, checkSealedDirectory, digest, equal, fields, fileLimit, hash, jsonBytes, need, parseStrictJson,
   prepareExport, protectedParent, readJson, reviewPolicy, sealDirectories, separate, totalLimit, uuid, validateReviewRequest } from "./review-inputs.mjs";
 import { observeDirectRuntime, runDirectPacket } from "./review-runtime.mjs";
 import { reviewBackends } from "./review-direct-supervisor.mjs";
