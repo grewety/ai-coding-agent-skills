@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawnFixtureSync } from "./test-shards.mjs";
 import { mkdir, mkdtemp, readdir, rename, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -10,7 +10,7 @@ const helper = new URL("../skills/software-development/openspec-delivery/scripts
 const alphabet = "0123456789abcdefghjkmnpqrstvwxyz";
 const decode = (text) => [...text].reduce((n, char) => n * 32n + BigInt(alphabet.indexOf(char)), 0n);
 function invoke(args, cwd) {
-  const result = spawnSync(process.execPath, [fileURLToPath(helper), ...args], { encoding: "utf8", cwd });
+  const result = spawnFixtureSync(process.execPath, [fileURLToPath(helper), ...args], { encoding: "utf8", cwd });
   return { status: result.status, ...(result.stdout.trim() ? JSON.parse(result.stdout) : { error: result.stderr }) };
 }
 async function scratch(t) {
@@ -34,14 +34,14 @@ test("generate emits a lowercase ULID name and matching path/branch without writ
   assert.equal(second.status, 0, second.error);
   assert.notEqual(second.name, result.name);
   assert.deepEqual(await readdir(cwd), []);
-  assert.equal(spawnSync("git", ["check-ref-format", "--branch", result.branch]).status, 0);
+  assert.equal(spawnFixtureSync("git", ["check-ref-format", "--branch", result.branch]).status, 0);
 });
 
 test("a symlinked helper invocation still emits its JSON result", async (t) => {
   const dir = await scratch(t);
   const alias = path.join(dir, "change-name.mjs");
   await symlink(fileURLToPath(helper), alias, "file");
-  const result = spawnSync(process.execPath, [alias, "generate", "--slug", "example"], { encoding: "utf8" });
+  const result = spawnFixtureSync(process.execPath, [alias, "generate", "--slug", "example"], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr);
   assert.notEqual(result.stdout.trim(), "", "Symlink invocation must not silently skip main");
   const output = JSON.parse(result.stdout);

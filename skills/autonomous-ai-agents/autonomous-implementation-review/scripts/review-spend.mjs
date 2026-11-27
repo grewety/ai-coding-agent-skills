@@ -1,3 +1,4 @@
+import { privatePath } from "./agent-configuration.mjs";
 // Trusted host ledger. A successfully claimed entry is never released or reused.
 import path from "node:path";
 import { createPublicKey, verify } from "node:crypto";
@@ -14,7 +15,7 @@ const scopeFields = ["change", "phase", "purpose", "target", "requestSha256", "e
 
 export function reviewSpendScope(request, expect, prepared, config, admission) {
   const { identity, authority, acceptance, scope, nonGoals } = request.worker;
-  const invocations = prepared.manifest.packets.length + 1;
+  const invocations = prepared.manifest.packets.length + (expect.schemaVersion === 2 ? 0 : 1);
   const target = request.mode === "candidate" ? request.snapshot.target :
     hash(jsonBytes({ inputs: identity.inputs, modes: request.policy?.planningModes }));
   const upperUsdMicros = invocations * usdMicros(config.maxBudgetUsd);
@@ -22,7 +23,8 @@ export function reviewSpendScope(request, expect, prepared, config, admission) {
   return { change: identity.change, phase: admission.phase, purpose: request.mode, target,
     requestSha256: expect.requestSha256, exportSha256: expect.exportSha256, configurationSha256: expect.configurationSha256,
     attempt: identity.attempt, scopeSha256: hash(jsonBytes({ authority, acceptance, scope, nonGoals, fileAcceptance: request.fileAcceptance,
-      ...(expect.explicit ? { explicit: expect.explicit, generator: expect.generator } : {}) })),
+      ...(expect.explicit ? { explicit: expect.explicit, generator: expect.generator } : {}),
+      ...(expect.schemaVersion === 2 ? { reviewer: expect.runtime } : {}) })),
     upperUsdMicros, invocations };
 }
 
@@ -36,7 +38,7 @@ async function protectedLedger(root, excluded) {
   need(absolute(root) && excluded.every((name) => separate(root, name)), "Review ledger overlaps protected inputs");
   await safePath(root);
   const st = await lstat(root);
-  need(st.isDirectory() && st.uid === process.getuid() && (st.mode & 0o077) === 0, "Expected a private host-owned review ledger directory");
+  need(st.isDirectory() && privatePath(root, st), "Expected a private host-owned review ledger directory");
 }
 
 const extensionName = (reference) => "extension-" + hash(jsonBytes(reference)) + ".json";
@@ -121,6 +123,7 @@ function extensionCaps(policy, extension, retained, identity, reservedAt) {
 }
 
 async function syncDirectory(location) {
+  if (process.platform === "win32") return; // Close/flush each reservation file before linking it on NTFS.
   const handle = await open(location, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
   try { await handle.sync(); } finally { await handle.close(); }
 }
@@ -153,6 +156,33 @@ export async function claimProbeRun({ grant, excluded }) {
     throw error;
   }
   await syncDirectory(directory);
+}
+
+export async function withDirectReviewSettlement(spend, run) {
+  const { root, scope, excluded } = spend;
+  await protectedLedger(root, excluded);
+  const marker = path.join(root, ".direct-review-" + hash(jsonBytes(scope.change)));
+  try {
+    await mkdir(marker, { mode: 0o700 });
+  } catch (error) {
+    if (error.code === "EEXIST") throw new Error("Previous Direct-CLI process settlement is unverified");
+    throw error;
+  }
+  let remove = true;
+  try {
+    await syncDirectory(root);
+    await claimReviewRun(spend);
+    remove = false;
+    const result = await run();
+    remove = result.settled === true;
+    return result;
+  } finally {
+    // Interrupted or unproved settlements leave the marker for operator disposition.
+    if (remove) {
+      await rmdir(marker);
+      await syncDirectory(root);
+    }
+  }
 }
 
 export async function claimReviewRun({ root, excluded, scope, policy, explicitGrant, retryGrant, extension }) {

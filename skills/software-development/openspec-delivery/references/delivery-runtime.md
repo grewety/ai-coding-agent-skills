@@ -60,15 +60,15 @@ reports `blocked`.
 | P2 | `auth` | Matching `repository`, `authenticated`, `requiredScopesPresent`. Retain no credential material. |
 | P3 | `local` | `activeChangeInventoryVerified`. The command compares primary HEAD, local target branch and tracking ref with the retained live target and checks local tracked/untracked cleanliness. |
 | P4 | `reviewer` | Passing `outcome`, observed and expected reviewer configuration hashes, and the matching reviewer package hash from P8. |
-| P5 | `relay` | `ready`, `materialRetained: false`, and the reviewer configuration hash. |
+| P5 | `reviewerSettings` | Under the adopting reviewer policy, bind `ready`, `authentication: normal-installed-client`, and the reviewer configuration SHA. An earlier parent verifies its original authentication observation. |
 | P6 | `runtime` | Observed and expected `node` and `openspec` versions. |
 | P7 | `checkpoint` | Matching live `head`, `policyRevision`, and `prerequisitesVerified`. |
 | P8 | `companions` | Complete `actual` and `expected` maps from package names to source inventory hashes, including the `reviewer` entry if P4 applies. |
 
 The summary contains a fixed-order item list, `ready`, the first unresolved
-item in `followUp`, and the reviewer probe authority observation. Missing or
-drifted reviewer evidence stays pending or blocked. A fresh paid probe requires
-a separate grant. Supply local authentication and relay readbacks without account
+item in `followUp` and the applicable reviewer preflight observation. Missing
+or drifted reviewer evidence stays pending or blocked. Earlier parents retain
+their original probe authority observation. Supply local authentication and reviewer setting readbacks without account
 details or secrets.
 
 ## Local decisions and status
@@ -206,7 +206,7 @@ session, and its native group/task to the same action. Use the reviewer
 configuration pinned by the pair and a session bound to this review. Retain the same
 outcome, acceptance criteria, scope and exclusions in the review request.
 Pin the independent expectation file as `expectFileSha256`. For either delivery
-mode, the contained reviewer uses the normalized Git plan digest and
+mode, the Direct-CLI reviewer uses the normalized Git plan digest and
 frozen planning inputs to reconstruct the full diff from the frozen plan.
 For Goal-First include `goal-contract:<approvedGoalContractDigest>` in
 the review acceptance list. The gate record uses the selected delivery

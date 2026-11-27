@@ -99,7 +99,7 @@ export function resolveDeliveryPolicy({ phase, context, selection, contractPaths
   return { mode, continuation: selection.continuousGoal ? "continuous-goal" : "single-group", requireApproachReview: selection.preExecutionReview,
     approachPolicy: selection.approachConvergence === true ? "charter-v1" : "strict",
     proposeToFreeze: !exempt && recovery === undefined && context.proposeToFreeze === true,
-    integrityGuards: !exempt, policyRevision, planApproved: false, executionAuthorized: false };
+    integrityGuards: !exempt, policyRevision, ...(context.directReviewer ? { directReviewer: true } : {}), planApproved: false, executionAuthorized: false };
 }
 
 export function continuationDecision({ policy, change, group, authority, restrictions, observed, runtimeAdmission = false }) {

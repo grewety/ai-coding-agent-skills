@@ -405,7 +405,8 @@ export async function protectedFinish(input, readiness, now = Date.now(), verify
     const parentGate = gatePass(completion.reviewedGate, records, identity, proof.reviewedParent, implementationGate.gateCommands);
     const parent = await verifyHandover(completion.handover);
     const reviewed = parent.result;
-    need(parentGate.passed && parentGate.reference === completion.reviewedGateReference &&
+    need((!policy.directReviewer || parent.reviewTransport === "direct-cli" && parent.reviewCoverage === "whole-file") &&
+      parentGate.passed && parentGate.reference === completion.reviewedGateReference &&
       parent.reviewPolicyBinding?.parent === identity.policyRevision && parent.reviewPolicyBinding.target === identity.targetRevision &&
       parent.reviewSnapshot?.base === identity.plan && parent.reviewSnapshot.plan === identity.plan &&
       parent.reviewSnapshot.planDigest === policy.planDigest && same(parent.request.identity.inputs, policy.inputs) &&

@@ -60,20 +60,20 @@ test("exclusive runtime guides document the observed qualification limits and re
   const guide = await readFile(new URL("docs/worker-runtime.md", root), "utf8");
   const profiles = await readFile(new URL("skills/autonomous-ai-agents/autonomous-implementation-review/references/profile-preparation.md", root), "utf8");
   for (const [file, qualification] of [
-    ["README.md", /Sealed synthetic trials on one\s+Linux host qualified/],
-    ["docs/openspec-installation.md", /Sealed synthetic trials on one Linux host qualified the dedicated pinned Codex\s+implementer and read-only Claude reviewer/],
+    ["README.md", /exact Direct-CLI reviewer binding/],
+    ["docs/openspec-installation.md", /exact Direct-CLI reviewer binding/],
     ["docs/openspec-workflow.md", /Qualification, setup and operator recovery\]\(worker-runtime\.md\)/],
-    ["docs/claude-installation.md", /sealed\s+synthetic trials qualify a dedicated Codex[\s\S]*?bound to the recorded host and runtime/],
-    ["docs/claude-reviewer.md", /Qualification follows the exact published role and host settings/],
+    ["docs/claude-installation.md", /exact Direct-CLI reviewer binding/],
+    ["docs/claude-reviewer.md", /native operating systems/],
   ]) {
     const source = await readFile(new URL(file, root), "utf8");
     assert.ok(source.includes(file === "README.md" ? "(docs/worker-runtime.md)" : "(worker-runtime.md)"), file);
     assert.match(source, qualification, file);
   }
-  assert.match(guide, /recorded synthetic qualification on one Linux host/);
-  assert.match(guide, /different host, client, model,\s+version or provider route requires its own qualified binding/);
-  for (const field of ["Codex **0.171.0**", "Claude Code **2.1.330**", "Bubblewrap **0.9.0**", "CODEX_HOME",
-    "--ignore-user-config", "--enable skip_host_skill_discovery", "no new privileges", "profile_routes", "exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m"]) {
+  assert.match(guide, /qualified native Codex supervision/);
+  assert.match(guide, /exact runtime, host|exact package inventories/);
+  for (const field of ["native Codex", "Direct-CLI", "schema 4", "CODEX_HOME",
+    "--ignore-user-config", "--enable skip_host_skill_discovery", "no new privileges", "separate single-run grant"]) {
     assert.ok(guide.includes(field), field);
   }
   for (const guard of ["curator lock", "skills.write_approval = true", "skills.creation_nudge_interval = 0",

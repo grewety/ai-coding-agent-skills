@@ -327,7 +327,7 @@ test("exclusive delivery verifies the complete transitive inventory before loadi
   };
   const options = { identity: { workspace: path.join(root, "workspace") } };
   // Start at both executable entry points and follow their literal package-local
-  // loads, including Python and the sandbox bridge invoked as subprocesses.
+  // loads, including native supervision invoked as a subprocess.
   const pending = [launcher, "review-candidate.mjs"];
   const files = new Map();
   for (const name of pending) {
@@ -351,7 +351,7 @@ test("exclusive delivery verifies the complete transitive inventory before loadi
   await writeFile(helper, files.get("worker-runtime-policy.mjs"));
   await writeFile(runtime, files.get("implementer-runtime.mjs"));
 
-  const tierHelper = "containment-tier.mjs";
+  const tierHelper = "review-direct-worktree.mjs";
   const missingTierHelper = path.join(scripts, tierHelper);
   await rm(missingTierHelper);
   await assert.rejects(readDelegation(input, options), { code: "ENOENT", path: missingTierHelper });

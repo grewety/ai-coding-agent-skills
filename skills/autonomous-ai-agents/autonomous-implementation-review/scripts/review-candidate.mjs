@@ -8,20 +8,28 @@ import { convergenceDecision } from "./orchestration-core.mjs";
 import { admitReceipt, candidateResult, describeFile, receiptContext, reviewPrompt } from "./review-admission.mjs";
 import { absolute, checkExport, checkSealedDirectory, digest, equal, fields, fileLimit, hash, jsonBytes, need, newProtectedDirectory, parseStrictJson,
   prepareExport, protectedParent, readJson, reviewPolicy, sealDirectories, separate, totalLimit, uuid, validateReviewRequest } from "./review-inputs.mjs";
-import { bubblewrapVersion, claudeVersion, requireReviewHost, reviewRelaySource, runtimeBinding, verifyRuntimePins, withReviewRuntime } from "./review-runtime.mjs";
-import { checkPacketTurns, offlineHostBinding, reviewClock, trustedJson } from "./review-preflight.mjs";
-import { checkProbeSpend, checkReviewSpend, claimProbeRun, claimReviewRun } from "./review-spend.mjs";
+import { observeDirectRuntime, runDirectPacket } from "./review-runtime.mjs";
+import { reviewBackends } from "./review-direct-supervisor.mjs";
+import { checkPacketTurns, reviewClock, trustedJson } from "./review-preflight.mjs";
+import { checkReviewSpend, withDirectReviewSettlement } from "./review-spend.mjs";
 import { verifyHarnessSeal } from "./harness-result.mjs";
-import { runtimeIdentity } from "./implementer-runtime.mjs";
 import { checkRoleIndependence, validatePin } from "./role-config.mjs";
 import { auditVersion } from "./runtime-version.mjs";
 import { upstreamClasses } from "./review-upstream-status.mjs";
 import { piReviewer } from "./agent-role-adapters.mjs";
 import { auditClaudeStream, auditPiStream } from "./review-stream.mjs";
-import { createAttempt, publishResult, readClosed, readHandoff, requestBytes as workerRequestBytes, writeClosed } from "./worker-handoff.mjs";
-import { maximumReviewerTimeoutMs, requireTier, tierFields, tierIdentity } from "./containment-tier.mjs";
+import { createAttempt, legacyReviewFields, legacyReviewIdentity, publishResult, readClosed, readHandoff, requestBytes as workerRequestBytes, writeClosed } from "./worker-handoff.mjs";
 import { packetConcurrency, replayPacketSchedule, schedulePackets } from "./review-packet-scheduler.mjs";
 
+import { directReviewSettings } from "./agent-role-adapters.mjs";
+import { directReviewHost, invocation, reviewerHelp, reviewerProvider } from "./review-direct-adapters.mjs";
+import { directPacketPrompt, verifyDirectPacket } from "./review-direct-receipt.mjs";
+import { usdMicros } from "./low-touch-policy.mjs";
+
+// Captures from a frozen parent have an independent status pin and retain
+// their original verifier identity at delivery. This reader has no transport.
+const claudeVersion = "2.1.330";
+const bubblewrapVersion = "0.9.0";
 const probePrompt = "Do not call any tools. Reply with exactly REVIEW_PROBE_OK.";
 const supervisorFields = ["code", "signal", "outcome", "quiescent"];
 const writeJson = (dir, name, value) => writeClosed(path.join(dir, name), jsonBytes(value), true);
@@ -29,8 +37,8 @@ const readSealed = (dir, name, limit) => readClosed(path.join(dir, name), limit,
 
 function validateRuntime(runtime, expect) {
   fields(runtime, ["session", "model", "version", "bubblewrapVersion", "maxTurns", "maxBudgetUsd",
-    "configurationSha256", "route"], "retained runtime", ["explicit", ...tierFields]);
-  need(equal(tierIdentity(runtime), tierIdentity(expect)), "Retained runtime tier or driver differs");
+    "configurationSha256", "route"], "retained runtime", ["explicit", ...legacyReviewFields]);
+  need(equal(legacyReviewIdentity(runtime), legacyReviewIdentity(expect)), "Retained runtime tier or driver differs");
   const pi = expect.explicit?.client === piReviewer.client;
   if (expect.explicit) {
     need(equal(runtime.explicit, expect.explicit) && runtime.version === expect.explicit.version.observedVersion &&
@@ -62,7 +70,7 @@ function validateExplicit(expect, request) {
   need((pi ? explicit.provider === piReviewer.provider && explicit.reasoningEffort === piReviewer.effort &&
     explicit.version?.versionPolicy === "exact" && explicit.version.versionCheck === true &&
     explicit.version.exactVersion === piReviewer.version && explicit.requestLimit === 96 && digest(explicit.piReleaseSha256) &&
-    Number.isSafeInteger(explicit.timeoutMs) && explicit.timeoutMs >= 1000 && explicit.timeoutMs <= (expect.osDriver ? maximumReviewerTimeoutMs : 300000) :
+    Number.isSafeInteger(explicit.timeoutMs) && explicit.timeoutMs >= 1000 && explicit.timeoutMs <= (expect.osDriver ? 600000 : 300000) :
     explicit.provider === "anthropic" && ["low", "medium", "high", "max"].includes(explicit.reasoningEffort)) &&
     pins.every((key) => digest(explicit[key])) && explicit.qualificationSha256 === expect.qualification.sha256,
   "Invalid independently retained explicit reviewer pins");
@@ -76,9 +84,8 @@ async function loadInputs(requestFile, expectFile) {
   validateReviewRequest(request);
   const expect = await readJson(expectFile);
   fields(expect, ["schemaVersion", "requestSha256", "exportSha256", "configurationSha256", "model"],
-    "independent expectation", ["statusSha256", "harness", "qualification", "generator", "explicit", "packetConcurrency", ...tierFields]);
-  const tier = tierIdentity(expect);
-  if (tier.osDriver) requireTier(tier, "reviewer", expect.explicit?.client ?? "claude-code");
+    "independent expectation", ["statusSha256", "harness", "qualification", "generator", "explicit", "packetConcurrency", ...legacyReviewFields]);
+  legacyReviewIdentity(expect);
   packetConcurrency(expect.packetConcurrency);
   need(expect.schemaVersion === 1 && expect.requestSha256 === hash(jsonBytes(request)) &&
     (expect.exportSha256 === null || digest(expect.exportSha256)) && digest(expect.configurationSha256) &&
@@ -95,7 +102,7 @@ function attemptRuntime(runtime) {
   const client = runtime.explicit?.client ?? "claude-code";
   return { adapter: client, client, version: runtime.version,
     session: runtime.session, provider: runtime.explicit?.provider ?? "anthropic", model: runtime.model,
-    ...tierIdentity(runtime), configurationSource: runtime.configurationSha256, configurationScope: "contained-review", readOnly: true };
+    ...legacyReviewIdentity(runtime), configurationSource: runtime.configurationSha256, configurationScope: "contained-review", readOnly: true };
 }
 
 function attemptNames(index) {
@@ -211,9 +218,9 @@ async function outcome(directory, request, expect, prepared, count, expected, sc
   const files = {};
   const describe = (name, bytes) => describeFile(directory, name, bytes);
   if (expect.osDriver) {
-    files["launch.json"] = jsonBytes({ schemaVersion: 1, ...tierIdentity(expect), runtime: observed.runtime,
+    files["launch.json"] = jsonBytes({ schemaVersion: 1, ...legacyReviewIdentity(expect), runtime: observed.runtime,
       requestSha256: expect.requestSha256, exportSha256: expect.exportSha256, sessions: observed.sessions });
-    if (observed.phase === "complete") files["receipt.json"] = jsonBytes({ schemaVersion: 1, ...tierIdentity(expect),
+    if (observed.phase === "complete") files["receipt.json"] = jsonBytes({ schemaVersion: 1, ...legacyReviewIdentity(expect),
       configurationSha256: expect.configurationSha256, requestSha256: expect.requestSha256,
       exportSha256: expect.exportSha256, packets: observed.receipts });
   }
@@ -225,7 +232,7 @@ async function outcome(directory, request, expect, prepared, count, expected, sc
     result = handoff;
   } else {
     files["report.md"] = observed.native;
-    result = { schemaVersion: 1, ...tierIdentity(expect), mode: request.mode, requestSha256: expect.requestSha256,
+    result = { schemaVersion: 1, ...legacyReviewIdentity(expect), mode: request.mode, requestSha256: expect.requestSha256,
       phase: observed.phase,
       ...(request.mode === "approach" ? {
         native: observed.receipts[0]?.receipt ?? null, approachAction: observed.receipts[0]?.admission.action ?? null,
@@ -238,7 +245,7 @@ async function outcome(directory, request, expect, prepared, count, expected, sc
 
 function statusFor(directory, expect, count, outcome, resultBytes, requestBytes) {
   return {
-    schemaVersion: 1, ...tierIdentity(expect), requestSha256: expect.requestSha256, exportSha256: expect.exportSha256,
+    schemaVersion: 1, ...legacyReviewIdentity(expect), requestSha256: expect.requestSha256, exportSha256: expect.exportSha256,
     configurationSha256: expect.configurationSha256, model: expect.model, phase: outcome.observed.phase, count,
     ...(packetConcurrency(expect.packetConcurrency) > 1 ?
       { packetConcurrency: expect.packetConcurrency, schedule: outcome.observed.schedule } : {}),
@@ -289,11 +296,13 @@ async function verify(directory, request, expect, prepared) {
 async function checkPrior(request, expect, prepared) {
   if (request.mode !== "approach" || !request.snapshot.priorLaunches.length) return;
   const [prior] = request.snapshot.priorLaunches;
-  const retained = await loadInputs(prior.request, prior.expect);
+  const direct = expect.schemaVersion === 2;
+  const retained = await (direct ? loadDirectInputs : loadInputs)(prior.request, prior.expect);
   need(retained.request.mode === "approach" && retained.request.snapshot.priorLaunches.length === 0 &&
     retained.expect.configurationSha256 === expect.configurationSha256 && retained.expect.model === expect.model &&
     packetConcurrency(retained.expect.packetConcurrency) === packetConcurrency(expect.packetConcurrency) &&
     equal(retained.expect.explicit, expect.explicit) && equal(retained.expect.generator, expect.generator) &&
+    equal(retained.expect.runtime, expect.runtime) && retained.expect.maxBudgetUsd === expect.maxBudgetUsd &&
     equal(retained.request.worker.identity.inputs, request.worker.identity.inputs) &&
     equal(retained.request.attachments, request.attachments) && equal(retained.request.limits, request.limits) &&
     equal(retained.request.snapshot.record, request.snapshot.record) &&
@@ -305,7 +314,7 @@ async function checkPrior(request, expect, prepared) {
     "Retry binding differs from retained launch");
   const oldExport = await checkExport(prior.export, retained.expect.exportSha256, retained.request);
   need(equal(prepared.manifest.files, oldExport.manifest.files), "Retry export bytes changed");
-  const readback = await verify(prior.output, retained.request, retained.expect, oldExport);
+  const readback = await (direct ? verifyDirect : verify)(prior.output, retained.request, retained.expect, oldExport);
   need(readback.phase === "invalid-receipt" && !readback.sessions.includes(request.session), "Prior launch does not authorize receipt retry");
   const decision = convergenceDecision({ record: request.snapshot.record, authority: request.snapshot.authority,
     preflight: true, launchFailures: 1, priorAttempt: { verified: true, reference: prior.output,
@@ -417,9 +426,7 @@ export async function runReview({ request, expect, prepared, directory, excluded
 const commands = {
   "--prepare": ["request", "expect", "export"],
   "--check": ["request", "expect", "export"],
-  "--probe": ["host-config", "admission", "output"],
   "--mode": ["request", "expect", "export", "output", "host-config"],
-  "--verify-tier1-trial": ["host-config", "output", "tier1-offline", "tier1-offline-sha256", "status-sha256"],
   "--verify": ["request", "expect", "export", "output"],
 };
 
@@ -429,8 +436,7 @@ function cli(argv) {
   const budgetOptions = ["budget-extension", "operator-key", "operator-key-sha256"];
   const optional = {
     "--prepare": ["host-config"], "--check": ["host-config", "admission", ...budgetOptions],
-    "--mode": ["admission", ...budgetOptions], "--verify": [], "--verify-tier1-trial": [],
-    "--probe": ["qualification", "qualification-sha256", "tier1-offline", "tier1-offline-sha256"],
+    "--mode": ["admission", ...budgetOptions], "--verify": [],
   }[command];
   const args = arguments_.slice();
   const mode = command === "--mode" ? args.shift() : null;
@@ -445,206 +451,323 @@ function cli(argv) {
     options[key] = value;
   }
   need(commands[command].every((key) => Object.hasOwn(options, key)), "Missing CLI option");
-  need(Boolean(options["tier1-offline"]) === Boolean(options["tier1-offline-sha256"]) &&
-    !(options["tier1-offline"] && options.qualification), "Missing independent offline trial pin or conflicting qualification");
-  need(Boolean(options.qualification) === Boolean(options["qualification-sha256"]), "Missing independent qualification path or pin");
   need(Boolean(options["operator-key"]) === Boolean(options["operator-key-sha256"]) &&
     (!options["operator-key"] || options.admission) && (!options["budget-extension"] || options["operator-key"]),
   "Review extensions require admission and an independently pinned operator key");
   return { command, mode, options };
 }
 
-const trialFiles = new Map([
-  ["target/alpha.txt", Buffer.from("Alpha fixture line one.\nAlpha fixture line two.")],
-  ["target/beta.txt", Buffer.from("Beta fixture line one.\nBeta fixture line two.")],
-]);
-const trialRequest = { mode: "candidate" };
-const trialContext = { target: hash(Buffer.concat([...trialFiles.values()])) };
-const trialPacket = { paths: [...trialFiles.keys()] };
-const trialPrompt = reviewPrompt(trialRequest, trialContext, trialPacket, 0, 1, "tier1-trial", { tool: "read", argument: "path" });
-
-function trialReceipt(observation) {
-  need(!observation.upstreamStatus && !observation.runtimeFailure, "Synthetic Pi trial relay failed");
-  const report = auditPiStream(observation.proc, observation.runtime, trialPacket.paths, false, trialFiles, true, trialPrompt);
-  const receipt = admitReceipt(trialRequest, trialContext, report, 0, "tier1-trial", trialPacket, { framedOnly: true });
-  need(receipt.verdict === "Verdict: No findings" && receipt.coverageLimitations.length === 0,
-    "Synthetic Pi trial did not return the expected clean receipt");
+function settingsFromRuntime(runtime) {
+  const { version, executableSha256, capabilitySha256, supervisor, ...settings } = runtime;
+  need(typeof version === "string" && /^\d+\.\d+\.\d+[0-9A-Za-z.+-]*$/.test(version) && digest(executableSha256),
+    "Invalid independently retained Direct-CLI runtime identity");
+  fields(supervisor, ["backend", "executableSha256"], "native supervisor identity");
+  need(Object.values(reviewBackends).includes(supervisor.backend) && digest(supervisor.executableSha256),
+    "Invalid independently retained native supervisor identity");
+  need(equal(settings, directReviewSettings(settings)), "Direct-CLI runtime settings are incomplete");
+  need(capabilitySha256 === hash(jsonBytes(reviewerHelp(settings, version))), "Native CLI capability binding differs");
+  return settings;
 }
 
-async function verifyPiTrial(directory, statusSha256, config, configurationSha256) {
-  await checkSealedDirectory(directory);
-  const statusBytes = await readSealed(directory, "status.json", 4096);
-  need(hash(statusBytes) === statusSha256, "Pi trial status pin mismatch");
-  const status = parseStrictJson(statusBytes);
-  fields(status, ["schemaVersion", "phase", "grantSha256", "configurationSha256", "captures"], "Pi trial status");
-  need(status.schemaVersion === 1 && status.phase === "trial-passed" && digest(status.grantSha256) &&
-    status.configurationSha256 === configurationSha256, "Pi trial status or host pin mismatch");
-  const expected = runtimeBinding(config, null, configurationSha256);
-  const observation = await replayCapture(directory, 0, expected);
-  need(equal(observation.runtime, runtimeBinding(config, observation.runtime.session, configurationSha256)) &&
-    equal(observation.descriptors, status.captures), "Pi trial runtime or capture pin mismatch");
-  trialReceipt(observation);
-  return { phase: "trial-passed", statusSha256 };
+async function loadDirectInputs(requestFile, expectFile) {
+  const request = await readJson(requestFile);
+  validateReviewRequest(request);
+  const expect = await readJson(expectFile);
+  fields(expect, ["schemaVersion", "requestSha256", "exportSha256", "configurationSha256", "model"],
+    "independent Direct-CLI expectation", ["statusSha256", "harness", "runtime", "maxBudgetUsd"]);
+  need(expect.schemaVersion === 2 && expect.requestSha256 === hash(jsonBytes(request)) &&
+    (expect.exportSha256 === null || digest(expect.exportSha256)) && digest(expect.configurationSha256) &&
+    typeof expect.model === "string" && (expect.statusSha256 === undefined || digest(expect.statusSha256)),
+  "Direct-CLI request differs from independently retained binding");
+  need((expect.runtime === undefined) === (expect.maxBudgetUsd === undefined), "Incomplete Direct-CLI runtime expectation");
+  if (expect.runtime) {
+    settingsFromRuntime(expect.runtime);
+    usdMicros(expect.maxBudgetUsd);
+    need(expect.runtime.model === expect.model, "Direct-CLI runtime model differs");
+  }
+  if (request.mode === "approach") {
+    need(expect.model === request.snapshot.record.binding.model &&
+      (!expect.runtime || expect.runtime.client === request.snapshot.record.binding.client),
+    "Approach reviewer differs from the fixed charter binding");
+  }
+  return { request, expect };
 }
 
-async function runPiTrial(directory, config, configurationSha256, grant, admission, openRuntime) {
-  const excluded = [directory, admission, grant.ledger];
-  const status = { schemaVersion: 1, phase: "trial-failed", configurationSha256,
-    grantSha256: hash(jsonBytes(grant)), captures: [] };
+const directRead = (directory, name, limit = totalLimit) => readSealed(directory, name, limit);
+const packetCaptureName = (index) => String(index + 1) + ".jsonl";
+
+function failureFrom(request, index, launch) {
+  return { failure: request.mode === "approach" ? "invalid-receipt" : "receipt-invalid",
+    ...(request.mode === "candidate" ? { rejection: { packet: index + 1, packetSha256: launch.inventorySha256,
+      target: request.snapshot.target, session: launch.session } } : {}) };
+}
+
+function directPacket(request, expect, prepared, index, launch, stdout) {
   try {
-    await openRuntime(config, { parent: directory, excluded, packetCount: 1, configurationSha256 }, async (run) => {
-      const session = randomUUID();
-      const observation = await run({ files: new Map(trialFiles), prompt: trialPrompt, session });
-      const expected = runtimeBinding(config, session, configurationSha256);
-      need(equal(observation.runtime, expected), "Pi trial runtime binding mismatch");
-      await capture(directory, 0, observation);
-      status.captures = (await replayCapture(directory, 0, expected)).descriptors;
-      trialReceipt(observation);
-      status.phase = "trial-passed";
-    });
+    return verifyDirectPacket({ request, context: receiptContext(request, prepared), prepared, index, launch,
+      stdout, runtime: expect.runtime, maxBudgetUsd: expect.maxBudgetUsd, reference: "direct-cli:" + request.session });
   } catch {
-    status.phase = "trial-failed";
-  } finally {
-    await writeJson(directory, "status.json", status);
-    await sealDirectories(directory);
+    return failureFrom(request, index, launch);
   }
-  const statusSha256 = hash(jsonBytes(status));
-  return status.phase === "trial-passed" ? verifyPiTrial(directory, statusSha256, config, configurationSha256) :
-    { phase: status.phase, statusSha256 };
 }
 
-export async function reviewCommand(argv, openRuntime = withReviewRuntime) {
-  const { command, mode, options } = cli(argv);
-  if (command === "--probe" || command === "--verify-tier1-trial") {
-    const directory = options.output;
-    const hostFile = options["host-config"];
-    const { value, configurationSha256 } = await trustedJson(hostFile, [directory]);
-    need([2, 4].includes(value.schemaVersion) || !options.qualification, "Legacy probe cannot select explicit qualification");
-    const qualification = options.qualification && { path: options.qualification, sha256: options["qualification-sha256"] };
-    const trialOffline = options["tier1-offline"] && { path: options["tier1-offline"], sha256: options["tier1-offline-sha256"] };
-    need(!trialOffline || value.schemaVersion === 2, "Tier 1 trial requires an explicit host pin");
-    const trustExcluded = [directory, options.admission].filter(Boolean);
-    const config = requireReviewHost(value, trustExcluded, [2, 4].includes(value.schemaVersion) ? {
-      qualification, trialOffline, configurationSha256, runtimeSha256: await runtimeIdentity(), verifyRuntimeIdentity: runtimeIdentity,
-      hostPin: { path: hostFile, sha256: configurationSha256 },
-    } : {});
-    const explicit = runtimeBinding(config, null, configurationSha256).explicit;
-    if (command === "--verify-tier1-trial") return verifyPiTrial(directory, options["status-sha256"], config, configurationSha256);
-    if (explicit) await verifyRuntimePins(config, trustExcluded);
-    const excluded = [hostFile, ...hostPaths(config)];
-    const spend = await checkProbeSpend({ file: options.admission, configurationSha256,
-      maxBudgetUsd: config.maxBudgetUsd, excluded: [...excluded, directory],
-      ...(explicit ? { explicitRuntimeSha256: hash(jsonBytes(explicit)) } : {}) });
-    await protectedParent(directory);
-    await newAttemptPath(directory);
-    need(excluded.every((root) => separate(directory, root)), "Output overlaps protected host paths");
-    await claimProbeRun(spend);
-    await newProtectedDirectory(directory, [...excluded, options.admission, spend.grant.ledger]);
-    if (trialOffline) return runPiTrial(directory, config, configurationSha256, spend.grant, options.admission, openRuntime);
-    let phase = "probe-failed";
-    try {
-      const passed = await openRuntime(config, { parent: directory, excluded: [directory, hostFile, options.admission, spend.grant.ledger],
-        packetCount: 0, configurationSha256 }, async (run) => {
-        const attempt = await run({ files: new Map(), prompt: probePrompt });
-        await capture(directory, 0, attempt);
-        return audit(attempt, [], true) !== null;
-      });
-      if (passed) phase = "probe-passed";
-    } finally {
-      await writeJson(directory, "status.json", { schemaVersion: 1, ...tierIdentity(config), phase, deliveryAccepted: false });
-      await sealDirectories(directory);
+function directRuntime(expect, session) {
+  const { client, model, version } = expect.runtime;
+  return { adapter: client, client, model, version, session, provider: reviewerProvider(expect.runtime),
+    configurationSource: expect.configurationSha256, configurationScope: "direct-cli", readOnly: true };
+}
+
+async function deriveDirect(directory, request, expect, prepared, launches, schedule) {
+  need(expect.runtime && digest(expect.exportSha256) && Array.isArray(launches) &&
+    launches.length <= prepared.manifest.packets.length, "Unbound Direct-CLI packet captures");
+  const raw = path.join(directory, "raw");
+  need(equal((await readdir(raw)).sort(), launches.map((_launch, index) => packetCaptureName(index)).sort()),
+    "Direct-CLI capture inventory differs");
+  const sessions = [];
+  const nativeSessions = new Set();
+  const observations = [];
+  const captures = [];
+  const diagnostics = [];
+  for (const [index, launch] of launches.entries()) {
+    const name = packetCaptureName(index);
+    const stdout = await directRead(raw, name, 4 * 1024 * 1024);
+    need(!sessions.includes(launch.session) && ![request.worker.identity.implementerSession,
+      request.worker.authority.authorSession, request.worker.authority.orchestrator].includes(launch.session) &&
+      (index === 0 ? launch.session === request.session : launch.session !== request.session),
+    "Reused Direct-CLI reviewer session");
+    sessions.push(launch.session);
+    const reviewed = directPacket(request, expect, prepared, index, launch, stdout);
+    if (!reviewed.failure) {
+      need(equal(launch.before, launches[0].before), "Worktree drifted between reviewer packets");
+      need(!reviewed.nativeSession || !nativeSessions.has(reviewed.nativeSession) &&
+        ![request.worker.identity.implementerSession, request.worker.authority.authorSession,
+          request.worker.authority.orchestrator].includes(reviewed.nativeSession), "Reused native reviewer session");
+      if (reviewed.nativeSession) nativeSessions.add(reviewed.nativeSession);
     }
-    return { phase };
+    observations.push(reviewed);
+    captures.push({ packet: index + 1, sha256: hash(stdout), bytes: stdout.length });
+    if (reviewed.failure) diagnostics.push({ packet: index + 1, classification: reviewed.failure });
   }
-  const { request, expect } = await loadInputs(options.request, options.expect);
-  need(mode === null || request.mode === mode, "CLI mode differs from request");
+  const failure = replayPacketSchedule(schedule, expect.runtime.packetConcurrency, observations, true);
+  const phase = failure?.failure ?? (launches.length === prepared.manifest.packets.length ? "complete" : "incomplete-packets");
+  const coverage = phase === "complete" && observations.every((item) => item.coverage === "whole-file") ? "whole-file" : "receipt-only";
+  const native = Buffer.from(observations.flatMap((item) => item.report ? [item.report.trimEnd()] : []).join("\n\n") +
+    (observations.some((item) => item.report) ? "\n" : ""));
+  const runtime = directRuntime(expect, request.session);
+  const record = { schemaVersion: 2, transport: "direct-cli", requestSha256: expect.requestSha256,
+    exportSha256: expect.exportSha256, configurationSha256: expect.configurationSha256, launches, schedule, captures };
+  const files = { "launch.json": jsonBytes(record),
+    "stdout.jsonl": Buffer.concat(captures.map(jsonBytes)), "stderr.log": Buffer.concat(diagnostics.map(jsonBytes)) };
+  const requestBytes = workerRequestBytes(request.worker);
+  const bound = expectedAttempt(directory, request, requestBytes);
+  const describe = (name, bytes) => describeFile(directory, name, bytes);
+  let handoff;
+  let approach;
+  let result;
+  if (phase === "complete" && request.mode === "candidate") {
+    files["native.txt"] = native;
+    files["receipt.json"] = jsonBytes({ coverage, packets: observations.map((item) => item.receipt) });
+    const review = observations.map(({ receipt, coverage: packetCoverage }) => packetCoverage === "whole-file" ? receipt :
+      { ...receipt, coverageLimitations: [...receipt.coverageLimitations, "Receipt-only packet has no independent whole-file coverage"] });
+    handoff = candidateResult(bound, runtime, review, files, describe);
+    result = handoff;
+  } else {
+    files["report.md"] = native;
+    if (phase === "complete") {
+      const accepted = observations[0].receipt;
+      // The charter's existing pass rules require verified packet coverage.
+      if (coverage === "whole-file") approach = accepted.admission;
+      files["receipt.json"] = jsonBytes({ coverage, packets: [accepted.receipt] });
+      result = { schemaVersion: 2, mode: "approach", phase, coverage, native: accepted.receipt,
+        approachAction: approach?.action ?? null, report: describe("report.md", native) };
+    } else {
+      result = { schemaVersion: 2, mode: request.mode, phase, ...(failure?.rejection ? { rejection: failure.rejection } : {}),
+        report: describe("report.md", native) };
+    }
+  }
+  const status = (resultBytes) => jsonBytes({ schemaVersion: 2, transport: "direct-cli", requestSha256: expect.requestSha256,
+    configurationSha256: expect.configurationSha256, exportSha256: expect.exportSha256, phase, sessions, coverage,
+    ...(failure?.rejection ? { rejection: failure.rejection } : {}),
+    deliveryAccepted: false,
+    files: [...Object.entries(files), ["request.md", requestBytes], ["result.json", resultBytes]]
+      .map(([name, bytes]) => describe(name, bytes)) });
+  return { phase, sessions, coverage, runtime, handoff, approach, result, files, status, failure, bound };
+}
+
+async function verifyDirect(directory, request, expect, prepared) {
+  need(digest(expect.statusSha256) && request.worker.evidenceRoots.includes(directory), "Missing independent Direct-CLI status pin");
+  await checkSealedDirectory(directory);
+  await checkSealedDirectory(path.join(directory, "raw"));
+  const statusBytes = await directRead(directory, "status.json");
+  need(hash(statusBytes) === expect.statusSha256, "Direct-CLI status changed after publication");
+  const launchBytes = await directRead(directory, "launch.json");
+  const launch = parseStrictJson(launchBytes);
+  const replay = await deriveDirect(directory, request, expect, prepared, launch.launches, launch.schedule);
+  need((await directRead(directory, "request.md")).equals(workerRequestBytes(request.worker)), "Changed Direct-CLI worker request");
+  for (const [name, bytes] of Object.entries(replay.files)) {
+    need((await directRead(directory, name)).equals(bytes), "Direct-CLI reconstructed evidence differs");
+  }
+  const resultBytes = await directRead(directory, "result.json");
+  if (replay.handoff) {
+    const handoff = await readHandoff({ expected: replay.bound, runtime: replay.runtime });
+    need(equal(handoff.result, replay.handoff), "Direct-CLI handoff differs from offline replay");
+  } else need(resultBytes.equals(jsonBytes(replay.result)), "Direct-CLI result differs from offline replay");
+  need(statusBytes.equals(replay.status(resultBytes)) &&
+    equal((await readdir(directory)).sort(), ["request.md", "result.json", "status.json", "raw", ...Object.keys(replay.files)].sort()),
+    "Direct-CLI evidence inventory or disposition differs");
+  return { phase: replay.phase, transport: "direct-cli", coverage: replay.coverage, sessions: replay.sessions,
+    ...(replay.failure?.rejection ? { rejection: replay.failure.rejection } : {}),
+    result: replay.result, ...(replay.approach ? { approach: replay.approach } : {}), deliveryAccepted: false };
+}
+
+async function directLaunch({ directory, request, expect, prepared, config, executable, python, exportDirectory, excluded }) {
+  await protectedParent(directory);
+  await createAttempt({ directory, request: request.worker, excludedRoots: excluded });
+  const raw = path.join(directory, "raw");
+  await mkdir(raw, { mode: 0o700 });
+  const cancellation = new AbortController();
+  const cancel = () => cancellation.abort();
+  const signalNames = ["SIGINT", "SIGTERM"];
+  for (const name of signalNames) process.on(name, cancel);
+  const count = prepared.manifest.packets.length;
+  const { budget } = request.worker;
+  const heldLimit = budget.unit === "minutes" ? budget.limit * 60_000 : Infinity;
+  const defaultLimit = count * config.timeoutMs + Math.max(0, count - 1) * (config.interPacketDelayMs ?? 0);
+  const clock = reviewClock({ ...config, runTimeoutMs: Math.min(config.runTimeoutMs ?? defaultLimit, heldLimit) },
+    count, { signal: cancellation.signal });
+  const launches = [];
+  const context = receiptContext(request, prepared);
+  let baseline;
+  try {
+    const schedule = await schedulePackets(count, config.packetConcurrency, clock, async (packet, begin, halt, stop) => {
+      const index = packet - 1;
+      const session = index === 0 ? request.session : randomUUID();
+      const prompt = directPacketPrompt(request, context, prepared, index, session, config.reviewer, config.maxBudgetUsd);
+      const observation = await runDirectPacket({ request, expect, prepared, config, executable, python, exportDirectory,
+        excluded: [...excluded, directory], index, session, prompt, begin,
+        signal: AbortSignal.any([cancellation.signal, stop]) });
+      if (!observation) return false;
+      const { launch } = observation;
+      let { stdout } = observation;
+      baseline ??= launch.before;
+      if (launch.diagnostic === null && !equal(baseline, launch.before)) {
+        launch.diagnostic = "integrity-failed";
+        stdout = Buffer.alloc(0);
+      }
+      launches[index] = launch;
+      const reviewed = directPacket(request, expect, prepared, index, launch, stdout);
+      if (reviewed.failure) halt();
+      await writeClosed(path.join(raw, packetCaptureName(index)), stdout, true);
+      return !reviewed.failure;
+    });
+    const replay = await deriveDirect(directory, request, expect, prepared, launches, schedule);
+    if (replay.handoff) {
+      await publishResult({ expected: replay.bound, runtime: replay.runtime, result: replay.handoff, files: replay.files });
+    } else {
+      for (const [name, bytes] of Object.entries(replay.files)) await writeClosed(path.join(directory, name), bytes, true);
+      await writeJson(directory, "result.json", replay.result);
+    }
+    const status = replay.status(await directRead(directory, "result.json"));
+    await writeClosed(path.join(directory, "status.json"), status, true);
+    await sealDirectories(directory);
+    const statusSha256 = hash(status);
+    const verified = await verifyDirect(directory, request, { ...expect, statusSha256 }, prepared);
+    return { phase: verified.phase, transport: verified.transport, coverage: verified.coverage, statusSha256,
+      ...(verified.rejection ? { rejection: verified.rejection } : {}),
+      settled: launches.every(({ process }) => process.quiescent === true), deliveryAccepted: false };
+  } finally {
+    for (const name of signalNames) process.off(name, cancel);
+  }
+}
+
+async function directCommand(command, mode, options) {
+  const { request, expect } = await loadDirectInputs(options.request, options.expect);
+  need(mode === null || request.mode === mode, "CLI mode differs from Direct-CLI request");
   const exportDirectory = options.export;
-  need([options.request, options.expect, ...request.worker.evidenceRoots]
-    .every((root) => separate(exportDirectory, root)), "Export overlaps retained inputs or evidence");
+  const workspace = request.worker.identity.workspace;
   const policy = await reviewPolicy(request);
-  const trustExcluded = [request.worker.identity.workspace, exportDirectory, options.request, options.expect, ...request.worker.evidenceRoots];
-  const checking = ["--prepare", "--check", "--mode"].includes(command);
-  if (policy && checking) need(options["host-config"], "An adopting parent requires a pinned offline host configuration");
-  if (expect.qualification && command !== "--verify") {
-    const { value } = await trustedJson(options.expect, trustExcluded.filter((root) => root !== options.expect), true);
-    need(equal(value, expect), "Explicit review expectation changed during admission");
+  need(policy?.directReviewer, "The exact integrated parent has not adopted Direct-CLI review");
+  const protectedRoots = [workspace, options.request, options.expect, ...request.worker.evidenceRoots];
+  need(protectedRoots.every((root) => separate(exportDirectory, root)), "Export overlaps retained review inputs or evidence");
+  const excluded = [...protectedRoots, exportDirectory];
+  const directory = options.output;
+  if (command === "--verify") {
+    need([exportDirectory, options.request, options.expect].every((root) => separate(directory, root)),
+      "Output overlaps retained inputs");
+    const prepared = await checkExport(exportDirectory, expect.exportSha256, request);
+    await checkPrior(request, expect, prepared);
+    return verifyDirect(directory, request, expect, prepared);
   }
-  const host = options["host-config"] ? await offlineHostBinding(options["host-config"], expect, trustExcluded,
-    Boolean(policy), { qualification: expect.qualification, runtimeSha256: expect.qualification ? await runtimeIdentity() : undefined,
-      verifyRuntimeIdentity: runtimeIdentity,
-      independentOf: [request.session, request.worker.authority.authorSession, request.worker.authority.orchestrator,
-        request.worker.identity.implementerSession] }) : null;
-  const { config } = host ?? {};
-  const explicit = config && runtimeBinding(config, request.session, host.configurationSha256).explicit;
-  if (explicit) {
-    if (explicit.client === piReviewer.client) {
-      checkRoleIndependence(expect.generator, { provider: explicit.provider, session: request.session });
-    }
-    need(expect.generator && (!expect.explicit || equal(expect.explicit, explicit)),
-      "Missing independent generating role or changed reviewer readback");
-    if (command === "--mode") need(policy && expect.explicit && options.admission,
-      "Explicit review requires adopting policy, independent runtime readback and durable run admission");
-  } else if (command === "--verify" && expect.qualification) {
-    need(expect.explicit, "Missing independently retained explicit reviewer readback");
-  }
-  const binding = policy && request.mode === "candidate" && config?.localHarness;
-  if (binding) {
-    const { value } = await trustedJson(options.expect, [...trustExcluded.filter((root) => root !== options.expect),
-      options["host-config"]], true);
-    need(equal(value, expect), "Host expectation changed during admission");
+  const hostFile = options["host-config"];
+  need(hostFile, "Direct-CLI preflight requires a pinned external host.json");
+  const host = await trustedJson(hostFile, excluded);
+  need(host.configurationSha256 === expect.configurationSha256, "Direct-CLI host configuration pin differs");
+  const config = directReviewHost(host.value);
+  need(config.model === expect.model && (!expect.runtime || equal(settingsFromRuntime(expect.runtime), config.reviewer) &&
+    config.maxBudgetUsd === expect.maxBudgetUsd), "Direct-CLI configuration differs from independent expectation");
+  if (request.mode === "approach") need(config.client === request.snapshot.record.binding.client,
+    "Direct-CLI client differs from the approach binding");
+  if (config.localHarness !== undefined) {
+    const retained = await trustedJson(options.expect, excluded.filter((root) => root !== options.expect), true);
+    need(equal(retained.value, expect), "Host expectation changed during admission");
   }
   const preflight = (prepared) => {
-    if (config && (policy || command !== "--mode")) checkPacketTurns(prepared, config.maxTurns);
-    if (!policy || !config || request.mode !== "candidate") return;
-    if (binding) {
+    if (config.client === "claude") checkPacketTurns(prepared, 128);
+    const context = receiptContext(request, prepared);
+    for (const [index, packet] of prepared.manifest.packets.entries()) {
+      const files = new Map(packet.paths.map((name) => [name, prepared.files.get(name)]));
+      const session = request.session;
+      const prompt = directPacketPrompt(request, context, prepared, index, session, config.reviewer, config.maxBudgetUsd);
+      invocation({ config, session, prompt, files, cwd: "packet", promptFile: "packet-prompt.txt", env: {} });
+    }
+    if (request.mode !== "candidate") return;
+    if (config.localHarness) {
       const attachment = prepared.files.get("context/" + request.snapshot.harness);
       need(request.snapshot.harness && attachment, "Missing exact local harness result before candidate review");
-      verifyHarnessSeal({ reference: expect.harness, binding, configurationSha256: host.configurationSha256,
-        candidate: request.snapshot.target, attachment, excluded: [...trustExcluded, options["host-config"],
-          options.output, options.admission].filter(Boolean) });
-    } else need(request.snapshot.harness === undefined && expect.harness === undefined,
-      "Unexpected harness result without a host binding");
+      verifyHarnessSeal({ reference: expect.harness, binding: config.localHarness, configurationSha256: host.configurationSha256,
+        candidate: request.snapshot.target, attachment, excluded: [...excluded, hostFile, directory, options.admission].filter(Boolean) });
+    } else need(request.snapshot.harness === undefined && expect.harness === undefined, "Unexpected harness result without a host binding");
   };
+  const observed = await observeDirectRuntime(config, [...excluded, hostFile]);
+  const { python } = observed;
+  if (expect.runtime) need(equal(expect.runtime, observed.runtime), "Installed Direct-CLI runtime differs from independent expectation");
+  const runtimeReadback = { runtime: observed.runtime, maxBudgetUsd: config.maxBudgetUsd };
   if (command === "--prepare") return { exportSha256: await prepareExport(exportDirectory, request, expect.exportSha256, preflight),
-    ...(explicit ? { explicit } : {}), ...(config ? tierIdentity(config) : {}) };
+    ...runtimeReadback };
   const prepared = await checkExport(exportDirectory, expect.exportSha256, request);
   preflight(prepared);
-  if (options.admission) need(policy && config, "Admission file requires adopting policy and pinned host.json");
-  const spend = options.admission ? await checkReviewSpend({ file: options.admission, policy, request, expect, prepared,
-    config, excluded: [...trustExcluded, options["host-config"], ...(options["operator-key"] ? hostPaths(config) : [])],
-    extensionFiles: options["operator-key"] && { key: options["operator-key"], sha256: options["operator-key-sha256"],
-      record: options["budget-extension"] } }) : null;
   receiptContext(request, prepared);
   await checkPrior(request, expect, prepared);
+  const spend = options.admission ? await checkReviewSpend({ file: options.admission, policy, request,
+    expect: { ...expect, ...runtimeReadback }, prepared, config, excluded: [...excluded, hostFile, observed.executable, python],
+    extensionFiles: options["operator-key"] && { key: options["operator-key"], sha256: options["operator-key-sha256"],
+      record: options["budget-extension"] } }) : null;
   if (command === "--check") return { exportSha256: expect.exportSha256, packets: prepared.manifest.packets.length,
-    ...(config ? { maxTurns: config.maxTurns } : {}), ...(spend ? { admission: spend.policy.mode, scope: spend.scope } : {}),
-    ...(spend?.ledgerIdentity ? { ledgerIdentity: spend.ledgerIdentity } : {}),
-    ...(explicit ? { explicit } : {}), ...(config ? tierIdentity(config) : {}) };
-  const directory = options.output;
-  need([exportDirectory, options.request, options.expect].every((root) => separate(directory, root)), "Output overlaps retained inputs");
-  if (command === "--verify") return verify(directory, request, expect, prepared);
-  need(expect.statusSha256 === undefined, "Use a fresh output for a new review");
-  need(!policy || spend, "Missing trusted admission and durable reservation before review launch");
-  const concurrency = packetConcurrency(config.packetConcurrency);
-  need(concurrency === 1 || spend, "Concurrent review requires durable reservation of the probe and every packet");
-  validateRuntime(runtimeBinding(config, request.session, expect.configurationSha256), expect);
+    ...runtimeReadback, ...(spend ? { admission: spend.policy.mode, scope: spend.scope } : {}),
+    ...(spend?.ledgerIdentity ? { ledgerIdentity: spend.ledgerIdentity } : {}) };
+  need(expect.runtime && expect.statusSha256 === undefined && spend, "Missing runtime expectation or durable review reservation");
   need(request.worker.evidenceRoots.includes(directory) &&
-    [request.worker.identity.workspace, options["host-config"], ...hostPaths(config)]
-      .every((root) => separate(directory, root)), "Output overlaps protected host or review paths");
-  const excluded = [exportDirectory, options["host-config"], ...hostPaths(config)];
-  if (binding) excluded.push(expect.harness.file);
-  const parent = await protectedParent(directory);
+    [workspace, hostFile, exportDirectory, options.request, options.expect, options.admission, observed.executable, python]
+      .every((root) => separate(directory, root)), "Direct-CLI output overlaps protected host or review paths");
+  await protectedParent(directory);
   await newAttemptPath(directory);
-  if (options.admission) excluded.push(options.admission);
-  if (options["operator-key"]) excluded.push(options["operator-key"]);
-  if (options["budget-extension"]) excluded.push(options["budget-extension"]);
-  if (spend) await claimReviewRun(spend);
-  const packetCount = prepared.manifest.packets.length;
-  const clock = policy || concurrency > 1 || config.interPacketDelayMs || config.runTimeoutMs
-    ? reviewClock(config, packetCount) : undefined;
-  return openRuntime(config, { parent, excluded: [request.worker.identity.workspace, exportDirectory, directory],
-    packetCount, configurationSha256: expect.configurationSha256 },
-  (run) => runReview({ request, expect, prepared, directory, excluded, run, clock }));
+  return withDirectReviewSettlement(spend, () => directLaunch({ directory, request, expect, prepared, config, python, executable: observed.executable, exportDirectory,
+    excluded: [workspace, hostFile, exportDirectory, options.request, options.expect, options.admission, spend.root,
+      options["operator-key"], options["budget-extension"], observed.executable, python].filter(Boolean) }));
+}
+
+export async function reviewCommand(argv) {
+  const { command, mode, options } = cli(argv);
+  const schemaVersion = (await readJson(options.expect)).schemaVersion;
+  if (schemaVersion === 2) return directCommand(command, mode, options);
+  const { request, expect } = await loadInputs(options.request, options.expect);
+  need(!(await reviewPolicy(request))?.directReviewer, "The integrated parent requires Direct-CLI evidence");
+  need(command === "--verify", "Use the original independently pinned reviewer for an earlier integrated parent");
+  need([options.export, options.request, options.expect]
+    .every((root) => separate(options.output, root)), "Output overlaps retained inputs");
+  const prepared = await checkExport(options.export, expect.exportSha256, request);
+  await checkPrior(request, expect, prepared);
+  return verify(options.output, request, expect, prepared);
 }
 
 async function newAttemptPath(directory) {
@@ -653,17 +776,12 @@ async function newAttemptPath(directory) {
   throw new Error("Expected an unused review output path");
 }
 
-function hostPaths(config) {
-  return [config.bwrap.path, (config.pi ?? config.claude).path, config.node.path, ...config.libraries.map((pin) => pin.path),
-    reviewRelaySource(config), ...(config.pi ? [config.piRelease.path] : [])];
-}
-
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   process.umask(0o077);
   try {
     const result = await reviewCommand(process.argv.slice(2));
     writeSync(1, JSON.stringify(result) + "\n");
-    if (result.phase?.endsWith("-failed") || ["invalid-receipt", "receipt-invalid", "incomplete-packets"].includes(result.phase)) process.exitCode = 1;
+    if (result.phase !== undefined && result.phase !== "complete") process.exitCode = 1;
   } catch (error) {
     writeSync(2, error.disposition ? JSON.stringify(error.disposition) + "\n" :
       `Review stopped: ${error.code ? "unsafe, missing or existing local artifact (" + error.code + ")" : error.message}\n`);

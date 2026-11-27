@@ -24,7 +24,7 @@ Use only the command for the current boundary and its matching request.
 Recording a verified display or reply appends a local observation. The other
 commands read observations. These examples supply no authority by themselves.
 
-## Launch contained review
+## Launch independent review
 
 Under adopting integrated policy, keep offline preparation and checking, the
 live launch, and offline replay and readback as separate invocations. For
@@ -37,7 +37,7 @@ node "$review_cli" --mode candidate --request REQUEST --expect EXPECT --export E
 node "$review_cli" --mode approach --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --admission ADMISSION --output OUTPUT
 ```
 
-Each live command runs the automatic probe and sends the scoped export
+Each live command sends the scoped export
 packets for paid inference. Use the exact authority verified by `ADMISSION`
 for the selected mode and phase. Codex still applies its permission checks.
 Use the original single-run authority procedure under inherited policy.

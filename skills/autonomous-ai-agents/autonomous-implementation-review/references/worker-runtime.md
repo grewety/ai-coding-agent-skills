@@ -1,60 +1,26 @@
 # Exclusive worker runtime bindings and recovery
 
-[run-implementer.md](run-implementer.md) describes the CLI and its approval
-and grant records. The sealed synthetic trials for
-`exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m` at repair SHA
-`9b909f9467ddea6b12f7ca77f959f39ef01e2702` qualified the exact pair on one
-Linux host. The implementer was dedicated standalone Codex 0.171.0 with
-OpenAI GPT-6.2-sol and native named workspace-write. The fresh read-only
-reviewer was Claude Code 2.1.330 with Anthropic Claude Sonnet 4.6 on pinned
-Bubblewrap 0.9.0 via `same-uid-key`. [Contained reviewer requirements](review-candidate.md).
-
-The trials verified original recovery without a replay launch, ordered
-Task-Guided continuation and blocking on missing or stale review evidence,
-and Goal-First candidate review bound to the approved Goal Contract digest.
-Four Codex starts and four Claude review invocations yielded three accepted
-sealed independent reviews. The original Group 2 finding was retained, and a
-separately approved review of corrected context used the unchanged candidate.
-This evidence covers the pinned synthetic runs. Verify both exact role records
-and the bound runtime before dispatch. Paid attempts, profile provisioning and
-publication depend on separate authority.
+[run-implementer.md](run-implementer.md) describes the local implementation
+assignment and authority. A verified adopting parent binds the qualified native
+Codex Implementer and independently selected Direct-CLI Reviewer. Older
+frozen assignments use the pinned original runtime and retained evidence.
 
 ## Pair and sandbox
 
-Both roles declare `client`, `model`, `provider`, `version`, `route`,
-`configuration`, `qualification`, `inventory` and physical `slot`.
-Configuration and qualification are protected path/hash locators.
-Inventory is the corresponding role’s pinned package file list, with at
-least two entries and each entry carrying a path and SHA-256. Use actual
-no-symlink regular file pins. Inventory files are rechecked after the
-original attempt settles.
+Use a schema 4 paired host with `runtimeSha256`, `pair`, `override`, `restrictions`
+and a pinned schema 2 `roleBindings` record. A bounded override names the exact
+attempt, approved expiry, complete pair and role binding pin. Each role provides
+client, model, provider, version, route, configuration and pinned file inventory.
 
-- The implementer sets route `codex-native-named-workspace-write`,
-  client `codex`, provider `openai`, version `0.171.0`, the qualified model
-  and an absolute native executable pin. Supply separate, persistent, owner-private
-  `codexHome`, `home` and `xdg` directories. `slot` equals `codexHome`.
-  The configuration record has `schemaVersion: 1`,
-  `role: "implementer"`, `auth: "dedicated-file"`,
-  `disableHostDiscovery: true` and
-  `permissionMode: "named-workspace-write"`.
-- The reviewer sets route `claude-bubblewrap-read-only`, client
-  `claude-code`, provider `anthropic`, version `2.1.330`, the qualified model,
-  an independent fresh `session` UUID and a separate private configuration
-  slot. Its configuration is the pinned contained reviewer host record. The implementer
-  runner validates and retains this binding for the orchestrator’s separate
-  reviewer dispatch.
-
-Each `exclusive-runtime-qualification` record has `schemaVersion: 1`,
-`status: "qualified"`, `role`, `client`, `route`, `version`, `model`,
-`provider`, `runtimeSha256`, `configurationSha256`, `inventorySha256`,
-`bindingSha256` (the canonical role hash excluding its qualification locator
-and fresh reviewer session)
-and an independent `supervisor` identity. The control fields
-`positiveControl`, `deniedPublication`, `protectedPaths`,
-`settlementVerified` and `inventoryUnchanged` are true only for
-verified observations. Retain the underlying supervision evidence
-independently. Synthetic tests exercise record admission without
-supplying a qualification record for the distributed route.
+- The Implementer uses route `codex-native-named-workspace-write`, the
+  exact approved native executable, `codexHome`, isolated `home` and `xdg`,
+  and independent offline and live qualification. The physical `slot` equals
+  `codexHome`. Its configuration enables dedicated auth, suppressed ambient
+  discovery and named workspace-write.
+- The Reviewer uses route `direct-cli`, the effective selected client and
+  exact schema 3 configuration, minimum two inventory pins and a fresh
+  `session` UUID. Keep reviewer and implementer evidence and grants independent.
+  [Review launch and replay](review-candidate.md).
 
 Provision the worker authentication separately. Keep the dedicated Codex home
 free of ambient `config.toml`, rules and skill discovery. The runner executes

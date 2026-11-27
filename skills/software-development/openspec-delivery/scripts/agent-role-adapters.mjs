@@ -1,4 +1,5 @@
-import { need, roleConfig } from "./role-config.mjs";
+import { validateHarnessBinding } from "./harness-result.mjs";
+import { fields, need, roleConfig } from "./role-config.mjs";
 
 const values = {
   codex: ["none", "minimal", "low", "medium", "high", "xhigh"],
@@ -54,4 +55,47 @@ export function nativeRoleBinding(input, role) {
       ...(role === "orchestrator" ? { opener: "claude", openerArgs: ["--setting-sources", ""] } : {}) };
   }
   return { args: ["--provider", provider, "--model", model, "--thinking", reasoningEffort] };
+}
+
+
+export const directReviewClients = Object.freeze(["claude", "codex", "grok", "pi", "hermes", "opencode", "kilo", "agy"]);
+const reviewEfforts = {
+  claude: [...values["claude-code"], "xhigh"],
+  codex: values.codex,
+  grok: ["low", "medium", "high", "max"],
+  pi: [...values.pi, "max"],
+  agy: ["low", "medium", "high", "xhigh", "max"],
+};
+export const defaultDirectReviewTimeoutMs = 300000;
+
+export function directReviewSettings(input) {
+  fields(input, ["client", "model"], ["reasoningEffort", "timeoutMs", "packetConcurrency"], "Direct-CLI reviewer settings");
+  const { client, model, reasoningEffort, timeoutMs = defaultDirectReviewTimeoutMs, packetConcurrency = 1 } = input;
+  need(directReviewClients.includes(client) && typeof model === "string" &&
+    /^[a-zA-Z0-9][a-zA-Z0-9_.:/@+-]{0,127}$/.test(model) && !model.split("/").some((part) => part === ".."),
+    "Unsupported Direct-CLI reviewer client or model");
+  const variant = ["opencode", "kilo"].includes(client) && typeof reasoningEffort === "string" &&
+    /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,31}$/.test(reasoningEffort);
+  need(reasoningEffort === undefined || variant || reviewEfforts[client]?.includes(reasoningEffort),
+    "Unsupported Direct-CLI reasoning effort for " + client);
+  need(Number.isSafeInteger(timeoutMs) && timeoutMs >= 1 && timeoutMs <= 600000, "Invalid reviewer timeoutMs (1–600000)");
+  need(Number.isSafeInteger(packetConcurrency) && packetConcurrency >= 1 && packetConcurrency <= 3,
+    "Invalid packetConcurrency (expected an integer from 1 through 3)");
+  return { client, model, ...(reasoningEffort === undefined ? {} : { reasoningEffort }), timeoutMs, packetConcurrency };
+}
+
+
+export function validateDirectHost(value) {
+  fields(value, ["schemaVersion", "reviewer", "maxBudgetUsd"],
+    ["interPacketDelayMs", "runTimeoutMs", "localHarness"], "Direct-CLI host configuration");
+  const reviewer = directReviewSettings(value.reviewer);
+  need(value.schemaVersion === 3 && Number.isFinite(value.maxBudgetUsd) && value.maxBudgetUsd > 0 &&
+    value.maxBudgetUsd <= 10 && /^\d+(?:\.\d{1,6})?$/.test(String(value.maxBudgetUsd)),
+    "Expected a bounded per-session reviewer cost");
+  for (const [name, minimum, maximum] of [["interPacketDelayMs", 0, 600000], ["runTimeoutMs", 1, 1200000]]) {
+    need(value[name] === undefined || Number.isSafeInteger(value[name]) && value[name] >= minimum && value[name] <= maximum,
+      "Invalid reviewer " + name);
+  }
+  if (value.localHarness !== undefined) validateHarnessBinding(value.localHarness);
+  return { ...value, reviewer };
 }

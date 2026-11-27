@@ -1,7 +1,7 @@
 ---
 name: openspec-next
 description: Inspect or advance an approved OpenSpec goal or task group.
-version: 0.8.0
+version: 0.9.0
 author: Raphael (forgegod), Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]

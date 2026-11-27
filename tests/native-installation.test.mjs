@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFixtureSync } from "./test-shards.mjs";
 import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -35,7 +35,7 @@ test("documented recipes copy five complete packages to all four native user loc
     assert.ok(section, `missing ${heading} installation section`);
     const command = section.match(/```sh\n([\s\S]*?)\n```/)?.[1];
     assert.ok(command, `missing ${heading} executable recipe`);
-    execFileSync("sh", ["-c", f.helper + "\n" + command], { cwd: f.scratch, env: f.env });
+    execFixtureSync("sh", ["-c", f.helper + "\n" + command], { cwd: f.scratch, env: f.env });
     const destination = path.join(f.home, directory);
     assert.deepEqual((await readdir(destination)).sort(), [...names].sort());
     for (const name of names) {
@@ -65,7 +65,7 @@ test("native helper refuses collisions before copying any other skill", async (t
   const existing = path.join(destination, "git-commit-message");
   await mkdir(existing, { recursive: true });
   await writeFile(path.join(existing, "SKILL.md"), "Operator edits.\n");
-  assert.throws(() => execFileSync("sh", ["-c", f.helper + '\ninstall_reviewed_skills "$HOME/.agents/skills"'], { cwd: f.scratch, env: f.env, stdio: "pipe" }));
+  assert.throws(() => execFixtureSync("sh", ["-c", f.helper + '\ninstall_reviewed_skills "$HOME/.agents/skills"'], { cwd: f.scratch, env: f.env, stdio: "pipe" }));
   assert.deepEqual(await readdir(destination), ["git-commit-message"]);
   assert.equal(await readFile(path.join(existing, "SKILL.md"), "utf8"), "Operator edits.\n");
 });

@@ -1,8 +1,11 @@
+import { privatePath } from "./agent-configuration.mjs";
+import { resolveInstalledExecutable } from "./agent-discovery.mjs";
 import { customPlanningPath, planningBudget, planningLayout, validatePlanningInputs } from "./planning-inventory.mjs";
-import { readLowTouchPolicy } from "./low-touch-policy.mjs";
+import { directReviewAdopted, readLowTouchPolicy } from "./low-touch-policy.mjs";
 import { relocatedPlan } from "./review-archive.mjs";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
+import { accessSync, constants, lstatSync, realpathSync } from "node:fs";
 import { chmod, lstat, mkdir, opendir, readdir } from "node:fs/promises";
 import path from "node:path";
 import { readClosed, safePath, validateRequest, writeClosed } from "./worker-handoff.mjs";
@@ -78,7 +81,7 @@ export const absolute = (name) => typeof name === "string" && path.isAbsolute(na
   path.normalize(name) === name && !/[\x00-\x1f\x7f]/.test(name);
 export const within = (root, name) => {
   const rel = path.relative(root, name);
-  return rel === "" || (!path.isAbsolute(rel) && rel !== ".." && !rel.startsWith("../"));
+  return rel === "" || (!path.isAbsolute(rel) && rel !== ".." && !rel.startsWith(".." + path.sep));
 };
 export const separate = (a, b) => !within(a, b) && !within(b, a);
 
@@ -119,14 +122,76 @@ export function packetize(diff, entries, limit, fits = () => true) {
   return result;
 }
 
+const windowsGitVerificationMs = 10_000;
+let windowsGitVerification;
+
+function windowsGitIdentity(searchPath) {
+  for (const entry of searchPath.split(path.delimiter)) {
+    if (!absolute(entry)) continue;
+    let file;
+    try {
+      file = realpathSync(path.join(entry, "git.exe"));
+      if (!lstatSync(file).isFile()) continue;
+      accessSync(file, constants.X_OK);
+    } catch { continue; }
+
+    // Include every canonical location covered by the resolver's ACL checks.
+    // Recheck the first PATH match so a newly appearing executable invalidates reuse.
+    try {
+      const directory = realpathSync(entry);
+      const locations = new Set([file, path.dirname(file), directory, path.dirname(directory)]);
+      const identity = [...locations].map((location) => {
+        const stat = lstatSync(location, { bigint: true });
+        need((location === file ? stat.isFile() : stat.isDirectory()) && stat.ino !== 0n && stat.ctimeNs > 0n,
+          "Unverifiable Git executable or directory identity");
+        return [location, stat.dev, stat.ino, stat.mode, stat.size, stat.birthtimeNs, stat.mtimeNs, stat.ctimeNs].map(String);
+      });
+      return { file, identity: JSON.stringify([entry, identity]) };
+    } catch { return null; }
+  }
+  return null;
+}
+
+function windowsGitExecutable(workspace, systemRoot) {
+  const searchPath = process.env.PATH ?? "";
+  const root = realpathSync(workspace);
+  const observed = windowsGitIdentity(searchPath);
+  const verified = windowsGitVerification;
+  if (verified && observed?.identity === verified.identity && searchPath === verified.searchPath &&
+      systemRoot === verified.systemRoot && workspace === verified.workspace && root === verified.root &&
+      performance.now() < verified.expires &&
+      separate(workspace, observed.file) && separate(root, observed.file)) {
+    return observed.file;
+  }
+
+  windowsGitVerification = undefined;
+  const file = resolveInstalledExecutable("git", { searchPath, excluded: [workspace, root] });
+  need(realpathSync(workspace) === root, "Git workspace changed during safety resolution");
+  if (observed) {
+    const confirmed = windowsGitIdentity(searchPath);
+    need(confirmed?.identity === observed.identity && confirmed.file === file, "Git executable changed during safety resolution");
+    windowsGitVerification = { identity: confirmed.identity, searchPath, systemRoot, workspace, root,
+      expires: performance.now() + windowsGitVerificationMs };
+  }
+  return file;
+}
+
 export function git(workspace, ...args) {
   try {
-    return execFileSync("/usr/bin/git", [
-      "--no-pager", "-c", "core.hooksPath=/dev/null", "-c", "core.quotePath=true",
+    const windows = process.platform === "win32";
+    const systemRoot = windows ? process.env.SystemRoot : undefined;
+    const executable = windows ? windowsGitExecutable(workspace, systemRoot) : "/usr/bin/git";
+    const disabled = windows ? "NUL" : "/dev/null";
+    return execFileSync(executable, [
+      "--no-pager", "-c", "core.hooksPath=" + disabled, "-c", "core.quotePath=true",
       "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false",
-      "-c", "diff.external=", "-c", "core.attributesFile=/dev/null", ...args,
+      "-c", "diff.external=", "-c", "core.attributesFile=" + disabled, ...args,
     ], {
-      cwd: workspace, env: { PATH: "/usr/bin:/bin", HOME: "/nonexistent", XDG_CONFIG_HOME: "/nonexistent",
+      cwd: workspace, windowsHide: windows, env: {
+        ...(windows ? { SystemRoot: systemRoot, PATH: path.dirname(executable),
+          USERPROFILE: path.join(path.parse(workspace).root, "Nonexistent"),
+          GIT_CONFIG_GLOBAL: disabled } : { PATH: "/usr/bin:/bin" }),
+        HOME: "/nonexistent", XDG_CONFIG_HOME: "/nonexistent",
         GIT_CONFIG_NOSYSTEM: "1", GIT_OPTIONAL_LOCKS: "0", GIT_NO_REPLACE_OBJECTS: "1", GIT_NO_LAZY_FETCH: "1", LC_ALL: "C" },
       maxBuffer: totalLimit, timeout: 10000, stdio: ["ignore", "pipe", "pipe"],
     });
@@ -136,10 +201,10 @@ export function git(workspace, ...args) {
 export async function verifiedGitRoot(workspace) {
   await safePath(workspace);
   await safePath(path.join(workspace, ".git"));
-  need(utf8(git(workspace, "rev-parse", "--show-toplevel")).trimEnd() === workspace, "Git workspace identity mismatch");
+  need(path.normalize(utf8(git(workspace, "rev-parse", "--show-toplevel")).trimEnd()) === workspace, "Git workspace identity mismatch");
   need(!utf8(git(workspace, "for-each-ref", "--format=%(refname)", "refs/replace/")).trim(), "Unsupported Git replace references");
   for (const local of ["info/grafts", "objects/info/alternates"]) {
-    const file = utf8(git(workspace, "rev-parse", "--path-format=absolute", "--git-path", local)).trimEnd();
+    const file = path.normalize(utf8(git(workspace, "rev-parse", "--path-format=absolute", "--git-path", local)).trimEnd());
     need(absolute(file), "Malformed Git object topology locator");
     try { await lstat(file); throw new Error("Unsupported Git graft or alternate object store"); }
     catch (error) { if (error.code !== "ENOENT") throw error; }
@@ -270,7 +335,7 @@ export function validateReviewRequest(request) {
     fields(s.record.charter, ["clauses", "boundaries", "tasks", "gates"], "review charter");
     if (s.correction !== null) fields(s.correction, ["verified", "reference", "strictExitCode", "metadataExitCode",
       "beforeInputs", "amendedInputs"], "planning correction");
-    need(s.record?.change === w.identity.change && s.record.binding?.client === "claude-code" &&
+    need(s.record?.change === w.identity.change && (s.record.binding?.client === "claude-code" || s.record.binding?.route === "direct-cli") &&
       Array.isArray(s.priorLaunches) && s.priorLaunches.length <= 1 &&
       (s.correction === null || plain(s.correction)), "Invalid approach identity");
     for (const prior of s.priorLaunches) {
@@ -368,7 +433,8 @@ export async function reviewPolicy(request) {
   need(["100644", "100755"].includes(entry.mode), "Expected regular root policy");
   const size = Number(utf8(git(workspace, "cat-file", "-s", entry.oid)).trim());
   need(Number.isSafeInteger(size) && size <= 4 * 1024 * 1024, "Root policy exceeds planning bounds");
-  const policy = readLowTouchPolicy(utf8(git(workspace, "cat-file", "blob", entry.oid)));
+  const rootContract = utf8(git(workspace, "cat-file", "blob", entry.oid));
+  const policy = readLowTouchPolicy(rootContract);
   if (!policy) { need(!binding, "Integrated parent has not adopted low-touch policy"); return null; }
   need(binding?.parent === parent && utf8(git(workspace, "rev-parse", "--verify", binding.target + "^{commit}")).trim() === binding.target,
     "Missing exact integrated policy binding");
@@ -378,7 +444,8 @@ export async function reviewPolicy(request) {
     need(draft === parent || draftParents.length === 1 && draftParents[0] === parent,
       "Draft is not at the integrated parent or its frozen predecessor");
   }
-  return policy;
+  const directReviewer = directReviewAdopted(rootContract);
+  return directReviewer ? { ...policy, directReviewer: true } : policy;
 }
 
 function chargePlan(budget, file, size, directories) {
@@ -564,7 +631,7 @@ export async function buildExport(request) {
 export async function protectedParent(directory) {
   await safePath(directory, true);
   const parent = await lstat(path.dirname(directory));
-  need(parent.uid === process.getuid() && (parent.mode & 0o022) === 0, "Protected directory parent must be owned and non-writable by other users");
+  need((process.platform === "win32" ? privatePath(path.dirname(directory), parent) : parent.uid === process.getuid() && (parent.mode & 0o022) === 0), "Protected directory parent must be owned and non-writable by other users");
   return path.dirname(directory);
 }
 
@@ -577,7 +644,7 @@ export async function newProtectedDirectory(directory, excluded) {
 export async function checkSealedDirectory(directory) {
   await safePath(directory);
   const st = await lstat(directory);
-  need(st.isDirectory() && st.uid === process.getuid() && (st.mode & 0o7777) === 0o500, "Directory is not sealed");
+  need(st.isDirectory() && (process.platform === "win32" ? privatePath(directory, st) : st.uid === process.getuid() && (st.mode & 0o7777) === 0o500), "Directory is not sealed");
 }
 
 export async function prepareExport(directory, request, expectedExport, inspect = () => {}) {
@@ -601,7 +668,7 @@ export async function sealDirectories(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     if (entry.isDirectory()) await sealDirectories(path.join(directory, entry.name));
   }
-  await chmod(directory, 0o500);
+  if (process.platform !== "win32") await chmod(directory, 0o500);
 }
 
 export async function checkExport(directory, expected, request) {

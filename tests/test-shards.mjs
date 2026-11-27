@@ -1,5 +1,5 @@
-import { spawn } from "node:child_process";
-import { accessSync, constants, lstatSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { accessSync, closeSync, constants, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { availableParallelism, tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -22,6 +22,36 @@ export function fixtureTest(...args) {
   // Each wrapper loads one suite in its own test-file process.
   const shard = globalThis[shardKey];
   if (!shard || nextFixture++ % shard.count === shard.index) return test(...args);
+}
+
+export function spawnFixtureSync(executable, args, { input, encoding, ...options } = {}) {
+  const directory = mkdtempSync(path.join(tmpdir(), "fixture-stdio-"));
+  const file = (name) => path.join(directory, name);
+  const descriptors = [];
+  const open = (name, flags) => {
+    const descriptor = openSync(file(name), flags, 0o600);
+    descriptors.push(descriptor);
+    return descriptor;
+  };
+  try {
+    if (input !== undefined) writeFileSync(file("stdin"), input, { mode: 0o600, flag: "wx" });
+    const stdin = input === undefined ? "ignore" : open("stdin", "r");
+    const stdout = open("stdout", "wx");
+    const stderr = open("stderr", "wx");
+    const result = spawnSync(executable, args, { ...options, stdio: [stdin, stdout, stderr] });
+    return { ...result, stdout: readFileSync(file("stdout"), encoding), stderr: readFileSync(file("stderr"), encoding) };
+  } finally {
+    for (const descriptor of descriptors) closeSync(descriptor);
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+export function execFixtureSync(executable, args, options) {
+  const result = spawnFixtureSync(executable, args, options);
+  if (result.error || result.status !== 0) {
+    throw Object.assign(result.error ?? new Error(`Fixture ${executable} exited with ${result.status}: ${result.stderr}`), result);
+  }
+  return result.stdout;
 }
 
 function testFiles(filenames, root) {

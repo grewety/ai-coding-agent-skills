@@ -1,4 +1,5 @@
 import { absolute, fields, need, roleConfig, roleNames, validatePin } from "./role-config.mjs";
+import { directReviewSettings } from "./agent-role-adapters.mjs";
 import { inspectPinnedFile, parseStrictJson } from "./agent-configuration.mjs";
 
 function validateWorksetRoots(roots) {
@@ -16,11 +17,13 @@ function validateWorksetRoots(roots) {
 
 export function validateRoleBindings(input) {
   fields(input, ["schemaVersion", "roles", "reviewerHost"], ["worksetRoots"], "external role bindings");
-  if (input.schemaVersion !== 1) throw new Error("Unsupported external role binding schema");
-  fields(input.roles, roleNames, [], "roles");
+  const direct = input.schemaVersion === 2;
+  if (!direct && input.schemaVersion !== 1) throw new Error("Unsupported external role binding schema");
+  const enabled = direct ? roleNames.filter((name) => name !== "reviewer") : roleNames;
+  fields(input.roles, enabled, [], "roles");
   return {
-    schemaVersion: 1,
-    roles: Object.fromEntries(roleNames.map((name) =>
+    schemaVersion: input.schemaVersion,
+    roles: Object.fromEntries(enabled.map((name) =>
       [name, name === "helper" && input.roles[name] === null ? null : roleConfig(input.roles[name])])),
     reviewerHost: validatePin(input.reviewerHost),
     ...(input.worksetRoots === undefined ? {} : { worksetRoots: validateWorksetRoots(input.worksetRoots) }),
@@ -30,6 +33,10 @@ export function validateRoleBindings(input) {
 export function readRoleBindings(pin, excluded = []) {
   const binding = validateRoleBindings(parseStrictJson(inspectPinnedFile(pin, { read: true, excluded })));
   const host = parseStrictJson(inspectPinnedFile(binding.reviewerHost, { read: true, excluded }));
+  if (binding.schemaVersion === 2) {
+    need(host.schemaVersion === 3, "Direct-CLI reviewer host differs from role schema");
+    return { ...binding, reviewer: directReviewSettings(host.reviewer) };
+  }
   if (![2, 4].includes(host.schemaVersion) || JSON.stringify(roleConfig(host.roleBinding)) !== JSON.stringify(binding.roles.reviewer)) {
     throw new Error("Reviewer host differs from the independently pinned role tuple");
   }

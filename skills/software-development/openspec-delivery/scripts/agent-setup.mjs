@@ -1,20 +1,18 @@
-import { authDirectoryIdentity, defaultReviewerTimeoutMs, grokTierBlocker, maximumReviewerTimeoutMs, requireTier, tierFields } from "./containment-tier.mjs";
-import { validatePiRelease } from "./agent-pi-runtime.mjs";
 import { closeSync, constants, fstatSync, fsyncSync, lstatSync, openSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { disjoint, hashBytes, inspectPinnedFile, jsonBytes, trustedHostPath } from "./agent-configuration.mjs";
+import { disjoint, hashBytes, inspectPinnedFile, jsonBytes, privatePath, trustedHostPath } from "./agent-configuration.mjs";
 import { observeVersion } from "./agent-discovery.mjs";
-import { grokReviewerBlocker, nativeRoleBinding, piReviewer, requirePiReviewer } from "./agent-role-adapters.mjs";
+import { directReviewSettings, nativeRoleBinding, validateDirectHost } from "./agent-role-adapters.mjs";
 import { readRoleBindings, validateRoleBindings } from "./agent-role-config.mjs";
 import { validateHarnessBinding } from "./harness-result.mjs";
 import { absolute, clients, fields, need, roleConfig, token, validatePin } from "./role-config.mjs";
-import { auditVersion, versionPolicy } from "./runtime-version.mjs";
+import { auditVersion } from "./runtime-version.mjs";
 
-const profileNames = [".agents", ".claude", ".codex", ".gemini", ".hermes", ".kilo", ".opencode", ".pi", ".ssh", ".gnupg"];
+const profileNames = [".agents", ".agy", ".antigravity", ".grok", ".claude", ".codex", ".gemini", ".hermes", ".kilo", ".opencode", ".pi", ".ssh", ".gnupg"];
 const profileRoots = ["agents", "claude", "claude-code", "codex", "gemini", "hermes", "kilo", "opencode", "openspec", "pi", "grok-build"];
-const selectors = ["CODEX_HOME",
+const selectors = ["AGY_HOME", "GROK_HOME", "CODEX_HOME",
   "CLAUDE_CONFIG_DIR", "HERMES_HOME", "OPENCODE_CONFIG_DIR", "PI_CODING_AGENT_DIR", "GEMINI_CLI_HOME"];
 
 function existingAliases(root) {
@@ -26,7 +24,7 @@ function existingAliases(root) {
 }
 
 function directoryState(directory, workspace) {
-  need(process.platform === "linux" && process.getuid, "Confirmed setup requires Linux directory identity checks");
+  need(["linux", "darwin", "win32"].includes(process.platform), "Unsupported native setup host");
   need(absolute(directory) && realpathSync(directory) === directory && disjoint(directory, realpathSync(workspace)),
     "Setup directory aliases the repository or is not canonical");
   const home = os.homedir();
@@ -38,91 +36,24 @@ function directoryState(directory, workspace) {
     ...selectors.map((name) => process.env[name]).filter(absolute)];
   need(profiles.flatMap(existingAliases).every((root) => disjoint(directory, root)) &&
     directory.split(path.sep).every((part) => !profileNames.includes(part)), "Setup directory aliases a live profile");
-  for (let current = directory; current !== "/"; current = path.dirname(current)) {
+  for (let current = directory; ; current = path.dirname(current)) {
     const metadata = path.join(current, ".git");
     const marker = lstatSync(metadata, { throwIfNoEntry: false });
     need(!marker || marker.isDirectory() &&
       !lstatSync(path.join(metadata, "HEAD"), { throwIfNoEntry: false }) &&
       !lstatSync(path.join(metadata, "config"), { throwIfNoEntry: false }), "Setup directory is inside a Git checkout");
+    if (current === path.parse(current).root) break;
   }
   const stat = lstatSync(directory);
-  need(stat.isDirectory() && stat.uid === process.getuid() && !(stat.mode & 0o077),
+  need(stat.isDirectory() && privatePath(directory, stat),
     "Setup requires an existing private, user-owned host directory");
   return { device: stat.dev, inode: stat.ino };
-}
-
-export function validatePilotHost(input) {
-  const tiered = input?.schemaVersion === 4;
-  const dedicated = tiered && input.containmentTier === "b";
-  fields(input, ["schemaVersion", "roleBinding", "bubblewrap", dedicated ? "authDirectory" : "relay",
-    "maxTurns", "interPacketDelayMs", "timeoutMs", "maxBudgetUsd", ...(tiered ? tierFields : [])],
-  ["runtime", "localHarness", "packetConcurrency", ...(tiered ? ["runTimeoutMs"] : [])], "reviewer pilot host");
-  need(tiered || input.schemaVersion === 2, "Invalid reviewer pilot host schema");
-  const roleBinding = roleConfig(input.roleBinding);
-  const { relay, maxTurns, interPacketDelayMs, timeoutMs, maxBudgetUsd, packetConcurrency } = input;
-  const tier = tiered ? requireTier(input, "reviewer", roleBinding.client) : {};
-  if (dedicated) {
-    need(absolute(input.authDirectory) && roleBinding.provider === "xai-oauth" && roleBinding.model === "grok-4.7" &&
-      roleBinding.transport === "provider-https" && roleBinding.versionPolicy === "exact" &&
-      roleBinding.versionCheck && roleBinding.exactVersion === "1.0.92", "Tier B requires explicit native Grok 1.0.92 xAI OAuth");
-  } else {
-    fields(relay, ["route", "credentialRef"], [], "named relay reference");
-    need(["same-uid-key", "dedicated-uid-broker", "openrouter", "openai-compatible", "gemini", "xai-oauth", piReviewer.relay].includes(relay.route) &&
-      token(relay.credentialRef) && !/^(?:sk-|ghp_|github_pat_)/i.test(relay.credentialRef), "Invalid named relay reference");
-    if (relay.route === piReviewer.relay || roleBinding.client === piReviewer.client) {
-      requirePiReviewer(roleBinding);
-      need(relay.route === piReviewer.relay, "Pi reviewer requires the host Hermes proxy xAI OAuth relay");
-    }
-    if (relay.route === "xai-oauth") need(roleBinding.client === "grok-build" && roleBinding.provider === "xai-oauth" &&
-      roleBinding.model === "grok-4.7" && roleBinding.transport === "unix-socket" &&
-      roleBinding.versionPolicy === "exact" && roleBinding.versionCheck && roleBinding.exactVersion === "1.0.92",
-    "Grok reviewer requires exact 1.0.92, grok-4.7 and host xAI OAuth over a Unix socket");
-  }
-  if (tiered && !dedicated) need(["same-uid-key", piReviewer.relay].includes(relay.route), "Unqualified Tier A relay");
-  need(input.runTimeoutMs === undefined || Number.isSafeInteger(input.runTimeoutMs) &&
-    input.runTimeoutMs >= 1000 && input.runTimeoutMs <= 3600000, "Invalid enclosing reviewer timeout");
-  need(maxTurns === 96 && Number.isSafeInteger(interPacketDelayMs) && interPacketDelayMs >= 0 && interPacketDelayMs <= 30000 &&
-    Number.isSafeInteger(timeoutMs) && timeoutMs >= 1000 && timeoutMs <= (tiered ? maximumReviewerTimeoutMs : defaultReviewerTimeoutMs) &&
-    Number.isFinite(maxBudgetUsd) && maxBudgetUsd > 0 && maxBudgetUsd <= 10, "Invalid reviewer limits");
-  need(packetConcurrency === undefined || Number.isSafeInteger(packetConcurrency) && packetConcurrency >= 1 &&
-    packetConcurrency <= 3 && (packetConcurrency === 1 || ["same-uid-key", piReviewer.relay].includes(relay?.route)),
-  "Invalid packetConcurrency or relay without packet isolation");
-  fields(input.bubblewrap, ["executable"], ["versionPolicy", "versionCheck", "exactVersion", "minVersion", "maxVersion"],
-    "Bubblewrap policy");
-  let runtime;
-  if (input.runtime !== undefined) {
-    fields(input.runtime, ["node", "libraries", ...(!dedicated ? ["relayConfiguration"] : []),
-      ...(roleBinding.client === piReviewer.client ? ["piRelease"] : [])], [], "reviewer runtime pins");
-    const { node, libraries, relayConfiguration, piRelease } = input.runtime;
-    need(Array.isArray(libraries) && libraries.length <= 64, "Invalid reviewer library pins");
-    const targets = new Set();
-    runtime = {
-      node: validatePin(node), ...(!dedicated ? { relayConfiguration: validatePin(relayConfiguration) } : {}),
-      ...(roleBinding.client === piReviewer.client ? { piRelease: validatePiRelease(piRelease) } : {}),
-      libraries: libraries.map((entry) => {
-        fields(entry, ["path", "sha256", "target"], [], "runtime library");
-        const { target, ...pin } = entry;
-        need(typeof target === "string" && /^\/(?:usr\/)?lib(?:64)?\/(?:[a-zA-Z0-9_-]+\/)?[a-zA-Z0-9_+-]+\.so(?:\.[\w.-]+)?$/.test(target) &&
-          !targets.has(target), "Unsafe reviewer runtime library target");
-        targets.add(target);
-        return { ...validatePin(pin), target };
-      }),
-    };
-  }
-  if (input.localHarness != null) validateHarnessBinding(input.localHarness);
-  if (tiered) need(runtime, "Tiered setup requires exact Node and runtime library pins");
-  return { schemaVersion: input.schemaVersion, ...tier, roleBinding,
-    bubblewrap: { executable: validatePin(input.bubblewrap.executable), ...versionPolicy(input.bubblewrap, "0.9.0") },
-    ...(dedicated ? { authDirectory: input.authDirectory } : { relay }), maxTurns, interPacketDelayMs, timeoutMs, maxBudgetUsd,
-    ...(input.runTimeoutMs === undefined ? {} : { runTimeoutMs: input.runTimeoutMs }),
-    ...(packetConcurrency === undefined ? {} : { packetConcurrency }),
-    ...(runtime === undefined ? {} : { runtime }), ...(input.localHarness === undefined ? {} : { localHarness: input.localHarness }) };
 }
 
 function worksetRootIdentity(directory) {
   need(absolute(directory) && trustedHostPath(directory) === directory, "Untrusted or noncanonical OpenSpec workset root");
   const stat = lstatSync(directory, { bigint: true });
-  need(stat.isDirectory() && [0n, BigInt(process.getuid())].includes(stat.uid) && !(stat.mode & 0o022n),
+  need(stat.isDirectory() && (process.platform === "win32" || !(stat.mode & 0o022n)),
     "Untrusted OpenSpec workset root");
   return { path: directory, device: String(stat.dev), inode: String(stat.ino), uid: String(stat.uid) };
 }
@@ -172,7 +103,7 @@ export function readWorksetOpener(pin, receivedArgs, { workspace = process.cwd()
 function outputState(file, bytes) {
   const st = lstatSync(file, { throwIfNoEntry: false });
   if (!st) return "absent";
-  need(st.isFile() && st.nlink === 1 && st.uid === process.getuid() && !(st.mode & 0o077) &&
+  need(st.isFile() && st.nlink === 1 && privatePath(file, st) &&
     st.size === bytes.length, "Setup destination conflicts: " + path.basename(file));
   const fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {
@@ -183,100 +114,61 @@ function outputState(file, bytes) {
   return "matching";
 }
 
-function pinTierInputs(input, tier, excluded) {
-  const dedicated = tier === "b";
-  const reviewer = input.reviewer;
-  const safePin = (value, options) => {
-    fields(value, ["path"], ["sha256"], "discovery pin");
-    need(absolute(value.path) && !value.path.split(path.sep).some((part) => profileNames.includes(part) ||
-      [".config", ".grok", "auth.json", "credentials.json"].includes(part)), "Runtime discovery path overlaps credential or profile state");
-    return inspectPinnedFile(value, { discover: true, excluded, ...options });
-  };
-  const runtime = reviewer.runtime;
-  fields(runtime, ["node", "libraries", ...(dedicated ? [] : ["relayConfiguration"])],
-    input.roles.reviewer.client === piReviewer.client ? ["piRelease"] : [], "tier runtime");
-  need(Array.isArray(runtime.libraries) && runtime.libraries.length <= 64, "Invalid reviewer library pins");
-  const relayConfiguration = dedicated ? null : validatePin(runtime.relayConfiguration);
-  if (relayConfiguration) {
-    need(trustedHostPath(relayConfiguration.path) === relayConfiguration.path, "Untrusted relay configuration path");
-    inspectPinnedFile(relayConfiguration, { excluded });
-  }
-  const roles = Object.fromEntries(Object.entries(input.roles).map(([name, role]) => [name, role && {
-    ...role, executable: safePin(role.executable, { executable: true }),
-  }]));
-  return { roles, reviewer: { ...reviewer, runtime: {
-    ...runtime, node: safePin(runtime.node, { executable: true }),
-    ...(relayConfiguration ? { relayConfiguration } : {}),
-    libraries: runtime.libraries.map(({ target, ...pin }) => ({ ...safePin(pin, { runtime: true }), target })),
-  }, bubblewrap: { ...reviewer.bubblewrap, executable: safePin(reviewer.bubblewrap.executable, { executable: true }) } } };
+function previewDirectSetup(input, workspace) {
+  fields(input, ["schemaVersion", "directory", "reviewer"],
+    ["maxBudgetUsd", "interPacketDelayMs", "runTimeoutMs", "localHarness", "roles", "worksetRoots"], "Direct-CLI setup");
+  const { directory, maxBudgetUsd = 2.50, interPacketDelayMs, runTimeoutMs, localHarness } = input;
+  const identity = directoryState(directory, workspace);
+  const reviewer = directReviewSettings(input.reviewer);
+  const host = jsonBytes(validateDirectHost({ schemaVersion: 3, reviewer, maxBudgetUsd,
+    ...(interPacketDelayMs === undefined ? {} : { interPacketDelayMs }),
+    ...(runTimeoutMs === undefined ? {} : { runTimeoutMs }),
+    ...(localHarness === undefined ? {} : { localHarness }) }));
+  const configurationSha256 = hashBytes(host);
+  const files = { "host.json": host };
+  if (input.roles !== undefined) {
+    const roots = input.worksetRoots ?? [realpathSync(workspace)];
+    need(Array.isArray(roots) && roots.length > 0, "Expected approved OpenSpec workset roots");
+    const roles = validateRoleBindings({ schemaVersion: 2, roles: input.roles,
+      reviewerHost: { path: path.join(directory, "host.json"), sha256: configurationSha256 },
+      worksetRoots: roots.map(worksetRootIdentity) });
+    const opener = nativeRoleBinding(roles.roles.orchestrator, "orchestrator");
+    need(opener.opener && !opener.blocker, opener.blocker ?? "Unsupported OpenSpec opener");
+    need(roots.every((root) => [directory, roles.roles.orchestrator.executable.path].every((file) => disjoint(root, file))),
+      "Pinned workset inputs overlap an approved root");
+    files["roles.json"] = jsonBytes(roles);
+    files["openspec-openers.json"] = jsonBytes({ openers: { [opener.opener]: { style: "attach-dirs", attach_flag: "--add-dir",
+      command: process.execPath, args: [fileURLToPath(new URL("./setup.mjs", import.meta.url)), "--launch-opener",
+        path.join(directory, "roles.json"), hashBytes(files["roles.json"]), ...opener.openerArgs, ...opener.args] } } });
+  } else need(input.worksetRoots === undefined, "Workset roots require configured roles");
+  const outputs = Object.entries(files).map(([name, bytes]) => {
+    const file = path.join(directory, name);
+    return { name, path: file, utf8: bytes.toString("utf8"), sha256: hashBytes(bytes), state: outputState(file, bytes) };
+  });
+  const details = { schemaVersion: 2, directory, identity, configurationSha256, outputs,
+    authentication: "Normal installed-client authentication", mappingBlockers: {} };
+  return { ...details, confirmationSha256: hashBytes(jsonBytes(details)) };
 }
 
-export function previewSetup(input, { workspace = process.cwd(), tier } = {}) {
-  fields(input, ["schemaVersion", "directory", "roles", "reviewer"], ["worksetRoots"], "setup request");
-  need(input.schemaVersion === 1, "Unsupported setup schema");
-  const directory = input.directory;
-  const identity = directoryState(directory, workspace);
-  const dedicated = tier === "b";
-  const choices = input.reviewer;
-  fields(choices, ["bubblewrap", dedicated ? "authDirectory" : "relay", "interPacketDelayMs", ...(tier ? ["runtime"] : ["timeoutMs"])],
-    ["maxBudgetUsd", "localHarness", "packetConcurrency", ...(tier ? ["osDriver", "timeoutMs", "runTimeoutMs"] : ["runtime"])],
-    "reviewer choices");
-  const tierBinding = tier ? { containmentTier: tier, osDriver: choices.osDriver ?? "linux-bwrap" } : {};
-  if (tier) requireTier(tierBinding, "reviewer", input.roles?.reviewer?.client);
-  const authIdentity = dedicated ? authDirectoryIdentity(choices.authDirectory, [directory, realpathSync(workspace)]) : undefined;
-  const pinned = tier ? pinTierInputs(input, tier, [directory, realpathSync(workspace), ...(dedicated ? [choices.authDirectory] : [])]) : input;
-  const { osDriver, ...reviewerChoices } = pinned.reviewer;
-  const reviewer = validatePilotHost({ maxBudgetUsd: 2.50, timeoutMs: defaultReviewerTimeoutMs, ...reviewerChoices,
-    ...tierBinding, schemaVersion: tier ? 4 : 2, maxTurns: 96, roleBinding: pinned.roles?.reviewer });
-  const host = jsonBytes(reviewer);
-  const configurationSha256 = hashBytes(host);
-  const roots = input.worksetRoots ?? [realpathSync(workspace)];
-  need(Array.isArray(roots) && roots.length > 0, "Expected approved OpenSpec workset roots");
-  const roles = validateRoleBindings({ schemaVersion: 1, roles: pinned.roles,
-    reviewerHost: { path: path.join(directory, "host.json"), sha256: configurationSha256 },
-    worksetRoots: roots.map(worksetRootIdentity) });
-  need(roots.every((root) => [directory, roles.roles.orchestrator.executable.path].every((file) => disjoint(root, file))),
-    "Pinned workset inputs overlap an approved root");
-  const mappings = Object.fromEntries(Object.entries(roles.roles).map(([role, binding]) =>
-    [role, role === "reviewer" && dedicated ? { blocker: grokTierBlocker } : binding && nativeRoleBinding(binding, role)]));
-  const opener = mappings.orchestrator;
-  need(opener.opener && !opener.blocker, opener.blocker ?? "Unsupported OpenSpec opener");
-  const roleBytes = jsonBytes(roles);
-  const snippet = { openers: { [opener.opener]: { style: "attach-dirs", attach_flag: "--add-dir", command: process.execPath,
-    args: [fileURLToPath(new URL("./setup.mjs", import.meta.url)), "--launch-opener", path.join(directory, "roles.json"),
-      hashBytes(roleBytes), ...opener.openerArgs, ...opener.args] } } };
-  const outputs = Object.entries({ "host.json": host, "roles.json": roleBytes, "openspec-openers.json": jsonBytes(snippet) })
-    .map(([name, bytes]) => {
-      const file = path.join(directory, name);
-      return { name, path: file, utf8: bytes.toString("utf8"), sha256: hashBytes(bytes), state: outputState(file, bytes) };
-    });
-  const details = { schemaVersion: 1, directory, identity, configurationSha256, outputs, ...(tier ? {
-    ...tierBinding,
-    qualification: dedicated ? { status: "unqualified", reason: grokTierBlocker } :
-      { status: "pending-exact-qualification", reason: "External setup does not qualify an exact runtime" },
-    exposure: dedicated ? "Dedicated auth state and qualified provider HTTPS" : "Zero worker-visible credentials and host relay only",
-    ...(dedicated ? { authIdentity } : {}),
-  } : {}),
-    mappingBlockers: { ...Object.fromEntries(Object.entries(mappings).filter(([, item]) => item?.blocker)
-      .map(([name, item]) => [name, item.blocker])),
-    ...(reviewer.roleBinding.client === piReviewer.client
-      ? { reviewer: "Pi requires matching offline controls and separately granted bounded live proof" }
-      : reviewer.roleBinding.client === "grok-build" ? { reviewer: dedicated ? grokTierBlocker : grokReviewerBlocker } : {}),
-    ...(roles.roles.helper ? { helper: "No verified effective binding adapter for optional AI invocation" } : {}) } };
-  return { ...details, confirmationSha256: hashBytes(jsonBytes(details)) };
+export function previewSetup(input, { workspace = process.cwd() } = {}) {
+  need(input?.schemaVersion === 2, "Expected a Direct-CLI setup request");
+  return previewDirectSetup(input, workspace);
 }
 
 export function applySetup(input, confirmationSha256, options = {}) {
   const preview = previewSetup(input, options);
   need(preview.confirmationSha256 === confirmationSha256, "Setup confirmation does not match the current preview");
-  const fd = openSync(preview.directory, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
-  const actual = fstatSync(fd);
+  const fd = process.platform === "win32" ? null : openSync(preview.directory,
+    constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
+  const actual = fd === null ? lstatSync(preview.directory) : fstatSync(fd);
   const results = [];
   try {
     need(actual.dev === preview.identity.device && actual.ino === preview.identity.inode &&
-      actual.uid === process.getuid() && !(actual.mode & 0o077), "Setup destination directory changed");
+      privatePath(preview.directory, actual), "Setup destination directory changed");
     for (const output of preview.outputs) {
-      const file = path.join("/proc/self/fd", String(fd), output.name);
+      const identity = directoryState(preview.directory, options.workspace ?? process.cwd());
+      need(identity.device === actual.dev && identity.inode === actual.ino, "Setup destination directory changed");
+      const file = process.platform === "linux" ? path.join("/proc/self/fd", String(fd), output.name) : output.path;
       const bytes = Buffer.from(output.utf8, "utf8");
       need(outputState(file, bytes) === output.state, "Setup destination changed: " + output.name);
       if (output.state === "absent") {
@@ -288,15 +180,14 @@ export function applySetup(input, confirmationSha256, options = {}) {
       need(outputState(file, bytes) === "matching", "Setup readback failed");
       results.at(-1).status = "verified";
     }
-    fsyncSync(fd);
+    if (fd !== null) fsyncSync(fd);
     const final = previewSetup(input, options);
-    need(JSON.stringify(final.authIdentity) === JSON.stringify(preview.authIdentity) &&
-      final.identity.device === actual.dev && final.identity.inode === actual.ino &&
+    need(final.identity.device === actual.dev && final.identity.inode === actual.ino &&
       final.outputs.every(({ state }) => state === "matching") && final.configurationSha256 === preview.configurationSha256,
     "Setup final directory, file bytes or configuration hash changed");
     return { status: "verified", configurationSha256: final.configurationSha256, outputs: results };
   } catch (error) {
     error.outputs = results;
     throw error;
-  } finally { closeSync(fd); }
+  } finally { if (fd !== null) closeSync(fd); }
 }

@@ -34,7 +34,7 @@ export async function schedulePackets(count, concurrency, clock, run) {
         events.push(["halt", packet]);
         stop.abort();
       };
-      const pending = Promise.resolve().then(() => run(packet, begin, halt)).then((passed) => {
+      const pending = Promise.resolve().then(() => run(packet, begin, halt, stop.signal)).then((passed) => {
         if (launched) events.push(["settle", packet]);
         if (!passed) stop.abort();
       }).catch((cause) => {

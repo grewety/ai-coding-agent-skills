@@ -55,14 +55,15 @@ const configurableBackends = "configurable-worker-and-reviewer-backends-01m8a1cf
 const testingOverhaul = "testing-overhaul-and-low-touch-friction-01m8b4nava84t4qbzm550nwy5n";
 const tier1Reviewer = "tier1-non-claude-contained-reviewer-01m8by1bvkhr053edzgtt5t0cm";
 const tieredContainment = "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb";
+const directCli = "direct-cli-reviewer-simplification-01m8deqc2446agfqswc0cb0gex";
 const currentSpecs = path.join(root, "openspec", "specs");
+const requirement = /^### Requirement: ([^\n]+)\n[\s\S]*?(?=^#{1,3} |(?![\s\S]))/gm;
 
 function readCapabilitySpec(specsRoot, capability) {
   return readFile(path.join(specsRoot, capability, "spec.md"), "utf8");
 }
 
 function withoutSupersededRequirements(delta, newerDelta, ...titles) {
-  const requirement = /^### Requirement: ([^\n]+)\n[\s\S]*?(?=^#{1,3} |(?![\s\S]))/gm;
   const modified = /^## MODIFIED Requirements\n([\s\S]*?)(?=^#{1,2} |(?![\s\S]))/m.exec(newerDelta);
   assert.ok(modified, "Expected a MODIFIED Requirements section in the superseding delta");
   const modifiedTitles = new Set(Array.from(modified[1].matchAll(requirement), ([, title]) => title));
@@ -73,6 +74,20 @@ function withoutSupersededRequirements(delta, newerDelta, ...titles) {
   const retained = delta.replace(requirement, (block, title) => remaining.delete(title) ? "" : block);
   assert.equal(remaining.size, 0, `Missing historical requirements: ${[...remaining].join(", ")}`);
   return retained;
+}
+
+async function checkHistoricalPromotion({ capability, delta, current, expected }) {
+  const successor = await readCapabilitySpec(await deltaDirectory(directCli), capability);
+  const superseded = new Set([...successor.matchAll(/^## (?:MODIFIED|REMOVED) Requirements\n([\s\S]*?)(?=^#{1,2} |(?![\s\S]))/gm)]
+    .flatMap(([, section]) => [...section.matchAll(requirement)].map(([, title]) => title)));
+  let replaced = 0;
+  const retained = delta.replace(requirement, (block, title) => {
+    if (!superseded.has(title)) return block;
+    replaced++;
+    return "";
+  });
+  const promoted = /^### Requirement: /m.test(retained) ? checkPromotion({ capability, delta: retained, current }) : 0;
+  assert.equal(promoted + replaced, expected, capability);
 }
 
 test("exclusive worker runtime requirements keep exact content until superseded by a current delta", async () => {
@@ -93,7 +108,7 @@ test("exclusive worker runtime requirements keep exact content until superseded 
       const newerDelta = await readCapabilitySpec(backendsRoot, capability);
       delta = withoutSupersededRequirements(delta, newerDelta, "Qualified paired worker bindings");
     }
-    assert.equal(checkPromotion({ capability, delta, current }), expected, capability);
+    await checkHistoricalPromotion({ capability, delta, current, expected });
   }
 });
 
@@ -115,7 +130,7 @@ test("low-touch delivery retains requirements until explicitly superseded, with 
       ? ["Bounded inter-packet pacing and private diagnostics"]
       : ["Immutable review identity", "Independent reviewer before merge",
         "Bounded paid contained-review authorization", "Standing zero-cost finish triggers"]));
-    assert.equal(checkPromotion({ capability, delta, current }), expected, capability);
+    await checkHistoricalPromotion({ capability, delta, current, expected });
   }
 });
 
@@ -142,7 +157,7 @@ test("configurable worker and reviewer backends retain exact requirements until 
       [delta] = tieredDelta.split("\n## ADDED Requirements\n", 1);
     }
     assert.ok(current.startsWith(header("spec", `capability: ${capability}\n`)));
-    assert.equal(checkPromotion({ capability, delta, current }), expected, capability);
+    await checkHistoricalPromotion({ capability, delta, current, expected });
   }
 });
 
@@ -162,7 +177,7 @@ test("Item 5.5 promotes every frozen requirement with its exact body and capabil
         "Tier 1 must preserve the entire Item 5.5 discovery requirement before its new scenarios");
       delta = delta.replace(original, () => extended);
     }
-    assert.equal(checkPromotion({ capability, delta, current }), expected, capability);
+    await checkHistoricalPromotion({ capability, delta, current, expected });
     assert.ok(current.startsWith(header("spec", `capability: ${capability}\n`)));
     assert.ok(Buffer.byteLength(current) <= 65536, `${capability} must fit the pinned review export`);
   }
@@ -175,7 +190,7 @@ test("Tier 1 reviewer promotes both frozen deltas exactly within the review expo
       readCapabilitySpec(deltaRoot, capability),
       readCapabilitySpec(currentSpecs, capability),
     ]);
-    assert.equal(checkPromotion({ capability, delta, current }), 1, capability);
+    await checkHistoricalPromotion({ capability, delta, current, expected: 1 });
     assert.ok(current.startsWith(header("spec", `capability: ${capability}\n`)));
     assert.ok(Buffer.byteLength(current) <= 65536, `${capability} must fit the pinned review export`);
   }
@@ -188,8 +203,19 @@ test("tiered containment promotes all three frozen deltas within the review expo
       readCapabilitySpec(deltaRoot, capability),
       readCapabilitySpec(currentSpecs, capability),
     ]);
-    assert.equal(checkPromotion({ capability, delta, current }), expected, capability);
+    await checkHistoricalPromotion({ capability, delta, current, expected });
     assert.ok(Buffer.byteLength(current) <= 65536, `${capability} must fit the pinned review export`);
+  }
+});
+
+test("Direct-CLI promotes each frozen requirement and keeps the integration export within its budget", async () => {
+  const deltaRoot = await deltaDirectory(directCli);
+  for (const [capability, expected] of [["contained-independent-review", 12], ["exclusive-worker-runtime", 2], ["openspec-integration", 11]]) {
+    const delta = await readCapabilitySpec(deltaRoot, capability);
+    const current = await readCapabilitySpec(currentSpecs, capability);
+    assert.equal(checkPromotion({ capability, delta, current }), expected, capability);
+    assert.ok(current.startsWith(header("spec", `capability: ${capability}\n`)));
+    assert.ok(Buffer.byteLength(current) <= (capability === "openspec-integration" ? 63488 : 65536), capability);
   }
 });
 async function fixture(t) {

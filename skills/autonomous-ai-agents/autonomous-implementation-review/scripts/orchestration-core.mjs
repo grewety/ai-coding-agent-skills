@@ -1,3 +1,4 @@
+import { directReviewClients } from "./agent-role-adapters.mjs";
 import { validatePlanningInputs } from "./planning-inventory.mjs";
 import { CANDIDATE_RECORDS, isRecordQualified } from "./terminal-adapters.mjs";
 // Pure packet/evidence checks plus re-exported adapter handoff/supervision helpers.
@@ -212,7 +213,10 @@ function validateFixed(r) {
   need(r?.schemaVersion === 1 && text(r.goal) && text(r.change) && r.passRule === 'charter-v1' && Number.isSafeInteger(r.budget) && r.budget > 0 && r.budget <= 3, 'Invalid fixed terms');
   need(r.charter && ['clauses', 'boundaries', 'tasks', 'gates'].every((k) => strings(r.charter[k])) && r.charter.clauses.length > 0, 'Invalid charter');
   const b = r.binding;
-  need(b && equal(Object.keys(b).sort(), ['client', 'independent', 'model', 'permissions', 'qualified', 'readOnly', 'route']) && b.route === 'terminal-adapter' && b.qualified === true && b.independent === true && b.readOnly === true && text(b.client) && isRecordQualified(CANDIDATE_RECORDS[b.client], b.client) && CANDIDATE_RECORDS[b.client].roles.includes('approach-reviewer') && text(b.model) && equal(b.permissions, ['read']), 'Unqualified review binding');
+  need(b && equal(Object.keys(b).sort(), ['client', 'independent', 'model', 'permissions', 'qualified', 'readOnly', 'route']) && b.qualified === true && b.independent === true && b.readOnly === true && text(b.client) &&
+    (b.route === 'direct-cli' && directReviewClients.includes(b.client) ||
+      b.route === 'terminal-adapter' && isRecordQualified(CANDIDATE_RECORDS[b.client], b.client) &&
+      CANDIDATE_RECORDS[b.client].roles.includes('approach-reviewer')) && text(b.model) && equal(b.permissions, ['read']), 'Unqualified review binding');
   need(Number.isSafeInteger(r.cumulativeCycles) && r.cumulativeCycles >= 0 && r.cumulativeCycles <= r.budget && Array.isArray(r.entries) && Array.isArray(r.ledger), 'Invalid continuity record');
 }
 export function startConvergenceReview({ change, goal, charter, binding, passRule, budget }) {

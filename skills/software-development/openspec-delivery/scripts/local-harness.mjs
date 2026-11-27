@@ -8,7 +8,7 @@ import { need, observed } from "./operator-records.mjs";
 import { checkHarnessExecutable, checkHarnessResult, validateHarnessBinding, verifyHarnessSeal } from "./harness-result.mjs";
 import { requireQualifiedPilot } from "./adapter-qualification.mjs";
 import { parseStrictJson } from "./agent-configuration.mjs";
-import { validatePilotHost } from "./agent-setup.mjs";
+import { validateDirectHost } from "./agent-role-adapters.mjs";
 
 const limit = 64 * 1024;
 function hostFile(ref, excluded) {
@@ -25,7 +25,8 @@ function hostFile(ref, excluded) {
 export function harnessConfiguration(hostConfiguration, excluded) {
   const host = parseStrictJson(hostFile(hostConfiguration, excluded));
   need([1, 2, 4].includes(host?.schemaVersion), "Unsupported host.json version");
-  if (host.schemaVersion !== 1) validatePilotHost(host);
+  if (host.schemaVersion === 3) validateDirectHost(host);
+  else need([1, 2, 4].includes(host.schemaVersion), "Unknown retained harness host schema");
   const binding = host.localHarness;
   if (binding !== undefined && binding !== null) validateHarnessBinding(binding);
   return binding ?? null;

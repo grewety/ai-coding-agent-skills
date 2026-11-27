@@ -12,7 +12,8 @@ import { observeImplementer, runImplementers, runtimeIdentity } from "../skills/
 import { readState } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-state.mjs";
 import { privateCheckoutIdentity } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/worker-runtime-policy.mjs";
 import { buildExport, jsonBytes, prepareExport } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-inputs.mjs";
-import { bubblewrapVersion, claudeVersion } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-runtime.mjs";
+const bubblewrapVersion = "0.9.0";
+const claudeVersion = "2.1.330";
 
 import { change, exec, gateArgv } from "./delivery-runtime-setup.mjs";
 
