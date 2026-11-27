@@ -548,7 +548,8 @@ async function deriveDirect(directory, request, expect, prepared, launches, sche
     }
     observations.push(reviewed);
     captures.push({ packet: index + 1, sha256: hash(stdout), bytes: stdout.length });
-    if (reviewed.failure) diagnostics.push({ packet: index + 1, classification: reviewed.failure });
+    if (reviewed.failure) diagnostics.push({ packet: index + 1, classification: reviewed.failure,
+      ...(reviewed.reason ? { reason: reviewed.reason } : {}) });
   }
   const failure = replayPacketSchedule(schedule, expect.runtime.packetConcurrency, observations, true);
   const phase = failure?.failure ?? (launches.length === prepared.manifest.packets.length ? "complete" : "incomplete-packets");

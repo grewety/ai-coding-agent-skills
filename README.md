@@ -776,7 +776,7 @@ its bundled content changes. See the [Claude release checks](docs/claude-install
 
 Current source versions are delivery 1.12.0 and its affected
 `openspec-development` plugin 1.12.0; `openspec-next` is 0.9.0 and
-`autonomous-orchestration` is 1.16.1 (core skill 0.26.1). Complete well-known output,
+`autonomous-orchestration` is 1.16.2 (core skill 0.26.2). Complete well-known output,
 skill ZIPs, workflow plugin ZIP and isolated native copies must retain all support
 files byte-for-byte, including delivery's runtime and evidence commands and next's
 read-only routing script and reference. Include `scripts/delegated-delivery.mjs`

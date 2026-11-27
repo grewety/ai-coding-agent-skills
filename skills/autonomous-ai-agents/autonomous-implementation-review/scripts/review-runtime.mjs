@@ -3,7 +3,7 @@ import path from "node:path";
 import { homedir, tmpdir, userInfo } from "node:os";
 import { installedReviewer, invocation, reviewerAuthVariable, reviewerEnvironmentRoots, reviewerHelp,
   reviewerMetadataEnvironment, reviewerProvider } from "./review-direct-adapters.mjs";
-import { packetIdentity, sanitizeNative } from "./review-direct-receipt.mjs";
+import { classifyNativeOutputError, packetIdentity, sanitizeNative } from "./review-direct-receipt.mjs";
 import { observeSupervisor, reviewBackends, superviseReview, supervisorCommand, unavailableProcess } from "./review-direct-supervisor.mjs";
 import { observeWorktree } from "./review-direct-worktree.mjs";
 import { checkExport, equal, fileLimit, hash, jsonBytes, need, separate } from "./review-inputs.mjs";
@@ -190,8 +190,9 @@ export async function runDirectPacket({ request, expect, prepared, config, execu
               .filter(([key, value]) => /KEY|TOKEN|CREDENTIAL/.test(key) && value.length >= 8).map(([, value]) => value)];
             stdout = sanitizeNative({ stdout: proc.stdout, format: command.format, cwd, files, redactions,
               launch, maxBudgetUsd: config.maxBudgetUsd });
-          } catch {
+          } catch (error) {
             launch.diagnostic = "invalid-native-output";
+            launch.diagnosticReason = classifyNativeOutputError(error);
           }
         }
       }
@@ -214,6 +215,7 @@ export async function runDirectPacket({ request, expect, prepared, config, execu
       } catch { /* Preserve the failed disposition. */ }
       if (!launch.before || !launch.after || !equal(launch.before, launch.after) || !launch.exportAfter || !launch.copyAfter) {
         launch.diagnostic = "integrity-failed";
+        delete launch.diagnosticReason;
         stdout = Buffer.alloc(0);
       }
     }

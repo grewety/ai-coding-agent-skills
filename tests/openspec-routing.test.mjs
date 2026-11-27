@@ -80,7 +80,7 @@ test("capability-wireframes uses stable keys and change-owned proposals", async 
 
 test("autonomous-implementation-review bounds orchestration to one change and supported hosts", async () => {
   const source = await read(`${entry.orchestration}SKILL.md`);
-  assert.match(source, /^version: 0\.26\.1$/m);
+  assert.match(source, /^version: 0\.26\.2$/m);
   assert.match(source, /A planning-only request stops after proposal\/spec\/design\/tasks/);
   assert.match(source, /qualified terminal adapter/);
   assert.match(source, /resolveLegacyRouteRequest/);
