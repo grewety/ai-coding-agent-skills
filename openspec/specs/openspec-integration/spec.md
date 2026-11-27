@@ -22,6 +22,15 @@ SHALL NOT create a second CAP/CHG task tracker or infer authority from installat
 - **WHEN** the operator approves only planning
 - **THEN** no executor, Git publication, integration or task execution is authorized
 
+#### Scenario: Authorized short proposal setup
+- **WHEN** an authorized short proposal proceeds to scaffolding
+- **THEN** prepare the isolated workspace before scaffolding
+- **AND** allow a plan-only commit only within the limits of the selected proposal policy
+
+#### Scenario: Implementation and publication authority
+- **WHEN** a proposal is ready for implementation or publication
+- **THEN** check separate authority for implementation and for publication before proceeding with either action
+
 ### Requirement: Immutable review identity
 
 The guard SHALL bind approval to committed Task-Guided planning content or an immutable Goal-First contract and bind result review to the exact reviewed candidate in both modes. Finish admission SHALL use an explicitly scoped verified task-completion or post-review PR-fix lineage proof when applicable.
@@ -92,13 +101,22 @@ Installation and metadata migration SHALL NOT grant issue-write authority.
 - **WHEN** the operator sends the documentation prompt
 - **THEN** the issue records impact and authorization fields, and does not copy `tasks.md`
 
+#### Scenario: Proposal issue content
+- **WHEN** creating or updating the proposal issue
+- **THEN** record request, blast radius, risk and authority
+- **AND** exclude prospective review, merge and closure evidence and keep the issue editable
+
+#### Scenario: Retained approval
+- **WHEN** binding approval for a documented proposal
+- **THEN** bind approval to the retained revisions
+
 ### Requirement: Change name is the identity
 
 The full name identifies paths, issues, PRs and evidence. Adopters SHALL generate `<slug>-<lowercase-ulid>` once, use `change/<full-name>` through review and preserve existing names. A proposal explicitly supplied with a valid new pre-minted full name SHALL verify identity and absence of a conflict and reuse it verbatim.
 
 #### Scenario: Short proposal
 - **WHEN** a short proposal starts with a slug
-- **THEN** generate the suffix before scaffolding without prompting. Naming grants no writes. The selected proposal policy supplies the authorized setup and planning boundary. Prepare the isolated workspace before scaffolding. Implementation and publication require separate authority, and any plan-only commit follows the selected proposal policy.
+- **THEN** generate the suffix before scaffolding without prompting. Naming grants no writes. The selected proposal policy supplies the authorized setup and planning boundary.
 
 #### Scenario: Authorized proposal from a pre-minted brief
 - **WHEN** a proposal explicitly supplies the new full name from a verified Change Brief
@@ -123,7 +141,7 @@ The full name identifies paths, issues, PRs and evidence. Adopters SHALL generat
 
 #### Scenario: Proposal issue
 - **WHEN** documenting the proposal
-- **THEN** use the same full name as the stable issue reference and avoid moving active or guessed archive links. Record request, blast radius, risk and authority. Exclude prospective review, merge and closure evidence. Bind approval to retained revisions and keep the issue editable.
+- **THEN** use the same full name as the stable issue reference and avoid moving active or guessed archive links.
 
 ### Requirement: Independent reviewer before merge
 
