@@ -196,12 +196,17 @@ function pinTierInputs(input, tier, excluded) {
   fields(runtime, ["node", "libraries", ...(dedicated ? [] : ["relayConfiguration"])],
     input.roles.reviewer.client === piReviewer.client ? ["piRelease"] : [], "tier runtime");
   need(Array.isArray(runtime.libraries) && runtime.libraries.length <= 64, "Invalid reviewer library pins");
+  const relayConfiguration = dedicated ? null : validatePin(runtime.relayConfiguration);
+  if (relayConfiguration) {
+    need(trustedHostPath(relayConfiguration.path) === relayConfiguration.path, "Untrusted relay configuration path");
+    inspectPinnedFile(relayConfiguration, { excluded });
+  }
   const roles = Object.fromEntries(Object.entries(input.roles).map(([name, role]) => [name, role && {
     ...role, executable: safePin(role.executable, { executable: true }),
   }]));
   return { roles, reviewer: { ...reviewer, runtime: {
     ...runtime, node: safePin(runtime.node, { executable: true }),
-    ...(!dedicated ? { relayConfiguration: validatePin(runtime.relayConfiguration) } : {}),
+    ...(relayConfiguration ? { relayConfiguration } : {}),
     libraries: runtime.libraries.map(({ target, ...pin }) => ({ ...safePin(pin, { runtime: true }), target })),
   }, bubblewrap: { ...reviewer.bubblewrap, executable: safePin(reviewer.bubblewrap.executable, { executable: true }) } } };
 }

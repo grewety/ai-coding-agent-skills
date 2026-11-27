@@ -274,22 +274,30 @@ test("setup allows a distinct XDG application directory and refuses a live profi
   assert.deepEqual(readdirSync(separate), []);
 });
 
+function tierARequest(input, command, relayConfiguration) {
+  const { timeoutMs, ...reviewer } = input.reviewer;
+  return { ...input, reviewer: { ...reviewer, runtime: { node: { path: command }, libraries: [], relayConfiguration } } };
+}
+
 test("explicit tier setup previews exact bytes, binds confirmation and refuses unsafe dedicated auth", (t) => {
   const { input, workspace, root, command, executable } = fixture(t);
   const relay = path.join(root, "relay.json");
-  const relayBytes = Buffer.from("{}\n");
+  const relayBytes = '{"keyFile":"/synthetic/relay-fixture-key"}\n';
   writeFileSync(relay, relayBytes, { mode: 0o600 });
-  const { timeoutMs, ...choices } = input.reviewer;
-  input.reviewer = { ...choices, runtime: { node: { path: command }, libraries: [],
-    relayConfiguration: { path: relay, sha256: hashBytes(relayBytes) } } };
-  const a = previewSetup(input, { workspace, tier: "a" });
+  const relayConfiguration = { path: relay, sha256: hashBytes(relayBytes) };
+  const request = tierARequest(input, command, relayConfiguration);
+  const a = previewSetup(request, { workspace, tier: "a" });
   assert.deepEqual(readdirSync(input.directory), []);
   const host = JSON.parse(a.outputs[0].utf8);
   assert.equal(host.timeoutMs, 300000);
   assert.deepEqual(host.runtime.node, executable);
+  assert.deepEqual(host.runtime.relayConfiguration, relayConfiguration);
+  assert.doesNotMatch(JSON.stringify(a), /relay-fixture-key/);
   assert.equal(a.configurationSha256, hashBytes(a.outputs[0].utf8));
-  assert.throws(() => applySetup(input, "0".repeat(64), { workspace, tier: "a" }), /confirmation/);
-  assert.equal(applySetup(input, a.confirmationSha256, { workspace, tier: "a" }).status, "verified");
+  assert.throws(() => applySetup(request, "0".repeat(64), { workspace, tier: "a" }), /confirmation/);
+  const confirmed = applySetup(request, a.confirmationSha256, { workspace, tier: "a" });
+  assert.equal(confirmed.status, "verified");
+  assert.doesNotMatch(JSON.stringify(confirmed), /relay-fixture-key/);
 
   const directory = path.join(root, "tier-b");
   const authDirectory = path.join(root, "fixture-auth");
@@ -297,7 +305,7 @@ test("explicit tier setup previews exact bytes, binds confirmation and refuses u
   mkdirSync(authDirectory, { mode: 0o700 });
   const auth = path.join(authDirectory, "auth.json");
   writeFileSync(auth, "benign-fixture-only", { mode: 0o600 });
-  const { relay: unusedRelay, ...dedicated } = choices;
+  const { relay: unusedRelay, timeoutMs, ...dedicated } = input.reviewer;
   input.directory = directory;
   input.reviewer = { ...dedicated, authDirectory, runtime: { node: executable, libraries: [] } };
   input.roles.reviewer = { ...input.roles.reviewer, client: "grok-build", model: "grok-4.7", provider: "xai-oauth",
@@ -308,4 +316,49 @@ test("explicit tier setup previews exact bytes, binds confirmation and refuses u
   assert.deepEqual(readdirSync(directory), []);
   chmodSync(auth, 0o640);
   assert.throws(() => previewSetup(input, { workspace, tier: "b" }), /Unsafe dedicated auth/);
+});
+
+test("Tier A setup refuses absent, untrusted, or inexact relay pins before writing", (t) => {
+  const { input, workspace, root, command } = fixture(t);
+  const relay = path.join(root, "relay.json");
+  const bytes = "{}\n";
+  writeFileSync(relay, bytes, { mode: 0o600 });
+  const pin = { path: relay, sha256: hashBytes(bytes) };
+  const options = { workspace, tier: "a" };
+  const preview = previewSetup(tierARequest(input, command, pin), options);
+  const shared = path.join(root, "shared");
+  const relayDirectory = path.join(shared, "relay");
+  mkdirSync(relayDirectory, { recursive: true, mode: 0o700 });
+  chmodSync(shared, 0o770);
+  const untrustedRelay = path.join(relayDirectory, "relay.json");
+  writeFileSync(untrustedRelay, bytes, { mode: 0o600 });
+  const directoryPin = path.join(root, "host-relay-directory");
+  mkdirSync(directoryPin, { mode: 0o700 });
+
+  for (const [invalid, error] of [
+    [{ ...pin, path: path.join(root, "missing-relay.json") }, /Untrusted relay configuration path/],
+    [{ ...pin, path: directoryPin }, /Untrusted pinned file/],
+    [{ ...pin, path: untrustedRelay }, /Untrusted relay configuration path/],
+    [{ path: relay }, /file pin/],
+    [{ ...pin, sha256: "0".repeat(64) }, /SHA-256 pin mismatch/],
+  ]) {
+    const request = tierARequest(input, command, invalid);
+    assert.throws(() => previewSetup(request, options), error);
+    assert.throws(() => applySetup(request, preview.confirmationSha256, options), error);
+    assert.deepEqual(readdirSync(input.directory), []);
+  }
+});
+
+test("Tier A confirmation refuses relay contents changed after preview without writing", (t) => {
+  const { input, workspace, root, command } = fixture(t);
+  const relay = path.join(root, "relay.json");
+  const bytes = '{"fixture":1}\n';
+  writeFileSync(relay, bytes, { mode: 0o600 });
+  const request = tierARequest(input, command, { path: relay, sha256: hashBytes(bytes) });
+  const options = { workspace, tier: "a" };
+  const preview = previewSetup(request, options);
+
+  writeFileSync(relay, '{"fixture":2}\n');
+  assert.throws(() => applySetup(request, preview.confirmationSha256, options), /SHA-256 pin mismatch/);
+  assert.deepEqual(readdirSync(input.directory), []);
 });
