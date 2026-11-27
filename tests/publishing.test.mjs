@@ -26,6 +26,11 @@ test("Pages artifact includes the hidden endpoint and Claude downloads", async (
   assert.match(inventory, /\.well-known\/skills\/index\.json/);
   assert.match(inventory, /downloads\/openspec-development\.plugin\.zip/);
   assert.match(inventory, /downloads\/autonomous-orchestration\.plugin\.zip/);
+  assert.match(inventory, /downloads\/delivery-operations\.plugin\.zip/);
+  assert.match(inventory, /downloads\/release-train-supervisor\.zip/);
+  assert.match(inventory, /downloads\/wiki-delivery-sync\.zip/);
+  assert.match(inventory, /\.well-known\/skills\/release-train-supervisor\/references\/herdr\.md/);
+  assert.match(inventory, /\.well-known\/skills\/wiki-delivery-sync\/references\/closeout\.md/);
   assert.match(inventory, /downloads\/openspec-delivery\.zip/);
   assert.match(inventory, /downloads\/index\.html/);
   assert.match(inventory, /(?:^|\/)downloads\/index\.json$/m);

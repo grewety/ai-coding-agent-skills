@@ -13,7 +13,15 @@ const expectedSkillNames = [
   "git-commit-message",
   "openspec-delivery",
   "openspec-next",
+  "release-train-supervisor",
+  "wiki-delivery-sync",
 ];
+
+const categoryBySkillName = {
+  "autonomous-implementation-review": "autonomous-ai-agents",
+  "release-train-supervisor": "delivery-operations",
+  "wiki-delivery-sync": "delivery-operations",
+};
 
 function frontmatterField(source, name) {
   return source.match(new RegExp(`^${name}:\\s*(.+)$`, "m"))?.[1]?.trim() ?? null;
@@ -42,7 +50,7 @@ test("well-known build publishes every skill and all advertised files", async ()
       const source = await readFile(path.join(endpoint, skill.name, "SKILL.md"), "utf8");
       assert.equal(frontmatterField(source, "name"), skill.name);
       assert.equal(frontmatterField(source, "description"), skill.description);
-      const category = skill.name === "autonomous-implementation-review" ? "autonomous-ai-agents" : "software-development";
+      const category = categoryBySkillName[skill.name] ?? "software-development";
       for (const file of skill.files) {
         assert.deepEqual(await readFile(path.join(endpoint, skill.name, file)), await readFile(path.join(root, "skills", category, skill.name, file)));
       }
@@ -50,6 +58,31 @@ test("well-known build publishes every skill and all advertised files", async ()
 
     const next = index.skills.find(({ name }) => name === "openspec-next");
     assert.deepEqual([...next.files].sort(), ["SKILL.md", "references/routing.md", "scripts/next.mjs"]);
+
+    const supervisor = index.skills.find(({ name }) => name === "release-train-supervisor");
+    assert.deepEqual([...supervisor.files].sort(), [
+      "SKILL.md",
+      "references/herdr.md",
+      "templates/decision-card.md",
+      "templates/hot.md",
+      "templates/state.md",
+    ]);
+
+    const wiki = index.skills.find(({ name }) => name === "wiki-delivery-sync");
+    assert.deepEqual([...wiki.files].sort(), [
+      "SKILL.md",
+      "references/closeout.md",
+      "templates/change-brief.md",
+      "templates/decisions.md",
+      "templates/hot.md",
+      "templates/project-index.md",
+      "templates/release-train.md",
+      "templates/repository-agents.md",
+      "templates/repository-local.md",
+      "templates/shipped.md",
+      "templates/vault-agents.md",
+      "templates/vault-local.md",
+    ]);
 
     const autonomous = index.skills.find((skill) => skill.name === "autonomous-implementation-review");
     const contract = await readFile(path.join(root, "skills/autonomous-ai-agents/AGENTS.md"), "utf8");

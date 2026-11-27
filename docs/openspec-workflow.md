@@ -396,6 +396,13 @@ ULID for those actions. Collaborators on one change share its identity and
 coordinate writers; independently created changes receive different identities.
 Existing change names and branches remain unchanged; no bulk rename is required.
 
+For an authorized proposal from a verified [Change Brief](delivery-operations.md),
+accept the explicit full name, verify its lowercase ULID and matching filename
+and metadata, and inspect active and dated archive inventories for conflicts.
+Use the full name unchanged for workspace, branch, native change, and authorized
+proposal-time issue. Stop on a mismatch. Read back the actual proposal and issue
+before binding the wiki link.
+
 On resume, use an explicitly selected existing change or verified current change
 context. A short slug resolves only if unambiguous. If multiple packages match,
 show their full names and proposal summaries and ask the operator to select one.
@@ -814,14 +821,21 @@ and independent verification of preserved, in-scope progress.
 | --- | --- |
 | `openspec-development` | `/openspec-delivery`, `/openspec-next`, `/git-commit-message`, `/capability-wireframes` |
 | `autonomous-orchestration` | `/autonomous-implementation-review` |
+| `delivery-operations` | `release-train-supervisor`, `wiki-delivery-sync` |
 
 Orchestration is optional. It requires the workflow plugin, explicit role and
 model configuration, and a supported host. Package installation does not create
 those roles.
 
+[Delivery operations](delivery-operations.md) is a separate opt-in for authorized
+Supervisor handoff and evidence-bound Markdown wiki maintenance. It adds no
+OpenSpec workflow or orchestration prerequisite. Tasks and delivery evidence
+stay with native OpenSpec.
+
 Current source versions are delivery 1.12.0 and `openspec-next` 0.9.0 in
 `openspec-development` 1.12.0, and core skill 0.26.6 in
-`autonomous-orchestration` 1.16.6.
+`autonomous-orchestration` 1.16.6. The `delivery-operations` bundle and both of
+its skills are 1.0.0.
 Representation support adds no upstream workflow, runtime dependency or
 installation route. Package availability/byte checks do not establish account
 sync, host execution, native client discovery, Desktop acceptance or scanner approval.
@@ -870,7 +884,7 @@ on native Linux, macOS and Windows and retain each platform's actual command/res
 WSL is Linux evidence, not native Windows evidence; case simulations and scratch
 plugin validation are supplementary. Missing native results block hardening
 completion. Require the unchanged trusted scanner's negative controls and safe
-community verdicts for all five complete packages, followed by independent review
+community verdicts for all seven complete packages, followed by independent review
 of the exact candidate. Do not replace retained failures with prototype results.
 
 ## References

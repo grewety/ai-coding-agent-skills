@@ -15,6 +15,7 @@ Portable engineering workflows for AI coding agents that use OpenSpec. This repo
 | [Claude installation](docs/claude-installation.md) | Native marketplace, ZIP installation and host checks. |
 | [Direct-CLI independent review](docs/claude-reviewer.md) | Native review through supported installed CLI clients, with offline packet preparation and receipt verification. |
 | [Exclusive worker runtime](docs/worker-runtime.md) | Qualified worker setup, role bindings and recovery. |
+| [Delivery operations](docs/delivery-operations.md) | Optional release-train dispatch, one-shot monitoring, and Markdown wiki coordination. |
 | [OpenSpec metadata](docs/openspec-metadata.md) | Native identity, issue links, validation and vault views. |
 
 ## SDLC
@@ -27,7 +28,7 @@ Before using the workflow, follow [Install the upstream OpenSpec prerequisites](
 CLI **2.1.1** (the npm package requires Node **22.20.0+**), Git, and **seven required upstream workflow skills**,
 including advisory verification. The guide separates Hermes profile enablement,
 Claude account uploads versus Code execution, and Codex user-global setup.
-The five packages below are companions, not a replacement for those prerequisites.
+The five packages below complement those prerequisites. The separate [delivery operations](docs/delivery-operations.md) packages are optional and add no workflow prerequisites.
 
 | Skill | What it adds |
 | --- | --- |
@@ -103,6 +104,8 @@ Companion installation: [Claude Desktop (no terminal)](#install-with-claude-desk
 | [git-commit-message](skills/software-development/git-commit-message/SKILL.md) | Dependency-aware logical Git batches, a preview before apply (or autonomous execution), and tiered Conventional Commit messages. |
 | [capability-wireframes](skills/software-development/capability-wireframes/SKILL.md) | Stable HTML/PNG visual handoff for a human-facing surface. |
 | [autonomous-implementation-review](skills/autonomous-ai-agents/autonomous-implementation-review/SKILL.md) | Bounded implementation and independent review loop. |
+| [release-train-supervisor](skills/delivery-operations/release-train-supervisor/SKILL.md) | Authorized Driver dispatch, one-shot monitoring and exact handoff. |
+| [wiki-delivery-sync](skills/delivery-operations/wiki-delivery-sync/SKILL.md) | Portable vault, Change Brief identity and verified release history. |
 
 ## Install with Claude Desktop
 
@@ -116,8 +119,10 @@ or hidden-folder copying is needed for installation.
 
 This installs delivery, next-step execution, commits and wireframes. It does not install OpenSpec
 or its CLI. **autonomous-orchestration** is a separate optional plugin: review it
-and its host/role prerequisites before adding it. Neither plugin installs
-execution roles, transfers another project's records, or changes permissions.
+and its host/role prerequisites before adding it. Choose **delivery-operations**
+separately for `release-train-supervisor` and `wiki-delivery-sync`. The
+[operations guide](docs/delivery-operations.md) covers adoption and host verification.
+Plugin installation does not create execution roles, transfer project records, or change permissions.
 
 Prefer a file upload? The [download page](https://grewety.github.io/ai-coding-agent-skills/downloads/index.html)
 offers ready-made plugin ZIPs and individual skill ZIPs. Upload a plugin with
@@ -178,6 +183,14 @@ four-package example does not establish scanner approval for it:
 
 ```sh
 hermes -p hermes-dev skills install "well-known:https://grewety.github.io/ai-coding-agent-skills/.well-known/skills/autonomous-implementation-review" --category autonomous-ai-agents
+```
+
+For individually selected operations packages, use the regular scanner-backed
+install route after reviewing the [operations guide](docs/delivery-operations.md):
+
+```sh
+hermes -p hermes-dev skills install "well-known:https://grewety.github.io/ai-coding-agent-skills/.well-known/skills/release-train-supervisor" --category delivery-operations
+hermes -p hermes-dev skills install "well-known:https://grewety.github.io/ai-coding-agent-skills/.well-known/skills/wiki-delivery-sync" --category delivery-operations
 ```
 
 The commands use the published endpoint, not this checkout:
@@ -249,12 +262,16 @@ scratch runs covering both families, supply both home roots.
 #### Install or refresh local packages
 
 For a reviewed checkout on the local machine, the repository script copies all
-five complete packages to the default profile, every recognized named profile,
-and detected user-global Claude Code/Codex targets:
+seven complete packages to the default profile, every recognized named profile,
+and detected user-global Claude Code/Codex targets. This bulk install includes
+both operations skills.
 
 ```sh
 npm run install:local
 ```
+
+For targeted installation of an operations skill, see the
+[individual ZIP and native copy routes](docs/delivery-operations.md#install-and-verify).
 
 To limit the copy to named profiles, repeat `--profile`; `default` names the
 base `~/.hermes` profile explicitly:
@@ -553,7 +570,7 @@ git clone https://github.com/grewety/ai-coding-agent-skills.git ai-coding-agent-
 ```
 
 After review, from the directory containing that checkout, define this helper in
-the same shell used for the agent-specific commands below. It copies all five
+the same shell used for the agent-specific commands below. It copies all seven
 package directories, preflights all name collisions, and never overwrites local
 edits.
 
@@ -563,7 +580,7 @@ skills_source="$PWD/ai-coding-agent-skills-review/skills"
 install_reviewed_skills() (
   set -eu
   destination="$1"
-  for package in autonomous-ai-agents/autonomous-implementation-review software-development/capability-wireframes software-development/git-commit-message software-development/openspec-delivery software-development/openspec-next; do
+  for package in autonomous-ai-agents/autonomous-implementation-review delivery-operations/release-train-supervisor delivery-operations/wiki-delivery-sync software-development/capability-wireframes software-development/git-commit-message software-development/openspec-delivery software-development/openspec-next; do
     skill="${package##*/}"
     test -f "$skills_source/$package/SKILL.md"
     if [ -e "$destination/$skill" ] || [ -L "$destination/$skill" ]; then
@@ -572,7 +589,7 @@ install_reviewed_skills() (
     fi
   done
   mkdir -p "$destination"
-  for package in autonomous-ai-agents/autonomous-implementation-review software-development/capability-wireframes software-development/git-commit-message software-development/openspec-delivery software-development/openspec-next; do
+  for package in autonomous-ai-agents/autonomous-implementation-review delivery-operations/release-train-supervisor delivery-operations/wiki-delivery-sync software-development/capability-wireframes software-development/git-commit-message software-development/openspec-delivery software-development/openspec-next; do
     skill="${package##*/}"
     cp -R "$skills_source/$package" "$destination/$skill"
   done
@@ -721,7 +738,7 @@ The verified SkillsLLM site is `https://skillsllm.com`. Its
 [submission page](https://skillsllm.com/submit) requires GitHub OAuth:
 
 1. Sign in as the operator and submit `https://github.com/grewety/ai-coding-agent-skills`.
-2. Describe it as a collection of **five** categorized Agent Skills packages and
+2. Describe it as a collection of **seven** categorized Agent Skills packages and
    retain the README's installation and security boundaries.
 3. Confirm the platform accepts the collection layout, wait for its scanning and
    catalog policy checks, and read back the resulting listing before claiming success.
@@ -767,16 +784,18 @@ npm run build
 
 Canonical source is `skills/<category>/<name>/`. `dist/` is generated and ignored. The generator emits the complete `.well-known/skills/` inventory, with an explicit file list for each package.
 
-The same build emits `dist/downloads/`: five complete skill ZIPs, two plugin ZIPs,
+The same build emits `dist/downloads/`: seven complete skill ZIPs, three plugin ZIPs,
 an HTML download page, and a JSON inventory with SHA-256 checksums. The checked-in
 `.claude-plugin/marketplace.json` selects canonical source packages directly;
 no generated skill copies are committed. Its explicit skill lists separate the
-OpenSpec companion workflow from opt-in orchestration. Bump every affected plugin's version when
-its bundled content changes. See the [Claude release checks](docs/claude-installation.md#maintainer-verification).
+OpenSpec companion workflow from the opt-in orchestration and delivery operations
+bundles. Bump every affected plugin's version when its bundled content changes.
+See the [Claude release checks](docs/claude-installation.md#maintainer-verification).
 
 Current source versions are delivery 1.12.0 and its affected
 `openspec-development` plugin 1.12.0; `openspec-next` is 0.9.0 and
-`autonomous-orchestration` is 1.16.6 (core skill 0.26.6). Complete well-known output,
+`autonomous-orchestration` is 1.16.6 (core skill 0.26.6). The `delivery-operations`
+bundle and its two skills are 1.0.0. Complete well-known output,
 skill ZIPs, workflow plugin ZIP and isolated native copies must retain all support
 files byte-for-byte, including delivery's runtime and evidence commands and next's
 read-only routing script and reference. Include `scripts/delegated-delivery.mjs`

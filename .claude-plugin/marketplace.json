@@ -3,7 +3,7 @@
   "owner": {
     "name": "Raphael (forgegod)"
   },
-  "description": "OpenSpec companion skills. Orchestration is a separate operator-reviewed option.",
+  "description": "OpenSpec companion skills with separate opt-in orchestration and delivery operations bundles.",
   "plugins": [
     {
       "name": "openspec-development",
@@ -26,6 +26,17 @@
       "strict": false,
       "skills": [
         "./skills/autonomous-ai-agents/autonomous-implementation-review"
+      ]
+    },
+    {
+      "name": "delivery-operations",
+      "version": "1.0.0",
+      "description": "Optional release-train supervision and evidence-bound Markdown wiki coordination for adopting projects.",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./skills/delivery-operations/release-train-supervisor",
+        "./skills/delivery-operations/wiki-delivery-sync"
       ]
     }
   ]

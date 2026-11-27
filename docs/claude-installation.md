@@ -6,7 +6,7 @@ All packages are community-maintained, not official Anthropic skills. Native
 installation does not provide Hermes scanner approval. Review instructions and
 scripts before enabling; do not use another client to evade an unresolved security finding.
 
-This guide installs our five companion packages, not upstream OpenSpec. Complete
+This guide covers seven packages from this catalog. Before running the OpenSpec workflow, complete
 the [separate OpenSpec prerequisite setup](openspec-installation.md) for CLI
 2.1.1, Node 22.20.0+ for the OpenSpec npm package, Git and the seven required
 upstream workflows. Its
@@ -30,7 +30,9 @@ and `capability-wireframes`. It does not install OpenSpec or its CLI and does no
 transfer another project's records. The separate **autonomous-orchestration**
 plugin adds `autonomous-implementation-review` only. It requires
 `openspec-development` and separately configured roles; those prerequisites are
-not installed automatically.
+not installed automatically. Select **delivery-operations** separately for
+`release-train-supervisor` and `wiki-delivery-sync`. Those playbooks use the
+[adopting project policy and verified host routes](delivery-operations.md).
 No agents, hooks, MCP servers, or permission changes are installed by any plugin.
 The bundled role templates remain inert support files.
 
@@ -48,8 +50,10 @@ and [plugin availability](https://support.claude.com/en/articles/13837440-use-pl
 3. In Claude, select **Customize → Plugins → Add → Upload plugin** and choose the ZIP.
 4. Review the installed plugin and check its skill inventory.
 
-The optional `autonomous-orchestration.plugin.zip` uses the same route but needs
-separate review.
+The optional `autonomous-orchestration.plugin.zip` and
+`delivery-operations.plugin.zip` use the same route. Review and enable each
+separately. For only one operations skill, choose `release-train-supervisor.zip`
+or `wiki-delivery-sync.zip` through the individual upload route.
 Plugin ZIPs contain `.claude-plugin/plugin.json`, a standalone README and license,
 and complete `skills/<name>/` directories. Do not unzip before uploading, and do
 not upload GitHub's whole-repository ZIP.
@@ -80,6 +84,10 @@ loaded something. The workflow plugin should list exactly
 `openspec-delivery`, `openspec-next`, `git-commit-message`, and `capability-wireframes`,
 and not `autonomous-implementation-review`.
 The optional orchestration plugin should list only that latter skill.
+The optional delivery operations plugin should list only `release-train-supervisor`
+and `wiki-delivery-sync`. For execution, check that the selected host has the
+required read/write scope, terminal and one-shot monitoring capabilities for
+supervision, and the trusted naming helper for new wiki briefs.
 
 | Claude Code installation | Read-only inspect | Bounded local delivery |
 | --- | --- | --- |
@@ -157,15 +165,15 @@ and [manage skills](https://support.claude.com/en/articles/12512180-use-skills-i
 
 `npm test` and `npm run build` validate the repository catalog and produce:
 
-- Five individual ZIPs, each preserving every canonical package file byte-for-byte.
-- Two plugin ZIPs, with the OpenSpec companion skills separated from opt-in orchestration.
+- Seven individual ZIPs, each preserving every canonical package file byte-for-byte.
+- Three plugin ZIPs for OpenSpec companions, opt-in orchestration and opt-in delivery operations.
 - `dist/downloads/index.html` and `index.json`, including SHA-256 checksums.
 - The unchanged-format Hermes `.well-known/skills/` endpoint.
 
 `.claude-plugin/marketplace.json` is the checked-in source catalog. Its root-source,
 explicit-skill-list layout follows [Anthropic's own skills marketplace](https://github.com/anthropics/skills/blob/main/.claude-plugin/marketplace.json).
 There is deliberately no root `.claude-plugin/plugin.json`: that would conflict
-with the two entry-defined plugins. ZIP wrappers are generated from the same
+with the three entry-defined plugins. ZIP wrappers are generated from the same
 catalog and canonical files; generated output stays untracked. The Git marketplace
 uses a repository checkout, while ZIP exports contain only allowlisted package
 files plus their generated plugin metadata, README, and license.
@@ -186,7 +194,7 @@ capture and offline readback. Keep next's `references/routing.md` and
 `scripts/next.mjs` with that skill. If direct packages load from different scopes,
 use the router's explicit trusted runtime path. The optional
 `autonomous-orchestration` is 1.16.6 (core skill 0.26.6) and `openspec-next` is 0.9.0. These
-source versions do not assert that the public marketplace/downloads are updated.
+source versions, including `delivery-operations` 1.0.0 and both of its skills at 1.0.0, do not assert that the public marketplace/downloads are updated.
 Preserve delivery's policy/task-authoring references and `delivery-policy.mjs`,
 and orchestration's `references/portable-core.md`, `scripts/orchestration-core.mjs`,
 `references/worker-handoff.md`, `scripts/worker-handoff.mjs`,

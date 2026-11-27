@@ -88,7 +88,7 @@ test("CLI home-root isolation applies to --all and explicit selectors opt in to 
     const output = execFixtureSync(process.execPath, [script, ...args, "--dry-run"], {
       cwd: f.root, encoding: "utf8", env: { ...process.env, HOME: f.ambientHome, USERPROFILE: f.ambientHome },
     });
-    assert.deepEqual([...output.matchAll(/Would install 5 skill packages into ([\w-]+)\./g)].map((match) => match[1]), expected);
+    assert.deepEqual([...output.matchAll(/Would install 7 skill packages into ([\w-]+)\./g)].map((match) => match[1]), expected);
   });
 });
 
@@ -365,8 +365,8 @@ test("CLI accepts repeated --profile arguments and reports a dry run", async (t)
     { cwd: f.root, encoding: "utf8" },
   );
 
-  assert.match(output, /Would install 5 skill packages into default\./);
-  assert.match(output, /Would install 5 skill packages into named\./);
+  assert.match(output, /Would install 7 skill packages into default\./);
+  assert.match(output, /Would install 7 skill packages into named\./);
   await assert.rejects(stat(path.join(f.hermesHome, "profiles", "named", "skills", "software-development", "demo")));
 });
 
@@ -379,7 +379,7 @@ test("CLI installs only a selected detected native client", async (t) => {
     { cwd: f.root, encoding: "utf8" },
   );
 
-  assert.match(output, /Would install 5 skill packages into codex\./);
+  assert.match(output, /Would install 7 skill packages into codex\./);
   await assert.rejects(stat(path.join(f.userHome, ".agents", "skills", "demo")));
   await assert.rejects(stat(path.join(f.hermesHome, "skills", "software-development", "demo")));
 });
@@ -407,7 +407,7 @@ test("update replaces complete packages, backs up local edits, and installs miss
   assert.equal(await readFile(path.join(unrelated, "SKILL.md"), "utf8"), "Unrelated user skill.\n");
 });
 
-test("CLI update supports dry-run and updates all five complete packages in selected scratch profiles", async (t) => {
+test("CLI update supports dry-run and updates all seven complete packages in selected scratch profiles", async (t) => {
   const f = await fixture(t);
   const args = [script, "--hermes-home", f.hermesHome, "--profile", "default", "--profile", "named"];
   execFixtureSync(process.execPath, args, { encoding: "utf8" });
@@ -419,18 +419,22 @@ test("CLI update supports dry-run and updates all five complete packages in sele
   }
   const before = await readdir(f.hermesHome);
   const preview = execFixtureSync(process.execPath, [...args, "--update", "--dry-run"], { encoding: "utf8" });
-  assert.match(preview, /Would install 0 and update 5 skill packages in default/);
-  assert.match(preview, /Would install 0 and update 5 skill packages in named/);
+  assert.match(preview, /Would install 0 and update 7 skill packages in default/);
+  assert.match(preview, /Would install 0 and update 7 skill packages in named/);
   assert.deepEqual(await readdir(f.hermesHome), before);
   const output = execFixtureSync(process.execPath, [...args, "--update"], { encoding: "utf8" });
-  assert.match(output, /Installed 0 and updated 5 skill packages in default/);
-  assert.match(output, /Installed 0 and updated 5 skill packages in named/);
+  assert.match(output, /Installed 0 and updated 7 skill packages in default/);
+  assert.match(output, /Installed 0 and updated 7 skill packages in named/);
   assert.match(output, /Backup:/);
   for (const home of [f.hermesHome, path.join(f.hermesHome, "profiles", "named")]) {
     const sourceDir = fileURLToPath(new URL("../skills/software-development/git-commit-message/", import.meta.url));
     const destination = path.join(home, "skills/software-development/git-commit-message");
     assert.deepEqual(await readFile(path.join(destination, "SKILL.md")), await readFile(path.join(sourceDir, "SKILL.md")));
     assert.equal(await stat(path.join(destination, "scripts")).then(() => true, () => false), false);
+    for (const [name, file] of [["release-train-supervisor", "references/herdr.md"], ["wiki-delivery-sync", "references/closeout.md"]]) {
+      assert.deepEqual(await readFile(path.join(home, "skills/delivery-operations", name, file)),
+        await readFile(new URL(`../skills/delivery-operations/${name}/${file}`, import.meta.url)));
+    }
     assert.ok((await readdir(home)).every((name) => !name.startsWith(".skills-staging-")));
   }
 });

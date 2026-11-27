@@ -9,6 +9,7 @@ Own optional, versioned agent playbooks that contributors can install and reuse 
 | Path | Owns |
 | --- | --- |
 | `autonomous-ai-agents/` | Optional portable outcome/review core, qualified terminal worker adapters, and operator role/model configuration. |
+| `delivery-operations/` | Optional Supervisor dispatch, reactive monitoring, handoff and evidence-bound wiki upkeep. |
 | `software-development/` | OpenSpec delivery modes, observation-driven routing, protected integration, commit batches and wireframes. |
 
 ## Local Contracts
@@ -44,6 +45,7 @@ Run `npm test` and `npm run build` in this repository. Validate changed skill me
 | Child | Owns | Read when editing… |
 | --- | --- | --- |
 | `autonomous-ai-agents/AGENTS.md` | Portable outcome/review core, qualified terminal adapters, operator configuration, and Herdr interaction fallback. | Autonomous orchestration skill or support files. |
+| `delivery-operations/AGENTS.md` | Release-train supervision and wiki intake/closeout. | Either delivery operations package or its templates. |
 | `software-development/AGENTS.md` | Delivery modes, routing, integration, evidence, commits and wireframes. | OpenSpec delivery/continuation, commits, or wireframe output. |
 
 Parent contract: `../AGENTS.md`.

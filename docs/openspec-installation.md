@@ -10,14 +10,16 @@ an installer or permission to execute a change. Complete four separate steps:
 3. Install this repository's [companion packages](../README.md#catalog) separately:
    `openspec-delivery`, `openspec-next`, `git-commit-message`, and
    `capability-wireframes`. `autonomous-implementation-review` is a fifth,
-   separately selected optional package, not an upstream prerequisite.
+   separately selected optional package. [Delivery operations](delivery-operations.md)
+   publishes `release-train-supervisor` and `wiki-delivery-sync` in a separate
+   opt-in bundle. OpenSpec does not require either operations skill.
 4. Explicitly adopt the SDLC in the target project's contributor instructions.
    Installing skills neither adopts it nor transfers records or grants Git/GitHub
    authority. This repository already has its OpenSpec project configuration.
 
 Neither our marketplace, ZIPs, well-known endpoint nor `npm run install:local`
-installs upstream OpenSpec. The published inventory stays five companion packages
-and two plugins. No upstream packages are vendored here.
+installs upstream OpenSpec. The catalog contains seven complete packages
+and three plugins. No upstream packages are vendored here.
 
 Keep companion packages complete when installing or updating: the delivery Git
 helpers import `scripts/git-environment.mjs` and document their allowlist and trusted
