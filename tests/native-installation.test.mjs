@@ -13,6 +13,8 @@ const packages = {
   "git-commit-message": "software-development/git-commit-message",
   "openspec-delivery": "software-development/openspec-delivery",
   "openspec-next": "software-development/openspec-next",
+  "release-train-supervisor": "delivery-operations/release-train-supervisor",
+  "wiki-delivery-sync": "delivery-operations/wiki-delivery-sync",
 };
 const names = Object.keys(packages);
 
@@ -28,7 +30,7 @@ async function setup(t) {
   return { readme, helper, scratch, home, env: { ...process.env, HOME: home, PI_CODING_AGENT_DIR: "" } };
 }
 
-test("documented recipes copy five complete packages to all four native user locations", async (t) => {
+test("documented recipes copy seven complete packages to all four native user locations", async (t) => {
   const f = await setup(t);
   for (const [heading, directory] of [["Claude Code", ".claude/skills"], ["Codex", ".agents/skills"], ["Kilo", ".kilo/skills"], ["Pi", ".pi/agent/skills"]]) {
     const section = f.readme.split(`### ${heading}\n`)[1]?.split(/\n### |\n## /)[0];
@@ -43,6 +45,17 @@ test("documented recipes copy five complete packages to all four native user loc
     }
     for (const [name, file] of [["autonomous-implementation-review", "references/environment-passthrough.md"], ["autonomous-implementation-review", "references/herdr.md"], ["autonomous-implementation-review", "references/lifecycle-watch.md"], ["autonomous-implementation-review", "scripts/herdr_lifecycle_watch.mjs"], ["openspec-delivery", "scripts/change-guard.mjs"], ["autonomous-implementation-review", "templates/phase-implementer.md"]]) {
       assert.deepEqual(await readFile(path.join(destination, name, file)), await readFile(path.join(root, "skills", packages[name], file)));
+    }
+    for (const name of ["release-train-supervisor", "wiki-delivery-sync"]) {
+      const canonical = path.join(root, "skills", packages[name]);
+      const installed = path.join(destination, name);
+      const files = async (directory) => (await readdir(directory, { recursive: true, withFileTypes: true }))
+        .filter((entry) => entry.isFile())
+        .map((entry) => path.relative(directory, path.join(entry.parentPath, entry.name))).sort();
+      assert.deepEqual(await files(installed), await files(canonical));
+      for (const file of await files(canonical)) {
+        assert.deepEqual(await readFile(path.join(installed, file)), await readFile(path.join(canonical, file)));
+      }
     }
     for (const name of ["autonomous-implementation-review"]) {
       const script = "scripts/herdr-pane-state.mjs";

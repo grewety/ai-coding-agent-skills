@@ -159,8 +159,28 @@ test("normal installer loop documents all generic software-development skills", 
   assert.equal(loop.length, 4);
   assert.deepEqual(loop, ["openspec-delivery", "openspec-next", "git-commit-message", "capability-wireframes"]);
   assert.match(source, /four-package example/);
-  assert.match(source, /collection of \*\*five\*\* categorized Agent Skills packages/);
+  assert.match(source, /collection of \*\*seven\*\* categorized Agent Skills packages/);
   assert.doesNotMatch(withoutRetirementManifest, /phased-plan-next/);
+});
+
+test("delivery operations docs retain standalone choices, authority and runtime checks", async () => {
+  const root = new URL("../", import.meta.url);
+  const paths = ["README.md", "docs/claude-installation.md", "docs/openspec-installation.md", "docs/openspec-workflow.md", "docs/delivery-operations.md"];
+  for (const file of paths) {
+    const source = await readFile(new URL(file, root), "utf8");
+    for (const item of ["delivery-operations", "release-train-supervisor", "wiki-delivery-sync"]) {
+      assert.ok(source.includes(item), `${file} must name ${item}`);
+    }
+  }
+  const guide = await readFile(new URL("docs/delivery-operations.md", root), "utf8");
+  for (const check of [/one-shot/, /same turn/, /separate authority/, /gitignored and untracked/,
+    /Node 22\+/, /naming helper/, /receipt SHA-256/, /preserve newer notes/i, /Live adoption/]) {
+    assert.match(guide, check);
+  }
+  const claude = await readFile(new URL("docs/claude-installation.md", root), "utf8");
+  for (const zip of ["delivery-operations.plugin.zip", "release-train-supervisor.zip", "wiki-delivery-sync.zip"]) {
+    assert.ok(claude.includes(zip), zip);
+  }
 });
 
 test("OpenSpec installation and orchestration use the explicitly selected workflow", async () => {

@@ -13,13 +13,18 @@ const escapeHtml = (value) => value.replace(/[&<>"']/g, (char) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
 })[char]);
 
-// One workflow bundle and one optional orchestration bundle. Every canonical
-// package belongs to exactly one bundle.
-const pluginNames = ["openspec-development", "autonomous-orchestration"];
+// Every canonical package belongs to exactly one bundle.
 const sharedSkillNames = new Set();
 const expectedBundleSkills = {
   "openspec-development": ["openspec-delivery", "openspec-next", "git-commit-message", "capability-wireframes"],
   "autonomous-orchestration": ["autonomous-implementation-review"],
+  "delivery-operations": ["release-train-supervisor", "wiki-delivery-sync"],
+};
+const pluginNames = Object.keys(expectedBundleSkills);
+const bundleScope = {
+  "openspec-development": "This bundle supports OpenSpec changes. It does not install OpenSpec, its CLI, or its native skills, and it does not write GitHub state.",
+  "autonomous-orchestration": "Orchestration is a separate opt-in and requires the openspec-development bundle plus separately reviewed project role configuration.",
+  "delivery-operations": "Delivery operations is a separate opt-in for Supervisor dispatch and Markdown wiki coordination. The adopting project supplies its delivery policy and authority. Driver dispatch needs a verified terminal and one-shot monitoring route. Minting new Change Briefs needs the trusted OpenSpec delivery naming helper.",
 };
 
 function validateMarketplace(marketplace, packages) {
@@ -32,7 +37,7 @@ function validateMarketplace(marketplace, packages) {
       !marketplace.owner.name.trim() || typeof marketplace.description !== "string" ||
       !marketplace.description.trim() || !Array.isArray(marketplace.plugins) ||
       marketplace.plugins.length !== pluginNames.length) {
-    fail("expected a named, skills-only catalog with two plugins");
+    fail(`expected a named, skills-only catalog with ${pluginNames.length} plugins`);
   }
   const selected = new Set();
   const bundlesByName = new Map();
@@ -148,13 +153,10 @@ export async function buildDistribution({ root = scriptRoot, output }) {
   const plugins = marketplace.plugins.map((plugin) => {
     const manifest = { name: plugin.name, version: plugin.version, description: plugin.description,
       author: marketplace.owner, license: "MIT" };
-    const scope = plugin.name === "openspec-development"
-      ? "This bundle supports OpenSpec changes. It does not install OpenSpec, its CLI, or its native skills, and it does not write GitHub state."
-      : "Orchestration is a separate opt-in and requires the openspec-development bundle plus separately reviewed project role configuration.";
     const readme = `# ${plugin.name}\n\n${plugin.description}\n\n` +
       "Upload this ZIP through Claude's Customize → Plugins → Add → Upload plugin. Review the bundled instructions and scripts before enabling. Installation does not grant execution authority or Hermes scanner approval.\n\n" +
       "These are community engineering workflows. Chat, Cowork, and Claude Code do not have equivalent execution capabilities. Git workflows require a project checkout, Git, Node 22+ for packaged guards, and the target project's tooling and permissions. Hermes-specific tool names must be mapped to available host tools.\n\n" +
-      `${scope}\n\n` +
+      `${bundleScope[plugin.name]}\n\n` +
       "No agents, hooks, connectors, or permission changes are installed by this package.\n\n" +
       "Instructions: https://github.com/grewety/ai-coding-agent-skills#install-with-claude-desktop\n" +
       "Upstream: https://claude.com/docs/plugins/overview\n\nMIT; see LICENSE. Canonical skill authors and metadata are preserved.\n";
@@ -172,7 +174,10 @@ export async function buildDistribution({ root = scriptRoot, output }) {
   await mkdir(downloads, { recursive: true });
   for (const [file, bytes] of archives) await writeFile(path.join(downloads, file), bytes);
   await writeFile(path.join(downloads, "index.json"), json(catalog));
-  const optional = new Set(["autonomous-orchestration", "autonomous-implementation-review"]);
+  const optional = new Set([
+    "autonomous-orchestration", "autonomous-implementation-review",
+    "delivery-operations", "release-train-supervisor", "wiki-delivery-sync",
+  ]);
   const adoption = new Set(["openspec-development", "openspec-delivery"]);
   const list = (entries) => entries.map(({ name, file }) => `<li><a href="${escapeHtml(file)}" download>${escapeHtml(name)}</a>${optional.has(name) ? " — optional; operator review required" : adoption.has(name) ? " — optional OpenSpec workflow; operator review required" : ""}</li>`).join("\n");
   await writeFile(path.join(downloads, "index.html"), `<!doctype html>
@@ -180,7 +185,7 @@ export async function buildDistribution({ root = scriptRoot, output }) {
 <body><h1>Claude skill downloads</h1>
 <p>Community packages, not official Anthropic skills or Hermes scanner-approved installations. Review before enabling. Installation does not grant execution authority.</p>
 <p><a href="https://github.com/grewety/ai-coding-agent-skills#install-with-claude-desktop">Installation instructions and execution requirements</a></p>
-<h2>Plugin bundles</h2><p>Use openspec-development for OpenSpec changes. Upload through Customize → Plugins → Add → Upload plugin. Orchestration is a separate opt-in; neither bundle installs OpenSpec or writes GitHub state.</p><ul>${list(plugins)}</ul>
+<h2>Plugin bundles</h2><p>Upload through Customize → Plugins → Add → Upload plugin. Choose openspec-development for OpenSpec changes. Select orchestration or delivery operations separately when you adopt those workflows. Install OpenSpec and qualify the actual execution host separately.</p><ul>${list(plugins)}</ul>
 <h2>Individual skills</h2><p>Upload one ZIP through Customize → Skills → + → Create skill → Upload a skill. Do not unzip it. Related workflows may require other skills.</p><ul>${list(skills)}</ul>
 <p><a href="index.json">Download inventory and SHA-256 checksums</a> · <a href="../index.html">Home</a></p>
 </body></html>\n`);

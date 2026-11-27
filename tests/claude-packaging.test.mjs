@@ -20,10 +20,25 @@ const expectedBundles = {
     version: "1.16.6",
     skills: ["autonomous-implementation-review"],
   },
+  "delivery-operations": {
+    version: "1.0.0",
+    skills: ["release-train-supervisor", "wiki-delivery-sync"],
+  },
 };
 const sharedSkills = [];
+const operationsFiles = {
+  "release-train-supervisor": [
+    "SKILL.md", "references/herdr.md", "templates/decision-card.md", "templates/hot.md", "templates/state.md",
+  ],
+  "wiki-delivery-sync": [
+    "SKILL.md", "references/closeout.md", "templates/change-brief.md", "templates/decisions.md",
+    "templates/hot.md", "templates/project-index.md", "templates/release-train.md",
+    "templates/repository-agents.md", "templates/repository-local.md", "templates/shipped.md",
+    "templates/vault-agents.md", "templates/vault-local.md",
+  ],
+};
 
-test("Claude marketplace selects exact canonical packages for two isolated bundles", async () => {
+test("Claude marketplace selects exact canonical packages for three isolated bundles", async () => {
   const source = await readFile(marketplacePath, "utf8").catch(() => null);
   assert.ok(source, "repository must provide .claude-plugin/marketplace.json");
   const marketplace = JSON.parse(source);
@@ -66,6 +81,7 @@ test("Claude marketplace selects exact canonical packages for two isolated bundl
   assert.deepEqual(selected.get("autonomous-implementation-review"), ["autonomous-orchestration"]);
   assert.equal(marketplace.plugins[0].skills.length, 4);
   assert.equal(marketplace.plugins[1].skills.length, 1);
+  assert.equal(marketplace.plugins[2].skills.length, 2);
 });
 
 test("distribution builds complete skill and plugin ZIPs from canonical bytes", async (t) => {
@@ -78,6 +94,17 @@ test("distribution builds complete skill and plugin ZIPs from canonical bytes", 
   const packages = await discoverSkillPackages({ root });
   const catalog = JSON.parse(await readFile(path.join(output, "downloads/index.json"), "utf8"));
   assert.deepEqual(catalog.skills.map(({ name }) => name), packages.map(({ name }) => name));
+  assert.equal(catalog.skills.length, 7);
+  const endpoint = path.join(output, ".well-known/skills");
+  const { skills } = JSON.parse(await readFile(path.join(endpoint, "index.json"), "utf8"));
+  assert.deepEqual(skills.map(({ name }) => name), catalog.skills.map(({ name }) => name));
+  for (const [name, files] of Object.entries(operationsFiles)) {
+    assert.deepEqual(skills.find((skill) => skill.name === name).files.slice().sort(), files.slice().sort());
+    for (const file of files) {
+      assert.deepEqual(await readFile(path.join(endpoint, name, file)),
+        await readFile(path.join(root, "skills/delivery-operations", name, file)));
+    }
+  }
   for (const pkg of packages) {
     const entry = catalog.skills.find(({ name }) => name === pkg.name);
     const archive = unzipSync(await readFile(path.join(output, "downloads", entry.file)));
@@ -124,6 +151,11 @@ test("distribution builds complete skill and plugin ZIPs from canonical bytes", 
   };
   assert.deepEqual(await pluginPackages(catalog.plugins[0]), expectedBundles["openspec-development"].skills.slice().sort());
   assert.deepEqual(await pluginPackages(catalog.plugins[1]), ["autonomous-implementation-review"]);
+  assert.deepEqual(await pluginPackages(catalog.plugins[2]), expectedBundles["delivery-operations"].skills);
+  const operations = unzipSync(await readFile(path.join(output, "downloads", catalog.plugins[2].file)));
+  const instructions = Buffer.from(operations["README.md"]).toString();
+  assert.match(instructions, /one-shot monitoring route/);
+  assert.match(instructions, /trusted OpenSpec delivery naming helper/);
   const reviewPackage = packages.find(({ name }) => name === "autonomous-implementation-review");
   const reviewEntry = catalog.skills.find(({ name }) => name === reviewPackage.name);
   assert.ok(reviewEntry, "individual reviewer ZIP must be advertised");
@@ -366,6 +398,10 @@ test("invalid marketplace cannot replace a previous distribution", async (t) => 
     ["integration leaked into orchestration", (m) => { m.plugins[1].skills.push(m.plugins[0].skills[0]); }],
     ["workflow skill duplicated across bundles", (m) => { m.plugins[1].skills.push(m.plugins[0].skills[1]); }],
     ["workflow skill removed", (m) => { m.plugins[0].skills.shift(); }],
+    ["delivery operations missing", (m) => { m.plugins.pop(); }],
+    ["delivery operations folded into workflow", (m) => { m.plugins[0].skills.push(m.plugins[2].skills.shift()); }],
+    ["delivery operations folded into orchestration", (m) => { m.plugins[1].skills.push(m.plugins[2].skills.pop()); }],
+    ["delivery operations gains workflow prerequisite", (m) => { m.plugins[2].skills.push(m.plugins[0].skills[1]); }],
     ["remote source", (m) => { m.plugins[0].source = "https://example.org"; }],
     ["active hooks", (m) => { m.plugins[0].hooks = {}; }],
     ["missing version", (m) => { delete m.plugins[0].version; }],
