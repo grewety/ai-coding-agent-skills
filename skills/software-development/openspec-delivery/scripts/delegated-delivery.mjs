@@ -1,4 +1,3 @@
-import { tierIdentity } from "./containment-tier.mjs";
 import { existsSync } from "node:fs";
 // Read back the independently pinned exclusive worker runtime. No worker or
 // reviewer starts, recovery publication, registry creation or slot release.
@@ -38,15 +37,30 @@ const lowTouchRuntimeSources = [
   "review-spend.mjs", "review-upstream-status.mjs",
 ];
 
+const directRuntimeSources = ["review-direct-adapters.mjs", "review-direct-receipt.mjs", "review-direct-supervisor.mjs",
+  "review-direct-supervisor.py", "review-direct-worktree.mjs"];
+function historicalTransport(record) {
+  if (!Object.hasOwn(record, "containmentTier") && !Object.hasOwn(record, "osDriver")) return {};
+  const { containmentTier, osDriver } = record;
+  need(containmentTier === "b" && osDriver === "linux-codex-native", "Invalid original native worker transport metadata");
+  return { containmentTier, osDriver };
+}
 const tieredRuntimeSources = ["containment-tier.mjs", "containment-linux-offline.mjs", "review-grok-offline.mjs"];
 
 function verifyRuntimeInventory(selected, scripts) {
   need(digest(selected.verifierSha256) && digest(selected.runtimeSha256), "Independent implementer package pin is missing");
   // An independently pinned legacy package has none of these support files.
   // A partial newer inventory cannot fall back to the legacy runtime pin.
+  const direct = directRuntimeSources.some((name) => existsSync(path.join(scripts, name)));
+  const obsolete = ["review-relay.mjs", "review-runtime-scratch.mjs", "review-sandbox-bridge.mjs",
+    "containment-linux-offline.mjs", "review-grok-offline.mjs", "agent-pi-runtime.mjs", "containment-tier.mjs"];
   const additions = [lowTouchRuntimeSources, configurableRuntimeSources, tieredRuntimeSources]
     .flatMap((group) => group.some((name) => existsSync(path.join(scripts, name))) ? group : []);
-  const inventory = Object.fromEntries([...runtimeSources, ...additions].map((name) => {
+  const files = [...runtimeSources, ...additions];
+  if (direct) need(obsolete.every((name) => !existsSync(path.join(scripts, name))),
+    "Mixed legacy and Direct-CLI runtime inventory");
+  const names = direct ? [...files.filter((name) => !obsolete.includes(name)), ...directRuntimeSources] : files;
+  const inventory = Object.fromEntries(names.map((name) => {
     const filename = path.join(scripts, name);
     return [name, sha256(readBounded(filename, 64 * 1024))];
   }));
@@ -170,7 +184,7 @@ export async function readDelegation(input, { context, policy, identity, impleme
   need(owner, "Exclusive assignment claim is missing");
   const attemptDirectory = path.join(directory, "attempt-" + id.attempt);
   const launch = data.history.at(-1);
-  need(launch?.attempt === id.attempt && same(tierIdentity(launch), tierIdentity(roles)) && same(launch.roleAudit, roles.roleAudit), "Original launch or explicit role audit differs");
+  need(launch?.attempt === id.attempt && same(historicalTransport(launch), historicalTransport(roles)) && same(launch.roleAudit, roles.roleAudit), "Original launch or explicit role audit differs");
   const observation = await runtime.observeImplementer(assignment, { registry, action: "inspect" });
   if (observation.phase === "blocked") throw new Error(observation.reason);
   const view = await recovery.currentAttempt(attemptDirectory, launch);
@@ -258,8 +272,9 @@ export async function verifyPairedReview(delegation, handoff, input) {
   const reviewed = handoff?.result;
   const role = roles.pair.reviewer;
   const session = reviewed.runtime.session;
-  need(same(handoff.reviewExplicitBinding, roles.roleAudit?.reviewer), "Review differs from its qualified explicit role pins");
-  if (roles.roleAudit) need(same(handoff.reviewGenerator, { provider: result.runtime.provider, session: result.runtime.session }),
+  need(role.route === "direct-cli" ? handoff.reviewTransport === "direct-cli" &&
+    same(handoff.reviewRuntime, roles.roleAudit?.reviewer) : same(handoff.reviewExplicitBinding, roles.roleAudit?.reviewer), "Review differs from its qualified explicit role pins");
+  if (roles.roleAudit && role.route !== "direct-cli") need(same(handoff.reviewGenerator, { provider: result.runtime.provider, session: result.runtime.session }),
     "Review generating role differs from the settled implementer");
   const pin = input.handover.reviewSessionBinding;
   need(typeof session === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(session),
@@ -295,6 +310,6 @@ export async function verifyPairedReview(delegation, handoff, input) {
     reviewed.runtime.client === role.client &&
     reviewed.runtime.version === role.version && reviewed.runtime.provider === role.provider &&
     reviewed.runtime.model === role.model && reviewed.runtime.configurationSource === role.configuration.sha256 &&
-    reviewed.runtime.configurationScope === "contained-review" && reviewed.runtime.readOnly === true,
+    reviewed.runtime.configurationScope === (role.route === "direct-cli" ? "direct-cli" : "contained-review") && reviewed.runtime.readOnly === true,
   "Review does not match the pinned independent role or original implementer");
 }

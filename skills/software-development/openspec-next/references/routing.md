@@ -53,15 +53,11 @@ as one request. The router forwards the request file byte-for-byte.
 `inspect` reports original-attempt readback and any ownership, recovery
 or review predicate. A delegated dispatch decision still requires the
 runtime's exclusive claim and qualified pair, with independent acceptance
-before any dependent successor. The sealed Group 3.1 trials qualified the
-pinned pair on one Linux host for synthetic Task-Guided and Goal-First
-changes. The pair used dedicated Codex 0.171.0 with GPT-6.2-sol and native
-named workspace-write, and fresh read-only Claude Code 2.1.330 with Claude
-Sonnet 4.6 on Bubblewrap 0.9.0 via the `same-uid-key` relay. Verify the exact
-runtime and role bindings against the orchestration skill's worker-runtime
-reference. Other hosts, clients, versions and provider routes require
-matching qualification. Each future live review requires separate authority
-for the exact export and paid inference.
+before any dependent successor. For an adopting integrated parent, forward the
+exact Direct-CLI settings and sealed packet observations. Independently verify
+native implementer qualification and the original ownership records. Earlier
+frozen parents keep their original pinned verifier. The integrated review
+policy governs authority for paid packet exposure.
 
 ## Apply the decision
 
@@ -89,7 +85,7 @@ for the exact export and paid inference.
    a result. Task-Guided can use a sealed contained candidate review of the full
    frozen-plan-to-candidate diff from an isolated checkout. Pass its retained
    `review-candidate` handover to delivery with the matching gate run. For
-   exclusive delegation, both modes use their paired contained reviewer.
+   exclusive delegation, both modes use their paired Direct-CLI reviewer.
    Its Goal-First request repeats the approved Goal Contract digest alongside
    the normalized Git plan identity. Inherited Goal-First routes use their
    qualified portable-role reviewer with the approved digest. Only

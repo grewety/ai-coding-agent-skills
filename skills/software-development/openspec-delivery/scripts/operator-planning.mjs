@@ -39,6 +39,21 @@ export async function charterObservation(input, context, proposal, workspace) {
     grantMatches(input.planningGrant, context, workspace.workspace) && input.planningGrant.review === true &&
     same(retained.record.binding, input.planningGrant.reviewBinding) &&
     (!context.lowTouch || same(retained.planningModes, context.modes)), "Charter differs from the fixed grant, goal or qualified reviewer");
+  if (context.directReviewer) {
+    const proof = selected.reviewEvidence;
+    need(proof && ["request", "expect", "exportDirectory", "output", "verifier"].every((name) =>
+      typeof proof[name] === "string" && [input.repo, workspace.workspace].every((root) => separate(root, proof[name]))) &&
+      path.basename(proof.verifier) === "review-candidate.mjs" && path.dirname(proof.verifier) === path.dirname(selected.verifier) &&
+      sha256(readBounded(proof.verifier, 1024 * 1024)) === proof.verifierSha256 &&
+      sha256(readBounded(proof.request, 1024 * 1024)) === proof.requestSha256 &&
+      sha256(readBounded(proof.expect, 1024 * 1024)) === proof.expectSha256, "Missing exact Direct-CLI charter evidence");
+    const { reviewCommand } = await import(pathToFileURL(proof.verifier).href);
+    const replay = await reviewCommand(["--verify", "--request", proof.request, "--expect", proof.expect,
+      "--export", proof.exportDirectory, "--output", proof.output]);
+    need(replay.phase === "complete" && replay.transport === "direct-cli" && replay.coverage === "whole-file" &&
+      replay.sessions[0] === retained.review?.identity?.reviewerSession && same(replay.result.native, retained.review),
+    "Direct-CLI charter receipt differs from the retained planning observation");
+  }
   const accepted = core.acceptConvergenceReview({ ...retained, currentInputs: context.inputs });
   if (input.proposal.phase !== "correct") return context.lowTouch ? { ...accepted, planningModes: context.modes } : accepted;
   need(accepted.action !== "freeze-ready", "Accepted charter requires no correction");

@@ -100,7 +100,7 @@ export function auditClaudeStream(proc, runtime, assigned, probe, files) {
         file.startLine === 1 && nonnegativeInteger(file.numLines) &&
         (file.numLines > 0 || (file.content === "" && pathname.endsWith(".patch"))) &&
         (file.totalLines === undefined || file.numLines === file.totalLines), "Failed or partial Read result");
-      if (runtime.explicit) {
+      if (runtime.explicit || runtime.direct) {
         const bytes = files?.get(pathname.slice("/review/".length));
         need(Buffer.isBuffer(bytes), "Missing exact exported bytes for the native Read");
         const exported = utf8(bytes);

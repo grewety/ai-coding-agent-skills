@@ -70,7 +70,9 @@ function checkReview(handoff, snapshot, context, gate, base, host, kind) {
       request.authority.writer].includes(session) &&
     review.base === base && review.target === snapshot.head && id.candidate === snapshot.head &&
     id.change === context.change && review.plan === snapshot.plan && review.planDigest === context.planDigest &&
-    same(id.inputs, context.inputs) && handoff.reviewPolicyBinding?.parent === context.parent &&
+    same(id.inputs, context.inputs) && (!context.directReviewer ||
+      handoff.reviewTransport === "direct-cli" && handoff.reviewCoverage === "whole-file") &&
+    handoff.reviewPolicyBinding?.parent === context.parent &&
     handoff.reviewPolicyBinding.target === context.target && handoff.reviewConfigurationSha256 === host &&
     request.acceptance.includes(`gate-run:${gate.reference}`), `Invalid zero-waiver PR-fix ${kind} review`);
   return { session, reference: result.report.sha256 };

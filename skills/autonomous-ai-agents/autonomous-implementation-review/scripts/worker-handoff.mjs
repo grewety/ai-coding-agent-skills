@@ -5,7 +5,6 @@ import { createHash, randomUUID } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, mkdir, open, link, unlink } from "node:fs/promises";
 import path from "node:path";
-import { requireTier, tierIdentity } from "./containment-tier.mjs";
 import { captureLimit, captureAggregateLimit } from "./bounded-worker.mjs";
 
 const need = (ok, message) => { if (!ok) throw new Error(message); };
@@ -110,8 +109,8 @@ export async function readClosed(p, maxBytes = 64 * 1024 * 1024, sealed = false)
 }
 export async function writeClosed(p, bytes, sealed = false) {
   await safePath(p, true);
-  need(Number.isInteger(constants.O_NOFOLLOW), "Exclusive no-follow creation unavailable");
-  const handle = await open(p, constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW | constants.O_WRONLY, 0o600);
+  need(process.platform === "win32" || Number.isInteger(constants.O_NOFOLLOW), "Exclusive no-follow creation unavailable");
+  const handle = await open(p, constants.O_CREAT | constants.O_EXCL | (constants.O_NOFOLLOW ?? 0) | constants.O_WRONLY, 0o600);
   try {
     const stat = await handle.stat();
     need(stat.isFile() && stat.nlink === 1, "Unsafe capture sink");
@@ -153,12 +152,23 @@ function descriptor(d, expected) {
   need(expected.request.evidenceRoots.some((root) => within(root, d.path)) && !["request.md", "result.json"].includes(path.basename(d.path)), "Unsafe evidence reference");
   need(digest(d.sha256) && Number.isSafeInteger(d.bytes) && d.bytes >= 0, "Invalid complete evidence hash/size");
 }
+// Optional metadata of historical sealed reviewer captures. A Direct-CLI
+// object has configurationScope "direct-cli" and cannot carry either field.
+export const legacyReviewFields = ["containmentTier", "osDriver"];
+export function legacyReviewIdentity(record) {
+  if (!legacyReviewFields.some((field) => Object.hasOwn(record, field))) return {};
+  const { containmentTier, osDriver } = record;
+  need(containmentTier === "a" && osDriver === "linux-bwrap", "Unsupported legacy review transport metadata");
+  return { containmentTier, osDriver };
+}
+
 function validateResult(result, expected, runtime) {
   keys(result, ["schemaVersion", "identity", "requestSha256", "runtime", "status", "verdict", "nativeVerdict", "findings", "coverageLimitations", "report", "reportKind", "evidence", "outputs", "completion", "nativeReport"], "result");
   need(result.schemaVersion === 1, "Unsupported result schema");
   need(same(result.identity, expected.request.identity) && result.requestSha256 === expected.requestSha256, "Result request/input identity mismatch");
-  const tier = tierIdentity(runtime);
-  if (tier.osDriver) requireTier(tier, result.identity.role === "implementer" ? "implementer" : "reviewer", runtime.client);
+  const tier = legacyReviewIdentity(runtime);
+  if (tier.osDriver) need(result.identity.role !== "implementer" && runtime.configurationScope === "contained-review" &&
+    ["claude-code", "pi"].includes(runtime.client), "Legacy transport metadata cannot bind this result");
   keys(runtime, [...Object.keys(tier), "adapter", "client", "version", "session", "provider", "model", "configurationSource", "configurationScope", "readOnly"], "runtime");
   need(Object.entries(runtime).every(([k, v]) => k === "readOnly" ? typeof v === "boolean" : text(v)) && same(runtime, result.runtime), "Runtime identity mismatch");
   need(runtime.session !== expected.request.authority.orchestrator && (result.identity.role === "implementer" || runtime.readOnly === true), "Invalid worker/read-only runtime");

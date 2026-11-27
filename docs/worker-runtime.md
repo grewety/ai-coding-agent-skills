@@ -1,33 +1,15 @@
 # Exclusive OpenSpec worker runtime
 
-See [external AI roles and backend pilots](configurable-backends.md) for explicit role settings and the
-[observed backend suitability matrix](configurable-backends.md#observed-backend-suitability).
+See [external AI roles and backend setup](configurable-backends.md) for explicit role settings.
 
-For a new explicit deployment, use a schema 2 pair backed by the pinned
-`roles.json` and the exact qualification manifests. The standalone Goal-First
-and exclusive commands use the same native Codex containment and supervision.
-
-## Supported binding
-
-The recorded synthetic qualification on one Linux host covers native
-dedicated Codex **0.171.0** with `gpt-6.2-sol`, its named workspace-write
-profile `worker` (`codex-native-named-workspace-write`), and a fresh
-read-only Claude Code **2.1.330** reviewer with `claude-sonnet-4-6`,
-Bubblewrap **0.9.0** and the `same-uid-key` relay. Retrieve the evidence for
-`exclusive-worker-runtime-01m84dt53xh6x16nwwqebacz8m` at the recorded repair
-SHA `9b909f9467ddea6b12f7ca77f959f39ef01e2702`. Qualification remains bound
-to the pinned host, runtime and role files. A different host, client, model,
-version or provider route requires its own qualified binding. Hermes
-`advanced-delegation` with `profile_routes` is an optional unqualified
-implementation route. Use the contained reviewer for its separate role.
-[Role configuration](openspec-operator-tutorial.md#configure-the-three-roles).
+For an adopting parent, use a schema 4 pair with independently pinned schema 2 role bindings and schema 3 reviewer host settings. Standalone Goal-First and exclusive execution keep the same qualified native Codex supervision. Use the original qualified runtime package to read earlier frozen assignments.
 
 ## Install and bind
 
 1. Follow the [OpenSpec prerequisites](openspec-installation.md). Install
-   complete delivery 1.11.0 and next 0.8.0 packages from the
-   `openspec-development` 1.11.0 bundle and the separately selected
-   orchestration 0.25.0 package from `autonomous-orchestration` 1.15.0.
+   complete delivery 1.12.0 and next 0.9.0 packages from the
+   `openspec-development` 1.12.0 bundle and the separately selected
+   orchestration 0.26.0 package from `autonomous-orchestration` 1.16.0.
    Check the exact CLI and supporting file bytes outside the workspace before
    enabling the project route. Use the normal collision, backup and fresh
    session checks when updating or removing a package.
@@ -35,14 +17,11 @@ implementation route. Use the contained reviewer for its separate role.
    [Hermes and Codex profile controls](../skills/autonomous-ai-agents/autonomous-implementation-review/references/profile-preparation.md).
 2. Use Node 22+, Git, Python 3, procfs and pidfds on Linux. Use one private
    host registry under the OS account's passwd home, shared by all known
-   clones and worktrees. Create distinct physical roles with a dedicated
-   persistent Codex home and isolated HOME and XDG config, plus a separate
-   reviewer config slot. The operator provisions dedicated authentication
-   separately and protects the pinned package, binaries, qualification
-   records, authority and evidence outside the mutable checkout. Claude remains
-   the default contained reviewer. The opt-in Pi 1.5.2 route requires a private host
-   Hermes proxy socket for xAI OAuth and matching offline and bounded live qualification
-   before real review. A different worker pair requires its own exact qualification.
+   clones and worktrees. The implementer keeps a dedicated persistent Codex
+   home and isolated HOME and XDG config. The operator pins package files,
+   executable, qualification, authority and evidence outside the mutable
+   checkout. The separately bound Direct-CLI reviewer uses the installed client and its
+   normal authentication.
    [Role binding schema](../skills/autonomous-ai-agents/autonomous-implementation-review/references/worker-runtime.md),
    [reviewer setup](claude-reviewer.md).
 3. Pin the exact package inventories, role client, version, generating
@@ -66,7 +45,7 @@ against the exact file allowlist before admitting outputs. The launch uses
 isolated environment values and removes inherited parent, Hermes and foreign
 runtime selectors, including `VIRTUAL_ENV`,
 `PYTHONHOME` and `PYTHONPATH`. Preserve the native sandbox and use the
-reviewer's separate OS-contained route. Run Codex directly under its native
+reviewer's separate disposable-packet route. Run Codex directly under its native
 sandbox. Hand authentication or approval waits to the operator in the
 verified original native session.
 
@@ -100,7 +79,7 @@ attempt and delivery status. A project-authorized `/openspec-next` or
 bounded local execution grant. It preserves restrictions such as no commits
 or a named group. The applicable review authorization binds the exact export,
 configuration, upper cost and output. A verified adopting parent can select
-bounded automatic contained reviews. An external diagnostic or retry needs
+bounded automatic independent reviews. An external diagnostic or retry needs
 separate permission. Branch publication and closeout require a named finish
 grant. [Review and finish configuration](openspec-review-configuration.md).
 
@@ -146,5 +125,3 @@ configuration and new candidate under a separate single-run grant.
 [Delegated review session binding](../skills/software-development/openspec-delivery/references/delivery-runtime.md#configured-exclusive-worker-runtime).
 Stale or missing evidence, invalid coverage, a wider correction or exhausted
 authority leaves the result pending or blocked.
-
-A new schemaVersion 3 paired worker host binds Tier B and `linux-codex-native` for the exact 0.172.0 pilot. The executable uses native named workspace-write directly. Dispatch requires matching bounded live evidence. See [Containment tiers](containment-tiers.md).

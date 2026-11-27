@@ -1,4 +1,3 @@
-import { tierIdentity } from "./containment-tier.mjs";
 import { lstat } from "node:fs/promises";
 import path from "node:path";
 import { effectiveRole } from "./implementer-bindings.mjs";
@@ -91,7 +90,7 @@ export async function handoffFor(context, state) {
   const settlementSha256 = hash(jsonBytes(state.settlement));
   const persisted = await readState(attemptDirectory, "publication.json", true);
   if (persisted) {
-    need(equal(tierIdentity(persisted), tierIdentity(runtime)) && persisted.settlementSha256 === settlementSha256 && equal(persisted.runtime, runtime), "Original publication identity differs");
+    need(persisted.settlementSha256 === settlementSha256 && equal(persisted.runtime, runtime), "Original publication identity differs");
     const { result } = await readHandoff({ expected, runtime });
     need(persisted.status === result.status && persisted.resultSha256 === hash(await readClosed(path.join(directory, "result.json"), undefined, true)),
       "Retained result differs from original publication");
@@ -128,9 +127,8 @@ export async function handoffFor(context, state) {
     "lifecycle.jsonl": Buffer.concat(lifecycle.map(jsonBytes)),
   };
   if (runtime.osDriver) {
-    const tier = tierIdentity(runtime);
-    files["status.json"] = jsonBytes({ schemaVersion: 1, ...tier, attempt: launch.attempt, status, settlementSha256 });
-    files["receipt.json"] = jsonBytes({ schemaVersion: 1, ...tier, attempt: launch.attempt, session,
+    files["status.json"] = jsonBytes({ schemaVersion: 1, attempt: launch.attempt, status, settlementSha256 });
+    files["receipt.json"] = jsonBytes({ schemaVersion: 1, attempt: launch.attempt, session,
       requestSha256: launch.requestSha256, settlementSha256, status });
   }
   const describe = (name) => describeFile(directory, name, files[name]);
@@ -150,7 +148,7 @@ export async function handoffFor(context, state) {
   const admitted = await readHandoff({ expected, runtime });
   need(equal(admitted.result, result), "Late result differs from original settlement or captured files");
   const resultSha256 = hash(await readClosed(path.join(directory, "result.json"), undefined, true));
-  await writeState(attemptDirectory, "publication.json", { ...tierIdentity(runtime), runtime, settlementSha256, resultSha256, reason, status,
+  await writeState(attemptDirectory, "publication.json", { runtime, settlementSha256, resultSha256, reason, status,
     nativeSha256: reportText ? hash(reportText) : null });
   return { phase: status, reason, result: admitted.result, settlementSha256, quiescent: true };
 }

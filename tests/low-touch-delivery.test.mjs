@@ -10,7 +10,7 @@ import { proposalFreeze } from "../skills/software-development/openspec-delivery
 import { finishReadiness } from "../skills/software-development/openspec-delivery/scripts/finish-readiness.mjs";
 import { evidenceCommand } from "../skills/software-development/openspec-delivery/scripts/evidence-cli.mjs";
 import { deliveryCommand } from "../skills/software-development/openspec-delivery/scripts/delivery-cli.mjs";
-import { verifyLocalHarness } from "../skills/software-development/openspec-delivery/scripts/local-harness.mjs";
+import { harnessConfiguration, verifyLocalHarness } from "../skills/software-development/openspec-delivery/scripts/local-harness.mjs";
 import { sha256 } from "../skills/software-development/openspec-delivery/scripts/evidence-retention.mjs";
 import { standingTriggerDecision } from "../skills/software-development/openspec-delivery/scripts/external-verification.mjs";
 import { buildExport, changedEntries, git as reviewGit, jsonBytes, tree } from
@@ -24,7 +24,7 @@ const current = "---\nmetadata_version: 1\nartifact: spec\ncapability: result\n-
 const tasks = "# Tasks\r\n\r\n- [ ] 1.1 Réal outcome\r\n\r\n```md\r\n- [ ] 1.2 example\r\n```\r\n";
 const gateArgv = ["/usr/bin/true"];
 
-function fixture(t, adopt = true) {
+function fixture(t, adopt = true, direct = false) {
   const root = mkdtempSync(path.join(os.tmpdir(), "lt-"));
   t.after(() => {
     const entries = (dir) => {
@@ -48,7 +48,8 @@ function fixture(t, adopt = true) {
   git("config", "core.autocrlf", "false");
   git("config", "user.name", "Synthetic Fixture");
   git("config", "user.email", "fixture@example.invalid");
-  write("AGENTS.md", adopt ? "<!-- openspec-low-touch: {} -->\n" : "# Legacy baseline\n");
+  write("AGENTS.md", adopt ? "<!-- openspec-low-touch: {} -->\n" +
+    (direct ? "<!-- openspec-reviewer: direct-cli-v1 -->\n" : "") : "# Legacy baseline\n");
   write("openspec/config.yaml", "schema: spec-driven\n");
   const parent = save("Integrated baseline");
   git("switch", "-c", "change/sample-low-touch");
@@ -238,6 +239,22 @@ function harnessSeal(root, binding, configurationSha256, candidate, overrides = 
   return { file, sha256: sha256(bytes) };
 }
 
+test("local harness admits only the legacy schema 1 and validated Direct-CLI schema 3 hosts", (t) => {
+  const f = fixture(t);
+  const reviewer = { client: "claude", model: "claude-fixture" };
+  const readHost = (name, settings) => {
+    const file = path.join(f.root, name + ".json");
+    const bytes = jsonBytes(settings);
+    writeFileSync(file, bytes, { mode: 0o600 });
+    return harnessConfiguration({ file, sha256: sha256(bytes) }, [f.repo]);
+  };
+  assert.equal(readHost("legacy", { schemaVersion: 1 }), null);
+  assert.equal(readHost("direct", { schemaVersion: 3, reviewer, maxBudgetUsd: 0.25 }), null);
+  assert.throws(() => readHost("invalid-direct", { schemaVersion: 3, reviewer, maxBudgetUsd: 0 }), /per-session reviewer cost/);
+  assert.throws(() => readHost("retired-pilot", { schemaVersion: 2 }), /Invalid Direct-CLI host configuration fields/);
+  assert.throws(() => readHost("worker-assignment", { schemaVersion: 4, reviewer, maxBudgetUsd: 0.25 }), /per-session reviewer cost/);
+});
+
 test("host-owned CLI and MCP harnesses both seal the committed SHA and fail closed on mismatch", async (t) => {
   const f = fixture(t);
   const plan = f.save("Freeze plan");
@@ -247,10 +264,15 @@ test("host-owned CLI and MCP harnesses both seal the committed SHA and fail clos
   f.git("clone", "--no-local", "--no-checkout", f.repo, checkout);
   const cloneGit = (...args) => execFileSync("/usr/bin/git", ["-C", checkout, ...args], { stdio: "ignore" });
   cloneGit("checkout", "--detach", plan);
-  for (const kind of ["cli", "mcp"]) {
-    const adapter = path.join(f.root, kind + "-adapter");
-    const output = path.join(f.root, kind + "-result.json");
-    const id = "fixture-" + kind;
+  const directHost = { schemaVersion: 3, reviewer: { client: "claude", model: "claude-fixture" }, maxBudgetUsd: 0.25 };
+  for (const [name, kind, hostSettings] of [
+    ["cli", "cli", { schemaVersion: 1 }],
+    ["mcp", "mcp", { schemaVersion: 1 }],
+    ["direct-cli", "cli", directHost],
+  ]) {
+    const adapter = path.join(f.root, name + "-adapter");
+    const output = path.join(f.root, name + "-result.json");
+    const id = "fixture-" + name;
     writeFileSync(adapter, `#!/usr/bin/python3
 import json
 import os
@@ -278,8 +300,8 @@ def send(value):
 `), { mode: 0o700 });
     const binding = { id, kind, executable: adapter, executableSha256: sha256(readFileSync(adapter)), args: [],
       timeoutMs: 3000, maxAgeMs: 60000, exposure: "local-only", ...(kind === "mcp" ? { tool: "fixture_review" } : {}) };
-    const host = JSON.stringify({ schemaVersion: 1, localHarness: binding });
-    const file = path.join(f.root, kind + "-host.json");
+    const host = JSON.stringify({ ...hostSettings, localHarness: binding });
+    const file = path.join(f.root, name + "-host.json");
     writeFileSync(file, host, { mode: 0o600 });
     const hostConfiguration = { file, sha256: sha256(host) };
     const grant = { verified: true, reference: "grant", kind: "local-candidate-harness", policyRevision: f.parent,
@@ -287,13 +309,13 @@ def send(value):
     const params = { ...f, plan, checkout, candidate: plan, hostConfiguration, output, grant };
     await assert.rejects(deliveryCommand("run-harness", { ...params, checkout: linked, grant: { ...grant, checkout: linked } }),
       /standalone detached clone/);
-    cloneGit("checkout", "-b", "attached-" + kind, plan);
+    cloneGit("checkout", "-b", "attached-" + name, plan);
     await assert.rejects(deliveryCommand("run-harness", params), /detached gate checkout/);
     cloneGit("checkout", "--detach", f.parent);
     await assert.rejects(deliveryCommand("run-harness", params), /HEAD changed/);
     cloneGit("checkout", "--detach", plan);
-    const aiOutput = path.join(f.root, kind + "-ai-result.json");
-    const aiHost = JSON.stringify({ schemaVersion: 1, localHarness: { ...binding,
+    const aiOutput = path.join(f.root, name + "-ai-result.json");
+    const aiHost = JSON.stringify({ ...hostSettings, localHarness: { ...binding,
       aiRole: { client: "codex", provider: "openai", model: "fixture-model", reasoningEffort: "high",
         executable: { path: adapter, sha256: binding.executableSha256 } } } });
     const aiPin = { file, sha256: sha256(aiHost) };
@@ -307,14 +329,22 @@ def send(value):
     await assert.rejects(deliveryCommand("run-harness", params), /Dirty checkout/);
     rmSync(dirty);
     assert.equal(existsSync(output), false);
-    const dirtyHost = JSON.stringify({ schemaVersion: 1, localHarness: { ...binding, args: ["--fixture-mutate"] } });
+    const dirtyHost = JSON.stringify({ ...hostSettings, localHarness: { ...binding, args: ["--fixture-mutate"] } });
     const dirtyPin = { file, sha256: sha256(dirtyHost) };
-    const dirtyOutput = path.join(f.root, kind + "-dirty-result.json");
+    const dirtyOutput = path.join(f.root, name + "-dirty-result.json");
     writeFileSync(file, dirtyHost);
     await assert.rejects(deliveryCommand("run-harness", { ...params, hostConfiguration: dirtyPin,
       grant: { ...grant, configurationSha256: dirtyPin.sha256 }, output: dirtyOutput }), /Dirty checkout/);
     assert.equal(readFileSync(dirtyOutput).length, 0);
     rmSync(path.join(checkout, "unexpected.txt"));
+    if (hostSettings.schemaVersion === 3) {
+      const invalidHost = JSON.stringify({ ...hostSettings, localHarness: binding, maxBudgetUsd: 0 });
+      const invalidPin = { file, sha256: sha256(invalidHost) };
+      writeFileSync(file, invalidHost);
+      await assert.rejects(deliveryCommand("run-harness", { ...params, hostConfiguration: invalidPin,
+        grant: { ...grant, configurationSha256: invalidPin.sha256 } }), /bounded per-session reviewer cost/);
+      assert.equal(existsSync(output), false);
+    }
     writeFileSync(file, host);
     const retained = await deliveryCommand("run-harness", params);
     assert.equal(retained.verdict, "pass");
@@ -334,7 +364,7 @@ def send(value):
 });
 
 test("candidate export includes custom artifacts and omits reserved vault preimages and postimages", async (t) => {
-  const f = fixture(t);
+  const f = fixture(t, true, true);
   const plan = f.save("Freeze plan");
   f.write("source.txt", "Candidate\n");
   const target = f.save("Source");
@@ -367,27 +397,31 @@ test("candidate export includes custom artifacts and omits reserved vault preima
   const paths = Object.fromEntries(["request", "expect", "host", "export", "output"].map((name) => [name, path.join(f.root, name)]));
   const bytes = jsonBytes(request);
   writeFileSync(paths.request, bytes);
-  const pin = { path: "/missing/fixture-tool", sha256: "a".repeat(64) };
-  const largest = Math.max(...prepared.manifest.packets.map(({ paths }) => paths.length));
-  const config = { schemaVersion: 1, bwrap: pin, claude: pin, node: pin, libraries: [], model: "claude-fixture",
-    timeoutMs: 1000, maxTurns: largest + 10, maxBudgetUsd: 0.25, requirePreExposureAttestation: false,
-    relay: { route: "same-uid-key", keyFile: "/missing/fixture-key", keyFormat: "raw" } };
+  const bin = path.join(f.root, "bin");
+  mkdirSync(bin, { mode: 0o700 });
+  const fake = path.join(bin, "claude");
+  writeFileSync(fake, `#!/bin/sh
+case "$1" in
+  --version) printf '2.1.330 (Claude Code)\\n';;
+  --help) printf '%s\\n' '--print --session-id --safe-mode --restricted --strict-mcp-config --permission-prompts --no-session-persistence --tools';;
+  *) exit 91;;
+esac
+`, { mode: 0o700 });
+  const originalPath = process.env.PATH;
+  process.env.PATH = bin + path.delimiter + originalPath;
+  t.after(() => { process.env.PATH = originalPath; });
+  const config = { schemaVersion: 3, reviewer: { client: "claude", model: "claude-fixture", timeoutMs: 4000 }, maxBudgetUsd: 0.25 };
   const checkArguments = ["--request", paths.request, "--expect", paths.expect, "--export", paths.export, "--host-config", paths.host];
-  const binding = { schemaVersion: 1, requestSha256: sha256(bytes), exportSha256: null, model: config.model };
-  const writeHost = (maxTurns) => {
-    const data = jsonBytes({ ...config, maxTurns });
-    writeFileSync(paths.host, data, { mode: 0o600 });
-    binding.configurationSha256 = sha256(data);
-    writeFileSync(paths.expect, jsonBytes(binding));
-  };
+  const data = jsonBytes(config);
+  writeFileSync(paths.host, data, { mode: 0o600 });
+  const binding = { schemaVersion: 2, requestSha256: sha256(bytes), exportSha256: null,
+    configurationSha256: sha256(data), model: config.reviewer.model };
+  writeFileSync(paths.expect, jsonBytes(binding), { mode: 0o600 });
   const neverRuntime = () => assert.fail("Offline command reached the reviewer runtime");
-  writeHost(largest + 9);
-  await assert.rejects(reviewCommand(["--prepare", ...checkArguments], neverRuntime), /Packet 1 requires/);
-  writeHost(largest + 10);
   const preflight = await reviewCommand(["--prepare", ...checkArguments], neverRuntime);
-  binding.exportSha256 = preflight.exportSha256;
+  Object.assign(binding, preflight);
   writeFileSync(paths.expect, jsonBytes(binding));
-  assert.equal((await reviewCommand(["--check", ...checkArguments], neverRuntime)).maxTurns, largest + 10);
+  assert.equal((await reviewCommand(["--check", ...checkArguments], neverRuntime)).runtime.client, "claude");
   const ledger = path.join(f.root, "ledger");
   mkdirSync(ledger, { mode: 0o700 });
   const admissionFile = path.join(f.root, "admission.json");
@@ -402,35 +436,36 @@ test("candidate export includes custom artifacts and omits reserved vault preima
   writeAdmission(admission);
   const offline = await reviewCommand(["--check", ...admissionArgs], neverRuntime);
   assert.equal(offline.admission, "auto-approved");
-  assert.equal(offline.scope.upperUsdMicros, (offline.packets + 1) * 250_000);
+  assert.equal(offline.scope.upperUsdMicros, offline.packets * 250_000);
   assert.equal(readdirSync(ledger).length, 0);
   writeAdmission({ ...admission, caps: { maxTotalUsd: 0.000001 } });
   await assert.rejects(reviewCommand(liveArgs, neverRuntime), /cost cap/);
   writeAdmission(admission);
-  await assert.rejects(reviewCommand(liveArgs, () => {
-    assert.match(readdirSync(path.join(ledger, change))[0], /^[a-f0-9]{64}\.json$/);
-    throw new Error("Synthetic boundary stops before opening the runtime");
-  }), /Synthetic boundary/);
-  await assert.rejects(reviewCommand(liveArgs, neverRuntime), /redeemed/);
+  const failed = await reviewCommand(liveArgs);
+  assert.equal(failed.phase, "client-failed");
+  assert.match(readdirSync(path.join(ledger, change))[0], /^[a-f0-9]{64}\.json$/);
+  await assert.rejects(reviewCommand([...liveArgs.slice(0,-1), path.join(f.root,"missing-output")]), /Output|output/);
   binding.configurationSha256 = "0".repeat(64);
   writeFileSync(paths.expect, jsonBytes(binding));
-  await assert.rejects(reviewCommand(["--check", ...checkArguments], neverRuntime), /pin or model mismatch/);
+  await assert.rejects(reviewCommand(["--check", ...checkArguments], neverRuntime), /configuration pin differs/);
 
   await t.test("configured reviewer requires an independent seal before offline or live admission", async (t) => {
     const adapter = harnessBinding(f.root);
-    const hostBytes = jsonBytes({ ...config, maxTurns: largest + 11, localHarness: adapter });
+    const hostBytes = jsonBytes({ ...config, localHarness: adapter });
     const configurationSha256 = sha256(hostBytes);
     writeFileSync(paths.host, hostBytes);
     const seal = harnessSeal(f.root, adapter, configurationSha256, target);
     const attached = readFileSync(seal.file);
     const name = "fixture-harness.json";
     t.after(() => rmSync(path.join(f.repo, name), { force: true }));
-    const reviewed = { ...request, snapshot: { ...request.snapshot, harness: name },
+    const reviewed = { ...request, worker: { ...request.worker, identity: { ...request.worker.identity, attempt: "harness-attempt" },
+      evidenceRoots: [path.join(f.root, "harness-output")] }, snapshot: { ...request.snapshot, harness: name },
       attachments: { ...request.attachments, [name]: sha256(attached) } };
     const exportPath = path.join(f.root, "harness-export");
     const args = ["--request", paths.request, "--expect", paths.expect, "--export", exportPath, "--host-config", paths.host];
-    const live = ["--mode", "candidate", ...args, "--output", paths.output, "--admission", admissionFile];
-    const expect = { ...binding, configurationSha256, requestSha256: sha256(jsonBytes(reviewed)), exportSha256: null };
+    const nextOutput = path.join(f.root, "harness-output");
+    const live = ["--mode", "candidate", ...args, "--output", nextOutput, "--admission", admissionFile];
+    const expect = { schemaVersion: 2, model: binding.model, configurationSha256, requestSha256: sha256(jsonBytes(reviewed)), exportSha256: null };
     const retain = (harness) => writeFileSync(paths.expect, jsonBytes({ ...expect, harness }));
     chmodSync(paths.expect, 0o600);
     writeFileSync(paths.request, jsonBytes(reviewed));
@@ -465,7 +500,7 @@ test("candidate export includes custom artifacts and omits reserved vault preima
     expect.requestSha256 = sha256(jsonBytes(reviewed));
     retain(seal);
     const prepared = await reviewCommand(["--prepare", ...args], neverRuntime);
-    expect.exportSha256 = prepared.exportSha256;
+    Object.assign(expect, prepared);
     retain(seal);
     assert.equal((await reviewCommand(["--check", ...args], neverRuntime)).exportSha256, prepared.exportSha256);
     assert.ok(!readFileSync(path.join(exportPath, "files/context", name)).includes(seal.file));
@@ -480,9 +515,7 @@ test("candidate export includes custom artifacts and omits reserved vault preima
     mkdirSync(configuredLedger, { mode: 0o700 });
     writeAdmission({ ...admission, ledger: configuredLedger, configurationSha256,
       phaseGrant: { ...admission.phaseGrant, requestSha256: expect.requestSha256 } });
-    await assert.rejects(reviewCommand(live, () => {
-      throw new Error("Synthetic configured boundary before reviewer runtime");
-    }), /Synthetic configured boundary/);
+    assert.equal((await reviewCommand(live)).phase, "client-failed");
   });
 
   const archive = `openspec/changes/archive/2026-11-25-${change}`;

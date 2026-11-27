@@ -9,11 +9,11 @@ Portable engineering workflows for AI coding agents that use OpenSpec. This repo
 | [Operator tutorial](docs/openspec-operator-tutorial.md) | Lifecycle, exact replies, session handoff, four role bindings and Intent-Driven planning. |
 | [Operator runbook](docs/openspec-operator-runbook.md) | Prepare, deliver, resume protected finish and recover. |
 | [OpenSpec workflow](docs/openspec-workflow.md) | Repository SDLC and governing authority. |
-| [External AI roles and backend pilots](docs/configurable-backends.md) | Discovery, previewed external configuration, version policy and qualification status. |
+| [External AI roles and backend setup](docs/configurable-backends.md) | Client discovery, preview and confirmation of Direct-CLI setup, and optional role bindings. |
 | [Review and finish configuration](docs/openspec-review-configuration.md) | Paid review modes, host pins, local harness and standing triggers. |
 | [OpenSpec installation](docs/openspec-installation.md) | Upstream prerequisite and upgrade procedures. |
 | [Claude installation](docs/claude-installation.md) | Native marketplace, ZIP installation and host checks. |
-| [Contained reviewer](docs/claude-reviewer.md) | Pinned host configuration, route qualification and offline receipt replay. |
+| [Direct-CLI independent review](docs/claude-reviewer.md) | Native review through supported installed CLI clients, with offline packet preparation and receipt verification. |
 | [Exclusive worker runtime](docs/worker-runtime.md) | Qualified worker setup, role bindings and recovery. |
 | [OpenSpec metadata](docs/openspec-metadata.md) | Native identity, issue links, validation and vault views. |
 
@@ -72,14 +72,7 @@ is keyed to the native task, not a session or label. Unintegrated contract chang
 are inert for their own change through integration. Each freeze keeps its
 original policy and approval.
 
-The optional [exclusive worker runtime](docs/worker-runtime.md) connects a
-host-wide claim and sealed, settled worker attempt to both delivery modes.
-`openspec-next inspect` reads that evidence. Execution preserves the
-selected role pair, restrictions, exact candidate gates and independent
-review across ordered groups and corrections. Sealed synthetic trials on one
-Linux host qualified dedicated Codex 0.171.0 / GPT-6.2-sol and read-only Claude
-Code 2.1.330 / Claude Sonnet 4.6 on Bubblewrap 0.9.0 via the `same-uid-key` relay.
-The qualification is bound to the pinned runtime and role configuration.
+The optional [exclusive worker runtime](docs/worker-runtime.md) uses the separate orchestration package. Verify independent native implementer qualification and the exact Direct-CLI reviewer binding.
 
 The delivery Git helpers share an explicit [child environment contract](skills/software-development/openspec-delivery/references/git-environment.md):
 only allowlisted runtime/configuration values reach Git, with global/system selectors
@@ -781,9 +774,9 @@ no generated skill copies are committed. Its explicit skill lists separate the
 OpenSpec companion workflow from opt-in orchestration. Bump every affected plugin's version when
 its bundled content changes. See the [Claude release checks](docs/claude-installation.md#maintainer-verification).
 
-Current source versions are delivery 1.11.0 and its affected
-`openspec-development` plugin 1.11.0; `openspec-next` is 0.8.0 and
-`autonomous-orchestration` is 1.15.0 (core skill 0.25.0). Complete well-known output,
+Current source versions are delivery 1.12.0 and its affected
+`openspec-development` plugin 1.12.0; `openspec-next` is 0.9.0 and
+`autonomous-orchestration` is 1.16.0 (core skill 0.26.0). Complete well-known output,
 skill ZIPs, workflow plugin ZIP and isolated native copies must retain all support
 files byte-for-byte, including delivery's runtime and evidence commands and next's
 read-only routing script and reference. Include `scripts/delegated-delivery.mjs`
@@ -793,13 +786,7 @@ proof or a claim of updated public downloads, native client discovery, Desktop
 acceptance or scanner approval. No upstream prerequisite or installation route is
 added by this representation facility.
 
-The packaged contained reviewer is a separate opt-in for approved candidate or
-charter-v1 exports. Claude remains the qualified default under its original
-pins. Pi 1.5.2 through host Hermes proxy xAI OAuth has synthetic offline evidence
-and requires an exact separately granted live qualification before real review.
-Grok 1.0.92 fails closed because its native stream has no verified host-only
-xAI OAuth path through the inference socket. The setup, limits and offline replay
-procedure are in the [operator guide](docs/claude-reviewer.md).
+For an adopting integrated parent, select the installed Direct-CLI reviewer and bind exact phase authority, packet evidence and offline replay. Earlier parents use their original pinned verifier. [Reviewer setup](docs/claude-reviewer.md)
 
 Preserve orchestration's complete `references/portable-core.md`,
 `scripts/orchestration-core.mjs`, `references/worker-handoff.md`,
@@ -852,5 +839,3 @@ The build tests cover metadata, workflow contracts, complete inventories, forbid
 The initial collection was extracted from [AI Software Blueprint](https://github.com/forgegod/ai-software-blueprint), preserving skill authors and versions. Skill source, testing, and publication are owned here; the scanner-blocked one-time blueprint initializer remains local to that blueprint for migration.
 
 MIT; see [LICENSE](LICENSE).
-
-The tier-aware setup and verification paths are documented in [Containment tiers](docs/containment-tiers.md). Claude remains the sealed Tier A default. Tier B requires explicit configuration and exact runtime qualification.

@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { closeSync, constants, fstatSync, lstatSync, openSync, readlinkSync, readSync, realpathSync } from "node:fs";
 import path from "node:path";
@@ -14,22 +15,63 @@ export function disjoint(a, b) {
   return outside(a, b) && outside(b, a);
 }
 
+const windowsAclScript = String.raw`
+$ErrorActionPreference = 'Stop'
+$file = [Environment]::GetEnvironmentVariable('DIRECT_REVIEW_ACL_PATH')
+$acl = Get-Acl -LiteralPath $file
+$user = [Security.Principal.WindowsIdentity]::GetCurrent().User
+$trusted = @($user.Value, 'S-1-5-18', 'S-1-5-32-544', 'S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464')
+$owner = $acl.GetOwner([Security.Principal.SecurityIdentifier])
+if ($owner.Value -notin $trusted -or ($env:DIRECT_REVIEW_ACL_PRIVATE -eq '1' -and $owner.Value -ne $user.Value)) { exit 2 }
+$protected = if ($env:DIRECT_REVIEW_ACL_PRIVATE -eq '1') { 0x1f01ff } else { 0x0d0156 }
+foreach ($rule in $acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) {
+  if ($rule.AccessControlType -eq 'Allow' -and $rule.IdentityReference.Value -notin $trusted -and
+      (([int]$rule.FileSystemRights -band $protected) -ne 0)) { exit 3 }
+}
+exit 0
+`;
+
+function windowsPathAccess(file, privateOnly = false) {
+  const system = process.env.SystemRoot;
+  if (!absolute(system)) return false;
+  const powershell = path.join(system, "System32", "WindowsPowerShell", "v1.0", "powershell.exe");
+  const result = spawnSync(powershell, ["-NoProfile", "-NonInteractive", "-Command", windowsAclScript], {
+    env: { SystemRoot: system, WINDIR: system, DIRECT_REVIEW_ACL_PATH: file,
+      DIRECT_REVIEW_ACL_PRIVATE: privateOnly ? "1" : "0" }, stdio: "ignore", windowsHide: true, timeout: 6500,
+  });
+  return !result.error && result.status === 0;
+}
+
+export function privatePath(file, stat = lstatSync(file)) {
+  if (process.platform === "win32") return windowsPathAccess(file, true);
+  return stat.uid === process.getuid() && !(stat.mode & 0o077);
+}
+
 export function trustedHostPath(file) {
-  if (!absolute(file) || !process.getuid) return null;
+  if (!absolute(file)) return null;
+  if (process.platform === "win32") {
+    try {
+      const resolved = path.normalize(realpathSync(file));
+      return windowsPathAccess(resolved) && windowsPathAccess(path.dirname(resolved)) ? resolved : null;
+    } catch {
+      return null;
+    }
+  }
   const uid = process.getuid();
+  const systemUid = lstatSync(path.parse(file).root).uid;
   const resolve = (entry, links, ancestor = false) => {
     const parent = path.dirname(entry);
     const directory = parent === entry ? entry : resolve(parent, links, true);
     if (!directory) return null;
     const candidate = parent === entry ? entry : path.join(directory, path.basename(entry));
     const info = lstatSync(candidate);
-    if (info.uid !== 0 && info.uid !== uid) return null;
+    if (info.uid !== systemUid && info.uid !== uid) return null;
     if (info.isSymbolicLink()) {
       if (links.has(candidate) || links.size >= 40) return null;
       return resolve(path.resolve(directory, readlinkSync(candidate)), new Set([...links, candidate]), ancestor);
     }
     // A root-owned sticky ancestor cannot be used by another UID to replace a trusted child.
-    const stickyAncestor = ancestor && info.isDirectory() && info.uid === 0 && (info.mode & 0o1000);
+    const stickyAncestor = ancestor && info.isDirectory() && info.uid === systemUid && (info.mode & 0o1000);
     if ((info.mode & 0o022) && !stickyAncestor) return null;
     return (ancestor ? info.isDirectory() : info.isDirectory() || info.isFile()) ? candidate : null;
   };
@@ -47,15 +89,17 @@ export function inspectPinnedFile(input, { executable = false, excluded = [], re
   if (discover) need(trustedHostPath(pin.path) === pin.path, "Untrusted discovery path");
   need(realpathSync(pin.path) === pin.path && excluded.every((root) => disjoint(root, pin.path)), "Unsafe or overlapping pinned file");
   const parent = lstatSync(path.dirname(pin.path));
-  need(process.getuid && [0, process.getuid()].includes(parent.uid) && !(parent.mode & 0o022), "Untrusted pin directory");
-  const fd = openSync(pin.path, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  const owners = [lstatSync(path.parse(pin.path).root).uid, process.getuid?.()];
+  need(process.platform === "win32" ? trustedHostPath(pin.path) === pin.path :
+    owners.includes(parent.uid) && !(parent.mode & 0o022), "Untrusted pin directory");
+  const fd = openSync(pin.path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0));
   const hash = createHash("sha256");
   const chunks = [];
   try {
     const before = fstatSync(fd);
-    need(before.isFile() && [0, process.getuid()].includes(before.uid) && !(before.mode & 0o022) &&
+    need(before.isFile() && (process.platform === "win32" || owners.includes(before.uid) && !(before.mode & 0o022)) &&
       before.size > 0 && before.size <= (executable || runtime ? 512 * 1024 * 1024 : 64 * 1024) &&
-      (executable ? before.mode & 0o111 : before.nlink === 1), "Untrusted pinned file");
+      (executable ? process.platform === "win32" || before.mode & 0o111 : before.nlink === 1), "Untrusted pinned file");
     const buffer = Buffer.alloc(64 * 1024);
     let remaining = before.size;
     while (remaining) {

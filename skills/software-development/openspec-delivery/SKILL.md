@@ -1,7 +1,7 @@
 ---
 name: openspec-delivery
 description: Automate setup, execution and closeout of OpenSpec changes.
-version: 1.11.0
+version: 1.12.0
 author: Raphael (forgegod), Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -27,20 +27,16 @@ separate operator decisions.
 For Codex Auto-review under adopting integrated policy, use the standalone Node
 command after preparing and checking the sealed export offline. Set
 `review_cli` to the absolute packaged `scripts/review-candidate.mjs` path, and
-substitute the absolute artifact paths. This invokes the authorized probe and
-paid candidate review under the retained admission.
+substitute the absolute artifact paths. This invokes the paid candidate review under the retained admission.
 
 ```text
 node "$review_cli" --mode candidate --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --admission ADMISSION --output OUTPUT
 ```
 
 Replay the sealed result offline before candidate readback. Follow
-[the operator workflow](references/operator-workflow.md#launch-contained-review)
+[the operator workflow](references/operator-workflow.md#launch-independent-review)
 for approach review and authority.
-Use an explicit alternative only with the independently pinned qualification
-for its exact runtime and host relay. The optional Pi trial is a separate
-synthetic single-run action under the
-[integrated review authority](references/low-touch.md#host-configuration-and-finish-triggers).
+The installed client and effective settings must match the independently retained host pin.
 Use the local capture, seal and offline readback interfaces for byte-preserving
 gate, readback and review evidence. [Evidence retention](references/evidence-retention.md).
 

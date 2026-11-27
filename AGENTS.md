@@ -3,6 +3,7 @@
 <!-- openspec-delivery-mode: goal-first -->
 <!-- openspec-proposal: propose-to-freeze -->
 <!-- openspec-low-touch: {} -->
+<!-- openspec-reviewer: direct-cli-v1 -->
 
 ## Purpose
 
@@ -17,10 +18,10 @@ Maintain portable AI coding-agent playbooks and publish complete Agent Skills pa
 
 ## Local Contracts
 
-- Keep tier and driver fields bound to admission and replay. Claude remains the sealed Tier A default. Dedicated-auth and optional platform routes require their own matching qualification. See [Containment tiers](docs/containment-tiers.md).
+- An integrated parent bearing the reviewer marker selects Direct-CLI independent review. Keep fresh sessions, disposable packet inputs, workspace integrity and offline evidence exact. Earlier parents keep their original pinned verifier and original authority. See [Direct-CLI review](docs/claude-reviewer.md).
+
 
 - The external role setup and pilot disposition contract lives in `docs/configurable-backends.md`. Setup writes only confirmed external files. Preserve original approved legacy pins and require separate live qualification for explicit pilots.
-- Claude remains the default contained reviewer with its original host pins and sealed captures. Optional Pi 1.5.2 requires the exact release, private host Hermes proxy xAI OAuth relay and matching offline and bounded live qualification. Keep Grok 1.0.92 unsupported while its host-only OAuth route is unverified. A synthetic trial has its own single-run authority and exposes only the fixed benign fixture. See [contained reviewer setup](docs/claude-reviewer.md).
 
 - Read applicable parent and child AGENTS.md files before editing. Update owning contracts and child indexes after changing durable responsibilities or workflows.
 - `skills/<category>/<name>/SKILL.md` is canonical. Generated `.well-known/skills/` packages contain only SKILL.md and explicitly supported package directories, never repository-control documents, credentials, or profile state.

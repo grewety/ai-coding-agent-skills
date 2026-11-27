@@ -9,7 +9,6 @@ import { acquireClaim, claimPath, defaultRegistry, exclusiveOperation, openRegis
   retireReservation, serializedOperation, slotPath } from "./implementer-claims.mjs";
 import { verifyPostWorker } from "./implementer-observations.mjs";
 import { currentAttempt, handoffFor, supervisorBinding, verifyTimeoutContinuation } from "./implementer-recovery.mjs";
-import { tierIdentity } from "./containment-tier.mjs";
 import { buildCodexLaunch, smokeCheck } from "./implementer-sandbox.mjs";
 import { cancelSupervisor, operationProcess, startSupervisor } from "./implementer-supervisor.mjs";
 import { identifier, newDirectory, privateDirectory, readState, syncDirectory, trustedJson, writeState } from "./implementer-state.mjs";
@@ -18,15 +17,17 @@ import { attemptWindow, checkCheckout, checkoutProtectedPaths, gitState, loadAut
 const packageRoot = fileURLToPath(new URL("../", import.meta.url)).replace(/\/$/, "");
 // Keep this inventory in sync with the delivery verifier and its transitive inventory test.
 const runtimeSources = [
-  "adapter-qualification.mjs", "agent-configuration.mjs", "agent-discovery.mjs", "agent-pi-runtime.mjs", "agent-role-adapters.mjs",
-  "agent-role-config.mjs", "agent-setup.mjs", "role-config.mjs", "runtime-version.mjs", "setup.mjs", "containment-tier.mjs",
+  "adapter-qualification.mjs", "agent-configuration.mjs", "agent-discovery.mjs", "agent-role-adapters.mjs",
+  "agent-role-config.mjs", "agent-setup.mjs", "role-config.mjs", "runtime-version.mjs", "setup.mjs",
   "bounded-worker.mjs", "bounded-worker.py", "implementer-bindings.mjs", "implementer-claims.mjs",
   "implementer-observations.mjs", "implementer-recovery.mjs", "implementer-runtime.mjs", "implementer-sandbox.mjs",
   "implementer-state.mjs", "implementer-supervisor.mjs", "implementer-supervisor.py", "orchestration-core.mjs",
-  "review-admission.mjs", "review-archive.mjs", "review-candidate.mjs", "review-inputs.mjs", "review-packet-scheduler.mjs", "review-relay.mjs",
-  "containment-linux-offline.mjs", "review-grok-offline.mjs", "review-runtime-scratch.mjs", "review-runtime.mjs", "review-sandbox-bridge.mjs", "review-stream.mjs",
+  "review-admission.mjs", "review-archive.mjs", "review-candidate.mjs", "review-inputs.mjs", "review-packet-scheduler.mjs",
+  "review-runtime.mjs", "review-stream.mjs",
   "harness-result.mjs", "low-touch-policy.mjs", "planning-inventory.mjs", "review-preflight.mjs",
   "review-spend.mjs", "review-upstream-status.mjs",
+  "review-direct-adapters.mjs", "review-direct-receipt.mjs", "review-direct-supervisor.mjs",
+  "review-direct-supervisor.py", "review-direct-worktree.mjs",
   "run-implementer.mjs", "terminal-adapters.mjs", "worker-handoff.mjs", "worker-runtime-policy.mjs",
 ];
 
@@ -141,11 +142,11 @@ async function dimensions(context) {
   const { entry, roles, registry, grant } = context;
   const workspace = entry.request.identity.workspace;
   const { codexHome, home, xdg } = roles.pair.implementer;
-  const roots = [workspace, registry, entry.request.evidenceRoots[0], codexHome, home, xdg, roles.pair.reviewer.slot,
+  const roots = [workspace, registry, entry.request.evidenceRoots[0], codexHome, home, xdg, ...(roles.pair.reviewer.slot ? [roles.pair.reviewer.slot] : []),
     ...await checkoutProtectedPaths(workspace)];
   const locations = [entry.approval.path, entry.grant.path, entry.host.path, grant.inference.path,
     ...[grant.continuation?.path, ...grant.accepted.map(({ receipt }) => receipt?.path)].filter(Boolean), ...[roles.pair.implementer, roles.pair.reviewer]
-    .flatMap((role) => [role.configuration.path, role.qualification.path, ...role.inventory.map((pin) => pin.path)])];
+    .flatMap((role) => [role.configuration.path, ...(role.qualification ? [role.qualification.path] : []), ...role.inventory.map((pin) => pin.path)])];
   for (const loc of locations) need(roots.every((root) => separate(root, loc)), "Trusted runtime/authority locator overlaps protected state");
 }
 
@@ -184,13 +185,13 @@ async function prepareAttempt(entry, registry, runtimeSha256, batchSize, emit, r
   need(batchSize <= grant.limits.batchSize && (batchSize === 1 || (predecessor === null && grant.accepted.length === 0)),
     "Batch must contain independently admitted initial assignments");
   need(predecessor !== null || grant.continuation === null, "Continuation lacks its original predecessor");
-  const roles = await bindPair(entry, grant, runtimeSha256, registry, prospective, runtimeIdentity);
+  const roles = await bindPair(entry, grant, runtimeSha256, registry, prospective);
   if (standalone) need(roles.roleAudit, "Standalone Implementer requires a qualified explicit pair");
   const context = { entry, grant, roles, registry, repository, claimDirectory, runtimeSha256 };
   await dimensions(context);
   const evidence = request.evidenceRoots[0];
   const { home, xdg, codexHome } = roles.pair.implementer;
-  const excludedRoots = [workspace, registry, home, xdg, codexHome, roles.pair.reviewer.slot];
+  const excludedRoots = [workspace, registry, home, xdg, codexHome, ...(roles.pair.reviewer.slot ? [roles.pair.reviewer.slot] : [])];
   need(excludedRoots.every((root) => separate(root, evidence)), "Attempt overlaps repository/profile/worker scratch");
   await safePath(evidence, true);
   try {
@@ -207,7 +208,7 @@ async function prepareAttempt(entry, registry, runtimeSha256, batchSize, emit, r
     const now = Date.now();
     const { deadline, timeoutMs } = attemptWindow(request, grant, roles, history, owner.createdAt, expiry, now);
     const binding = physicalReservation(owner.claimId, attempt, roles);
-    const launch = { schemaVersion: 1, ...tierIdentity(roles), repository, workspace, change, task, attempt, predecessor, transition,
+    const launch = { schemaVersion: 1, repository, workspace, change, task, attempt, predecessor, transition,
       claimId: owner.claimId, nonce: randomUUID(), startedAt: now, sequence: history.length, deadline,
       limits: grant.limits, grantExpiresAt: grant.expiresAt,
       requestSha256: hash(requestBytes(request)), invocationSha256: hash(jsonBytes(entry)), runtimeSha256,
@@ -270,7 +271,7 @@ async function prepareAttempt(entry, registry, runtimeSha256, batchSize, emit, r
   await checkCheckout(request, grant, { allowRetainedProgress: Boolean(launch.timeoutContinuation) });
   const refreshed = await loadAuthority(entry, repository);
   need(equal(refreshed.grant, grant) && equal(refreshed.inference, inference), "Execution authority changed after preflight");
-  const checkedRoles = await bindPair(entry, grant, runtimeSha256, registry, prospective, runtimeIdentity);
+  const checkedRoles = await bindPair(entry, grant, runtimeSha256, registry, prospective);
   need(equal(checkedRoles, roles), "Paired role runtime changed after native preflight");
   const protectedGit = await gitState(workspace);
   if (prospective) {
@@ -368,8 +369,8 @@ async function retainedContext(entry, registry) {
     launch.requestSha256 === hash(requestBytes(entry.request)) && launch.invocationSha256 === hash(jsonBytes(entry)) &&
     launch.runtimeSha256 === runtimeSha256, "Original retained attempt, runtime or request differs");
   const { grant, prospective } = await loadAuthority(entry, repository);
-  const roles = await bindPair(entry, grant, runtimeSha256, registry, prospective, runtimeIdentity);
-  need(equal(tierIdentity(roles), tierIdentity(launch)) && equal(roles.pair, launch.pair) && equal(roles.roleAudit, launch.roleAudit) && equal(roles.physicalSlot, launch.slot) &&
+  const roles = await bindPair(entry, grant, runtimeSha256, registry, prospective);
+  need(equal(roles.pair, launch.pair) && equal(roles.roleAudit, launch.roleAudit) && equal(roles.physicalSlot, launch.slot) &&
     equal(physicalReservation(launch.claimId, attempt, roles), launch.reservation), "Original pinned role or physical slot differs");
   return { entry, registry, repository, claimDirectory, attemptDirectory, owner, launch, grant, roles, runtimeSha256 };
 }

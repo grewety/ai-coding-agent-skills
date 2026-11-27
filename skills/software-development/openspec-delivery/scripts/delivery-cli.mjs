@@ -158,12 +158,16 @@ export async function verifyHandover(input, pinnedReviewCommand) {
     const verified = await reviewCommand(["--verify", "--request", request, "--expect", expect, "--export", exportDirectory, "--output", output]);
     need(verified.phase === "complete" && verified.result?.identity?.role === "reviewer" &&
       stableJson(requestRecord.worker.identity) === stableJson(verified.result.identity) &&
-      verified.result.runtime?.session === requestRecord.session && verified.sessions?.[1] === requestRecord.session &&
+      verified.result.runtime?.session === requestRecord.session &&
+      verified.sessions?.[expectation.schemaVersion === 2 ? 0 : 1] === requestRecord.session &&
+      (expectation.schemaVersion !== 2 || digest(input.expectFileSha256) &&
+        verified.transport === "direct-cli" && ["whole-file", "receipt-only"].includes(verified.coverage)) &&
       readBounded(request, 1024 * 1024).equals(requestBytes) && readBounded(expect, 1024 * 1024).equals(expectBytes),
     "Reviewer request or runtime identity differs from its handover");
     return { ...verified, request: requestRecord.worker, reviewSnapshot: requestRecord.snapshot,
       reviewPolicyBinding: requestRecord.policy, reviewConfigurationSha256: expectation.configurationSha256,
       reviewExplicitBinding: expectation.explicit, reviewGenerator: expectation.generator,
+      reviewTransport: verified.transport, reviewCoverage: verified.coverage, reviewRuntime: expectation.runtime,
       reviewAttachments: requestRecord.attachments,
       reviewHarnessReferenceSha256: expectation.harness === undefined ? undefined : sha256(stableJson(expectation.harness)),
       reviewStatusSha256: expectation.statusSha256 };
@@ -388,6 +392,8 @@ async function readDeliveryHandover(input, { context, policy, identity, snapshot
       stableJson(id.inputs) === stableJson(context.inputs) &&
       separate(id.workspace, identity.workspace) && separate(id.workspace, input.repo),
     "Contained review does not cover the full approved candidate from an isolated checkout");
+    if (context.directReviewer) need(handoff.reviewTransport === "direct-cli" &&
+      handoff.reviewCoverage === "whole-file", "The integrated candidate requires Direct-CLI whole-file evidence");
     if (context.lowTouch) {
       need(handoff.reviewPolicyBinding?.parent === context.parent && handoff.reviewPolicyBinding.target === context.target &&
         handoff.reviewConfigurationSha256 === input.hostConfiguration?.sha256,

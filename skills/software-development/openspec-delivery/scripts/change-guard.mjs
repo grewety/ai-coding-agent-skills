@@ -6,7 +6,7 @@ import { closeSync, constants, fstatSync, lstatSync, openSync, readFileSync, ope
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { gitEnvironment } from "./git-environment.mjs";
-import { readLowTouchPolicy } from "./low-touch-policy.mjs";
+import { directReviewAdopted, readLowTouchPolicy } from "./low-touch-policy.mjs";
 import { planningBudget, planningLayout, planningLimits, safePlanningPath } from "./planning-inventory.mjs";
 import { readBounded, sha256, stableJson, verifyGateRun } from "./evidence-retention.mjs";
 import { goalContractIdentity, readGoalContract, withinScope } from "./delivery-control.mjs";
@@ -752,7 +752,9 @@ export function integratedPolicyContext(repo, parent, target, allowUnintegratedP
   const proposals = [...source.matchAll(/^<!-- openspec-proposal: ([^\r\n]*?) -->\r?$/gm)];
   const proposeToFreeze = integrated && proposals.length === 1 && proposals[0][1] === "propose-to-freeze";
   const lowTouch = integrated ? readLowTouchPolicy(rootContractSource) : null;
-  return { ok: integrated, parent, target, contractInputs, ...(lowTouch ? { lowTouch } : {}), goalFirstOptIn: integrated && goalFirstOptIn, delegatedRuntime, proposeToFreeze };
+  const directReviewer = Boolean(lowTouch && directReviewAdopted(rootContractSource));
+  return { ok: integrated, parent, target, contractInputs, ...(lowTouch ? { lowTouch } : {}),
+    ...(directReviewer ? { directReviewer } : {}), goalFirstOptIn: integrated && goalFirstOptIn, delegatedRuntime, proposeToFreeze };
 }
 
 function commitParents(repo, ref) {

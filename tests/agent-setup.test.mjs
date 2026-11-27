@@ -26,11 +26,9 @@ function fixture(t) {
   writeFileSync(command, executableBytes, { mode: 0o700 });
   const executable = { path: command, sha256: hashBytes(executableBytes) };
   const codex = { client: "codex", provider: "openai", model: "gpt-fixture", reasoningEffort: "high", executable };
-  const claude = { ...codex, client: "claude-code", provider: "anthropic", model: "claude-fixture" };
-  return { root, workspace, command, executable, codex, input: { schemaVersion: 1, directory,
-    roles: { orchestrator: codex, implementer: codex, reviewer: claude, helper: null },
-    reviewer: { bubblewrap: { executable }, relay: { route: "same-uid-key", credentialRef: "fixture-reference" },
-      interPacketDelayMs: 100, timeoutMs: 5000, maxBudgetUsd: 1 } } };
+  return { root, workspace, command, executable, codex, input: { schemaVersion: 2, directory,
+    roles: { orchestrator: codex, implementer: codex, helper: null }, interPacketDelayMs: 100, maxBudgetUsd: 1,
+    reviewer: { client: "claude", model: "claude-fixture", timeoutMs: 5000 } } };
 }
 
 test("version audits preserve observed identity and independent checks", (t) => {
@@ -97,7 +95,7 @@ test("discovery reports untrusted executables without probing and filters the pr
     assert.equal(observed.versionProbe, "untrusted-path");
   }
   const cli = spawnSync(process.execPath, [new URL("../skills/software-development/openspec-delivery/scripts/detect-agents.mjs", import.meta.url).pathname],
-    { encoding: "utf8", env: { PATH: root } });
+    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: { PATH: root } });
   assert.equal(cli.status, 0, cli.stderr);
   const observed = JSON.parse(cli.stdout).agents;
   assert.equal(observed.find(({ client }) => client === "codex").version, "0.172.0");
@@ -175,12 +173,12 @@ test("setup previews exact bytes, refuses drift and reads back independent role 
   assert.deepEqual(readdirSync(input.directory), []);
   assert.ok(nativeRoleBinding(codex, "orchestrator").args.includes('model_reasoning_effort="high"'));
   assert.ok(JSON.parse(preview.outputs[2].utf8).openers.codex.args.includes('model_provider="openai"'));
-  assert.equal(JSON.parse(preview.outputs[0].utf8).maxTurns, 96);
+  assert.equal(JSON.parse(preview.outputs[0].utf8).reviewer.timeoutMs, 5000);
   assert.equal(JSON.parse(preview.outputs[0].utf8).maxBudgetUsd, 1);
-  const { maxBudgetUsd, ...defaultReviewer } = input.reviewer;
-  const defaultHost = JSON.parse(previewSetup({ ...input, reviewer: defaultReviewer }, options).outputs[0].utf8);
+  const { maxBudgetUsd, ...defaultRequest } = input;
+  const defaultHost = JSON.parse(previewSetup({ ...defaultRequest, reviewer: { client: "claude", model: "claude-fixture" } }, options).outputs[0].utf8);
   assert.equal(defaultHost.maxBudgetUsd, 2.50);
-  assert.equal(defaultHost.maxTurns, 96);
+  assert.equal(defaultHost.reviewer.timeoutMs, 300000);
   assert.throws(() => applySetup(input, "0".repeat(64), options), /confirmation/);
   const alias = path.join(root, "alias");
   symlinkSync(input.directory, alias);
@@ -204,7 +202,7 @@ test("setup previews exact bytes, refuses drift and reads back independent role 
   assert.deepEqual(launch.args, native);
   assert.throws(() => readWorksetOpener(pin, [...native, "--model", "elsewhere"], { workspace }), /workset members/);
   assert.throws(() => readWorksetOpener(pin, native, { workspace, env: { OPENAI_BASE_URL: "fixture" } }), /override/);
-  const opener = spawnSync(command, [...args, "--add-dir", workspace], { cwd: workspace, encoding: "utf8",
+  const opener = spawnSync(command, [...args, "--add-dir", workspace], { cwd: workspace, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"],
     env: { PATH: "/usr/bin:/bin", HOME: root } });
   assert.equal(opener.status, 0, opener.stderr);
   assert.deepEqual(opener.stdout.trimEnd().split("\n"), native);
@@ -236,7 +234,7 @@ test("configured opener requires approved root identities before forwarding atta
   assert.throws(() => readWorksetOpener(pin, [...native, "--add-dir", workspace], { workspace }), /Duplicate/);
   assert.throws(() => readWorksetOpener(pin, native, { workspace: unrelated }), /launch directory/);
   const rejected = spawnSync(command, [...args, "--add-dir", workspace, "--add-dir", unrelated],
-    { cwd: workspace, encoding: "utf8", env: { PATH: "/usr/bin:/bin", HOME: root } });
+    { cwd: workspace, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], env: { PATH: "/usr/bin:/bin", HOME: root } });
   assert.equal(rejected.status, 2);
   assert.equal(rejected.stdout, "");
   assert.match(rejected.stderr, /outside the approved workset roots/);
@@ -274,91 +272,20 @@ test("setup allows a distinct XDG application directory and refuses a live profi
   assert.deepEqual(readdirSync(separate), []);
 });
 
-function tierARequest(input, command, relayConfiguration) {
-  const { timeoutMs, ...reviewer } = input.reviewer;
-  return { ...input, reviewer: { ...reviewer, runtime: { node: { path: command }, libraries: [], relayConfiguration } } };
-}
-
-test("explicit tier setup previews exact bytes, binds confirmation and refuses unsafe dedicated auth", (t) => {
-  const { input, workspace, root, command, executable } = fixture(t);
-  const relay = path.join(root, "relay.json");
-  const relayBytes = '{"keyFile":"/synthetic/relay-fixture-key"}\n';
-  writeFileSync(relay, relayBytes, { mode: 0o600 });
-  const relayConfiguration = { path: relay, sha256: hashBytes(relayBytes) };
-  const request = tierARequest(input, command, relayConfiguration);
-  const a = previewSetup(request, { workspace, tier: "a" });
-  assert.deepEqual(readdirSync(input.directory), []);
-  const host = JSON.parse(a.outputs[0].utf8);
-  assert.equal(host.timeoutMs, 300000);
-  assert.deepEqual(host.runtime.node, executable);
-  assert.deepEqual(host.runtime.relayConfiguration, relayConfiguration);
-  assert.doesNotMatch(JSON.stringify(a), /relay-fixture-key/);
-  assert.equal(a.configurationSha256, hashBytes(a.outputs[0].utf8));
-  assert.throws(() => applySetup(request, "0".repeat(64), { workspace, tier: "a" }), /confirmation/);
-  const confirmed = applySetup(request, a.confirmationSha256, { workspace, tier: "a" });
-  assert.equal(confirmed.status, "verified");
-  assert.doesNotMatch(JSON.stringify(confirmed), /relay-fixture-key/);
-
-  const directory = path.join(root, "tier-b");
-  const authDirectory = path.join(root, "fixture-auth");
-  mkdirSync(directory, { mode: 0o700 });
-  mkdirSync(authDirectory, { mode: 0o700 });
-  const auth = path.join(authDirectory, "auth.json");
-  writeFileSync(auth, "benign-fixture-only", { mode: 0o600 });
-  const { relay: unusedRelay, timeoutMs, ...dedicated } = input.reviewer;
-  input.directory = directory;
-  input.reviewer = { ...dedicated, authDirectory, runtime: { node: executable, libraries: [] } };
-  input.roles.reviewer = { ...input.roles.reviewer, client: "grok-build", model: "grok-4.7", provider: "xai-oauth",
-    transport: "provider-https", versionPolicy: "exact", versionCheck: true, exactVersion: "1.0.92" };
-  const b = previewSetup(input, { workspace, tier: "b" });
-  assert.equal(b.qualification.status, "unqualified");
-  assert.ok(!JSON.stringify(b).includes("benign-fixture-only"));
-  assert.deepEqual(readdirSync(directory), []);
-  chmodSync(auth, 0o640);
-  assert.throws(() => previewSetup(input, { workspace, tier: "b" }), /Unsafe dedicated auth/);
-});
-
-test("Tier A setup refuses absent, untrusted, or inexact relay pins before writing", (t) => {
-  const { input, workspace, root, command } = fixture(t);
-  const relay = path.join(root, "relay.json");
-  const bytes = "{}\n";
-  writeFileSync(relay, bytes, { mode: 0o600 });
-  const pin = { path: relay, sha256: hashBytes(bytes) };
-  const options = { workspace, tier: "a" };
-  const preview = previewSetup(tierARequest(input, command, pin), options);
-  const shared = path.join(root, "shared");
-  const relayDirectory = path.join(shared, "relay");
-  mkdirSync(relayDirectory, { recursive: true, mode: 0o700 });
-  chmodSync(shared, 0o770);
-  const untrustedRelay = path.join(relayDirectory, "relay.json");
-  writeFileSync(untrustedRelay, bytes, { mode: 0o600 });
-  const directoryPin = path.join(root, "host-relay-directory");
-  mkdirSync(directoryPin, { mode: 0o700 });
-
-  for (const [invalid, error] of [
-    [{ ...pin, path: path.join(root, "missing-relay.json") }, /Untrusted relay configuration path/],
-    [{ ...pin, path: directoryPin }, /Untrusted pinned file/],
-    [{ ...pin, path: untrustedRelay }, /Untrusted relay configuration path/],
-    [{ path: relay }, /file pin/],
-    [{ ...pin, sha256: "0".repeat(64) }, /SHA-256 pin mismatch/],
-  ]) {
-    const request = tierARequest(input, command, invalid);
-    assert.throws(() => previewSetup(request, options), error);
-    assert.throws(() => applySetup(request, preview.confirmationSha256, options), error);
-    assert.deepEqual(readdirSync(input.directory), []);
+test("minimal confirmed setup writes only host.json and rejects incompatible settings", (t) => {
+  const { input, workspace } = fixture(t);
+  const options = { workspace };
+  const minimal = { schemaVersion: 2, directory: input.directory, reviewer: { client: "pi", model: "provider/model" } };
+  const preview = previewSetup(minimal, options);
+  assert.deepEqual(preview.outputs.map(({ name }) => name), ["host.json"]);
+  assert.deepEqual(JSON.parse(preview.outputs[0].utf8), { schemaVersion: 3, maxBudgetUsd: 2.5,
+    reviewer: { client: "pi", model: "provider/model", timeoutMs: 300000, packetConcurrency: 1 } });
+  assert.throws(() => applySetup({ ...minimal, reviewer: { ...minimal.reviewer, packetConcurrency: 2 } },
+    preview.confirmationSha256, options), /confirmation/);
+  for (const settings of [{ timeoutMs: 600001 }, { packetConcurrency: 4 }, { client: "missing" }, { relay: "old" }]) {
+    assert.throws(() => previewSetup({ ...minimal, reviewer: { ...minimal.reviewer, ...settings } }, options), /Invalid|Unsupported/);
   }
-});
-
-test("Tier A confirmation refuses relay contents changed after preview without writing", (t) => {
-  const { input, workspace, root, command } = fixture(t);
-  const relay = path.join(root, "relay.json");
-  const bytes = '{"fixture":1}\n';
-  writeFileSync(relay, bytes, { mode: 0o600 });
-  const request = tierARequest(input, command, { path: relay, sha256: hashBytes(bytes) });
-  const options = { workspace, tier: "a" };
-  const preview = previewSetup(request, options);
-
-  writeFileSync(relay, '{"fixture":2}\n');
-  assert.throws(() => applySetup(request, preview.confirmationSha256, options), /SHA-256 pin mismatch/);
   assert.deepEqual(readdirSync(input.directory), []);
+  applySetup(minimal, preview.confirmationSha256, options);
+  assert.deepEqual(readdirSync(input.directory), ["host.json"]);
 });

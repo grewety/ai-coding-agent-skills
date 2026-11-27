@@ -1,6 +1,6 @@
 # OpenSpec operator runbook
 
-See [external AI roles and backend pilots](configurable-backends.md) for explicit role settings and route dispositions.
+See [external AI roles and backend setup](configurable-backends.md) for explicit role settings and route dispositions.
 Confirm setup's exact external bytes separately from any profile update.
 Match qualification to the current runtime bytes before admitting a pilot.
 
@@ -48,7 +48,7 @@ resuming. For a qualified Herdr relay, use the separately authorized
 [checkpoint rotation](../skills/software-development/openspec-delivery/references/operator-workflow.md#read-only-status-and-checkpoint-relay)
 with the predecessor preserved through successor acknowledgement.
 
-## Launch contained review
+## Launch independent review
 
 For Codex Auto-review under adopting integrated policy, prepare and check
 the sealed export offline. Set `review_cli` to the absolute packaged
@@ -60,7 +60,7 @@ node "$review_cli" --mode candidate --request REQUEST --expect EXPECT --export E
 node "$review_cli" --mode approach --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --admission ADMISSION --output OUTPUT
 ```
 
-The live launch runs the automatic probe and sends scoped export packets for
+The live launch sends scoped export packets for
 paid inference under the exact phase and cost authority verified by
 `ADMISSION`. Codex still applies its permission checks. Replay the sealed
 result offline before reading back acceptance. See the [reviewer runbook](claude-reviewer.md)

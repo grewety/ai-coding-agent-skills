@@ -17,15 +17,9 @@ function setup() {
     return;
   }
   const args = process.argv.slice(2);
-  let tier;
-  if (args[0] === "--tier") {
-    tier = args[1];
-    need(["a", "b"].includes(tier), "Expected --tier a or --tier b");
-    args.splice(0, 2);
-  }
   const [file, flag, confirmation] = args;
   need(file && (flag === undefined || args.length === 3 && flag === "--confirm" &&
-    sha256Pattern.test(confirmation)), "Usage: setup.mjs [--tier a|b] REQUEST [--confirm PREVIEW_SHA256]");
+    sha256Pattern.test(confirmation)), "Usage: setup.mjs REQUEST [--confirm PREVIEW_SHA256]");
   const fd = openSync(file, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   let input;
   try {
@@ -41,13 +35,14 @@ function setup() {
     need(count === st.size, "Setup request changed during read");
     input = parseStrictJson(bytes.subarray(0, count));
   } finally { closeSync(fd); }
-  const result = flag ? applySetup(input, confirmation, { tier }) : previewSetup(input, { tier });
-  process.stdout.write(JSON.stringify(result, null, 2) + "\n");
+  need(input.schemaVersion === 2, "Expected a Direct-CLI setup request");
+  const result = flag ? applySetup(input, confirmation) : previewSetup(input);
+  writeSync(1, JSON.stringify(result, null, 2) + "\n");
 }
 
 try { setup(); }
 catch (error) {
-  process.stderr.write(JSON.stringify({ status: "blocked", reason: error.code ?? error.message,
+  writeSync(2, JSON.stringify({ status: "blocked", reason: error.code ?? error.message,
     ...(error.outputs ? { outputs: error.outputs } : {}) }) + "\n");
   process.exitCode = 2;
 }

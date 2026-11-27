@@ -6,7 +6,7 @@ const changeName = (value) => typeof value === "string" && /^[a-z][a-z0-9]*(?:-[
 const attemptId = (value) => typeof value === "string" && /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(value);
 const retained = (value) => value?.verified === true && text(value.reference);
 
-export function preflight({ live, auth, local, reviewer, relay, runtime, checkpoint, companions }, source, policy, delegation = null) {
+export function preflight({ live, auth, local, reviewer, reviewerSettings, relay, runtime, checkpoint, companions }, source, policy, delegation = null) {
   function matchInventory(actual, expected) {
     if (!actual || !expected || typeof actual !== "object" || typeof expected !== "object" ||
         Array.isArray(actual) || Array.isArray(expected)) return false;
@@ -14,6 +14,7 @@ export function preflight({ live, auth, local, reviewer, relay, runtime, checkpo
     return wanted.length > 0 && Object.keys(actual).length === wanted.length &&
       wanted.every((key) => digest(expected[key]) && actual[key] === expected[key]);
   }
+  const direct = policy?.directReviewer === true;
   const entries = [
     ["P1", "live-target", live, () => text(live.remote) && text(live.branch) && text(live.repository) && sha(live.head) &&
       (!delegation || live.repository === delegation.repository)],
@@ -21,12 +22,16 @@ export function preflight({ live, auth, local, reviewer, relay, runtime, checkpo
       auth.requiredScopesPresent === true],
     ["P3", "local-baseline", local, () => sha(live?.head) && source && source.branch === `refs/heads/${live.branch}` &&
       source.head === live.head && source.targetHead === live.head && source.trackingHead === live.head && source.dirty === false && local.activeChangeInventoryVerified === true],
-    ["P4", "reviewer-probe", reviewer, () => reviewer.outcome === "pass" && digest(reviewer.configurationSha256) &&
+    ["P4", direct ? "reviewer-offline-preflight" : "reviewer-probe", reviewer, () => reviewer.outcome === "pass" &&
+      (!direct || reviewer.transport === "direct-cli" && reviewer.packetFeasible === true) && digest(reviewer.configurationSha256) &&
       reviewer.configurationSha256 === reviewer.expectedConfigurationSha256 && digest(reviewer.packageSha256) &&
       reviewer.packageSha256 === companions?.expected?.reviewer &&
       (!delegation || reviewer.configurationSha256 === delegation.configuration && reviewer.packageSha256 === delegation.inventory)],
-    ["P5", "reviewer-relay", relay, () => relay.ready === true && relay.materialRetained === false &&
-      relay.configurationSha256 === reviewer?.configurationSha256],
+    ["P5", direct ? "reviewer-settings" : "reviewer-relay", direct ? reviewerSettings : relay, () =>
+      (direct ? reviewerSettings.ready === true && reviewerSettings.authentication === "normal-installed-client" &&
+        reviewerSettings.configurationSha256 === reviewer?.configurationSha256 :
+        relay.ready === true && relay.materialRetained === false &&
+      relay.configurationSha256 === reviewer?.configurationSha256)],
     ["P6", "local-runtime", runtime, () => ["node", "openspec"].every((tool) => text(runtime[tool]) &&
       runtime[tool] === runtime.expected?.[tool]) && runtime.node === process.version],
     ["P7", "integrated-checkpoint", checkpoint, () => sha(checkpoint.head) && checkpoint.head === live?.head &&
@@ -40,7 +45,8 @@ export function preflight({ live, auth, local, reviewer, relay, runtime, checkpo
   const ready = items.every(({ state }) => state === "pass");
   const followUp = items.find(({ state }) => state !== "pass")?.id ?? null;
   return { schemaVersion: 1, ready, items, followUp,
-    reviewerProbeAuthority: items[3].state === "pass" ? "retained-probe" : "separate-grant-required" };
+    ...(direct ? { reviewerPreflight: items[3].state } :
+      { reviewerProbeAuthority: items[3].state === "pass" ? "retained-probe" : "separate-grant-required" }) };
 }
 
 const reasonPattern = /^[A-Z][A-Z_]+$/;

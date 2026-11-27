@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFixtureSync } from "./test-shards.mjs";
 import fs, { cp, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { syncBuiltinESMExports } from "node:module";
 import os from "node:os";
@@ -85,7 +85,7 @@ test("CLI home-root isolation applies to --all and explicit selectors opt in to 
     [[...hermes, ...user], [...profiles, ...clients]],
   ];
   for (const [args, expected] of cases) await t.test(args.join(" ") || "default roots", () => {
-    const output = execFileSync(process.execPath, [script, ...args, "--dry-run"], {
+    const output = execFixtureSync(process.execPath, [script, ...args, "--dry-run"], {
       cwd: f.root, encoding: "utf8", env: { ...process.env, HOME: f.ambientHome, USERPROFILE: f.ambientHome },
     });
     assert.deepEqual([...output.matchAll(/Would install 5 skill packages into ([\w-]+)\./g)].map((match) => match[1]), expected);
@@ -359,7 +359,7 @@ test("preflights collisions across every selected profile before copying", async
 
 test("CLI accepts repeated --profile arguments and reports a dry run", async (t) => {
   const f = await fixture(t);
-  const output = execFileSync(
+  const output = execFixtureSync(
     process.execPath,
     [script, "--hermes-home", f.hermesHome, "--profile", "default", "--profile", "named", "--dry-run"],
     { cwd: f.root, encoding: "utf8" },
@@ -373,7 +373,7 @@ test("CLI accepts repeated --profile arguments and reports a dry run", async (t)
 test("CLI installs only a selected detected native client", async (t) => {
   const f = await fixture(t);
   await mkdir(path.join(f.userHome, ".codex"));
-  const output = execFileSync(
+  const output = execFixtureSync(
     process.execPath,
     [script, "--hermes-home", f.hermesHome, "--user-home", f.userHome, "--client", "codex", "--dry-run"],
     { cwd: f.root, encoding: "utf8" },
@@ -410,7 +410,7 @@ test("update replaces complete packages, backs up local edits, and installs miss
 test("CLI update supports dry-run and updates all five complete packages in selected scratch profiles", async (t) => {
   const f = await fixture(t);
   const args = [script, "--hermes-home", f.hermesHome, "--profile", "default", "--profile", "named"];
-  execFileSync(process.execPath, args, { encoding: "utf8" });
+  execFixtureSync(process.execPath, args, { encoding: "utf8" });
   for (const home of [f.hermesHome, path.join(f.hermesHome, "profiles", "named")]) {
     const obsolete = path.join(home, "skills/software-development/git-commit-message/scripts");
     await mkdir(obsolete, { recursive: true });
@@ -418,11 +418,11 @@ test("CLI update supports dry-run and updates all five complete packages in sele
     await writeFile(path.join(obsolete, "herdr-pane-state.mjs"), "Obsolete pane monitor.\n");
   }
   const before = await readdir(f.hermesHome);
-  const preview = execFileSync(process.execPath, [...args, "--update", "--dry-run"], { encoding: "utf8" });
+  const preview = execFixtureSync(process.execPath, [...args, "--update", "--dry-run"], { encoding: "utf8" });
   assert.match(preview, /Would install 0 and update 5 skill packages in default/);
   assert.match(preview, /Would install 0 and update 5 skill packages in named/);
   assert.deepEqual(await readdir(f.hermesHome), before);
-  const output = execFileSync(process.execPath, [...args, "--update"], { encoding: "utf8" });
+  const output = execFixtureSync(process.execPath, [...args, "--update"], { encoding: "utf8" });
   assert.match(output, /Installed 0 and updated 5 skill packages in default/);
   assert.match(output, /Installed 0 and updated 5 skill packages in named/);
   assert.match(output, /Backup:/);
@@ -481,7 +481,7 @@ test("local installs register the public update source and the exact installed h
     assert.deepEqual(entry.scan_provenance, {});
     assert.equal(entry.metadata.install_method, "local-checkout");
     assert.equal(entry.metadata.source_revision, undefined);
-    const actualHash = execFileSync("python3", ["-c", "import hashlib,pathlib,sys; p=pathlib.Path(sys.argv[1]); h=hashlib.sha256(); [(h.update(f.relative_to(p).as_posix().encode()+b'\\0'),h.update(f.read_bytes())) for f in sorted(p.rglob('*'),key=lambda f:f.relative_to(p).as_posix()) if f.is_file()]; print('sha256:'+h.hexdigest()[:16])", path.join(home, "skills", entry.install_path)], { encoding: "utf8" }).trim();
+    const actualHash = execFixtureSync("python3", ["-c", "import hashlib,pathlib,sys; p=pathlib.Path(sys.argv[1]); h=hashlib.sha256(); [(h.update(f.relative_to(p).as_posix().encode()+b'\\0'),h.update(f.read_bytes())) for f in sorted(p.rglob('*'),key=lambda f:f.relative_to(p).as_posix()) if f.is_file()]; print('sha256:'+h.hexdigest()[:16])", path.join(home, "skills", entry.install_path)], { encoding: "utf8" }).trim();
     assert.equal(entry.content_hash, actualHash);
   }
 });

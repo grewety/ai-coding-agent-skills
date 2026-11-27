@@ -27,32 +27,27 @@ This adds no upstream skill or runtime dependency. Package installation/validati
 does not establish native Git behavior; missing native macOS/Windows results remain
 hardening completion blockers, and WSL or case simulations do not replace them.
 
-For explicit role setup and version policy, see [external AI roles and backend pilots](configurable-backends.md).
+For explicit role setup and version policy, see [external AI roles and backend setup](configurable-backends.md).
 
-Delivery 1.11.0 (in `openspec-development` 1.11.0) also includes
+Delivery 1.12.0 (in `openspec-development` 1.12.0) also includes
 `references/evidence-retention.md`, `scripts/evidence-retention.mjs`,
 `scripts/evidence-cli.mjs`, `scripts/delivery-cli.mjs` and
 `scripts/delegated-delivery.mjs`, `scripts/finish-trigger-credits.mjs` and
 `scripts/pr-fix-lineage.mjs`. Keep the complete
-evidence and runtime support in companion copies and ZIPs. `openspec-next` is 0.8.0
+evidence and runtime support in companion copies and ZIPs. `openspec-next` is 0.9.0
 and ships `references/routing.md` and `scripts/next.mjs` for read-only routing to
 delivery. Install both complete packages in the intended host. The separate optional
-`autonomous-orchestration` plugin is 1.15.0 (core skill 0.25.0). Installation, account sync and
+`autonomous-orchestration` plugin is 1.16.0 (core skill 0.26.0). Installation, account sync and
 host execution verification remain separate; package byte checks establish none
 of native client discovery, Desktop acceptance or scanner approval.
 
-The contained reviewer is optional within the orchestration package. Keep its packaged
-runner and `scripts/review-packet-scheduler.mjs` together. Claude remains the default.
-The opt-in Pi 1.5.2 route requires a private host Hermes proxy socket for xAI OAuth
-and matching offline and bounded live qualification before real review. OpenSpec
-prerequisites and skill installation are separate from reviewer setup and the grant
-for export and paid inference. See the [contained reviewer guide](claude-reviewer.md).
+For an adopting integrated parent, select the installed Direct-CLI reviewer and bind exact phase authority, packet evidence and offline replay. Earlier parents use their original pinned verifier. [Reviewer setup](claude-reviewer.md)
 
 The [exclusive worker runtime](worker-runtime.md) uses the optional
 orchestration package only when the project selects delegated delivery.
-Sealed synthetic trials on one Linux host qualified the dedicated pinned Codex
-implementer and read-only Claude reviewer. Verify the exact runtime, host and
-role records and provision the dedicated operator configuration before use.
+Before use, verify the approved native implementer's qualification, the
+exact Direct-CLI reviewer binding and the role records, and provision the
+dedicated operator configuration.
 Dispatch requires bounded workflow authority and separate per-run inference
 authority. Its packaged `scripts/run-implementer.mjs` launch, recovery and
 evidence interfaces retain the seven upstream skills, CLI pin and installation
@@ -535,5 +530,3 @@ existing tests only when separately in scope. This is an author/reviewer obligat
 not a claim of new automated enforcement. Preserve archived plans and evidence as
 historical records; do not rewrite them. Migration documentation grants no uninstall,
 real-profile modification, scanner bypass or account-installation authority.
-
-Installed companion packages include explicit tier setup. External host configuration and runtime qualification follow the adopting project’s authority. See [Containment tiers](containment-tiers.md).

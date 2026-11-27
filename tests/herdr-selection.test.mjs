@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawnFixtureSync } from "./test-shards.mjs";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -22,7 +22,7 @@ async function run(t, panes, selection, inspection = { pane: "w1:p2", workspace:
       args.push("--inspection", proof);
     }
   }
-  return spawnSync("python3", args, { input: JSON.stringify({ result: { panes } }), encoding: "utf8" });
+  return spawnFixtureSync("python3", args, { input: JSON.stringify({ result: { panes } }), encoding: "utf8" });
 }
 const answered = { source: "clarify", outcome: "submitted", status: "answered", pane_id: "w1:p2" };
 

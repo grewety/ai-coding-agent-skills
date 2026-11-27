@@ -1,13 +1,12 @@
 import { hashBytes, inspectPinnedFile, jsonBytes, parseStrictJson } from "./agent-configuration.mjs";
 import { observeVersion } from "./agent-discovery.mjs";
-import { grokReviewerBlocker, nativeRoleBinding, piReviewer } from "./agent-role-adapters.mjs";
+import { directReviewClients, nativeRoleBinding } from "./agent-role-adapters.mjs";
 import { clients, fields, need, roleConfig, sha256Pattern, token, verifyEffectiveRole } from "./role-config.mjs";
-import { requireTier, tierFields, tierIdentity } from "./containment-tier.mjs";
 import { auditVersion } from "./runtime-version.mjs";
 
 const candidates = {
   implementer: ["codex", "claude-code", "hermes", "opencode", "pi", "agy", "grok-build", "kilo", "gemini"],
-  reviewer: ["claude-code", "grok-build", "pi", "codex", "gemini", "openrouter", "openai-compatible"],
+  reviewer: directReviewClients,
 };
 
 const limits = {
@@ -20,12 +19,7 @@ const limits = {
     agy: "Non-interactive effective role settings and native OS workspace-write isolation are unverified",
     "grok-build": "Effective reasoning effort and native OS workspace-write isolation are unverified",
   },
-  reviewer: {
-    "grok-build": grokReviewerBlocker,
-    pi: "No exact offline and bounded live proof for Pi through the host Hermes proxy xAI OAuth relay",
-    "claude-code": "No exact-route offline and bounded live proof of explicit reasoning effort through the isolated Anthropic relay and whole-file Read audit",
-    codex: "No qualified host inference relay plus stream-proved whole-file Read and receipt mapping for Codex",
-  },
+
 };
 
 const unsupported = (role, client, reason, runtimeVersion) => ({
@@ -38,41 +32,27 @@ const contracts = {
     "exclusiveClaim", "protectedPathsDenied", "publicationDenied", "nonInteractive",
     "originalProcessTreeSettled", "sealedFileHandover", "inventoryUnchanged",
   ] },
-  reviewer: { client: "claude-code", route: "claude-bubblewrap-read-only", controls: [
-    "effectiveSettings", "minimalRootfs", "readOnly", "directNetworkDenied", "unixSocketInference",
-    "credentialsAndDiagnosticsHostOnly", "unauthorizedToolsDenied", "wholeFileStreamCoverage",
-    "nativeTerminalResult", "strictReceipt", "offlineReplay", "originalProcessTreeSettled",
-  ] },
 };
-
-const piContract = { client: piReviewer.client, route: piReviewer.route,
-  controls: [...contracts.reviewer.controls, "finiteRelayRequestsAndDeadline", "parallelWholeFileResults"] };
-const contractFor = (role, client) => role === "reviewer" && client === piReviewer.client ? piContract : contracts[role];
 
 function matches(actual, expected, label) {
   fields(actual, Object.keys(expected), [], label);
   for (const [key, value] of Object.entries(expected)) need(actual[key] === value, label + " differs: " + key);
 }
 
-function qualificationSubject(role, binding, actual, context) {
-  fields(context, ["runtimeSha256", "configurationSha256", "constraintsSha256",
-    ...(role === "reviewer" ? ["relaySha256"] : [])], tierFields, "trusted qualification context");
-  const tier = tierIdentity(context);
-  if (tier.osDriver) requireTier(tier, role, binding.client);
-  need(Object.entries(context).filter(([name]) => !tierFields.includes(name)).every(([, value]) => typeof value === "string" && sha256Pattern.test(value)),
-    "Missing independent runtime, configuration, constraints or relay pin");
+function qualificationSubject(binding, actual, context) {
+  fields(context, ["runtimeSha256", "configurationSha256", "constraintsSha256"], [], "trusted implementer qualification context");
+  need(Object.values(context).every((value) => typeof value === "string" && sha256Pattern.test(value)),
+    "Missing independent runtime, configuration or constraints pin");
   const subject = { ...context, roleBindingSha256: hashBytes(jsonBytes(binding)) };
-  const effective = { ...tier, ...Object.fromEntries(["client", "provider", "model", "reasoningEffort", "profile", "transport"]
-    .filter((name) => binding[name] !== undefined).map((name) => [name, binding[name]])) };
+  const effective = Object.fromEntries(["client", "provider", "model", "reasoningEffort", "profile", "transport"]
+    .filter((name) => binding[name] !== undefined).map((name) => [name, binding[name]]));
   return { subject, effective: { ...effective, version: actual, executableSha256: binding.executable.sha256 } };
 }
 
 function readControl(pin, { kind, subject, effective, supervisor, contract, excluded, independentOf }) {
   const proof = parseStrictJson(inspectPinnedFile(pin, { read: true, excluded }));
-  const piLive = contract === piContract && kind === "live";
   fields(proof, ["schemaVersion", "kind", "supervisor", "subject", "effective", "controls",
-    ...(kind === "live" ? ["runGrantReference", "attempt", "positiveControl", "negativeControl"] : []),
-    ...(piLive ? ["trialStatus", "trialGrantSha256"] : [])], [], kind + " qualification evidence");
+    ...(kind === "live" ? ["runGrantReference", "attempt", "positiveControl", "negativeControl"] : [])], [], kind + " qualification evidence");
   need(proof.schemaVersion === 1 && proof.kind === kind && token(proof.supervisor) &&
     !independentOf.includes(proof.supervisor) && (supervisor === undefined || proof.supervisor === supervisor),
   kind + " qualification evidence does not match its supervisor or stage");
@@ -83,21 +63,13 @@ function readControl(pin, { kind, subject, effective, supervisor, contract, excl
       proof.runGrantReference.length <= 1024 && token(proof.attempt), "Missing bounded live qualification grant or attempt");
     for (const name of ["positiveControl", "negativeControl"]) need(proof[name] === true, "Live qualification invariant failed: " + name);
   }
-  if (piLive) {
-    const trial = parseStrictJson(inspectPinnedFile(proof.trialStatus, { read: true, excluded }));
-    fields(trial, ["schemaVersion", "phase", "grantSha256", "configurationSha256", "captures"], [], "sealed Pi trial status");
-    need(trial.schemaVersion === 1 && trial.phase === "trial-passed" &&
-      trial.configurationSha256 === subject.configurationSha256 && sha256Pattern.test(trial.grantSha256 ?? "") &&
-      trial.grantSha256 === proof.trialGrantSha256 && Array.isArray(trial.captures) && trial.captures.length === 3,
-    "Live qualification does not bind the sealed Pi trial");
-  }
   fields(proof.controls, contract.controls, [], kind + " qualification controls");
   for (const name of contract.controls) need(proof.controls[name] === true, kind + " qualification invariant failed: " + name);
 }
 
 function readQualification(role, binding, actual, { qualification, context, excluded, independentOf = [] }) {
-  const contract = contractFor(role, binding.client);
-  const { subject, effective } = qualificationSubject(role, binding, actual, context);
+  const contract = contracts[role];
+  const { subject, effective } = qualificationSubject(binding, actual, context);
   const record = parseStrictJson(inspectPinnedFile(qualification, { read: true, excluded }));
   fields(record, ["schemaVersion", "kind", "role", "route", "subject", "effective", "supervisor", "offline", "live"], [],
     "explicit route qualification");
@@ -117,7 +89,9 @@ function readQualification(role, binding, actual, { qualification, context, excl
 export function qualificationInventory(agents) {
   const observed = new Map(agents.map((agent) => [agent.client, agent]));
   const entries = Object.entries(candidates).flatMap(([role, list]) => list.map((client) => {
-    const agent = observed.get(client);
+    const agent = observed.get(({ claude: "claude-code", grok: "grok-build" })[client] ?? client);
+    if (role === "reviewer") return { role, client, status: agent?.status === "present" ? "unknown" : "unavailable",
+      reason: "Direct-CLI effective capability and live qualification are unverified" };
     const route = limits[role][client];
     let reason = !route ? "Discovery or adapter contract only" :
       !agent || agent.status === "unavailable" ? "Executable unavailable on discovery PATH: " + clients[client].command :
@@ -144,19 +118,9 @@ export function pilotDisposition(role, input, options = {}) {
     const actual = observeVersion(binding.executable.path, { ...options, client });
     if (!actual) return unsupported(role, client, "Executable version could not be verified");
     inspectPinnedFile(binding.executable, { executable: true, excluded: options.excluded });
-    if (role === "reviewer" && client === piReviewer.client && options.piReleaseVersion !== undefined) {
-      need(actual === options.piReleaseVersion, "Observed Pi executable version differs from the pinned release version");
-    }
     runtimeVersion = auditVersion(binding, actual, clients[client].floor);
     const mapped = nativeRoleBinding(binding, role);
-    const contract = contractFor(role, client);
-    if (role === "reviewer" && client === piReviewer.client && options.trialOffline && !options.qualification) {
-      const { subject, effective } = qualificationSubject(role, binding, actual, options.context);
-      readControl(options.trialOffline, { kind: "offline", subject, effective, contract, excluded: options.excluded,
-        independentOf: options.independentOf ?? [] });
-      return { status: "trial-only", role, client, route: contract.route, runtimeVersion,
-        binding: verifyEffectiveRole(binding, effective), args: mapped.args, offlineSha256: options.trialOffline.sha256 };
-    }
+    const contract = contracts[role];
     if (mapped.blocker || contract?.client !== client || !options.qualification) {
       return unsupported(role, client, mapped.blocker ?? limits[role][client], runtimeVersion);
     }

@@ -43,6 +43,13 @@ function policyJson(source) {
   return value;
 }
 
+export function directReviewAdopted(source) {
+  const markers = source.split(/\r?\n/).slice(0, 12).filter((line) => line.startsWith("<!-- openspec-reviewer:"));
+  need(markers.length === 0 || markers.length === 1 && markers[0] === "<!-- openspec-reviewer: direct-cli-v1 -->",
+    "Ambiguous or unsupported reviewer transport marker");
+  return markers.length === 1;
+}
+
 export function readLowTouchPolicy(source) {
   const markers = [];
   let fence;

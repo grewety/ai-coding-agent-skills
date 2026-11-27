@@ -1,7 +1,7 @@
 ---
 name: autonomous-implementation-review
 description: Implement changes with an independent review loop.
-version: 0.25.0
+version: 0.26.0
 author: Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -31,7 +31,7 @@ Integrated-parent charter-v1 readiness grants no freeze, approval, execution or 
 ## Optional worker runtime and reviewer
 
 Bind roles with `scripts/detect-agents.mjs` and `scripts/setup.mjs`.
-[Worker runtime](references/worker-runtime.md) and [contained review](references/review-candidate.md)
+[Worker runtime](references/worker-runtime.md) and [Direct-CLI review](references/review-candidate.md)
 require qualification and separate inference authority. For Codex Auto-review,
 use the direct command with retained admission.
 

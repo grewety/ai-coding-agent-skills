@@ -17,10 +17,9 @@ import { observeImplementer, runImplementers, runtimeIdentity } from "../skills/
 import { readState } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-state.mjs";
 import { operationProcess } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/implementer-supervisor.mjs";
 import { requestBytes, writeClosed } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/worker-handoff.mjs";
-import { applySetup, previewSetup, validatePilotHost } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/agent-setup.mjs";
+import { applySetup, previewSetup } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/agent-setup.mjs";
 import { hashBytes, jsonBytes as roleBytes } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/agent-configuration.mjs";
 import { roleConfig } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/role-config.mjs";
-import { auditVersion } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/runtime-version.mjs";
 
 const probe = async () => ({ proof: [{ mode: "read-only", quiescent: true }, { mode: "workspace-write", quiescent: true }] });
 const change = "synthetic-runtime-01m84dt53xh6x16nwwqebacz8m";
@@ -131,10 +130,13 @@ async function fixture(t, label = "first", mode = "task-guided", prospective = f
   }
   const git = (cwd, ...args) => {
     const result = spawnSync("/usr/bin/git", ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", ...args],
-      { cwd, env: gitEnv, encoding: "utf8" });
+      { cwd, env: gitEnv, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
     assert.equal(result.status, 0, result.stderr);
     return result.stdout.trim();
   };
+  if (["explicit", "stale"].includes(label)) {
+    await writeFile(path.join(workspace, "AGENTS.md"), "<!-- openspec-low-touch: {} -->\n<!-- openspec-reviewer: direct-cli-v1 -->\n");
+  }
   git(workspace, "init", "-q", "-b", "change/runtime");
   git(workspace, "remote", "add", "origin", "git@github.com:Example/Runtime.git");
   git(workspace, "add", ".");
@@ -232,61 +234,66 @@ async function fixture(t, label = "first", mode = "task-guided", prospective = f
 const implementerControls = ["effectiveSettings", "workspaceWrite", "isolatedHomeAndXdg", "ambientDiscoverySuppressed",
   "exclusiveClaim", "protectedPathsDenied", "publicationDenied", "nonInteractive", "originalProcessTreeSettled",
   "sealedFileHandover", "inventoryUnchanged"];
-const reviewerControls = ["effectiveSettings", "minimalRootfs", "readOnly", "directNetworkDenied", "unixSocketInference",
-  "credentialsAndDiagnosticsHostOnly", "unauthorizedToolsDenied", "wholeFileStreamCoverage", "nativeTerminalResult",
-  "strictReceipt", "offlineReplay", "originalProcessTreeSettled"];
-
-async function explicitHost(f, fault) {
+async function explicitHost(t, f, fault, client = "claude") {
   const pair = structuredClone(f.pair);
   const runtimeSha256 = f.hostValue.runtimeSha256;
-  const reviewerExecutable = await f.pin("explicit-reviewer", "#!/bin/sh\nprintf '2.1.331 (Claude Code)\\n'\n", 0o700);
-  const bubblewrap = await f.pin("explicit-bwrap", "#!/bin/sh\nprintf 'bubblewrap 0.9.1\\n'\n", 0o700);
-  const relayConfiguration = await f.locator("explicit-relay.json", { schemaVersion: 1, credentialRef: "fixture-key",
-    route: "same-uid-key", keyFile: f.dir("unneeded-key"), keyFormat: "raw" });
+  const claude = client === "claude";
+  const version = claude ? "2.1.331 (Claude Code)" : client + " 2.1.0";
+  const flags = claude ? "--print --session-id --safe-mode --restricted --strict-mcp-config --permission-prompts --no-session-persistence --tools --effort" :
+    "--standalone --model --format --file --variant";
+  const executable = await f.pin(client, `#!/bin/sh
+case "$*" in
+  --version) printf '%s\\n' '${version}';;
+  *--help) printf '%s\\n' '${flags}';;
+  *) exit 91;;
+esac
+`, 0o700);
+  const oldPath = process.env.PATH;
+  process.env.PATH = path.dirname(executable.path) + path.delimiter + oldPath;
+  t.after(() => { process.env.PATH = oldPath; });
+  if (!claude) {
+    const oldKey = process.env.OPENROUTER_API_KEY;
+    process.env.OPENROUTER_API_KEY = "fx-pair";
+    t.after(() => {
+      if (oldKey === undefined) delete process.env.OPENROUTER_API_KEY;
+      else process.env.OPENROUTER_API_KEY = oldKey;
+    });
+  }
   const implementer = { client: "codex", provider: "openai", model: pair.implementer.model, reasoningEffort: "high",
     executable: pair.implementer.executable, versionPolicy: "exact", exactVersion: "0.999.0", versionCheck: false };
-  const reviewer = { client: "claude-code", provider: "anthropic", model: pair.reviewer.model,
-    reasoningEffort: "medium", executable: reviewerExecutable };
   const directory = f.dir("role-setup");
   await mkdir(directory, { mode: 0o700 });
-  const setup = { schemaVersion: 1, directory, roles: { orchestrator: implementer, implementer, reviewer, helper: null },
-    reviewer: { bubblewrap: { executable: bubblewrap }, relay: { route: "same-uid-key", credentialRef: "fixture-key" },
-      runtime: { node: reviewerExecutable, libraries: [], relayConfiguration }, interPacketDelayMs: 0, timeoutMs: 2000, maxBudgetUsd: 1 } };
+  const setup = { schemaVersion: 2, directory, roles: { orchestrator: implementer, implementer, helper: null },
+    reviewer: { client, model: claude ? pair.reviewer.model : "openrouter/vendor/fixture-model",
+      reasoningEffort: "medium", timeoutMs: 2000 }, maxBudgetUsd: 1 };
   const options = { workspace: f.workspace };
   const preview = previewSetup(setup, options);
   applySetup(setup, preview.confirmationSha256, options);
   const [host, roles] = preview.outputs.map(({ path, sha256 }) => ({ path, sha256 }));
-  pair.reviewer.configuration = host;
-  pair.reviewer.version = "2.1.331";
-  const pilotHost = validatePilotHost(JSON.parse(preview.outputs[0].utf8));
-  const bubblewrapAudit = auditVersion(pilotHost.bubblewrap, "0.9.1", "0.9.0");
-  for (const [role, binding, controlNames] of [
-    ["implementer", implementer, implementerControls], ["reviewer", reviewer, reviewerControls],
-  ]) {
-    const worker = pair[role];
-    const subject = {
-      runtimeSha256: role === "implementer" && fault === "runtime" ? "f".repeat(64) : runtimeSha256,
-      configurationSha256: role === "reviewer" && fault === "config" ? "e".repeat(64) : worker.configuration.sha256,
-      constraintsSha256: role === "implementer" ? roleQualificationBinding(worker) :
-        hash(jsonBytes({ runtime: pilotHost.runtime, bubblewrapAudit })),
-      ...(role === "reviewer" ? { relaySha256: fault === "relay" ? "d".repeat(64) : relayConfiguration.sha256 } : {}),
-      roleBindingSha256: hashBytes(roleBytes(roleConfig(binding))),
-    };
-    const effective = { client: worker.client, provider: worker.provider, model: worker.model, version: worker.version,
-      reasoningEffort: role === "implementer" && fault === "effort" ? "low" : binding.reasoningEffort,
-      executableSha256: role === "implementer" && fault === "executable" ? "c".repeat(64) : binding.executable.sha256 };
-    const supervisor = role + "-synthetic-qualification";
-    const shared = { schemaVersion: 1, supervisor, subject, effective };
-    const controls = Object.fromEntries(controlNames.map((id) => [id, true]));
-    const offline = await f.locator(role + "-offline.json", { ...shared, kind: "offline", controls });
-    if (role === "implementer" && fault === "control") controls.protectedPathsDenied = false;
-    const live = await f.locator(role + "-live.json", { ...shared, kind: "live", controls, runGrantReference: "synthetic-reference",
-      attempt: "synthetic-controls", positiveControl: true, negativeControl: true });
-    worker.qualification = await f.locator(role + "-explicit-qualification.json", {
-      ...shared, kind: "explicit-route-qualification", role, route: worker.route, offline, live,
-    });
-  }
-  return f.locator("explicit-assignment-host.json", { ...f.hostValue, schemaVersion: 2, pair, roleBindings: roles });
+  const { inventory, session } = pair.reviewer;
+  pair.reviewer = { inventory, session, client, model: setup.reviewer.model,
+    provider: fault === "provider" ? client : claude ? "anthropic" : "openrouter",
+    version: fault === "reviewer" ? "0.1.0" : claude ? "2.1.331" : "2.1.0", route: "direct-cli", configuration: host };
+  const worker = pair.implementer;
+  const subject = { runtimeSha256: fault === "runtime" ? "f".repeat(64) : runtimeSha256,
+    configurationSha256: fault === "config" ? "e".repeat(64) : worker.configuration.sha256,
+    constraintsSha256: roleQualificationBinding(worker), roleBindingSha256: hashBytes(roleBytes(roleConfig(implementer))) };
+  const effective = { client: worker.client, provider: worker.provider, model: worker.model, version: worker.version,
+    reasoningEffort: fault === "effort" ? "low" : implementer.reasoningEffort,
+    executableSha256: fault === "executable" ? "c".repeat(64) : implementer.executable.sha256 };
+  const supervisor = "implementer-synthetic-qualification";
+  const shared = { schemaVersion: 1, supervisor, subject, effective };
+  const controls = Object.fromEntries(implementerControls.map((id) => [id, true]));
+  const offline = await f.locator("implementer-offline.json", { ...shared, kind: "offline", controls });
+  if (fault === "control") controls.protectedPathsDenied = false;
+  const live = await f.locator("implementer-live.json", { ...shared, kind: "live", controls, runGrantReference: "synthetic-reference",
+    attempt: "synthetic-controls", positiveControl: true, negativeControl: true });
+  worker.qualification = await f.locator("implementer-explicit-qualification.json", {
+    ...shared, kind: "explicit-route-qualification", role: "implementer", route: worker.route, offline, live,
+  });
+  return f.locator("explicit-assignment-host.json", { ...f.hostValue, schemaVersion: 4, pair, roleBindings: roles,
+    restrictions: { ...f.hostValue.restrictions, allowedClients: ["codex", client],
+      allowedModels: [worker.model, pair.reviewer.model], allowedProviders: [worker.provider, pair.reviewer.provider] } });
 }
 
 const run = (f, entries, extra = {}) => runImplementers(entries, { registry: f.registry, runProbe: probe, ...extra });
@@ -297,7 +304,7 @@ test("explicit pair launches the same sealed native Codex route for standalone G
   for (const [mode, standalone] of [["goal-first", true], ["task-guided", false]]) {
     await t.test(mode, async (t) => {
       const f = await fixture(t, "explicit", mode);
-      const hostPin = await explicitHost(f);
+      const hostPin = await explicitHost(t, f);
       const entry = await f.assignment("explicit-run", "valid", { hostPin });
       const [result] = await run(f, [entry], { standalone });
       assert.equal(result.phase, "completed", result.reason);
@@ -305,8 +312,8 @@ test("explicit pair launches the same sealed native Codex route for standalone G
       assert.equal(launch.roleAudit.implementer.reasoningEffort, "high");
       assert.equal(launch.roleAudit.implementer.runtimeVersion.observedVersion, "0.171.0");
       assert.equal(launch.roleAudit.implementer.runtimeVersion.comparison, "disabled");
-      assert.equal(launch.roleAudit.reviewer.version.observedVersion, "2.1.331");
-      assert.equal(launch.roleAudit.reviewer.bubblewrap.observedVersion, "0.9.1");
+      assert.equal(launch.roleAudit.reviewer.version, "2.1.331");
+      assert.equal(launch.roleAudit.reviewer.reasoningEffort, "medium");
       assert.equal((await observeImplementer(entry, { registry: f.registry, action: "recover" })).phase, "completed");
     });
   }
@@ -314,17 +321,38 @@ test("explicit pair launches the same sealed native Codex route for standalone G
 
 test("explicit pair refuses stale readback and failed qualification before native preflight", async (t) => {
   for (const [fault, reason] of [
-    ["runtime", /runtimeSha256/], ["config", /configurationSha256/], ["relay", /relaySha256/],
+    ["runtime", /runtimeSha256/], ["config", /configurationSha256/], ["reviewer", /reviewer effective identity/],
     ["effort", /reasoningEffort/], ["executable", /executableSha256/], ["control", /protectedPathsDenied/],
   ]) {
     await t.test(fault, async (t) => {
       const f = await fixture(t, "stale", "goal-first");
-      const hostPin = await explicitHost(f, fault);
+      const hostPin = await explicitHost(t, f, fault);
       const entry = await f.assignment("stale-run", "valid", { hostPin });
       const [result] = await run(f, [entry], { standalone: true, runProbe: () => assert.fail("native preflight reached") });
-      assert.equal(result.phase, "unsupported", result.reason);
+      assert.equal(result.phase, fault === "reviewer" ? "blocked" : "unsupported", result.reason);
       assert.match(result.reason, reason);
       await assert.rejects(lstat(attemptDirectory(f, "stale-run")), { code: "ENOENT" });
+    });
+  }
+});
+
+test("paired OpenCode and Kilo admission binds the configured model provider", async (t) => {
+  for (const [client, fault] of [["kilo", undefined], ["opencode", "provider"], ["kilo", "provider"]]) {
+    await t.test(`${client} ${fault ? "brand mismatch" : "explicit prefix"}`, async (t) => {
+      const f = await fixture(t, "explicit", "goal-first");
+      const hostPin = await explicitHost(t, f, fault, client);
+      const entry = await f.assignment("qualified-provider", "valid", { hostPin });
+      const [result] = await run(f, [entry], { standalone: true,
+        ...(fault ? { runProbe: () => assert.fail("implementer native preflight reached") } : {}) });
+      if (fault) {
+        assert.equal(result.phase, "blocked", result.reason);
+        assert.match(result.reason, /reviewer effective identity/);
+        await assert.rejects(lstat(attemptDirectory(f, "qualified-provider")), { code: "ENOENT" });
+      } else {
+        assert.equal(result.phase, "completed", result.reason);
+        const { roleAudit } = await readState(attemptDirectory(f, "qualified-provider"), "launch.json");
+        assert.equal(roleAudit.reviewer.provider, "openrouter");
+      }
     });
   }
 });
