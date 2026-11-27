@@ -181,8 +181,8 @@ Bump the affected plugin version in the catalog whenever its selected skills or
 support files change; skill versions alone do not update the enclosing plugin.
 See [external role configuration](configurable-backends.md) for host setup and qualification status after installation.
 
-The source catalog's `openspec-development` 1.10.0 includes `openspec-delivery`
-1.10.0 with its shared `scripts/git-environment.mjs` and
+The source catalog's `openspec-development` 1.11.0 includes `openspec-delivery`
+1.11.0 with its shared `scripts/git-environment.mjs` and
 `references/git-environment.md` for the Git guard/workspace helpers. Also preserve
 `references/evidence-retention.md`, `scripts/evidence-retention.mjs`,
 `scripts/evidence-cli.mjs`, `scripts/delivery-cli.mjs` and
@@ -192,7 +192,7 @@ skill/plugin ZIP exports. The evidence command supports authorized exact-SHA gat
 capture and offline readback. Keep next's `references/routing.md` and
 `scripts/next.mjs` with that skill. If direct packages load from different scopes,
 use the router's explicit trusted runtime path. The optional
-`autonomous-orchestration` is 1.14.0 (core skill 0.24.0) and `openspec-next` is 0.8.0. These
+`autonomous-orchestration` is 1.15.0 (core skill 0.25.0) and `openspec-next` is 0.8.0. These
 source versions do not assert that the public marketplace/downloads are updated.
 Preserve delivery's policy/task-authoring references and `delivery-policy.mjs`,
 and orchestration's `references/portable-core.md`, `scripts/orchestration-core.mjs`,
@@ -240,3 +240,5 @@ A local build does not publish either surface.
 
 Packaging references: [Marketplace schema](https://code.claude.com/docs/en/plugins/marketplace-reference)
 and [plugin manifest schema](https://code.claude.com/docs/en/plugins/manifest-reference).
+
+The updated OpenSpec and orchestration bundles include synchronized containment setup and optional Windows prerequisite checks. Profile installation and runtime qualification are separate steps. See [Containment tiers](containment-tiers.md).

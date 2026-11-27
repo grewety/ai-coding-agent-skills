@@ -3,8 +3,8 @@
 See [external AI roles and backend pilots](configurable-backends.md) for explicit role settings and the
 [observed backend suitability matrix](configurable-backends.md#observed-backend-suitability).
 
-The optional `autonomous-implementation-review` 0.24.0 skill and
-`autonomous-orchestration` 1.14.0 bundle ship a standalone command for candidate
+The optional `autonomous-implementation-review` 0.25.0 skill and
+`autonomous-orchestration` 1.15.0 bundle ship a standalone command for candidate
 review and charter-v1 approach review. Use the complete package from a reviewed
 checkout or the [Claude installation guide](claude-installation.md). Resolve
 `scripts/review-candidate.mjs` inside that package. This command runs locally
@@ -265,3 +265,5 @@ node review-candidate.mjs --verify --request REQUEST --expect EXPECT --export EX
   request, configuration, model and manifest bindings against the original
   retention record. Preserve the failed artifacts. Recomputing a hash from
   suspect output cannot recover its authenticity.
+
+Claude remains the default Tier A reviewer. New tiered setup binds `linux-bwrap` and uses the 300000 ms default with a 600000 ms maximum. Legacy host and capture replay retains its original limits and schema. See [Containment tiers](containment-tiers.md).

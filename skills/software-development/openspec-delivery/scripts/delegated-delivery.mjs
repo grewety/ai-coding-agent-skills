@@ -1,3 +1,4 @@
+import { tierIdentity } from "./containment-tier.mjs";
 import { existsSync } from "node:fs";
 // Read back the independently pinned exclusive worker runtime. No worker or
 // reviewer starts, recovery publication, registry creation or slot release.
@@ -37,11 +38,13 @@ const lowTouchRuntimeSources = [
   "review-spend.mjs", "review-upstream-status.mjs",
 ];
 
+const tieredRuntimeSources = ["containment-tier.mjs", "containment-linux-offline.mjs", "review-grok-offline.mjs"];
+
 function verifyRuntimeInventory(selected, scripts) {
   need(digest(selected.verifierSha256) && digest(selected.runtimeSha256), "Independent implementer package pin is missing");
   // An independently pinned legacy package has none of these support files.
   // A partial newer inventory cannot fall back to the legacy runtime pin.
-  const additions = [lowTouchRuntimeSources, configurableRuntimeSources]
+  const additions = [lowTouchRuntimeSources, configurableRuntimeSources, tieredRuntimeSources]
     .flatMap((group) => group.some((name) => existsSync(path.join(scripts, name))) ? group : []);
   const inventory = Object.fromEntries([...runtimeSources, ...additions].map((name) => {
     const filename = path.join(scripts, name);
@@ -167,7 +170,7 @@ export async function readDelegation(input, { context, policy, identity, impleme
   need(owner, "Exclusive assignment claim is missing");
   const attemptDirectory = path.join(directory, "attempt-" + id.attempt);
   const launch = data.history.at(-1);
-  need(launch?.attempt === id.attempt && same(launch.roleAudit, roles.roleAudit), "Original launch or explicit role audit differs");
+  need(launch?.attempt === id.attempt && same(tierIdentity(launch), tierIdentity(roles)) && same(launch.roleAudit, roles.roleAudit), "Original launch or explicit role audit differs");
   const observation = await runtime.observeImplementer(assignment, { registry, action: "inspect" });
   if (observation.phase === "blocked") throw new Error(observation.reason);
   const view = await recovery.currentAttempt(attemptDirectory, launch);

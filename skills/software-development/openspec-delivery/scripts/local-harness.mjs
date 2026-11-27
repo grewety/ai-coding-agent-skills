@@ -24,8 +24,8 @@ function hostFile(ref, excluded) {
 
 export function harnessConfiguration(hostConfiguration, excluded) {
   const host = parseStrictJson(hostFile(hostConfiguration, excluded));
-  need(host?.schemaVersion === 1 || host?.schemaVersion === 2, "Unsupported host.json version");
-  if (host.schemaVersion === 2) validatePilotHost(host);
+  need([1, 2, 4].includes(host?.schemaVersion), "Unsupported host.json version");
+  if (host.schemaVersion !== 1) validatePilotHost(host);
   const binding = host.localHarness;
   if (binding !== undefined && binding !== null) validateHarnessBinding(binding);
   return binding ?? null;
@@ -67,7 +67,7 @@ function invoke(binding, checkout, candidate) {
     if (isMcp) {
       child.stdin.on("error", () => { if (!response) fail("MCP harness input failed"); });
       send(mcpRequest(1, "initialize", { protocolVersion: "2024-11-05", capabilities: {},
-        clientInfo: { name: "openspec-delivery", version: "1.10.0" } }));
+        clientInfo: { name: "openspec-delivery", version: "1.11.0" } }));
     }
     child.on("error", () => fail("Harness launch failed"));
     child.stdout.on("data", (chunk) => {

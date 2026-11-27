@@ -29,7 +29,7 @@ hardening completion blockers, and WSL or case simulations do not replace them.
 
 For explicit role setup and version policy, see [external AI roles and backend pilots](configurable-backends.md).
 
-Delivery 1.10.0 (in `openspec-development` 1.10.0) also includes
+Delivery 1.11.0 (in `openspec-development` 1.11.0) also includes
 `references/evidence-retention.md`, `scripts/evidence-retention.mjs`,
 `scripts/evidence-cli.mjs`, `scripts/delivery-cli.mjs` and
 `scripts/delegated-delivery.mjs`, `scripts/finish-trigger-credits.mjs` and
@@ -37,7 +37,7 @@ Delivery 1.10.0 (in `openspec-development` 1.10.0) also includes
 evidence and runtime support in companion copies and ZIPs. `openspec-next` is 0.8.0
 and ships `references/routing.md` and `scripts/next.mjs` for read-only routing to
 delivery. Install both complete packages in the intended host. The separate optional
-`autonomous-orchestration` plugin is 1.14.0 (core skill 0.24.0). Installation, account sync and
+`autonomous-orchestration` plugin is 1.15.0 (core skill 0.25.0). Installation, account sync and
 host execution verification remain separate; package byte checks establish none
 of native client discovery, Desktop acceptance or scanner approval.
 
@@ -535,3 +535,5 @@ existing tests only when separately in scope. This is an author/reviewer obligat
 not a claim of new automated enforcement. Preserve archived plans and evidence as
 historical records; do not rewrite them. Migration documentation grants no uninstall,
 real-profile modification, scanner bypass or account-installation authority.
+
+Installed companion packages include explicit tier setup. External host configuration and runtime qualification follow the adopting project’s authority. See [Containment tiers](containment-tiers.md).

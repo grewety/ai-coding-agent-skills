@@ -819,9 +819,9 @@ Orchestration is optional. It requires the workflow plugin, explicit role and
 model configuration, and a supported host. Package installation does not create
 those roles.
 
-Current source versions are delivery 1.10.0 and `openspec-next` 0.8.0 in
-`openspec-development` 1.10.0, and core skill 0.24.0 in
-`autonomous-orchestration` 1.14.0.
+Current source versions are delivery 1.11.0 and `openspec-next` 0.8.0 in
+`openspec-development` 1.11.0, and core skill 0.25.0 in
+`autonomous-orchestration` 1.15.0.
 Representation support adds no upstream workflow, runtime dependency or
 installation route. Package availability/byte checks do not establish account
 sync, host execution, native client discovery, Desktop acceptance or scanner approval.
@@ -891,3 +891,5 @@ Local authority is defined above, not attributed to upstream:
 - [OpenSpec skill actions by host](#lifecycle-picture) for the direct-directory Claude Code and Hermes routes and Codex skill mentions.
 - [OpenSpec verification skill](https://github.com/Fission-AI/OpenSpec/blob/0c737dc1b543249b38b0f4716816fcf493d894dd/skills/openspec-verify-change/SKILL.md)
 - [OpenSpec configuration](https://github.com/Fission-AI/OpenSpec/blob/0c737dc1b543249b38b0f4716816fcf493d894dd/docs/customization.md)
+
+Use the independently pinned tier and driver throughout admission and replay for a tier-aware invocation. The original frozen approval and legacy replay semantics still apply to previously approved bindings. See [Containment tiers](containment-tiers.md).

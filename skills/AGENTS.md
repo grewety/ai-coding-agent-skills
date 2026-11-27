@@ -13,6 +13,8 @@ Own optional, versioned agent playbooks that contributors can install and reuse 
 
 ## Local Contracts
 
+- Share tier selection, Windows prerequisite interface and tier-aware external setup byte-for-byte across delivery and orchestration.
+
 - Keep external role configuration, discovery, version policy and setup modules byte-identical across delivery and orchestration packages.
 - Keep the shared Pi release inventory and exact role qualification checks byte-identical in delivery and orchestration. Orchestration owns the contained Pi runtime, Unix relay, stream audit and receipt replay. Preserve legacy Claude host pins, capture schemas, defaults, scheduling and spend.
 

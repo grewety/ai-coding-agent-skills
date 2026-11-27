@@ -30,7 +30,7 @@ export function validateRoleBindings(input) {
 export function readRoleBindings(pin, excluded = []) {
   const binding = validateRoleBindings(parseStrictJson(inspectPinnedFile(pin, { read: true, excluded })));
   const host = parseStrictJson(inspectPinnedFile(binding.reviewerHost, { read: true, excluded }));
-  if (host.schemaVersion !== 2 || JSON.stringify(roleConfig(host.roleBinding)) !== JSON.stringify(binding.roles.reviewer)) {
+  if (![2, 4].includes(host.schemaVersion) || JSON.stringify(roleConfig(host.roleBinding)) !== JSON.stringify(binding.roles.reviewer)) {
     throw new Error("Reviewer host differs from the independently pinned role tuple");
   }
   return binding;

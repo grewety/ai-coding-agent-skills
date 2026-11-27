@@ -18,6 +18,7 @@ import { auditVersion, reportedVersion } from "./runtime-version.mjs";
 import { grokReviewerBlocker, piReviewer } from "./agent-role-adapters.mjs";
 import { verifyPiRelease } from "./agent-pi-runtime.mjs";
 import { verifyHermesProxySocket, validateHermesProxySocket } from "./review-relay.mjs";
+import { authDirectoryIdentity, grokTierBlocker, maximumReviewerTimeoutMs, requireTier, tierFields, tierIdentity } from "./containment-tier.mjs";
 import { packetConcurrency } from "./review-packet-scheduler.mjs";
 
 export const claudeVersion = "2.1.330";
@@ -35,9 +36,14 @@ const pluginSettings = JSON.stringify({ enabledPlugins: {
 
 export function validateHostConfig(config) {
   const pi = config?.schemaVersion === 3;
+  const tier = tierIdentity(config);
+  if (tier.osDriver) {
+    requireTier(tier, "reviewer", config.pi ? "pi" : "claude-code");
+    need(admittedPilots.has(config), "Tiered runtime must come from exact host admission");
+  }
   fields(config, ["schemaVersion", "bwrap", pi ? "pi" : "claude", "node", "libraries", "model", "relay",
     "timeoutMs", "maxTurns", "maxBudgetUsd", "requirePreExposureAttestation"], "trusted host configuration",
-  ["interPacketDelayMs", "runTimeoutMs", "localHarness", "packetConcurrency", ...(pi ? ["piRelease"] : [])]);
+  ["interPacketDelayMs", "runTimeoutMs", "localHarness", "packetConcurrency", ...tierFields, ...(pi ? ["piRelease"] : [])]);
   const concurrency = packetConcurrency(config.packetConcurrency);
   if (config.localHarness !== undefined && config.localHarness !== null) validateHarnessBinding(config.localHarness);
   for (const [name, min, max] of [["interPacketDelayMs", 0, 30000], ["runTimeoutMs", 1000, 3600000]]) {
@@ -60,7 +66,7 @@ export function validateHostConfig(config) {
       !targets.has(mount.target), "Unsafe runtime mount target");
     targets.add(mount.target);
   }
-  for (const [name, min, max] of [["timeoutMs", 1000, 300000], ["maxTurns", 1, 128]]) {
+  for (const [name, min, max] of [["timeoutMs", 1000, tier.osDriver ? maximumReviewerTimeoutMs : 300000], ["maxTurns", 1, 128]]) {
     need(Number.isSafeInteger(config[name]) && config[name] >= min && config[name] <= max, "Invalid finite runtime limit");
   }
   need(Number.isFinite(config.maxBudgetUsd) && config.maxBudgetUsd > 0 && config.maxBudgetUsd <= 10, "Invalid finite cost limit");
@@ -86,7 +92,7 @@ export function validateHostConfig(config) {
 }
 
 export function requireReviewHost(config, excluded, options = {}) {
-  if (config?.schemaVersion !== 2) {
+  if (![2, 4].includes(config?.schemaVersion)) {
     validateHostConfig(config);
     return config;
   }
@@ -94,6 +100,11 @@ export function requireReviewHost(config, excluded, options = {}) {
   const { executable, ...policy } = pilot.bubblewrap;
   const pi = pilot.roleBinding.client === piReviewer.client;
   try {
+    const tier = tierIdentity(pilot);
+    if (tier.containmentTier === "b") {
+      authDirectoryIdentity(pilot.authDirectory, excluded);
+      throw new Error(grokTierBlocker);
+    }
     need(pilot.roleBinding.client !== "grok-build", grokReviewerBlocker);
     need(pi ? pilot.relay.route === piReviewer.relay : pilot.relay.route === "same-uid-key", pilot.relay.route === "dedicated-uid-broker"
       ? "Dedicated UID broker has no verified explicit effort and relay identity readback" : "Selected inference relay is contract-only");
@@ -108,7 +119,7 @@ export function requireReviewHost(config, excluded, options = {}) {
       roleOptions.piReleaseVersion = pilot.runtime.piRelease.version;
     }
     if (pilot.runtime) roleOptions.context = {
-      runtimeSha256: options.runtimeSha256, configurationSha256: options.configurationSha256,
+      ...tier, runtimeSha256: options.runtimeSha256, configurationSha256: options.configurationSha256,
       constraintsSha256: hash(jsonBytes({ runtime: pilot.runtime, bubblewrapAudit })),
       relaySha256: pilot.runtime.relayConfiguration.sha256,
     };
@@ -127,10 +138,11 @@ export function requireReviewHost(config, excluded, options = {}) {
     need(schemaVersion === 1 && credentialRef === pilot.relay.credentialRef &&
       relay.route === pilot.relay.route, "Pinned relay does not resolve the selected route and credential reference");
     const runtime = {
-      schemaVersion: pi ? 3 : 1, bwrap: executable, [pi ? "pi" : "claude"]: pilot.roleBinding.executable,
+      schemaVersion: pi ? 3 : 1, ...tier, bwrap: executable, [pi ? "pi" : "claude"]: pilot.roleBinding.executable,
       node, libraries, relay, ...(piRelease ? { piRelease } : {}),
       model: pilot.roleBinding.model, maxTurns: pilot.maxTurns, timeoutMs: pilot.timeoutMs,
       interPacketDelayMs: pilot.interPacketDelayMs, maxBudgetUsd: pilot.maxBudgetUsd, requirePreExposureAttestation: false,
+      ...(pilot.runTimeoutMs === undefined ? {} : { runTimeoutMs: pilot.runTimeoutMs }),
       ...(pilot.packetConcurrency === undefined ? {} : { packetConcurrency: pilot.packetConcurrency }),
       ...(pilot.localHarness === undefined ? {} : { localHarness: pilot.localHarness }),
     };
@@ -223,7 +235,7 @@ export function runtimeBinding(config, session, configurationSha256 = hash(jsonB
   return { session, model: config.model, version: pilot?.role.runtimeVersion.observedVersion ?? claudeVersion,
     bubblewrapVersion: pilot?.bubblewrapAudit.observedVersion ?? bubblewrapVersion,
     maxTurns: config.maxTurns, maxBudgetUsd: config.maxBudgetUsd,
-    configurationSha256, route: config.relay.route,
+    configurationSha256, route: config.relay.route, ...tierIdentity(config),
     ...(pilot ? { explicit: { provider: pilot.role.provider, reasoningEffort: pilot.role.reasoningEffort,
       executableSha256: pilot.role.executable.sha256, version: pilot.role.runtimeVersion, bubblewrap: pilot.bubblewrapAudit,
       relaySha256: pilot.relayConfiguration.sha256, runtimeSha256: pilot.runtimeSha256,
