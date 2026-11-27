@@ -185,7 +185,7 @@ skill/plugin ZIP exports. The evidence command supports authorized exact-SHA gat
 capture and offline readback. Keep next's `references/routing.md` and
 `scripts/next.mjs` with that skill. If direct packages load from different scopes,
 use the router's explicit trusted runtime path. The optional
-`autonomous-orchestration` is 1.16.4 (core skill 0.26.4) and `openspec-next` is 0.9.0. These
+`autonomous-orchestration` is 1.16.5 (core skill 0.26.5) and `openspec-next` is 0.9.0. These
 source versions do not assert that the public marketplace/downloads are updated.
 Preserve delivery's policy/task-authoring references and `delivery-policy.mjs`,
 and orchestration's `references/portable-core.md`, `scripts/orchestration-core.mjs`,

@@ -37,7 +37,7 @@ Delivery 1.12.0 (in `openspec-development` 1.12.0) also includes
 evidence and runtime support in companion copies and ZIPs. `openspec-next` is 0.9.0
 and ships `references/routing.md` and `scripts/next.mjs` for read-only routing to
 delivery. Install both complete packages in the intended host. The separate optional
-`autonomous-orchestration` plugin is 1.16.4 (core skill 0.26.4). Installation, account sync and
+`autonomous-orchestration` plugin is 1.16.5 (core skill 0.26.5). Installation, account sync and
 host execution verification remain separate; package byte checks establish none
 of native client discovery, Desktop acceptance or scanner approval.
 
