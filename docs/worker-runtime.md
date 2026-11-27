@@ -1,6 +1,6 @@
 # Exclusive OpenSpec worker runtime
 
-See [external AI roles and backend pilots](configurable-backends.md) for explicit role settings.
+See [external AI roles and backend setup](configurable-backends.md) for explicit role settings.
 
 For an adopting parent, use a schema 4 pair with independently pinned schema 2 role bindings and schema 3 reviewer host settings. Standalone Goal-First and exclusive execution keep the same qualified native Codex supervision. Use the original qualified runtime package to read earlier frozen assignments.
 

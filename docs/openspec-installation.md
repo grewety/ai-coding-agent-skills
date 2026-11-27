@@ -27,7 +27,7 @@ This adds no upstream skill or runtime dependency. Package installation/validati
 does not establish native Git behavior; missing native macOS/Windows results remain
 hardening completion blockers, and WSL or case simulations do not replace them.
 
-For explicit role setup and version policy, see [external AI roles and backend pilots](configurable-backends.md).
+For explicit role setup and version policy, see [external AI roles and backend setup](configurable-backends.md).
 
 Delivery 1.12.0 (in `openspec-development` 1.12.0) also includes
 `references/evidence-retention.md`, `scripts/evidence-retention.mjs`,

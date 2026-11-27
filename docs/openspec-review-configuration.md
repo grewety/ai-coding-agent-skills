@@ -1,6 +1,6 @@
 # OpenSpec review and finish configuration
 
-See [external AI roles and backend pilots](configurable-backends.md) for explicit role settings and route dispositions.
+See [external AI roles and backend setup](configurable-backends.md) for explicit role settings and route dispositions.
 
 Read the [workflow](openspec-workflow.md) for authorization and the
 [operator tutorial](openspec-operator-tutorial.md) for the role and session
