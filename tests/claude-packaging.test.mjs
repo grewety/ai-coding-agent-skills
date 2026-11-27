@@ -17,7 +17,7 @@ const expectedBundles = {
     skills: ["openspec-delivery", "openspec-next", "git-commit-message", "capability-wireframes"],
   },
   "autonomous-orchestration": {
-    version: "1.16.3",
+    version: "1.16.4",
     skills: ["autonomous-implementation-review"],
   },
 };
@@ -128,7 +128,7 @@ test("distribution builds complete skill and plugin ZIPs from canonical bytes", 
   const reviewEntry = catalog.skills.find(({ name }) => name === reviewPackage.name);
   assert.ok(reviewEntry, "individual reviewer ZIP must be advertised");
   const reviewArchive = unzipSync(await readFile(path.join(output, "downloads", reviewEntry.file)));
-  assert.match(Buffer.from(reviewArchive[`${reviewPackage.name}/SKILL.md`]).toString(), /^version: 0\.26\.3$/m);
+  assert.match(Buffer.from(reviewArchive[`${reviewPackage.name}/SKILL.md`]).toString(), /^version: 0\.26\.4$/m);
   const orchestrationArchive = unzipSync(await readFile(path.join(output, "downloads", catalog.plugins[1].file)));
   const reviewFiles = [
     "references/review-candidate.md",
@@ -174,10 +174,10 @@ test("distribution builds complete skill and plugin ZIPs from canonical bytes", 
     const reviewerLink = file === "README.md" ? "(docs/claude-reviewer.md)" : "(claude-reviewer.md)";
     assert.ok(guide.includes(reviewerLink), `${file} links to reviewer setup`);
     assert.ok(guide.includes("1.12.0"), `${file} lists delivery and workflow bundle versions`);
-    assert.ok(guide.includes("0.26.3") && guide.includes("1.16.3"), `${file} lists paired orchestration versions`);
+    assert.ok(guide.includes("0.26.4") && guide.includes("1.16.4"), `${file} lists paired orchestration versions`);
   }
   const reviewerGuide = await readFile(path.join(root, "docs/claude-reviewer.md"), "utf8");
-  assert.ok(reviewerGuide.includes("0.26.3") && reviewerGuide.includes("1.16.3"), "reviewer guide lists paired versions");
+  assert.ok(reviewerGuide.includes("0.26.4") && reviewerGuide.includes("1.16.4"), "reviewer guide lists paired versions");
   const reviewerReference = await readFile(path.join(reviewPackage.directory, "references/review-candidate.md"), "utf8");
   const commandForms = (guide) => guide.split("\n")
     .filter((line) => /^(?:node "\$review_cli"|node review-candidate\.mjs) --/.test(line))

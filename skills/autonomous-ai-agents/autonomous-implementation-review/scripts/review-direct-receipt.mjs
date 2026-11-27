@@ -134,7 +134,13 @@ function exactPacketPath(value, cwd, paths) {
   throw new Error("Native Read targeted an unassigned path");
 }
 
-const claudeAdvisorySystemSubtypes = new Set(["api_retry", "status", "compact_boundary"]);
+const claudeAdvisoryTypes = new Set(["rate_limit_event", "tool_progress", "tool_use_summary"]);
+const claudeAdvisorySystemSubtypes = new Set([
+  "api_retry", "away_summary", "checkpoint_done", "compact_boundary", "file_snapshot",
+  "informational", "instruction_size_warning", "notification", "per_turn_effort_changed",
+  "post_turn_summary", "session_metadata", "session_state_changed", "session_title_changed", "status",
+]);
+const diagnosticDetailPattern = /^[a-z0-9_/:.-]{1,64}$/;
 
 function sanitizeClaude(events, cwd, paths, redactions) {
   const projected = [];
@@ -168,11 +174,14 @@ function sanitizeClaude(events, cwd, paths, redactions) {
     } else if (type === "system" && subtype === "thinking_tokens") {
       const { estimated_tokens, estimated_tokens_delta } = event;
       projected.push({ ...common, estimated_tokens, estimated_tokens_delta });
-    } else if ((type === "rate_limit_event" || (type === "system" && claudeAdvisorySystemSubtypes.has(subtype))) && !parent_tool_use_id) {
+    } else if ((claudeAdvisoryTypes.has(type) || (type === "system" && claudeAdvisorySystemSubtypes.has(subtype))) && !parent_tool_use_id) {
       need(session_id === undefined || session_id === events[0]?.session_id, "Unexpected Claude advisory session");
       continue;
     } else {
-      throw new Error("Unexpected Claude stream event");
+      const tag = typeof type === "string" ? (typeof subtype === "string" ? `${type}/${subtype}` : type) : "unknown";
+      const err = new Error("Unexpected Claude stream event");
+      err.diagnosticDetail = diagnosticDetailPattern.test(tag) ? tag : "unknown";
+      throw err;
     }
   }
   return projected;
@@ -220,7 +229,7 @@ const passProcess = (process) => process.quiescent === true && process.code === 
 export function verifyDirectPacket({ request, context, prepared, index, launch, stdout, runtime, maxBudgetUsd, reference }) {
   fields(launch, ["schemaVersion", "packet", "session", "runtime", "inventorySha256", "invocationSha256", "backend", "timeoutMs",
     "before", "after", "exportBefore", "exportAfter", "copyBefore", "copyAfter", "process", "diagnostic"],
-  "Direct-CLI launch", ["diagnosticReason"]);
+  "Direct-CLI launch", ["diagnosticReason", "diagnosticDetail"]);
   fields(launch.process, ["code", "signal", "outcome", "quiescent"], "Direct-CLI process settlement");
   need(launch.schemaVersion === 1 && launch.packet === index + 1 && uuid(launch.session) &&
     equal(launch.runtime, runtime) && launch.backend === runtime.supervisor.backend &&
@@ -242,10 +251,15 @@ export function verifyDirectPacket({ request, context, prepared, index, launch, 
       "capture-quota", "upstream-rate-limited", "upstream-overloaded", "upstream-auth-failed"].includes(launch.diagnostic) &&
       (launch.diagnosticReason === undefined ||
         (launch.diagnostic === "invalid-native-output" && nativeOutputReasons.includes(launch.diagnosticReason))) &&
+      (launch.diagnosticDetail === undefined ||
+        (launch.diagnostic === "invalid-native-output" && typeof launch.diagnosticDetail === "string" &&
+          diagnosticDetailPattern.test(launch.diagnosticDetail))) &&
       stdout.length === 0, "Invalid Direct-CLI failure evidence");
-    return { failure: launch.diagnostic, ...(launch.diagnosticReason ? { reason: launch.diagnosticReason } : {}) };
+    return { failure: launch.diagnostic,
+      ...(launch.diagnosticReason ? { reason: launch.diagnosticReason } : {}),
+      ...(launch.diagnosticDetail ? { detail: launch.diagnosticDetail } : {}) };
   }
-  need(launch.diagnosticReason === undefined, "Unexpected Direct-CLI diagnostic reason");
+  need(launch.diagnosticReason === undefined && launch.diagnosticDetail === undefined, "Unexpected Direct-CLI diagnostic reason");
   for (const observation of [launch.before, launch.after]) {
     fields(observation, ["head", "statusSha256", "contentSha256"], "worktree observation");
     need(/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(observation.head) &&

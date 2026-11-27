@@ -193,6 +193,9 @@ export async function runDirectPacket({ request, expect, prepared, config, execu
           } catch (error) {
             launch.diagnostic = "invalid-native-output";
             launch.diagnosticReason = classifyNativeOutputError(error);
+            if (typeof error?.diagnosticDetail === "string" && /^[a-z0-9_/:.-]{1,64}$/.test(error.diagnosticDetail)) {
+              launch.diagnosticDetail = error.diagnosticDetail;
+            }
           }
         }
       }
@@ -216,6 +219,7 @@ export async function runDirectPacket({ request, expect, prepared, config, execu
       if (!launch.before || !launch.after || !equal(launch.before, launch.after) || !launch.exportAfter || !launch.copyAfter) {
         launch.diagnostic = "integrity-failed";
         delete launch.diagnosticReason;
+        delete launch.diagnosticDetail;
         stdout = Buffer.alloc(0);
       }
     }
