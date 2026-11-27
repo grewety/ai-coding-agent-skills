@@ -44,9 +44,10 @@ of native client discovery, Desktop acceptance or scanner approval.
 For an adopting integrated parent, select the installed Direct-CLI reviewer and bind exact phase authority, packet evidence and offline replay. Earlier parents use their original pinned verifier. [Reviewer setup](claude-reviewer.md)
 
 The [exclusive worker runtime](worker-runtime.md) uses the optional
-orchestration package only when the project selects delegated delivery. Verify its native implementer qualification and exact Direct-CLI reviewer binding.
-Verify the approved native implementer, exact reviewer and
-role records and provision the dedicated operator configuration before use.
+orchestration package only when the project selects delegated delivery.
+Before use, verify the approved native implementer's qualification, the
+exact Direct-CLI reviewer binding and the role records, and provision the
+dedicated operator configuration.
 Dispatch requires bounded workflow authority and separate per-run inference
 authority. Its packaged `scripts/run-implementer.mjs` launch, recovery and
 evidence interfaces retain the seven upstream skills, CLI pin and installation

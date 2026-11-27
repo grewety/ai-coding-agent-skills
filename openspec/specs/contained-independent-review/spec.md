@@ -7,7 +7,7 @@ capability: contained-independent-review
 
 ## Purpose
 
-Let operators run independent Claude Code reviews of exact, approved exports and verify the resulting evidence without exposing the checkout or trusting terminal prose.
+Run independent reviews of exact, approved exports through supported installed CLI clients in disposable packet workspaces and verify the resulting evidence offline.
 
 ## Requirements
 

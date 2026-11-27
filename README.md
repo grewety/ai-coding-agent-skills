@@ -13,7 +13,7 @@ Portable engineering workflows for AI coding agents that use OpenSpec. This repo
 | [Review and finish configuration](docs/openspec-review-configuration.md) | Paid review modes, host pins, local harness and standing triggers. |
 | [OpenSpec installation](docs/openspec-installation.md) | Upstream prerequisite and upgrade procedures. |
 | [Claude installation](docs/claude-installation.md) | Native marketplace, ZIP installation and host checks. |
-| [Contained reviewer](docs/claude-reviewer.md) | Pinned host configuration, route qualification and offline receipt replay. |
+| [Direct-CLI independent review](docs/claude-reviewer.md) | Native review through supported installed CLI clients, with offline packet preparation and receipt verification. |
 | [Exclusive worker runtime](docs/worker-runtime.md) | Qualified worker setup, role bindings and recovery. |
 | [OpenSpec metadata](docs/openspec-metadata.md) | Native identity, issue links, validation and vault views. |
 
