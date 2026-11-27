@@ -14,7 +14,7 @@ Herdr pane-selection helper.
 | `autonomous-implementation-review/scripts/orchestration-core.mjs` | Pure packet and retained-observation checks; no launch, progress writes or authority authentication. |
 | `autonomous-implementation-review/scripts/worker-handoff.mjs` and `references/worker-handoff.md` | Portable strict request/result schemas, adapter-only local publication and complete retained-artifact admission; no launch, cleanup or delivery acceptance. |
 | `autonomous-implementation-review/scripts/terminal-adapters.mjs`, `references/terminal-adapters.md` and `references/profile-preparation.md` | Candidate qualification records, terminal worker adapters (`hermes`, `claude-code`, `codex`, `grok-build`), role/model bindings, non-argv transport, process supervision, same-session interaction exposure, bootstrap-exception expiry, Hermes profile preparation and legacy-route retirement. |
-| `autonomous-implementation-review/scripts/review-candidate.mjs`, `scripts/review-*.mjs` in that package, and `references/review-candidate.md` | Opt-in contained review, exact host and route admission, candidate and charter-v1 exports, native stream audit and sealed receipt replay. |
+| `autonomous-implementation-review/scripts/review-candidate.mjs`, `scripts/review-*.mjs` in that package, and `references/review-candidate.md` | Direct-CLI review, exact host admission, candidate and charter-v1 exports, native process settlement and sealed receipt replay. |
 | `autonomous-implementation-review/scripts/run-implementer.mjs`, its `implementer-*.mjs`, `implementer-supervisor.py` and `worker-runtime-policy.mjs` helpers, and `references/run-implementer.md` and `references/worker-runtime.md` | Candidate exclusive Linux runtime, host assignment and physical slot ownership, pinned role pairs, native Codex preflight, durable supervision and original handover recovery. |
 | `autonomous-implementation-review/scripts/bounded-worker.mjs` and `scripts/bounded-worker.py` in that package | Shared bounded process-tree supervision and stream capture. |
 | `autonomous-implementation-review/scripts/herdr_panes.py` | Read-only overview and fail-closed validation of supplied operator selection against fresh pane JSON. |
@@ -30,7 +30,8 @@ Herdr pane-selection helper.
 
 ## Local Contracts
 
-- Own tier-bound reviewer replay, the native Codex admission path and offline Grok and wrapped Linux probe contracts. Keep provider HTTPS behind exact native qualification.
+- Bind Direct-CLI review to the verified integrated parent, exact client, packet and phase. Keep the native implementer qualification and settlement independent.
+
 
 - The explicit pilot admission reports exact unsupported predicates before dispatch or review export exposure. Preserve legacy frozen bindings and sealed offline review replay.
 
@@ -52,8 +53,7 @@ Herdr pane-selection helper.
 - Every iteration-cap handoff must pass delivery's `workerContinuationDecision` before dispatch, including retained legacy procedures and their additional approval gates. Only one fresh bounded same-role continuation per group/native task is allowed; a second cap stops. Never split, relabel or change sessions to reset the allowance. Preserve the capped session and complete retained history; no result, goal restart or budget increase bypasses the decision.
 - Bound discovery and reuse valid evidence. Qualified terminal adapters launch workers directly and publish sealed attempt handoffs (`worker-handoff.mjs`); operator-selected Herdr pane dispatch (`herdr-pane-dispatch`, which required per-handoff pane approval under issue #141194) is retired via `resolveLegacyRouteRequest`. When `herdr_lifecycle_watch.mjs` is used to observe a Herdr fallback or retained surface, it reads `agent get` for identity and `agent read --source detection` for live activity, records one terminal outcome, and never sends input or starts another goal. An unreadable frame (a repaint caught in flight) is retried up to `--unknown-tolerance` consecutive samples and recorded with a bounded frame excerpt; ambiguous visible input stops at once, and one `inconclusive` receipt may be resumed once with `--resume-from`. Source changes do not authorize installed-profile updates.
 
-- The contained reviewer owns offline packet feasibility, packet-scoped acceptance, host pin and atomic per-change review admission, and private upstream status evidence. Standalone probes require a distinct host-owned single-run grant and durable reservation before runtime. The reviewer uses the verified integrated planning policy and retains the old interpretation for sealed attempts. Keep shared planning, policy and harness interfaces byte-identical with delivery. No host configuration, ledger or credentials belong in reviewer exports.
-- Keep the default Claude binding and its original pin and replay schemas. The optional Pi 1.5.2 runtime mounts the verified release and packet read-only, grants only `read`, and admits inference solely through the capped private Unix relay to an exact host Hermes proxy xAI OAuth socket. Require independent offline and live proof, a strict framed receipt and full native parallel read association. Grok's native reviewer route stays unsupported until host-only OAuth routing is proved. A distinct grant limits the Pi trial to the fixed benign packet.
+- The Direct-CLI reviewer owns offline packet feasibility, packet-scoped acceptance, host pin and atomic per-change review admission, and private upstream status evidence. Standalone probes require a distinct host-owned single-run grant and durable reservation before runtime. The reviewer uses the verified integrated planning policy and retains the old interpretation for sealed attempts. Keep shared planning, policy and harness interfaces byte-identical with delivery. No host configuration, ledger or credentials belong in reviewer exports.
 - `scripts/review-packet-scheduler.mjs` owns pinned concurrency, launch pacing and sibling settlement with packet-bound replay. `scripts/review-spend.mjs` owns atomic reservations and exact signed extensions within integrated ceilings. Supervisor recovery owns identity-bound timeout settlement and progress evidence. Delivery applies the remaining grant, scope and continuation bounds before a successor can launch.
 
 ## Verification
@@ -67,18 +67,17 @@ Run `npm test` and `npm run build`. Confirm the generated package advertises
 `references/lifecycle-watch.md`, `references/openspec.md`, `references/claude-code-host.md`, `scripts/herdr_panes.py`,
 `scripts/herdr_lifecycle_watch.mjs`, `scripts/herdr-pane-state.mjs`,
 `scripts/adapter-qualification.mjs`, `scripts/agent-configuration.mjs`,
-`scripts/agent-discovery.mjs`, `scripts/agent-pi-runtime.mjs`, `scripts/agent-role-adapters.mjs`,
+`scripts/agent-discovery.mjs`, `scripts/agent-role-adapters.mjs`,
 `scripts/agent-role-config.mjs`, `scripts/agent-setup.mjs`,
-`scripts/containment-tier.mjs`, `scripts/detect-agents.mjs`, `scripts/role-config.mjs`,
+`scripts/detect-agents.mjs`, `scripts/role-config.mjs`,
 `scripts/runtime-version.mjs`, `scripts/setup.mjs`,
-`scripts/windows-containment-preflight.mjs`,
 `templates/phase-implementer.md`, and `templates/phase-reviewer.md`.
 
 Verify the implementer CLI, runtime helpers and references alongside the
-contained reviewer. They must be
+Direct-CLI reviewer. They must be
 byte-identical in the individual skill and optional orchestration bundle,
 with five skills and two bundles still advertised. Synthetic tests cover
 offline admission and containment checks. Packaged live qualification
-requires a separate grant for the exact runtime, relay and export inputs.
+requires a separate grant for the exact runtime, authority and export inputs.
 
 Parent contract: `../AGENTS.md`.

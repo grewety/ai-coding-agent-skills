@@ -82,7 +82,7 @@ applicable operator decision. A new host session supplies no new authority.
 | --- | --- |
 | **Role 1 · Orchestrator** | Bind the interactive client, provider, model, effort and version policy. It owns Git, `tasks.md`, evidence admission and protected closeout. |
 | **Role 2 · Implementer** | Select a standalone bounded implementer allowed by the integrated policy, or the exact qualified exclusive binding. The implementation outcome, editable paths, time and correction budget belong in the request. |
-| **Role 3 · Independent reviewer** | Select the qualified contained host, model, exact runtime/configuration, phase and exposure. Keep a separate reviewer session. Review has read-only scope over its approved manifest. |
+| **Role 3 · Independent reviewer** | Select the installed reviewer, model, exact settings, phase and exposure. Keep a separate reviewer session. Review has read-only scope over its approved manifest. |
 | **Role 4 · Optional AI helper or harness** | Select an explicit role tuple when enabled. The effective-binding gate currently blocks AI helper and AI harness execution. A configured non-AI harness uses the [standalone detached clone contract](openspec-review-configuration.md#optional-local-harness). |
 
 ### Role 1 · Interactive workset opener
@@ -127,36 +127,27 @@ effective role readback. The explicit Codex pilot shares the same supervised
 native route for standalone Goal-First and exclusive assignments.
 [Qualified worker setup](worker-runtime.md).
 
-### Role 3 · Contained review
+### Role 3 · Direct-CLI independent review
 
-The recorded legacy Linux/WSL route used Claude Code **2.1.330**, Bubblewrap
-**0.9.0**, `claude-sonnet-4-6` and `same-uid-key`. In trusted external
-`host.json`, pin the binaries, libraries, model and relay. Choose per-process
-`maxTurns`, `maxBudgetUsd`, and `timeoutMs`. Before any live request, build
-and check the export offline. An adopting policy requires a matching raw-file
-`configurationSha256` and at most `maxTurns - 10` whole-file reads in each
-packet. Use an independently authorized host configuration change when a
-packet needs a different budget. [Reviewer setup](claude-reviewer.md).
-
-New setup defaults to 96 turns and USD 2.50 per invocation, including the
-automatic probe as a separate reservation. The following host settings
-select those limits and serial packet execution. Merge
-these into the external host's complete configuration only under a matching
-operator grant. A different configuration requires its own exact pin.
+Pin the external schema 3 `host.json` and the offline runtime readback.
+The reviewer uses normal host authentication and a fresh disposable packet
+workspace. Confirm the exact phase grant and reserve the complete cost before
+provider contact. These settings show a serial launch with a 300000 ms timeout.
 
 ```json
 {
-  "model": "claude-sonnet-4-6",
-  "maxTurns": 96,
-  "maxBudgetUsd": 2.50,
-  "timeoutMs": 180000,
-  "interPacketDelayMs": 1000,
-  "packetConcurrency": 1,
-  "runTimeoutMs": 900000
+  "schemaVersion": 3,
+  "reviewer": {
+    "client": "claude",
+    "model": "claude-sonnet-4-6",
+    "timeoutMs": 300000,
+    "packetConcurrency": 1
+  },
+  "maxBudgetUsd": 2.5
 }
 ```
 
-Use the [direct Node launch](openspec-operator-runbook.md#launch-contained-review)
+Use the [direct Node launch](openspec-operator-runbook.md#launch-independent-review)
 after offline export preflight and exact run admission.
 
 ## Optional Intent-Driven planning

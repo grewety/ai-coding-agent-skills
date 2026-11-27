@@ -115,14 +115,7 @@ without copying `.claude/agents` templates). Installing a plugin neither
 configures an adapter nor authorizes commits, checkout creation, publication, or
 unattended execution.
 
-Projects selecting the [exclusive worker runtime](worker-runtime.md) need the
-complete separate orchestration package on a Linux execution host. The sealed
-synthetic trials qualify a dedicated Codex 0.171.0 / GPT-6.2-sol implementer and
-read-only Claude Code 2.1.330 / Claude Sonnet 4.6 reviewer on Bubblewrap 0.9.0
-with the `same-uid-key` relay, bound to the recorded host and runtime. Before
-dispatch, verify the exact host and role bindings and obtain the separate
-execution and inference grants. Account upload and plugin activation cover
-skill installation.
+Projects selecting the [exclusive worker runtime](worker-runtime.md) can use the separately installed orchestration package. Verify independent native implementer qualification and the exact Direct-CLI reviewer binding.
 
 Anthropic documents account skills and plugins syncing into Claude Code v2.1.273+
 when signed in with the same Claude account. API-key and cloud-provider sign-ins
@@ -181,8 +174,8 @@ Bump the affected plugin version in the catalog whenever its selected skills or
 support files change; skill versions alone do not update the enclosing plugin.
 See [external role configuration](configurable-backends.md) for host setup and qualification status after installation.
 
-The source catalog's `openspec-development` 1.11.0 includes `openspec-delivery`
-1.11.0 with its shared `scripts/git-environment.mjs` and
+The source catalog's `openspec-development` 1.12.0 includes `openspec-delivery`
+1.12.0 with its shared `scripts/git-environment.mjs` and
 `references/git-environment.md` for the Git guard/workspace helpers. Also preserve
 `references/evidence-retention.md`, `scripts/evidence-retention.mjs`,
 `scripts/evidence-cli.mjs`, `scripts/delivery-cli.mjs` and
@@ -192,7 +185,7 @@ skill/plugin ZIP exports. The evidence command supports authorized exact-SHA gat
 capture and offline readback. Keep next's `references/routing.md` and
 `scripts/next.mjs` with that skill. If direct packages load from different scopes,
 use the router's explicit trusted runtime path. The optional
-`autonomous-orchestration` is 1.15.0 (core skill 0.25.0) and `openspec-next` is 0.8.0. These
+`autonomous-orchestration` is 1.16.0 (core skill 0.26.0) and `openspec-next` is 0.9.0. These
 source versions do not assert that the public marketplace/downloads are updated.
 Preserve delivery's policy/task-authoring references and `delivery-policy.mjs`,
 and orchestration's `references/portable-core.md`, `scripts/orchestration-core.mjs`,
@@ -214,12 +207,7 @@ unsafe paths, and symlinks, and verify archive bytes, repeatability, checksums,
 and Pages artifact inclusion. They do not prove model obedience, cloud acceptance,
 or scanner approval.
 
-The optional orchestration package includes a standalone Linux contained reviewer.
-Claude remains the default. The opt-in Pi 1.5.2 route uses a private host Hermes proxy
-socket for xAI OAuth and requires matching offline and bounded live qualification before
-real review. Marketplace installation, ZIP upload and account sync do not configure the
-inference route or authorize data export or paid inference, which require a separate
-explicit grant. See the [reviewer setup and evidence checks](claude-reviewer.md).
+For an adopting integrated parent, select the installed Direct-CLI reviewer and bind exact phase authority, packet evidence and offline replay. Earlier parents use their original pinned verifier. [Reviewer setup](claude-reviewer.md)
 
 Validate the marketplace and both plugin exports with a disposable HOME and
 CLAUDE_CONFIG_DIR, without account credentials. Check exact inventories: four
@@ -240,5 +228,3 @@ A local build does not publish either surface.
 
 Packaging references: [Marketplace schema](https://code.claude.com/docs/en/plugins/marketplace-reference)
 and [plugin manifest schema](https://code.claude.com/docs/en/plugins/manifest-reference).
-
-The updated OpenSpec and orchestration bundles include synchronized containment setup and optional Windows prerequisite checks. Profile installation and runtime qualification are separate steps. See [Containment tiers](containment-tiers.md).

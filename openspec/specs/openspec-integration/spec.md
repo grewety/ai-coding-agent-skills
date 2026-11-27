@@ -492,17 +492,15 @@ Delivery SHALL provide runnable preflight, policy, workspace reconciliation, sta
 
 ### Requirement: External verification authority and data boundary
 
-Delivery SHALL require explicit authority for each external or paid run and retry, tunnel and external app automation. Bounded `auto-approved` contained reviews and verified standing $0 finish triggers under an adopting integrated parent SHALL be the only standing exceptions introduced by this policy. Verification authority SHALL identify target, scope, exposed data, cost or credits and run count. External and irreversible actions SHALL remain outside ordinary local execution grants.
+Delivery SHALL require exact authority for external or paid runs and retries, tunnels and external automation. Only eligible bounded automatic review and verified standing zero-cost finish triggers are exceptions. Authority SHALL bind target, exposure, cost or credits and run count.
 
 #### Scenario: Tunnels and vendor defaults
-- **WHEN** a cloud check requests a temporary tunnel or a vendor skill requests auto-test or auto-retry
-- **THEN** the orchestrator refuses unapproved work, serves only the approved built artifact during an authorized run, and tears down the tunnel immediately after success or failure
-- **AND** raw source, credentials, account operations and live data stay outside the exposure, and a tunnel or vendor retry needs a new grant
+- **WHEN** a vendor asks for a tunnel, auto-test or retry
+- **THEN** refuse an unapproved run. Serve only an authorized built artifact and tear down its tunnel after either outcome. Source, credentials, live data and account operations stay outside that exposure.
 
 #### Scenario: Publication and preview
-- **WHEN** a separately authorized push or preview could trigger external automation
-- **THEN** the orchestrator checks the triggers before activation and stops without the necessary additional grant or verified standing authority
-- **AND** a declared UI flow can offer a local-only try-out, semantic accessible-name checks and a separately approved deploy-preview review pause before merge
+- **WHEN** an authorized push or preview can trigger external automation
+- **THEN** inspect trigger authority before activation, including any required local-only UI checks and separately approved pre-merge preview pause.
 
 ### Requirement: Exact candidate and bounded planning verification
 
@@ -580,26 +578,23 @@ Under verified adopting policy, protected finish SHALL accept a task-completion 
 
 ### Requirement: Bounded paid contained-review authorization
 
-Under an adopting integrated parent, delivery SHALL default to `auto-approved` for eligible paid contained reviews and support `explicit` per-run approval. Integrated-parent policy SHALL govern mode, phases, cap ceilings and the standing $0 trigger allowlist. External host-owned configuration SHALL supply the `host.json` `configurationSha256` pin and optional local harness binding.
+Eligible independent reviews SHALL retain integrated-parent mode, phase and ceiling checks, pinned external host configuration, and durable accounting. Both automatic and separately granted explicit launches SHALL be supported.
 
 #### Scenario: Default mode and configured ceilings
-- **WHEN** the applicable integrated parent adopts this policy and supplies no overrides
-- **THEN** `auto-approved` applies with `maxReviews: 10` and `maxTotalUsd: 25` per change, shared across `["planning", "execution", "finish"]`
-- **AND** permitted overrides stay within integrated ceilings, and unreviewed candidate files and host settings cannot expand authority or raise those ceilings. New setup guidance defaults to 96 turns and USD 2.50 per launch. The upper bound includes the probe and every applicable packet. Existing pins keep their configured values. An explicitly adopted higher project ceiling applies prospectively.
+- **WHEN** the integrated parent adopts defaults
+- **THEN** apply automatic limits of 10 reviews and USD 25 shared across planning, execution and finish. Use a complete provable upper bound for all invocations. Existing pins and prospective project ceilings retain their applicability.
 
 #### Scenario: Concurrent or resumed automatic use
-- **WHEN** an eligible automatic paid review is proposed
-- **THEN** admission verifies the exact snapshot or candidate, phase, scope and host pin, and durably reserves one review and the full upper USD cost of the probe and applicable packets before provider contact
-- **AND** the per-change ledger serializes reservations across phases, retains spent or uncertain amounts and rejects replay or over-allocation on resume or concurrent use. A retry still needs separate authority and a new reservation when covered by the automatic budget.
+- **WHEN** an eligible automatic launch is proposed
+- **THEN** verify exact review identity, phase, host hash and scope, then serialize a reservation for the entire bounded cost before provider contact. Retain spent and uncertain amounts and reject replay or over-allocation.
 
 #### Scenario: Missing or exceeded automatic bounds
-- **WHEN** the phase is ineligible, the host is unpinned or mismatched, effective caps are absent, invalid or exceeded, or an upper cost or durable reservation cannot be verified
-- **THEN** automatic admission stops before launch and grants no fallback or cap increase. Only Operator-signed review cap extension can grant an eligible prospective increase.
+- **WHEN** a phase, pin, effective bound or reservation cannot be verified or is exceeded
+- **THEN** refuse launch without fallback. Only a matching signed extension can raise an eligible cap within the integrated ceiling.
 
 #### Scenario: Single-run authority
-- **WHEN** `explicit` is selected for the run, or the verified integrated parent predates the adoption of this policy
-- **THEN** the run requires a distinct single-run grant for its exact target, scope, exposure and cost
-- **AND** neither mode grants plan approval, local execution, finish, profile sync or retries.
+- **WHEN** a run uses explicit admission, is a retry, or is governed by inherited single-run policy
+- **THEN** require distinct exact authority with the applicable cost and exposure. Review authority cannot grant plan approval, execution, finish or profile updates.
 
 ### Requirement: Standing zero-cost finish triggers
 
@@ -642,74 +637,63 @@ Delivery SHALL support an optional declarative CLI or MCP harness in external ho
 
 ### Requirement: Operator workflow guidance
 
-The distribution SHALL publish a top-level index of active guides and a visual tutorial covering prompt and authority boundaries, fresh-session checkpoints, external role configuration and native schema interoperability. Protected closure guidance SHALL explain explicit issue closure after accepted integrated verification and record readback.
+The distribution SHALL publish a current guide index and visual walkthrough of prompt authority, checkpoints, external settings, native schemas and protected closure.
 
 #### Scenario: Current role and schema setup
-- **WHEN** an operator configures a workset opener, standalone or exclusive Implementer, optional AI helper or harness, or contained Reviewer host
-- **THEN** synchronized guides show explicit client, provider, model, reasoning-effort and version configuration, the supported and unsupported route matrix, native argument or config examples, moderated setup and separately authorized decisions using the maintained lifecycle diagram, chat sequence and reply examples
-- **AND** optional custom schemas remain governed by the same frozen identity and evidence requirements. Active upgrade guidance is preserved when obsolete history is pruned. The repository suitability matrix identifies Claude as the qualified Tier 1 baseline, Grok and Pi as Tier 1 candidates, Hermes and Codex as medium, and OpenCode, Kilo and agy as unsuitable for the current minimal-rootfs contained route, with dated evidence and qualification limits.
+- **WHEN** an operator sets up a role or optional native schema
+- **THEN** the synchronized guides show effective settings, supported routes and limits, fixture versus live evidence and operator decisions. Native schema inputs stay within the same frozen identity and evidence checks.
 
 #### Scenario: Review and closeout text
-- **WHEN** an operator follows the protected finish guidance
-- **THEN** the guidance explains how to bind the optional local pre-PR harness, verify its sealed exact-candidate evidence and configure the repository-local Aikido examples for the local check and standing $0 triggers
-- **AND** the closure PR template explains deliberate omission of an auto-close keyword and requires explicit issue closure after verified integration and archival evidence.
+- **WHEN** an operator follows protected finish guidance
+- **THEN** show optional exact-candidate pre-PR harness setup and evidence, repository-local Aikido checks and trigger examples, and explicit issue closure after accepted integration and archive readback. The closure PR template omits auto-close keywords.
 
 ### Requirement: Explicit external AI role configuration
 
-The workflow SHALL use a validated external binding for every enabled AI role, including the orchestrator, Implementer, contained Reviewer and optional AI helper or harness. The binding SHALL identify `client`, `provider`, `model`, `reasoningEffort` and version policy.
+Enabled roles SHALL use validated external bindings. Non-review roles retain their supported role tuples and version policy. The Direct-CLI Reviewer uses client, model, optional reasoning effort, timeout and packet concurrency with trusted accounting settings.
 
 #### Scenario: Resolve a supported explicit binding
 - **WHEN** an operator selects an enabled role and supported values
-- **THEN** the same declared tuple maps deterministically to the client's native arguments or configuration, including the OpenSpec `openers.<tool>.args` path for the orchestrator
-- **AND** the effective configuration is verified before use with no ambient model or reasoning defaults. Non-AI harnesses need no fabricated AI tuple.
+- **THEN** map the approved settings deterministically into the selected CLI or OpenSpec opener and verify the effective binding. Non-AI harnesses require only their own settings.
 
 #### Scenario: Reject missing or unsupported role settings
-- **WHEN** a required value is absent, unsupported, ambiguous or overridden at launch
-- **THEN** block that AI invocation and report the failed mapping or admission predicate without falling back to global defaults or substituting another adapter.
+- **WHEN** a required setting is absent, ambiguous, overridden or unsupported
+- **THEN** refuse dispatch and report the failed predicate without substituting global settings or another adapter.
 
 ### Requirement: Flexible audited runtime version policy
 
-External role configuration SHALL apply a default `versionPolicy: "gte"` with an inclusive tested-version floor, permit an inclusive `maxVersion` with that policy or an explicit `"exact"` match, and support explicit `versionCheck: false` to skip version comparison only.
+External role configuration SHALL keep audited version floors and inclusive optional maximums, exact pins and explicit version comparison opt-outs on applicable routes.
 
 #### Scenario: Compare observed versions
-- **WHEN** a role is started with checking enabled
-- **THEN** admit a supported version at the floor or within the configured range, reject versions below the floor or above the configured maximum, and reject a mismatch under exact policy
-- **AND** apply the same policy to relevant pinned runtimes such as Bubblewrap. A satisfying version cannot replace required qualification or hash and runtime checks.
+- **WHEN** comparison is enabled
+- **THEN** accept the configured version or range and reject a mismatch. Required runtime identity and qualification checks still apply.
 
 #### Scenario: Audit an explicit opt-out
-- **WHEN** the operator opts out of comparison
-- **THEN** retain the observed version and the disabled check state in audit evidence
-- **AND** refuse unverifiable runtime identity, failed containment or mismatched runtime, relay or configuration pins even under opt-out.
+- **WHEN** comparison is explicitly disabled
+- **THEN** retain the observed version and audit state. Identity, effective settings and applicable boundary failures still block launch.
 
 ### Requirement: Moderated external host discovery and setup
 
-`detect-agents` SHALL report read-only, redacted host observations. `setup` SHALL preview exact external role configuration and the reviewer host file SHA-256 before any operator-confirmed write. Discovery and setup SHALL avoid credential values, inference, automatic installation, and repository or live-profile mutation.
+Discovery SHALL be fast, redacted and read-only across supported desktop OSes. Setup SHALL preview exact external paths, bytes and raw SHA-256 before writing only on matching confirmation.
 
 #### Scenario: Discover installed or unavailable tools
-- **WHEN** discovery checks Codex, Claude Code, Gemini, Hermes, OpenCode, Kilo, Pi, `grok`, legacy `grok-build` references, `agy`, Bubblewrap and OpenSpec
-- **THEN** report presence, executable path and observed version where available, and safe local evidence for auth readiness, containment and supported model and reasoning options
-- **AND** mark unobservable capabilities unknown and absent binaries unavailable. Discovery status neither authenticates a provider nor qualifies a route. Resolve the real `grok` executable through supported discovery paths, retain the legacy client identity, and report absence or ambiguity without installation, inference or profile changes.
+- **WHEN** discovery inspects installed clients and OpenSpec
+- **THEN** report available paths, observed versions and locally observable options. Mark unavailable tools missing and unverifiable facts unknown.
 
 #### Scenario: Dry-run approved role choices before writing
-- **WHEN** an operator selects role tuples and reviewer limits
-- **THEN** setup previews exact output paths and bytes for reviewer host JSON including `maxTurns: 96` and `interPacketDelayMs`, external role-binding JSON, an OpenSpec opener snippet, and the raw-byte `configurationSha256`
-- **AND** dry runs or canceled confirmations write nothing. A matching explicit confirmation writes only to the chosen external host configuration directory and verifies the written bytes and pin.
+- **WHEN** the operator selects reviewer client, model, optional reasoning effort, timeout and packet concurrency
+- **THEN** preview the minimal host settings and any other requested role-binding or opener outputs. Normal host authentication needs no relay, tier or cloned auth-home setup.
 
 #### Scenario: Refuse conflicting or changed destinations
-- **WHEN** a preview changes, a destination aliases a repository or live profile, a symlink redirects an output, or an existing file would be overwritten without matching confirmation
-- **THEN** refuse the write and report the conflict without exposing credentials or presenting unverified configuration as usable.
+- **WHEN** a confirmation is stale, output would touch a repository or live profile, or the destination is unsafe or unapproved
+- **THEN** refuse writes and preserve existing files, profiles and credentials. Discovery and setup perform no inference or installation.
 
 #### Scenario: Report the observed Grok version
-
-- **WHEN** a trusted installed `grok` reports `grok 1.0.92 (b06756fd6256) [stable]`
-- **THEN** discovery reports version `1.0.92` under the existing `grok-build` configuration identity
-- **AND** supported legacy `grok-build` output still works. Untrusted paths or malformed and ambiguous output stay unverified.
+- **WHEN** a trusted installed Grok produces recognized version output
+- **THEN** report its observed version. Supported legacy output remains recognized for the Implementer identity.
 
 #### Scenario: Stage an explicit alternative reviewer
-
-- **WHEN** an operator selects a non-Claude contained Reviewer binding
-- **THEN** setup validates the exact client, provider, model, relay, effective settings, runtime and limits and reports an explicit qualification disposition
-- **AND** incomplete or mismatched offline and bounded live proof keeps that binding unsupported for real review, without ambient profile fallback or changing the default reviewer.
+- **WHEN** the operator chooses any supported reviewer
+- **THEN** verify the exact client and effective settings, and surface any host or capability blocker before launch without fallback.
 
 ### Requirement: Deterministic isolated distribution verification
 
@@ -766,44 +750,22 @@ Protected finish SHALL verify post-review PR corrections through exact non-waive
 
 ### Requirement: Direct contained review launch guidance
 
-The operator and reviewer guides SHALL show the packaged review runner as a standalone Node command with its exact inputs and existing authority prerequisites.
+Published examples SHALL use standalone Node launch and identify exact input bindings and held authority.
 
 #### Scenario: Review invocation in Codex
-- **WHEN** an operator follows a documented candidate or approach review example
-- **THEN** the live launch invokes `node …/review-candidate.mjs` directly, without a compound shell wrapper, and retains the separate admission, replay and readback steps. The guidance preserves platform review and permission enforcement.
+- **WHEN** following a documented candidate or approach launch
+- **THEN** invoke `node …/review-candidate.mjs` directly, preserve host permission checks, and keep offline preparation, live admission, replay and readback as separate steps.
 
-### Requirement: Confirmed containment setup preview
+### Requirement: Synchronized Direct-CLI review distribution
 
-The packaged setup command SHALL offer a single-command preview for explicit `--tier a` and `--tier b` selection. It SHALL report the tier and driver, exact pins, external outputs, raw host configuration digest, confirmation digest and qualification disposition. It SHALL write only after matching explicit confirmation, within the already supported external setup boundary.
+The packaged workflow SHALL use one default Direct-CLI review route, synchronized setup and documentation across both complete skills and their Claude bundles, and a prospective policy boundary for existing plans.
 
-#### Scenario: Preview the default Linux sealed route
-- **WHEN** an operator selects `--tier a` with trusted Linux runtime prerequisites
-- **THEN** the preview resolves the exact pinned runtime and libraries, explains zero-credential sealed operation and reports exact proposed output bytes, selected driver and confirmation digest
-- **AND** preview leaves configuration, credentials and profiles untouched. Matching confirmation admits only reviewed external output bytes.
+#### Scenario: Verify the exact build and documentation inventory
+- **WHEN** the exact candidate is verified
+- **THEN** check the advertised package file sets, shared script parity, required version bumps, current links and executable launch examples. Synchronize README, root and owning skill contracts, Claude and OpenSpec installation, workflow, review configuration, external backends, worker runtime, reviewer, operator runbook and tutorial guides.
+- **AND** the integration spec occupies at most 63,488 UTF-8 bytes, the archive tree is unchanged, and current references to retired components are removed except for any indispensable, documented receipt compatibility field.
 
-#### Scenario: Preview dedicated-auth Linux setup
-- **WHEN** an operator selects `--tier b` with an explicitly named dedicated authentication directory
-- **THEN** the preview checks the 0700 auth-only boundary using redacted metadata, reports the provider-connectivity and credential trade-offs, and distinguishes preview readiness from exact route qualification
-- **AND** it refuses unsafe directory identity or contents, missing prerequisites, conflicting outputs and stale confirmation without exposing credential values, copying ambient auth or writing outside the verified destination.
-
-### Requirement: Fail-closed platform driver selection
-
-The runtime SHALL expose `linux-bwrap` as primary and recognize optional `windows-container` and `macos-seatbelt` contracts in that order. Optional driver use SHALL require exact native proof of the advertised OS, filesystem, auth, network and role containment. An unavailable or unqualified driver SHALL be reported without fallback.
-
-#### Scenario: Gate Windows tests before launch
-- **WHEN** an operator explicitly enables an optional Windows integration test from native Windows or WSL2 interop
-- **THEN** preflight verifies the actual Windows host, native AI CLI executables needed for the selected tests, container, job and filesystem controls before any Windows integration test runs
-- **AND** return `missing-windows-client` for absent required clients, `unsupported-on-host` where native Windows or supported interop is unavailable, or `unqualified` when required native controls or exact qualification cannot be established. Linux executables or synthetic fixtures alone do not qualify Windows.
-
-#### Scenario: Recognize the macOS contract
-- **WHEN** an operator selects `macos-seatbelt`
-- **THEN** return `unsupported-on-host` outside native macOS and `unqualified` until a matching native trial proves profile and network controls, scoped review or worktree access and the correct tier-specific auth boundary.
-
-### Requirement: Synchronized containment distribution
-
-Both affected complete skills and their Claude bundles SHALL ship synchronized role setup, supported and unsupported routes, compatibility and operator guidance. Their versions SHALL reflect bundled changes. Qualification claims SHALL reference exact evidence and distinguish local packaging, native discovery, and live qualification.
-
-#### Scenario: Verify all affected packaging and documentation
-- **WHEN** the candidate is built from its exact committed revision
-- **THEN** the package inventories and shared setup stay synchronized and the new driver and verification materials are included wherever their owning package requires them
-- **AND** verify the documentation scope explicitly covers `docs/containment-tiers.md`, `docs/configurable-backends.md`, `docs/claude-reviewer.md`, `docs/worker-runtime.md`, `docs/claude-installation.md`, `docs/openspec-installation.md`, `docs/openspec-workflow.md`, `docs/openspec-review-configuration.md`, `README.md`, `AGENTS.md` and owning child contributor contracts.
+#### Scenario: Review governed by an existing plan parent
+- **WHEN** a planning, execution or finish review is governed by an integrated parent whose policy selected the original reviewer
+- **THEN** keep that exact review policy, pins, captures, zero-waiver checks and approved authority. A new default takes effect only under the adopting integrated parent.
+- **AND** if a receipt field cannot be migrated without breaking an active admission or finish reader, preserve and verify the exact minimal field and document its applicability. A mixed or unknown schema does not establish successful replay.

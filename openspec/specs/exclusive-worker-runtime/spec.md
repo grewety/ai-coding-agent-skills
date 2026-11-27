@@ -32,22 +32,21 @@ The packaged runtime SHALL acquire a non-blocking host-wide claim before any che
 
 ### Requirement: Qualified paired worker bindings
 
-`scripts/run-implementer.mjs` SHALL use a data-only request and a qualified external implementer when a project selects delegated execution. The resolved implementer and reviewer SHALL have separately verified role, client, model, reasoning effort, provider, version, settings, permissions and session identities. Pair admission SHALL verify independent sessions and providers.
+The exclusive runtime SHALL use a data-only request, a qualified external Implementer and a separately bound independent Direct-CLI Reviewer. It SHALL verify effective role settings, identity, permission scope and fresh independent sessions. Project policy SHALL retain any distinct provider or model requirement.
 
 #### Scenario: Reuse a verified project pair
-- **WHEN** project-default bindings pass preflight and stay pinned, or an explicitly authorized per-run override passes the same checks
-- **THEN** the assignment reuses the resolved pair and auth routes for its eligible groups and corrections
-- **AND** an unavailable, changed, unqualified or ambiguous binding blocks dispatch and reports the failed predicate without inline fallback or backend substitution.
+- **WHEN** project-default bindings or an authorized override pass the original assignment and preflight checks
+- **THEN** reuse the exact resolved pair for eligible work and corrections. Unavailable, changed or ambiguous bindings block dispatch without inline fallback or adapter substitution.
 
 #### Scenario: Persistent Codex worker authentication
-- **WHEN** the selected client is the qualified Codex implementer
-- **THEN** it uses a persistent pre-authenticated dedicated worker `CODEX_HOME`, isolated home and XDG config, a pinned executable path and native `workspace-write` containment
-- **AND** worker auth failure is surfaced on the same verified route, with host skill discovery and ambient user configuration disabled and no copied credentials or operator profile edits.
+- **WHEN** the selected Implementer is qualified Codex
+- **THEN** keep its verified dedicated worker `CODEX_HOME`, isolated home and XDG settings, pinned executable and native workspace-write boundary, including suppression of ambient skill and profile discovery
+- **AND** surface auth failure on the same route without copying credentials or touching profiles.
 
 #### Scenario: Verify actual role boundaries
-- **WHEN** qualification uses benign files and a synthetic publish credential with positive controls at an isolated test service
-- **THEN** both real launch routes show the intended permissions and permitted connectivity, deny out-of-scope access and publishing, and leave the role package inventories unchanged
-- **AND** the reviewer is fresh and OS-confined read-only, and the implementer cannot mutate protected handoffs, credentials, task state, or Git state outside the orchestrator boundary.
+- **WHEN** qualifying the Implementer and checking the Reviewer binding
+- **THEN** verify the Implementer's existing native write, protected-path access, credential, claim and supervision controls with benign positive and negative evidence
+- **AND** admit the Reviewer through fresh Direct-CLI sessions, the disposable packet boundary, untouched-worktree checks and exact receipt replay. The review client has the operator's normal host authentication and process access.
 
 ### Requirement: Verify checkout containment before dispatch
 
@@ -142,22 +141,3 @@ The runtime SHALL allow at most one automatic same-outcome continuation after a 
 - **WHEN** evidence is missing or stale, the checkout has no attributable progress or contains disallowed changes, the prior process can still write, ownership conflicts, authority has expired, or the automatic continuation was already consumed
 - **THEN** recovery preserves work and evidence, refuses a successor and never resets budgets or releases an unsettled slot.
 - **AND** neither a timeout nor a progress checkpoint can tick tasks or substitute for an accepted handover. Existing native approval waits and native turn-cap continuation retain their separate checks and share the original execution budgets.
-
-### Requirement: Tier-bound implementer containment
-
-Exclusive implementer assignments SHALL bind the exact containment tier and OS driver in new host, launch, status and receipt evidence. Admission SHALL require a qualified native or driver-contained workspace-write route, with dedicated authentication and hidden ambient home for Tier B. Routing SHALL preserve the exclusive claim, supervision, scope validation and settlement guarantees.
-
-#### Scenario: Prove the pinned native Codex implementer
-- **WHEN** a separately authorized benign Linux trial evaluates Codex 0.172.0
-- **THEN** it uses Codex native workspace-write and its exact pinned, dedicated worker authentication without outer Bubblewrap nesting
-- **AND** positive and negative controls verify named workspace writes, denied access outside scope, hidden ambient home and skill suppression, exact effective identity, original process settlement and sealed handover. A failed control yields the exact sealed `unsupported` disposition and leaves product dispatch blocked.
-
-#### Scenario: Prove wrapped non-Codex implementer containment
-- **WHEN** an eligible non-Codex implementer explicitly selects Tier B `linux-bwrap`
-- **THEN** admission verifies hidden ambient home and XDG configuration, a dedicated 0700 auth-only directory, read-only system inputs and named workspace-write containment with private scratch
-- **AND** it refuses writes to governed task state, Git, claims, protected evidence and paths beyond the permitted workspace, and gates real dispatch on the exact offline and bounded live proof for that route.
-
-#### Scenario: Refuse changed identity or failed startup
-- **WHEN** the driver or tier differs between qualification and launch or the runtime cannot establish its OS controls
-- **THEN** fail closed before product dispatch and retain the exact blocker
-- **AND** the runtime never silently selects a weaker tier, swaps the driver or falls back to an ambient profile or unqualified adapter.

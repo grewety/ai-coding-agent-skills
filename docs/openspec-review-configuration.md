@@ -42,21 +42,11 @@ the run. `finish` requests bind `request.policy.finishReference` to the
 retained finish grant. Review authorization has no effect on approval,
 implementation, publication, profile sync or retries.
 
-The reviewer host defaults to `packetConcurrency: 1`. An integer of 2 or 3
-requires the same value in the independent expectation, a raw-byte host pin,
-the private same-UID relay, and a durable reservation for the probe and all
-packets before launch. A failure stops queued packets while active packets
-settle. Offline verification binds the sealed schedule and audits each packet.
-
-The existing Claude default keeps its original host pins and sealed capture
-schemas. An explicit Pi 1.5.2 reviewer uses a setup-produced schema 2 host with
-a pinned release inventory and private Hermes proxy xAI OAuth relay. Treat
-`maxTurns: 96` as the per-invocation relay request limit for Pi. Keep the
-same durable reservation for the probe and every packet. Synthetic trial
-authority covers only the runner's fixed benign two-file fixture. Real review
-requires matching live qualification and explicit single-run admission for
-the approved export.
-Follow the [host and trial setup](claude-reviewer.md#prepare-and-qualify-the-pi-route).
+The schema 3 reviewer host defaults to one packet session at a time. A setting of
+2 or 3 must match the independently retained runtime settings and raw host pin.
+The reservation covers every packet. A failure stops queued packets and
+cancels active siblings. Offline verification checks the sealed schedule and
+each outcome. Use the originating pinned verifier and host for frozen earlier plans.
 
 The following admission shape selects automatic mode by omission. Replace
 the SHA and references with verified values for one exact run. Use one
@@ -87,30 +77,16 @@ reviewed exact target require retry authority for that purpose.
 }
 ```
 
-Offline preparation and checking use `--host-config HOST`. Set
-`maxTurns >= 11` for low-touch packet feasibility. The ten-turn reserve
-leaves at most `maxTurns - 10` whole-file reads per packet. The host schema
-accepts 1–128 for standalone probes and retained legacy runs. Offline
-`--check --admission ADMISSION` also checks the effective scope and
-authority without claiming the reservation. The approved launch uses
-`--mode ... --host-config HOST --admission ADMISSION`. Before contacting the
-relay or reading credential material, it durably claims the run. The full
-reservation is the host's per-invocation `maxBudgetUsd` multiplied by the
-number of packets plus one probe. New setup uses 96 turns and defaults to
-USD 2.50 per invocation. Six packets with a probe reserve USD 17.50 and
-seven with a probe reserve USD 20.00 at this setting. Existing host pins
-retain their configured values. The ledger retains spent and uncertain
-amounts conservatively and refuses replay or excess. A crashed or partially
-written ledger stops future claims pending host reconciliation. Keep the
-original entries when reconciling. A standalone diagnostic `--probe` is
-outside automatic approval. Use `--probe --host-config HOST --admission
-PROBE_GRANT --output PROBE_OUTPUT` with a separate host-owned
-`standalone-review-probe` grant. It binds one invocation to the raw host
-SHA-256, exact cost bound in USD millionths and stable host ledger path.
-The runner reserves the grant's unique approval reference in that ledger
-before opening the runtime or reading credentials. Keep that reservation
-after a failed run.
-[Packaged request and command schema](../skills/autonomous-ai-agents/autonomous-implementation-review/references/review-candidate.md).
+Offline preparation and checking use `--host-config HOST` and verify complete
+packet feasibility. Claude reserves ten of 128 native turns. The standalone
+`--check --admission ADMISSION` verifies phase and spend scope offline.
+`--mode ... --host-config HOST --admission ADMISSION` claims a durable
+reservation before the first provider contact. Direct-CLI reserves the
+supportable per-session `maxBudgetUsd` multiplied by the packet count.
+With an independently supported USD 2.50 bound, six sessions reserve USD 15.00.
+The ledger preserves uncertain amounts and refuses replay or excess. A partial
+ledger publication requires host reconciliation and preservation of original entries.
+Use the [reviewer guide](claude-reviewer.md) for host setup and replay.
 
 ## Signed execution cap extension
 
@@ -300,5 +276,3 @@ approval. A missing or stale inventory blocks activation.
 [Aikido GitHub PR gating](https://help.aikido.dev/code-scanning/local-code-scanning/pr-gating/github-pr-gating-using-local-scanner),
 [Aikido default-branch scanning](https://help.aikido.dev/code-scanning/miscellaneous/scanned-branches-in-aikido),
 [Aikido Deep Review credits](https://help.aikido.dev/deep-review/configure-deep-review).
-
-New tier-aware hosts and expectations bind `containmentTier` and `osDriver` through qualification, launch and replay. A per-invocation timeout up to 600000 ms still operates within the enclosing run and authority limits. See [Containment tiers](containment-tiers.md).

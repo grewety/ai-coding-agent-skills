@@ -1,269 +1,48 @@
-# Contained reviewer
+# Direct-CLI independent review
 
-See [external AI roles and backend pilots](configurable-backends.md) for explicit role settings and the
-[observed backend suitability matrix](configurable-backends.md#observed-backend-suitability).
+Install core skill 0.26.0 from the optional `autonomous-orchestration` 1.16.0 bundle. The [exclusive worker runtime](worker-runtime.md) keeps its own native qualification.
 
-The optional `autonomous-implementation-review` 0.25.0 skill and
-`autonomous-orchestration` 1.15.0 bundle ship a standalone command for candidate
-review and charter-v1 approach review. Use the complete package from a reviewed
-checkout or the [Claude installation guide](claude-installation.md). Resolve
-`scripts/review-candidate.mjs` inside that package. This command runs locally
-from a terminal and requires neither account skill sync nor a plugin loaded
-in the reviewer process.
+Under an adopting integrated parent, the independent reviewer runs the selected installed CLI in a fresh session for each assigned packet. Prepare, capability checks and replay remain offline. Linux supervises a kernel subreaper. On macOS the launcher starts an unprivileged session with a hard process creation limit of zero before executing the client. The host probe must observe both `fork` and `posix_spawn` refused. Clients that require child processes to start or complete a turn fail on this route. [Darwin kernel process creation](https://github.com/apple-oss-distributions/xnu/blob/main/bsd/kern/kern_fork.c).
 
-## Supported binding
+The Windows launcher assigns the suspended client to a no-breakaway Job Object before resuming it. After leader exit, the supervisor checks a complete bounded Job PID list, revalidates process membership and exit by handle, and checks pipe EOF separately. Descendants get up to 250 ms to exit within the original run deadline. A surviving tree is terminated and the review refused. Incomplete observations cannot establish settlement. [Windows Job process ID list](https://learn.microsoft.com/windows/win32/api/winnt/ns-winnt-jobobject_basic_process_id_list).
 
-The recorded Linux/WSL qualification at
-`4eddbade12fab2a032755a446f9176005b7b04a1` used Bubblewrap **0.9.0**,
-Claude Code **2.1.330**, `claude-sonnet-4-6` and the `same-uid-key` relay.
-Qualification follows the exact published role and host settings.
-Use the [worker runtime](worker-runtime.md) for exclusive worker pairing
-and [review configuration](openspec-review-configuration.md) for policy,
-approved exposure and single-run exceptions.
+The selected installed build must expose the required native CLI controls. The offline probe reads version and help in an isolated home without credentials. The worker retains the executable, capability and supervisor pins, then binds the exact argument form, stdin or attachment, and any per-packet settings into each launch. Synthetic fixtures exercise the transport and evidence contract on the native operating systems. Live qualification requires separate evidence for the installed build and platform.
 
-Claude remains the default. The explicit Pi 1.5.2 route has offline evidence
-against synthetic inference and needs matching live host qualification before
-real review. Grok 1.0.92 is unsupported. The credential-free investigation
-left host-only xAI OAuth routing for `streaming-messages-json` through
-`inference.sock` unverified, so admission refuses the route before export
-exposure. No live xAI call was made with Grok. The only permitted fallback
-for this change is Pi through Hermes proxy xAI OAuth under a separate trial grant.
+| Client | Native input and configured effort | Admission and evidence |
+| --- | --- | --- |
+| `claude` | Print-mode stdin with `--effort` when selected | Fresh UUID, safe and restricted mode, assigned whole-file Read evidence |
+| `codex` | `exec` stdin with `model_reasoning_effort` when selected | Ephemeral read-only exec, isolated configuration controls, receipt-only |
+| `grok` | One bounded `--single` argument with `--effort` when selected | `XAI_API_KEY` with a disposable profile, Read-only tool selection, receipt-only |
+| `pi` | Print-mode stdin with `--thinking` when selected | In-memory UUID, JSON model and terminal evidence, extensions and MCP disabled, receipt-only |
+| `hermes` | One-shot `--query-file -` stdin | Current `chat` delegates to a gateway outside the supervised tree. Dispatch is blocked and no one-shot reasoning pin is exposed. |
+| `opencode` | V2 standalone run with a text attachment and `model#variant` when selected | Supported provider environment key, private server and tool-deny policy, receipt-only |
+| `kilo` | Headless run with a text attachment and `--variant` when selected | Supported provider environment key, embedded runtime with daemon discovery disabled, receipt-only |
+| `agy` | A single JSONL user message with `--effort` when selected | `GEMINI_API_KEY`, native `--settings` support with strict permissions and no interactive approvals, strict-mode and model readback, receipt-only |
 
-## Host setup and credential routes
+Claude, Codex and Pi can use their normal host authentication. The disposable profiles for Grok, OpenCode, Kilo and Antigravity use their supported environment credentials and never copy authenticated profiles. The provider-qualified OpenCode and Kilo routes accept `anthropic`, `openai`, `openrouter`, `xai`, `google`, `opencode` and `opencode-go` where the selected CLI supports that provider. A configured variant must exist for the selected model. [Grok headless](https://docs.x.ai/build/cli/headless-scripting), [Hermes classic CLI gateway](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/developer-guide/gateway-classic-cli.md), [OpenCode models and variants](https://opencode.ai/docs/models/), [Kilo CLI reference](https://kilo.ai/docs/code-with-ai/platforms/cli-reference), [Antigravity headless](https://antigravity.google/docs/cli/headless/), [Antigravity authentication](https://antigravity.google/docs/cli/install/).
 
-- Use Linux (or WSL with the required Linux facilities), working Bubblewrap
-  namespaces, Python 3 with pidfd support, Node 22+ and Git for candidate
-  preparation. The command checks Bubblewrap **0.9.0** and audits Claude Code
-  **2.1.330**. Use known runtime binaries and minimal required shared libraries.
-- Keep trusted host configuration, reviewed checkout, export, publisher output
-  and independent expectations separate. Use private, existing parents for
-  fresh output and export directories. Use absolute paths throughout. The
-  runner allocates separate private runtime scratch and checks the Unix socket
-  path in UTF-8 bytes before binding. Teardown keeps the retained review output.
-- In the schema-version-1 host JSON, pin the absolute `bwrap`, `claude` and
-  `node` binaries by `path` and SHA-256. Pin each entry in `libraries` by
-  source path, SHA-256 and exact sandbox `target`. Use regular files owned by
-  the caller or root and protected from group/other writes. Bind the exact
-  `model` and explicit `relay` to the approved configuration. Set
-  `timeoutMs` (1,000–300,000), `maxTurns` (1–128) and `maxBudgetUsd`
-  (greater than zero, up to 10) within the live grant. These are per-launch
-  settings. New setup uses 96 turns and defaults to USD 2.50 per invocation.
-  Keep the exact host pin for an existing change. Account for the probe and
-  every packet when granting spending.
-- Set `requirePreExposureAttestation` to false only if policy permits a
-  synthetic probe followed by a post-run audit of each data-bearing process.
-  If policy requires attestation of that process before exposure, stop.
+Use Node 22+, native Git and Python 3 on the review host. Linux requires procfs and Python with pidfd support. Windows requires native `.exe` launchers, an NTFS evidence location, Windows PowerShell for read-only access checks and a process that can enter a nested Job Object. macOS requires unprivileged execution and `/usr/bin/git` with the Command Line Tools available. Keep the Git checkout, host configuration, evidence, and disposable packet directories at distinct canonical locations. The reviewer has ordinary host permissions. The packet boundary, capability restrictions and before/after comparisons detect specific integrity failures under those permissions.
 
-| Route | Host configuration and qualification |
-| --- | --- |
-| `same-uid-key` | Relay used in the historical standalone trial and the exclusive Linux pair. Set `keyFile` and `keyFormat` explicitly. Use a host-owned single-link 0400 regular file with only the key for `raw`, or a host-owned single-link 0600 regular file with one literal `ANTHROPIC_API_KEY` assignment for `assignment`. The relay parses text without sourcing it and keeps the key host-side. Same-UID protection depends on isolation and trust in host processes running under that UID. |
-| `dedicated-uid-broker` | Implemented interface pending independent qualification. Set `socket` to an absolute `inference.sock` and `ownerUid` to the distinct non-root broker UID. The socket must be mode 0660 and its parent must be owned by that UID and protected from group/other writes. The separately operated broker needs its own route and policy evidence. |
-| `scoped-oauth` | Unavailable under the pinned inference and startup constraints. The command rejects the route. Ambient login, cloud-provider sign-in and account sync are unqualified. |
+## Prepare and launch
 
-The sandbox exposes the assigned export packet and pinned runtime read-only,
-private writable scratch and the approved Unix socket. It leaves the original
-checkout, Git metadata, live home/config, credential files and publisher output
-outside. The same-UID relay sends approved Anthropic inference traffic over
-verified TLS. Provider exposure includes the review prompt and the full files
-read from the packet. Approve those bytes before launch and keep secrets and
-unrelated context out of the export, including gate attachments and old file
-versions. Treat raw captures and extracted reports as sensitive review data.
+Use [external setup](configurable-backends.md) to preview the client, model, optional effort, timeout and concurrency. The host pin binds the resulting bytes. Start with an independent schema 2 expectation holding `requestSha256`, `exportSha256` (initially null), `configurationSha256` and `model`. Retain `runtime` and `maxBudgetUsd` from offline preparation together with the manifest digest. Retain the expectation separately from the attempt.
 
-## Prepare and qualify the Pi route
-
-Prepare these inputs on the trusted host outside the checkout, exports, output,
-ledger and live profiles. Use the same private directory protections as the
-Claude route. Pass the resulting pins through the external role setup preview
-and confirm the exact preview only under operator authority.
-
-1. Stage the existing, independently verified `@earendil-works/pi-coding-agent`
-   1.5.2 release and its runtime dependencies in a release-only directory. Its
-   sole top-level entry is `node_modules`. Include the package metadata and
-   `dist/bundle/cli.js`. Use canonical paths, trusted ownership and no group or
-   other write bits. Use only internal relative symlinks. `REVIEW_SCRIPTS` is
-   the absolute packaged scripts directory and `PI_RELEASE` is the absolute
-   directory containing `node_modules`. This command reads the release and
-   prints the pin for `reviewer.runtime.piRelease`.
-
-   ```sh
-   node --input-type=module -e '
-     const { piReleaseInventory } = await import(process.argv[1] + "/agent-pi-runtime.mjs");
-     const path = process.argv[2];
-     console.log(JSON.stringify({ path, ...await piReleaseInventory(path) }));
-   ' "$REVIEW_SCRIPTS" "$PI_RELEASE"
-   ```
-
-   Pin the Pi executable as provenance in `roles.reviewer.executable` and
-   select `client: "pi"`, `provider: "xai-oauth"`, `model: "grok-4.7"`,
-   `reasoningEffort: "off"`, `transport: "unix-socket"`, `versionPolicy: "exact"`,
-   `versionCheck: true` and `exactVersion: "1.5.2"`. The sandbox runs the
-   fixed release entry from a verified read-only snapshot with the pinned Node
-   and libraries. It mounts `/review` read-only and uses disposable state,
-   disabled ambient discovery and only `read`. The host relay caps requests at
-   the schema 2 host's `maxTurns: 96` and the supervisor applies `timeoutMs`.
-
-2. Provision a trusted host-side broker for the selected Hermes xAI OAuth
-   backend. It must serve streamed `POST /v1/chat/completions` for `grok-4.7`
-   on a canonical `hermes-xai.sock` owned by the invoking UID, mode `0600`, in
-   a directory owned by that UID, mode `0700`. Authenticate upstream and keep
-   the credentials and refresh state entirely on the host. An HTTP health
-   response or a local SSE test establishes only transport behavior. Verify
-   upstream protocol and OAuth identity separately. The review runner verifies
-   socket identity and forwards only allowed inference. The isolated process
-   receives the separate per-invocation `inference.sock`.
-
-   With `HERMES_SOCKET` set to the absolute broker socket path, read its pin:
-
-   ```sh
-   node --input-type=module -e '
-     const { lstat } = await import("node:fs/promises");
-     const path = process.argv[1];
-     const stat = await lstat(path, { bigint: true });
-     if (!stat.isSocket()) throw Error("Expected the host Hermes proxy socket");
-     console.log(JSON.stringify({ path, device: String(stat.dev), inode: String(stat.ino) }));
-   ' "$HERMES_SOCKET"
-   ```
-
-   In setup choose `reviewer.relay.route: "hermes-proxy-xai-oauth"` and a
-   nonsecret `credentialRef`. Store the relay JSON with `schemaVersion: 1`,
-   the same `route` and `credentialRef`, and the socket pin as `upstreamSocket`.
-   Pin its exact bytes and path as `reviewer.runtime.relayConfiguration`.
-   A re-created socket changes its inode and requires a matching new pin and
-   evidence for the changed binding.
-
-3. Retain independent offline control evidence for the exact released package,
-   raw schema 2 host bytes, runtime constraints, role and relay. Use the
-   [packaged trial procedure](../skills/autonomous-ai-agents/autonomous-implementation-review/references/review-candidate.md#pi-qualification-trial)
-   with the separate synthetic one-run grant. Replay the sealed trial offline
-   and retain the independent status hash, canonical grant digest and complete
-   captures. The live proof must identify the approved Hermes OAuth route and
-   record actual containment, credential custody, request/deadline bounds,
-   whole-file parallel coverage and strict receipt replay. A matching sealed
-   qualification plus independently pinned `expect.explicit`, `expect.generator`
-   and `expect.qualification` are required before running a real review.
-
-## Prepare, run and verify
-
-Use the [packaged CLI reference](../skills/autonomous-ai-agents/autonomous-implementation-review/references/review-candidate.md)
-for the exact request, expectation and host schemas. In candidate mode, bind
-the exact base, target, plan, canonical diff and passing gate evidence. Review
-changed whole files, including deleted and renamed sources, plan inputs and
-approved attachments. In approach mode, bind the raw plan inputs, charter-v1
-record, correction if present, authority, fixed model and ledger. Use a fresh
-reviewer session and a declared publisher evidence root.
-
-For an explicitly qualified reviewer, use the setup-produced schema 2 host and
-independently pin the qualification manifest as `expect.qualification`
-(`path` and `sha256`). Also pin the generating `provider` and `session` in
-`expect.generator`. The candidate generator is the settled Implementer.
-The planning generator is the author. Retain the `explicit` runtime readback
-from `--prepare` or `--check` in the independently held expectation before
-launch. Use a separate single-run grant for the exact readback, export,
-scope and cost. For an explicit standalone probe, pass
-`--qualification PATH --qualification-sha256 SHA` and bind the canonical
-runtime readback hash as `explicitRuntimeSha256` in the probe grant.
-Replay uses the retained expectation, export and captures, including the
-original version audit. Older runs use their original bindings.
-
-Use Node 22+ and substitute the absolute packaged
-`scripts/review-candidate.mjs` path in each command. Use absolute paths for the
-uppercase operands. The mode examples apply to adopting integrated policy. Include
-`--host-config HOST` on `--prepare` and `--check` for these requests. Run a
-live mode only within the exact review authority verified by `ADMISSION`.
-For Codex Auto-review, run the mode line directly as a standalone Node command
-with platform permission checks in effect.
-The mode lines are alternatives. For each run, `OUTPUT` is a fresh absolute
-path declared in that request's `worker.evidenceRoots`. Use the same request,
-sealed export and original `OUTPUT` path for `--verify`.
+For Codex Auto-review, run these commands with absolute paths and the standalone packaged script. The first two operations prepare and validate the export. The third sends only assigned packet inputs for paid inference after verifying the exact phase grant and claiming the complete reservation. The final command replays the sealed result offline. Add the returned `statusSha256` to the independently retained expectation before replay.
 
 ```text
-node review-candidate.mjs --prepare --request REQUEST --expect EXPECT --export EXPORT
-node review-candidate.mjs --check --request REQUEST --expect EXPECT --export EXPORT
-node review-candidate.mjs --probe --host-config HOST --admission PROBE_GRANT --output PROBE_OUTPUT
-node review-candidate.mjs --mode candidate --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --admission ADMISSION --output OUTPUT
-node review-candidate.mjs --mode approach --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --admission ADMISSION --output OUTPUT
-node review-candidate.mjs --verify --request REQUEST --expect EXPECT --export EXPORT --output OUTPUT
+node "$review_cli" --prepare --request REQUEST --expect EXPECT --export EXPORT --host-config HOST
+node "$review_cli" --check --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --admission ADMISSION
+node "$review_cli" --mode candidate --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --admission ADMISSION --output OUTPUT
+node "$review_cli" --mode approach --request REQUEST --expect EXPECT --export EXPORT --host-config HOST --admission ADMISSION --output OUTPUT
+node "$review_cli" --verify --request REQUEST --expect EXPECT --export EXPORT --output OUTPUT
 ```
 
-1. Independently approve and pin the request and host configuration hashes.
-   The request digest is compact JSON with recursively sorted object keys
-   and a final LF. The host pin for adopting policy hashes raw file bytes.
-   Legacy review records keep their original configuration identity. For
-   initial preparation, set `exportSha256` to null. Offline `--prepare` creates
-   a sealed export and reports its manifest hash. Inspect the whole manifest,
-   file bytes and packet scopes. Retain the approved hash in the independent
-   expectation, then use offline `--check` to confirm the sealed inventory and
-   packet count. Set `maxTurns >= 11` for low-touch packet feasibility.
-   Each packet can assign at most `maxTurns - 10` whole-file reads. Legacy
-   hosts accept 1–128 for standalone probes and retained runs. Configure optional `interPacketDelayMs`
-   from 0 to 30000 and `runTimeoutMs` from 1000 to 3600000 in the pinned host.
-   Optional `packetConcurrency` accepts integers 1 through 3 and defaults to 1.
-   For 2 or 3, pin the raw host bytes, match the value in the independent
-   expectation, and use the same-UID relay and durable full-run admission.
-   Each invocation gets a separate relay, scratch directory and supervised
-   process. Pacing applies between settlement and the next serial packet,
-   or between launches for concurrent packets.
-2. With a separately authorized `PROBE_GRANT`, `--probe` first reserves the
-   approved host configuration and single-invocation cost in the host-owned
-   ledger. It then sends a synthetic prompt with an empty packet and records
-   `probe-passed` or `probe-failed` with separate captures. For
-   each approved mode run, use a fresh output root and an expectation without
-   `statusSha256`. The mode run performs its own separate probe before sending
-   any packet. The native audit checks the model and session, the pinned
-   startup inventory, and 100% whole-file coverage for every assigned packet.
-   Claude offers only `Read` with empty plugin, MCP, skill and slash-command
-   inventories. Pi offers only `read` and the audit matches each parallel
-   result to its call ID and exact file bytes.
-   After a failure, active siblings settle and queued packets stop. Offline
-   verification checks the sealed launch and settlement order and each
-   packet's capture. A failed or incomplete run cannot be accepted.
-3. Retain the reported `statusSha256` independently and add it to the
-   expectation used for offline `--verify`. Keep the sealed export, request,
-   expectation and complete output. Mode output contains raw captures under
-   `raw/`, separate extracted `native.txt` and `lifecycle.jsonl` for a
-   completed candidate or `report.md` otherwise, and sealed `request.md`,
-   `result.json` and `status.json`. Replay checks bytes, inventories,
-   runtime and session identities, and receipt admission. A successful replay
-   can describe a failed launch, so inspect the returned phase and result.
-4. Apply the existing [OpenSpec review rules](openspec-workflow.md). Candidate
-   acceptance still requires a complete literal no-findings verdict with zero
-   limitations. Approach admission retains the charter's ledger, findings,
-   deferrals and packet-gap decisions. The command always reports
-   `deliveryAccepted: false`. The orchestrator decides task state and delivery
-   under the existing authority.
+Use `--mode approach` for an authorized charter-bound review. Use the [operator runbook](openspec-operator-runbook.md#launch-independent-review) and the [review configuration](openspec-review-configuration.md) for exact phase authority, pacing, retries and signed caps. Scope checks and worktree snapshots run on failed launches and timeouts. Preserve any changed checkout for the operator.
 
-## Troubleshooting
+## Read back evidence
 
-- **Delivery reports a pending probe or result review.** Use the read-only
-  delivery preflight for P4/P5 and P8 evidence, and reconcile the exact candidate,
-  configuration and handover bindings. A verified adopting parent can grant
-  bounded automatic mode. Every retry needs distinct authority.
-  [Delivery runtime](../skills/software-development/openspec-delivery/references/delivery-runtime.md).
-- **Preparation or check rejects the export.** Check absolute path separation,
-  private parent ownership, fresh directory names, exact Git and input
-  identities, and every manifest member. Whole files are capped at 64 KiB and
-  a packet is capped at 96 files and 512 KiB. Resolve scope or identity errors
-  with the approving authority. Keep whole-file coverage and retain the new
-  approved binding if inputs change.
-- **Probe or startup fails.** Inspect retained stdout, stderr and capture
-  metadata for namespace or pidfd support, runtime hash and version mismatches,
-  missing library mounts, broker ownership or permissions, and unexpected
-  startup inventory. Keep containment and pins in force. Stop if the approved
-  route cannot run and seek separate authority for any successor launch.
-- **Runtime or receipt fails.** A failed probe, runtime failure or invalid
-  receipt exits nonzero. Preserve the complete sealed output where available.
-  An interrupted or partial output cannot establish acceptance. The same-UID
-  relay retains only allowlisted upstream status classes in private evidence.
-  Provider response details stay outside the sandbox.
-  A candidate receipt rejection records `receipt-invalid` and the offending
-  packet with its captures. Offline verification reproduces the rejection.
-  One verified malformed approach receipt can be retried under the existing
-  zero-correction-cycle convergence decision with a fresh session and output,
-  matching binding and retained predecessor. A packet gap follows the
-  charter's repair path. Neither outcome grants another paid launch.
-- **Offline replay fails.** Compare the independently retained status hash,
-  request, configuration, model and manifest bindings against the original
-  retention record. Preserve the failed artifacts. Recomputing a hash from
-  suspect output cannot recover its authenticity.
+Replay validates the independently pinned status, candidate or planning identity, packet files and digests, fresh sessions, supervisor observations, verdict and finding paths. A packet must produce exactly one `BEGIN_REVIEW_RECEIPT` and `END_REVIEW_RECEIPT` frame. Whole-file coverage requires paired structured Read calls and responses with bytes matching the assigned export. Receipt-only observations retain the verdict and findings for inspection. Gates requiring zero-waiver whole-file coverage require the structured proof.
 
-Claude remains the default Tier A reviewer. New tiered setup binds `linux-bwrap` and uses the 300000 ms default with a 600000 ms maximum. Legacy host and capture replay retains its original limits and schema. See [Containment tiers](containment-tiers.md).
+Earlier frozen parents retain their original pinned package and sealed captures, including the original transport and receipt schemas. Use the originating verifier for those records. An adopting parent requires Direct-CLI evidence. No profile changes follow from installing or using the reviewer.
+
+Run `node --test tests/review-direct.test.mjs` on each native platform. The Windows fixture compiles a synthetic native launcher with the .NET Framework v4.0.30319 `csc.exe` and uses native `python.exe`, Node and Git from trusted PATH locations. It checks rapid Python exits and refusal of a sleeping Python child that signals readiness before its leader exits. The macOS fixture exercises native process-group settlement and separately proves the dispatch guard denies descendants. These runs exercise synthetic clients in disposable profiles. [Claude Code CLI](https://code.claude.com/docs/en/cli-reference), [Codex CLI](https://developers.openai.com/codex/cli/reference), [Pi JSON mode](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/json.md).
