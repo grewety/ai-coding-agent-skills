@@ -20,7 +20,7 @@
     },
     {
       "name": "autonomous-orchestration",
-      "version": "1.16.5",
+      "version": "1.16.6",
       "description": "Optional implementation/review orchestration. Requires openspec-development and separately configured execution roles.",
       "source": "./",
       "strict": false,
