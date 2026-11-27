@@ -790,7 +790,7 @@ neither approval nor commit authority nor restriction/correction-budget reset.
 ## Optional exclusive worker runtime
 
 For an integrated project selection, both delivery modes use a qualified
-external implementer and a fresh independently Direct-CLI reviewer.
+external implementer and a fresh independent Direct-CLI reviewer.
 `openspec-next` resolves the full change and registered workspace and hands
 the held restrictions to delivery. Inspection reads original-attempt evidence
 and reports its state. The orchestrator uses sealed settlement and exact

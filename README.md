@@ -9,7 +9,7 @@ Portable engineering workflows for AI coding agents that use OpenSpec. This repo
 | [Operator tutorial](docs/openspec-operator-tutorial.md) | Lifecycle, exact replies, session handoff, four role bindings and Intent-Driven planning. |
 | [Operator runbook](docs/openspec-operator-runbook.md) | Prepare, deliver, resume protected finish and recover. |
 | [OpenSpec workflow](docs/openspec-workflow.md) | Repository SDLC and governing authority. |
-| [External AI roles and backend pilots](docs/configurable-backends.md) | Discovery, previewed external configuration, version policy and qualification status. |
+| [External AI roles and backend setup](docs/configurable-backends.md) | Client discovery, preview and confirmation of Direct-CLI setup, and optional role bindings. |
 | [Review and finish configuration](docs/openspec-review-configuration.md) | Paid review modes, host pins, local harness and standing triggers. |
 | [OpenSpec installation](docs/openspec-installation.md) | Upstream prerequisite and upgrade procedures. |
 | [Claude installation](docs/claude-installation.md) | Native marketplace, ZIP installation and host checks. |
