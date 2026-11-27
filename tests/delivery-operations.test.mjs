@@ -19,9 +19,13 @@ const date = "2026-01-12";
 const issueUrl = "https://github.com/example-org/sample-widget/issues/73";
 const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
+function shellBlocks(file) {
+  return [...file.matchAll(/^\s*\x60{3}sh\n([\s\S]*?)^\s*\x60{3}$/gm)]
+    .map((match) => match[1].trim());
+}
+
 function command(file, firstLine) {
-  const block = [...file.matchAll(/^\s*\x60{3}sh\n([\s\S]*?)^\s*\x60{3}$/gm)]
-    .map((match) => match[1].trim()).find((body) => body.startsWith(firstLine));
+  const block = shellBlocks(file).find((body) => body.startsWith(firstLine));
   assert.ok(block, firstLine);
   return block;
 }
@@ -61,34 +65,34 @@ function checkpoint(source) {
   return block[1];
 }
 
-test("Supervisor uses documented Herdr argv with a mock and supervises one request to a governance stop", async (t) => {
+test("Supervisor observes Herdr with a mock and supervises one native-session request to a governance stop", async (t) => {
   const directory = await scratch(t);
   const playbook = await supervisor("SKILL.md");
   const adapter = await supervisor("references/herdr.md");
-  const split = command(adapter, "herdr pane split");
-  const observe = command(adapter, "herdr pane get");
-  const start = command(adapter, "herdr agent start");
-  const readDriver = command(adapter, "herdr agent get");
-  const prompt = command(adapter, "herdr agent prompt");
+  const observations = shellBlocks(adapter);
+  assert.equal(observations.length, 2);
   const mock = path.join(directory, "mock-herdr.mjs");
   const callsFile = path.join(directory, "calls.jsonl");
   await writeFile(mock, [
     'import { appendFileSync } from "node:fs";',
     'const args = process.argv.slice(2);',
     'appendFileSync(process.env.calls_file, JSON.stringify(args) + "\\n");',
-    'const [, operation] = args;',
-    'if (operation === "split") console.log(JSON.stringify({ result: { pane: { pane_id: "w1:p2" } } }));',
-    'if (operation === "process-info") console.log(JSON.stringify({ cwd: process.env.worktree }));',
-    'if (operation === "read" && args[0] === "agent") console.log(process.env.driver_session);',
-    'if (operation === "prompt") process.exitCode = 75; // Submitted, acknowledgment lost.',
+    'const pane = { id: "w1:p2", name: "widget-driver" };',
+    'const reads = {',
+    '  "workspace list": ["w1"], "pane list": [pane], "agent list": [pane.name],',
+    '  "pane get": pane, "pane process-info": { cwd: process.env.worktree }, "pane read": "Driver ready",',
+    '};',
+    'const key = args.slice(0, 2).join(" ");',
+    'if (Object.hasOwn(reads, key)) console.log(JSON.stringify(reads[key]));',
+    'else process.exitCode = 64;',
   ].join("\n"));
-  const bindings = {
-    anchor_pane: "w1:p1", worktree: path.join(directory, "repo with 'quotes'; $(literal)"),
-    driver_name: "widget-driver", driver_session: "native 'session'; $(literal)", calls_file: callsFile,
-    request_text: "Request D1: deliver " + exampleId + " with '$literal' and a semicolon;",
-    mock_script: mock,
-  };
-  const invoke = (script) => shell('herdr() { node "$mock_script" "$@"; }\n' + script, bindings);
+  const worktree = path.join(directory, "repo with 'quotes'; $(literal)");
+  await mkdir(worktree);
+  assert.equal(await realpath(worktree), worktree);
+  const pane = { id: "w1:p2", name: "widget-driver" };
+  const bindings = { worktree, pane_id: pane.id, calls_file: callsFile, mock_script: mock };
+  const observe = (script) => shell('herdr() { node "$mock_script" "$@"; }\n' + script, bindings)
+    .split("\n").map((line) => JSON.parse(line));
 
   // Exercise the documented startup read sequence and route qualification in the fixture.
   const startup = new Map([
@@ -112,7 +116,7 @@ test("Supervisor uses documented Herdr argv with a mock and supervises one reque
 
   let pending;
   let generation = 0;
-  const bind = { change: exampleId, phase: "local delivery", session: bindings.driver_session, request: "D1" };
+  const bind = { change: exampleId, phase: "local delivery", session: "native 'session'; $(literal)", request: "D1" };
   const arm = (nextBinding) => {
     assert.equal(pending, undefined, "only one outstanding check");
     pending = { id: ++generation, binding: nextBinding };
@@ -126,26 +130,48 @@ test("Supervisor uses documented Herdr argv with a mock and supervises one reque
   };
   assert.deepEqual(wake(arm({ probe: true })), { probe: true });
 
-  // Owner and grant readback are controlled fixture inputs. No live adapter is used.
-  const grant = { change: exampleId, phase: "local delivery", remaining: 2 };
-  assert.equal(grant.change, bind.change);
-  assert.equal(grant.phase, bind.phase);
-  assert.ok(grant.remaining > 0);
-  bindings.pane_id = JSON.parse(invoke(split)).result.pane.pane_id;
-  assert.equal(JSON.parse(invoke(observe)).cwd, bindings.worktree);
-  invoke(start);
-  assert.equal(invoke(readDriver), bind.session);
-  assert.throws(() => invoke(prompt), { status: 75 });
+  const [inventory, inspection] = observations.map(observe);
+  assert.deepEqual(inventory, [["w1"], [pane], [pane.name]]);
+  assert.deepEqual(inspection, [pane, { cwd: worktree }, "Driver ready"]);
+
+  // The qualified test-only transport gets identity from native readback, outside Herdr.
+  const request = {
+    identity: bind, text: "Request D1: deliver " + exampleId + " with '$literal' and a semicolon;",
+  };
+  const grant = { identity: bind, worktree, requestSha256: digest(request.text), remaining: 2 };
+  const live = { session: bind.session, process: "launch-01", cwd: worktree, transport: "private-channel-01" };
+  const seal = Object.freeze({ ...live });
+  const accepted = [];
+  const deliver = (target, nativeReadback, phaseRequest) => {
+    assert.deepEqual(nativeReadback, target, "native session or bound transport changed");
+    assert.equal(nativeReadback.session, grant.identity.session);
+    assert.equal(nativeReadback.cwd, grant.worktree);
+    assert.ok(grant.remaining > 0);
+    assert.deepEqual(phaseRequest.identity, grant.identity);
+    assert.equal(digest(phaseRequest.text), grant.requestSha256, "exact request bytes");
+    accepted.push({ session: target.session, transport: target.transport, request: phaseRequest });
+    return { acknowledgment: "lost" };
+  };
+  // The same Herdr label and pane can refer to a replaced native session.
+  const replacement = { ...live, session: "replacement-session", process: "launch-02" };
+  const changedTransport = { ...live, transport: "private-channel-02" };
+  assert.throws(() => deliver(seal, replacement, request), /native session or bound transport changed/);
+  assert.throws(() => deliver(seal, changedTransport, request), /native session or bound transport changed/);
+  assert.throws(() => deliver(seal, live, { ...request, text: request.text + " changed" }), /exact request bytes/);
+  assert.deepEqual(accepted, []);
+  assert.deepEqual(deliver(seal, live, request), { acknowledgment: "lost" });
   const firstWake = arm(bind); // Uncertain delivery still arms in the launch turn.
   assert.equal(pending.id, firstWake);
   assert.deepEqual(wake(firstWake), bind);
-  assert.equal(invoke(readDriver), bind.session);
+  assert.deepEqual(observe(observations[1]), inspection);
+  assert.deepEqual(accepted, [{ session: bind.session, transport: seal.transport, request }]);
   const calls = (await readFile(callsFile, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
-  assert.deepEqual(calls.find((argv) => argv[1] === "split"),
-    ["pane", "split", bindings.anchor_pane, "--direction", "right", "--cwd", bindings.worktree, "--no-focus"]);
-  assert.deepEqual(calls.find((argv) => argv[1] === "start"),
-    ["agent", "start", bindings.driver_name, "--kind", "codex", "--pane", bindings.pane_id, "--", "resume", bind.session]);
-  assert.deepEqual(calls.filter((argv) => argv[1] === "prompt"), [["agent", "prompt", bindings.driver_name, bindings.request_text]]);
+  const paneReads = [
+    ["pane", "get", pane.id],
+    ["pane", "process-info", "--pane", pane.id],
+    ["pane", "read", pane.id, "--source", "recent-unwrapped", "--lines", "40"],
+  ];
+  assert.deepEqual(calls, [["workspace", "list"], ["pane", "list"], ["agent", "list"], ...paneReads, ...paneReads]);
 
   const routineWake = arm(bind); // Working through a recoverable check failure.
   assert.equal(wake(firstWake), null);

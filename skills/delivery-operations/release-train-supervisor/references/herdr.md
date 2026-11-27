@@ -1,41 +1,36 @@
-# Herdr terminal adapter example
+# Herdr observation example
 
-Use only an operator-approved Herdr instance on the intended host and a verified scheduler. Confirm the installed CLI and server support these forms with local help and a controlled fixture. A Herdr workspace, terminal or agent name can outlive a launch attempt; keep the native Driver session and request identity too.
+Use an operator-approved Herdr instance on the intended host for read-only observation. Confirm these CLI and server forms with local help and a controlled fixture. Qualify the terminal adapter and the one-shot scheduler independently before dispatch.
 
-## Observe and open an authorized shell
-
-Use `herdr workspace list`, `herdr pane list` and `herdr agent list` to inspect existing targets. If there is an active or uncertain Driver, reconcile it first. For a new launch, the operator selects the host and an anchor pane. The first command below creates a shell pane under the already verified worktree. It requires explicit authority to dispatch on that host. The second and third only observe the returned pane after its ID has been recorded from `.result.pane.pane_id`.
+## Observe the existing Driver
 
 ```sh
-herdr pane split "$anchor_pane" --direction right --cwd "$worktree" --no-focus
+herdr workspace list
+herdr pane list
+herdr agent list
 ```
+
+Select the pane ID from verified records and correlate it with the current inventory. Inspect that pane without sending input.
 
 ```sh
 herdr pane get "$pane_id"
 herdr pane process-info --pane "$pane_id"
+herdr pane read "$pane_id" --source recent-unwrapped --lines 40
 ```
 
-Check the real shell cwd against the canonical registered worktree. If adapter metadata does not prove runtime cwd, with a confirmed idle shell and authority to use it, submit a fixed read-only probe such as `herdr pane run "$pane_id" 'pwd -P'` and read its output with `herdr pane read "$pane_id" --source recent-unwrapped --lines 40`. Correlate fresh output, pane and foreground process before starting. An argument passed to `--cwd` is a request, not cwd evidence.
+Treat pane output and process metadata as observations. Workspace, pane and agent names can outlive an attempt or be reused. Use fresh native adapter evidence to establish runtime identity and cwd. Reconcile an active or uncertain Driver before considering a launch or relay.
 
-If SSH is required, use the trusted host-local initialization already selected by the operator, in this pane's shell or through the approved session launcher. Verify the resulting agent availability from that shell before launching, for example with a local `ssh-add -l` read where approved; keep the output private. Do not establish network connectivity just to test a local socket. Avoid starting an extra agent, sourcing pointer files or passing private material as arguments. Stop if the required host-local setup cannot be verified.
+## Verify the adapter and deliver the phase request
 
-## Start and relay
+1. Verify the dedicated worktree's canonical root, registered branch and HEAD against the expected change and phase. Verify the exact plan or candidate, the applicable phase grant and its restrictions, budget and deadline, and any separate host or authentication authority. Bind the request ID and exact request bytes to that worktree, change, phase and grant in approved private evidence.
+2. Prepare the qualified terminal adapter for the authorized native launch or resume. Preserve argument boundaries with a structured argument list and the installed client's verified forms. Use a verified native session ID for resume and the client's new-session form for a fresh Driver. Prepare the phase request as literal data for the adapter's qualified private transport, such as a documented stdin or request-file route. Keep shell evaluation and sensitive request data out of launch arguments.
+3. When SSH is required, use the operator's already approved host-local agent or session launcher. Verify the expected agent from the intended session, for example with an approved local `ssh-add -l` read, and keep the output private. Keep verification local to the existing socket. Avoid starting an extra agent, sourcing pointer files or passing private material in arguments. Stop if the required setup cannot be verified.
+4. Use the adapter to launch or resume the Driver and seal the actual live native session, its process identity, observed runtime cwd and explicitly bound request transport. Immediately before delivery, recheck the registered worktree, branch and HEAD. Verify that the Driver is ready in that worktree, the live session and transport still match the seal, and the current grant authorizes the exact request. Require the transport to enforce the same binding when it accepts the request, including if delivery occurs during launch. Submit once using that bound transport. Stop at any mismatch, missing readback or unavailable session-bound route.
 
-For a supported client and a ready shell, use Herdr's argument forwarding. Example variables below are structured inputs chosen and verified by the Supervisor. `driver_session` is the native session to resume; omit the resume arguments for a genuinely new Driver, and use the adopted client's verified argument forms. This example selects Codex's resume form. Start is an authorized local Driver launch; prompt submits only the held phase request. Use non-sensitive short request text or an approved private transport, and put the request identifier in the text so it can be observed. Never pass a shell-joined command as an argument list or use eval on paths, prompts or settings.
+If the Driver enters a native human-input wait, use its qualified native decision surface. A Herdr fallback is limited to an independently qualified, documented human-input route bound to that exact waiting session. Verify the same session and the applicable decision authority before exposing it for human input. Keep phase requests on the adapter's bound request transport.
 
-```sh
-herdr agent start "$driver_name" --kind codex --pane "$pane_id" -- resume "$driver_session"
-```
+## Reconcile delivery and monitor
 
-```sh
-herdr agent get "$driver_name"
-herdr agent read "$driver_name" --source recent-unwrapped --lines 80
-```
+Arm and read back the verified one-shot or equivalent in-session monitor from the main playbook in the same turn as launch or unblock, including uncertain startup or delivery. Bind the check to the original Driver and request and keep at most one outstanding check. Rearm while work is active under the held authority.
 
-After matching the live pane, cwd, native session and expected readiness, submit once. Prefix the text with its fixed request label, for example `Request D1`, and reject terminal control characters. A blocked approval UI requires its own verified decision and relay.
-
-```sh
-herdr agent prompt "$driver_name" "$request_text"
-```
-
-Read the same agent and pane again. Confirm the exact request and actual phase with native session/evidence, and arm the one-shot in this turn. A queued prompt, a start timeout or an agent status change alone cannot prove delivery. On uncertainty inspect existing pane/agent/session state before any further submission. `agent wait` is a status observation with a timeout, not a persistent scheduler. Use the verified one-shot or equivalent in-session route from the main playbook.
+Confirm acceptance and actual phase using native evidence tied to the same session and exact request. A transport acknowledgment, pane output or status change alone leaves delivery unproven. If startup or delivery is uncertain, treat the original Driver as potentially active and inspect the same session, request and relevant repository evidence. Retry only when positive evidence shows the action did not take effect, the original request cannot still run, and the same grant still permits retry.
