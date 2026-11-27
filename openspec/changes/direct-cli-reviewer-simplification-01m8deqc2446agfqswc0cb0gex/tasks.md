@@ -8,7 +8,7 @@ change: direct-cli-reviewer-simplification-01m8deqc2446agfqswc0cb0gex
 
 ## 1. Deliver the Direct-CLI review outcome
 
-- [ ] 1.1 Deliver the Goal Contract across reviewer, setup, delivery and packaging. Verify the native OS fixture matrix, strict receipt replay, preserved archive and worker safeguards, synchronized guides and packages, all exact-candidate gates, and independent zero-waiver review.
+- [x] 1.1 Deliver the Goal Contract across reviewer, setup, delivery and packaging. Verify the native OS fixture matrix, strict receipt replay, preserved archive and worker safeguards, synchronized guides and packages, all exact-candidate gates, and independent zero-waiver review.
 
 ## Workflow follow-up
 
