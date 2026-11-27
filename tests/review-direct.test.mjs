@@ -414,3 +414,45 @@ test("synthetic Kilo packet and offline receipt bind the explicit model provider
   assert.equal(verified.coverage, "receipt-only");
   assert.equal(verified.result.runtime.provider, "openrouter");
 });
+
+test("Claude Direct-CLI stream audit accepts builtin-only plugins and rejects non-builtin plugins", () => {
+  const cwd = path.resolve("fixture-workspace");
+  const rel = "sample.txt";
+  const body = Buffer.from("hello\n");
+  const files = new Map([[rel, body]]);
+  const launch = {
+    session,
+    process: { code: 0, signal: null, outcome: "exit", quiescent: true },
+    runtime: { client: "claude", model: "claude-sonnet-4-6", version: "2.1.332", maxTurns: 128 },
+  };
+  const runWithPlugins = (plugins) => {
+    const events = [
+      { type: "system", subtype: "init", session_id: session, cwd, tools: ["Read"], mcp_servers: [],
+        skills: [], slash_commands: [], plugins, permissionMode: "dontAsk",
+        claude_code_version: "2.1.332", model: "claude-sonnet-4-6" },
+      { type: "assistant", session_id: session, message: { id: "m1", model: "claude-sonnet-4-6",
+        content: [{ type: "tool_use", id: "t1", name: "Read", input: { file_path: path.join(cwd, rel) }, caller: { type: "direct" } }] } },
+      { type: "user", session_id: session, message: { content: [{ type: "tool_result", tool_use_id: "t1", content: "1\thello" }] },
+        tool_use_result: { type: "text", file: { filePath: path.join(cwd, rel), content: "hello", startLine: 1, numLines: 1, totalLines: 1 } } },
+      { type: "assistant", session_id: session, message: { id: "m2", model: "claude-sonnet-4-6", content: [{ type: "text", text: "OK" }] } },
+      { type: "result", subtype: "success", session_id: session, is_error: false, permission_denials: [],
+        num_turns: 2, total_cost_usd: 0.02, result: "OK" },
+    ];
+    return sanitizeNative({ stdout: Buffer.concat(events.map(jsonBytes)), format: "claude-read",
+      cwd, files, redactions: [], launch, maxBudgetUsd: 2.5 });
+  };
+  const builtins = [
+    { name: "cc-plugin-agents-md", path: "builtin", source: "cc-plugin-agents-md@builtin" },
+    { name: "cc-plugin-privacy", path: "builtin", source: "cc-plugin-privacy@builtin" },
+  ];
+  assert.match(runWithPlugins(builtins).toString(), /cc-plugin-agents-md@builtin/);
+  assert.match(runWithPlugins([]).toString(), /"plugins":\[\]/);
+  for (const bad of [
+    [{ name: "user-plugin", path: "/home/u/.claude/p", source: "user-plugin@local" }],
+    [{ name: "cc-plugin-agents-md", path: "builtin", source: "other@builtin" }],
+    [{ name: "cc-plugin-agents-md", path: "builtin", source: "cc-plugin-agents-md@builtin", extra: true }],
+    ["cc-plugin-agents-md"],
+  ]) {
+    assert.throws(() => runWithPlugins(bad), /Unexpected native startup inventory/);
+  }
+});
