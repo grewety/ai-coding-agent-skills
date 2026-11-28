@@ -21,7 +21,7 @@ const expectedBundles = {
     skills: ["autonomous-implementation-review"],
   },
   "delivery-operations": {
-    version: "1.0.0",
+    version: "1.0.1",
     skills: ["release-train-supervisor", "wiki-delivery-sync"],
   },
 };

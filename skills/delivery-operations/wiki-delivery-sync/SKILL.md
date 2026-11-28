@@ -1,7 +1,7 @@
 ---
 name: wiki-delivery-sync
 description: Route OpenSpec briefs and archive verified wiki releases.
-version: 1.0.0
+version: 1.0.1
 ---
 
 # Maintain a Markdown delivery wiki
