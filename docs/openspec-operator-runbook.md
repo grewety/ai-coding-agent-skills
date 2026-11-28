@@ -50,6 +50,12 @@ with the predecessor preserved through successor acknowledgement.
 
 ## Launch independent review
 
+Use the proof level derived from the verified integrated plan parent. An
+explicit receipt-only level still requires every packet receipt and zero-waiver
+acceptance. Retain the level with the exact reviewed revision and host pin.
+The one-file compatibility probe has its own authority and evidence contract.
+See [Direct-CLI independent review](claude-reviewer.md).
+
 For Codex Auto-review under adopting integrated policy, prepare and check
 the sealed export offline. Set `review_cli` to the absolute packaged
 `scripts/review-candidate.mjs` path and replace the uppercase operands with

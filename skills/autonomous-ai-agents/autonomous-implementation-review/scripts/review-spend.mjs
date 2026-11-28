@@ -24,7 +24,7 @@ export function reviewSpendScope(request, expect, prepared, config, admission) {
     requestSha256: expect.requestSha256, exportSha256: expect.exportSha256, configurationSha256: expect.configurationSha256,
     attempt: identity.attempt, scopeSha256: hash(jsonBytes({ authority, acceptance, scope, nonGoals, fileAcceptance: request.fileAcceptance,
       ...(expect.explicit ? { explicit: expect.explicit, generator: expect.generator } : {}),
-      ...(expect.schemaVersion === 2 ? { reviewer: expect.runtime } : {}) })),
+      ...(expect.schemaVersion === 2 ? { reviewer: expect.runtime, ...(expect.proofLevel ? { proofLevel: expect.proofLevel } : {}) } : {}) })),
     upperUsdMicros, invocations };
 }
 
@@ -156,6 +156,31 @@ export async function claimProbeRun({ grant, excluded }) {
     throw error;
   }
   await syncDirectory(directory);
+}
+
+export async function withProbeSettlement(spend, run) {
+  const { grant, excluded } = spend;
+  await protectedLedger(grant.ledger, excluded);
+  const marker = path.join(grant.ledger, ".standalone-probe-active");
+  try { await mkdir(marker, { mode: 0o700 }); }
+  catch (error) {
+    if (error.code === "EEXIST") throw new Error("Previous standalone probe settlement is unverified");
+    throw error;
+  }
+  let settled = true;
+  try {
+    await syncDirectory(grant.ledger);
+    await claimProbeRun(spend);
+    settled = false;
+    const result = await run();
+    settled = result.settled === true;
+    return result;
+  } finally {
+    if (settled) {
+      await rmdir(marker);
+      await syncDirectory(grant.ledger);
+    }
+  }
 }
 
 export async function withDirectReviewSettlement(spend, run) {

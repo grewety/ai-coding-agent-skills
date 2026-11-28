@@ -1,4 +1,5 @@
 import { validatePlanningInputs } from "./planning-inventory.mjs";
+import { reviewProofMatches } from "./low-touch-policy.mjs";
 // Read-only policy decisions from retained observations. No scheduler or authority service.
 const requireThat = (condition, message) => { if (!condition) throw new Error(message); };
 const text = (value) => typeof value === "string" && value.trim().length > 0;
@@ -87,6 +88,9 @@ export function resolveDeliveryPolicy({ phase, context, selection, contractPaths
   if (selection.preExecutionReview && phase !== "draft") requireThat(reviewAcceptance?.action === "freeze-ready" && text(reviewAcceptance.reference) &&
     sameInputs(reviewAcceptance.inputs, context.inputs) &&
     (!context.lowTouch || sameInputs(reviewAcceptance.planningModes, context.modes)) &&
+    (!context.proofLevel || reviewProofMatches(context, { ...reviewAcceptance.reviewProof,
+      transport: "direct-cli", proofComplete: true }) && reviewAcceptance.reviewProof.zeroWaiver === true &&
+      digest(reviewAcceptance.reviewProof.statusSha256) && sameInputs(reviewAcceptance.reviewProof.reviewedPlan?.inputs, context.inputs)) &&
     (selection.approachConvergence === true ? reviewAcceptance.policy === "charter-v1" : reviewAcceptance.policy === undefined || reviewAcceptance.policy === "strict"), "Missing matching complete approach-review acceptance");
   requireThat(selection.goalFirst === undefined || typeof selection.goalFirst === "boolean", "Invalid Goal-First selection");
   const boundary = deliveryBoundary;
@@ -99,7 +103,8 @@ export function resolveDeliveryPolicy({ phase, context, selection, contractPaths
   return { mode, continuation: selection.continuousGoal ? "continuous-goal" : "single-group", requireApproachReview: selection.preExecutionReview,
     approachPolicy: selection.approachConvergence === true ? "charter-v1" : "strict",
     proposeToFreeze: !exempt && recovery === undefined && context.proposeToFreeze === true,
-    integrityGuards: !exempt, policyRevision, ...(context.directReviewer ? { directReviewer: true } : {}), planApproved: false, executionAuthorized: false };
+    integrityGuards: !exempt, policyRevision, ...(context.directReviewer ? { directReviewer: true } : {}),
+    ...(context.proofLevel ? { proofLevel: context.proofLevel } : {}), planApproved: false, executionAuthorized: false };
 }
 
 export function continuationDecision({ policy, change, group, authority, restrictions, observed, runtimeAdmission = false }) {

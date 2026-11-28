@@ -24,7 +24,7 @@ const current = "---\nmetadata_version: 1\nartifact: spec\ncapability: result\n-
 const tasks = "# Tasks\r\n\r\n- [ ] 1.1 Réal outcome\r\n\r\n```md\r\n- [ ] 1.2 example\r\n```\r\n";
 const gateArgv = ["/usr/bin/true"];
 
-function fixture(t, adopt = true, direct = false) {
+function fixture(t, adopt = true, direct = false, proofLevel) {
   const root = mkdtempSync(path.join(os.tmpdir(), "lt-"));
   t.after(() => {
     const entries = (dir) => {
@@ -49,7 +49,8 @@ function fixture(t, adopt = true, direct = false) {
   git("config", "user.name", "Synthetic Fixture");
   git("config", "user.email", "fixture@example.invalid");
   write("AGENTS.md", adopt ? "<!-- openspec-low-touch: {} -->\n" +
-    (direct ? "<!-- openspec-reviewer: direct-cli-v1 -->\n" : "") : "# Legacy baseline\n");
+    (direct ? "<!-- openspec-reviewer: direct-cli-v1 -->\n" : "") +
+    (proofLevel ? `<!-- openspec-review-proof: ${proofLevel} -->\n` : "") : "# Legacy baseline\n");
   write("openspec/config.yaml", "schema: spec-driven\n");
   const parent = save("Integrated baseline");
   git("switch", "-c", "change/sample-low-touch");
@@ -87,7 +88,8 @@ test("draft and committed inventories share custom coverage and exclusions under
 });
 
 test("native freeze requires the observed custom schema artifact closure and exact file modes", (t) => {
-  const f = fixture(t);
+  const proofLevel = "receipt-only";
+  const f = fixture(t, true, true, proofLevel);
   for (const excluded of ["evidence", "vault"]) rmSync(path.join(f.repo, dir, excluded), { recursive: true });
   const context = draftPolicyContext(f);
   const root = path.join(f.repo, dir);
@@ -109,11 +111,12 @@ test("native freeze requires the observed custom schema artifact closure and exa
     baseline: { verified: true, reference: "baseline", head: f.parent, upstreamVerified: true },
     issue: { verified: true, reference: "issue", change, required: false, bound: false } };
   let check = 0;
-  const assess = (value) => {
+  const assess = (value, reviewAcceptance, approachPolicy, charter) => {
     const file = path.join(f.root, `native-check-${++check}.json`);
     const bytes = JSON.stringify(value);
     writeFileSync(file, bytes, { mode: 0o600 });
-    return proposalFreeze({ input: { ...input, validation: { file, sha256: sha256(bytes) } }, context, workspace, policy, proposal });
+    return proposalFreeze({ input: { ...input, reviewAcceptance, validation: { file, sha256: sha256(bytes) } },
+      context, workspace, policy: { ...policy, approachPolicy, requireApproachReview: Boolean(approachPolicy) }, proposal, charter });
   };
   assert.equal(assess(validation).action, "freeze-ready");
   const missing = structuredClone(validation);
@@ -122,6 +125,28 @@ test("native freeze requires the observed custom schema artifact closure and exa
   const drift = structuredClone(validation);
   drift.modes[dir + "/adr/0001-decision.md"] = "100755";
   assert.equal(assess(drift).reason, "NATIVE_VALIDATION_PENDING");
+
+  const review = { action: "freeze-ready", policy: "strict", reference: "direct-cli:fixture",
+    inputs: context.inputs, planningModes: context.modes };
+  const reviewProof = { proofLevel, coverage: "receipt-only", zeroWaiver: true, statusSha256: "a".repeat(64),
+    reviewedPlan: { change, inputs: context.inputs }, reference: review.reference, session: "fixture-reviewer" };
+  const strict = assess(validation, { ...review, reviewProof }, "strict");
+  assert.equal(strict.action, "freeze-ready");
+  assert.deepEqual(strict.reviewProof, reviewProof);
+  for (const invalid of [undefined, { ...reviewProof, zeroWaiver: "true" }, { ...reviewProof, statusSha256: ["a".repeat(64)] },
+    { ...reviewProof, coverage: "whole-file" }, { ...reviewProof, proofLevel: "whole-file-read" },
+    { ...reviewProof, reference: "direct-cli:stale" }, { ...reviewProof, session: "" },
+    { ...reviewProof, reviewedPlan: { inputs: {} } }]) {
+    assert.equal(assess(validation, { ...review, reviewProof: invalid }, "strict").reason, "APPROACH_REVIEW_PENDING");
+  }
+  const charter = { ...review, policy: "charter-v1", reviewProof };
+  const acceptedCharter = assess(validation, undefined, "charter-v1", charter);
+  assert.equal(acceptedCharter.action, "freeze-ready");
+  assert.deepEqual(acceptedCharter.reviewProof, reviewProof);
+  const adverse = { ...reviewProof, zeroWaiver: false };
+  const blockedCharter = assess(validation, undefined, "charter-v1", { ...charter, reviewProof: adverse });
+  assert.equal(blockedCharter.reason, "APPROACH_REVIEW_PENDING");
+  assert.deepEqual(blockedCharter.reviewProof, adverse);
 });
 
 test("a pre-adoption parent preserves plan identity even when the candidate selects the policy", (t) => {

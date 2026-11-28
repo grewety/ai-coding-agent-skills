@@ -8,6 +8,12 @@ setup. The exact frozen plan's verified integrated parent governs these
 settings. Changing a branch or host configuration cannot adopt a new policy
 for work already governed by an earlier parent.
 
+The verified integrated plan parent selects Direct-CLI proof. Whole-file read
+is the default. Explicit `receipt-only` permits sealed receipt proof through
+planning and finish. Match any host proof pin and retain the independently
+derived level, actual reviewed identity and sealed status. See
+[Direct-CLI independent review](claude-reviewer.md).
+
 ## Contained review mode and budget
 
 The following root contributor-contract marker enables schema-agnostic

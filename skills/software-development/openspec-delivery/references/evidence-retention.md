@@ -115,7 +115,7 @@ implementation-review session.
 
 ## Routing
 
-Use [guard.md](guard.md) for immutable plan/candidate/review/receipt identity.
+Use [guard.md](guard.md) for immutable plan/candidate/review/receipt identity. For an explicitly selected Direct-CLI level, retain the finish checkpoint and readback so archive replay can verify the receipt's `reviewProof` against the sealed handover and recover the separate closure proof. Use the receipt guard's `--policy-target` to name the original exact integrated target when replaying an explicitly governed receipt.
 Use [integration.md](integration.md) for protected publication, actual named-gate
 retention, and target readbacks. Use [recovery.md](recovery.md) when evidence is
 missing, a gate fails, or a review is rejected. Use [continuation.md](continuation.md)

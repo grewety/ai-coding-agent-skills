@@ -18,9 +18,10 @@ import { proposalInput, charterObservation, proposalFreeze } from "./operator-pl
 import { cardDisplay, currentCard, narrowRestrictions, observed, recordCard, recordReply,
   readPlanningFeedback, readSeparateGrant, readShortAuthority, same, sealedObservation, verifyShortRoles } from "./operator-records.mjs";
 import { checkpointObservation, operatorStatus, relayCheckpoint, resumeCheckpoint } from "./operator-status.mjs";
-import { runLocalHarness, verifyLocalHarness } from "./local-harness.mjs";
+import { runLocalHarness } from "./local-harness.mjs";
 import { readPrFixBundle } from "./pr-fix-lineage.mjs";
-import { protectedFinish } from "./protected-finish.mjs";
+import { protectedFinish, verifyReviewHostHarness } from "./protected-finish.mjs";
+import { reviewProofMatches } from "./low-touch-policy.mjs";
 
 const need = (condition, message) => { if (!condition) throw new Error(message); };
 const digest = (value) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
@@ -140,6 +141,15 @@ async function companion(entry, filename) {
   return import(pathToFileURL(selected).href);
 }
 
+function candidateReviewProof({ result, coverage, proofLevel }, expectation) {
+  return { proofLevel, coverage, reviewedHead: result.identity.candidate, reviewedPlan: result.identity.plan,
+    reviewedPlanDigest: result.identity.planDigest, statusSha256: expectation.statusSha256,
+    reference: result.report.sha256, session: result.runtime.session,
+    zeroWaiver: result.status === "completed" && result.verdict === "no_findings" &&
+      result.nativeVerdict === "Verdict: No findings" && result.findings.length === 0 &&
+      result.coverageLimitations.length === 0 && result.waivers === undefined };
+}
+
 export async function verifyHandover(input, pinnedReviewCommand) {
   if (input.kind === "review-candidate") {
     const reviewCommand = pinnedReviewCommand ?? (await companion(input, "review-candidate.mjs")).reviewCommand;
@@ -164,7 +174,11 @@ export async function verifyHandover(input, pinnedReviewCommand) {
         verified.transport === "direct-cli" && ["whole-file", "receipt-only"].includes(verified.coverage)) &&
       readBounded(request, 1024 * 1024).equals(requestBytes) && readBounded(expect, 1024 * 1024).equals(expectBytes),
     "Reviewer request or runtime identity differs from its handover");
-    return { ...verified, request: requestRecord.worker, reviewSnapshot: requestRecord.snapshot,
+    need(verified.proofLevel === expectation.proofLevel &&
+      (!expectation.proofLevel || verified.proofComplete === true && digest(expectation.statusSha256)),
+    "Sealed review proof differs from its independent expectation");
+    const reviewProof = expectation.proofLevel ? candidateReviewProof(verified, expectation) : undefined;
+    return { ...verified, ...(reviewProof ? { reviewProof } : {}), request: requestRecord.worker, reviewSnapshot: requestRecord.snapshot,
       reviewPolicyBinding: requestRecord.policy, reviewConfigurationSha256: expectation.configurationSha256,
       reviewExplicitBinding: expectation.explicit, reviewGenerator: expectation.generator,
       reviewTransport: verified.transport, reviewCoverage: verified.coverage, reviewRuntime: expectation.runtime,
@@ -238,7 +252,7 @@ function checkedPreflight(input, policy, delegation) {
   if (!policy && !input.plan && observed(observations.live) && observed(observations.checkpoint)) {
     try {
       const checkpoint = integratedPolicyContext(input.repo, observations.checkpoint.policyRevision, observations.live.head);
-      policy = { policyRevision: checkpoint.parent };
+      policy = { policyRevision: checkpoint.parent, directReviewer: checkpoint.directReviewer, proofLevel: checkpoint.proofLevel };
     } catch { /* P7 reports blocked. */ }
   }
   let source;
@@ -392,13 +406,13 @@ async function readDeliveryHandover(input, { context, policy, identity, snapshot
       stableJson(id.inputs) === stableJson(context.inputs) &&
       separate(id.workspace, identity.workspace) && separate(id.workspace, input.repo),
     "Contained review does not cover the full approved candidate from an isolated checkout");
-    if (context.directReviewer) need(handoff.reviewTransport === "direct-cli" &&
-      handoff.reviewCoverage === "whole-file", "The integrated candidate requires Direct-CLI whole-file evidence");
+    if (context.directReviewer) need(reviewProofMatches(context, handoff),
+      "Candidate review does not establish the integrated Direct-CLI proof level");
     if (context.lowTouch) {
       need(handoff.reviewPolicyBinding?.parent === context.parent && handoff.reviewPolicyBinding.target === context.target &&
         handoff.reviewConfigurationSha256 === input.hostConfiguration?.sha256,
       "Contained review differs from the integrated or host-owned binding");
-      const harness = verifyLocalHarness({ hostConfiguration: input.hostConfiguration, harness: input.harness,
+      const harness = verifyReviewHostHarness(context, { hostConfiguration: input.hostConfiguration, harness: input.harness,
         candidate: snapshot.head, excluded: [input.repo, identity.workspace, id.workspace, input.handover.request,
           input.handover.expect, input.handover.exportDirectory, input.handover.output, ...handoff.request.evidenceRoots,
           delegation?.directory, ...(delegation?.request.evidenceRoots ?? [])].filter(Boolean) });
@@ -618,6 +632,10 @@ async function deliveryEvaluation(input, options) {
       }
     }
   }
+  if (context.proofLevel && decision.action === "accept-result") {
+    need(handoff?.reviewProof?.zeroWaiver, "Exact candidate proof or zero-waiver verdict is missing");
+    decision = { ...decision, reviewProof: handoff.reviewProof };
+  }
   return { policy, context, identity, planDigest, snapshot, decision, handoff, invalidHandover, candidateRequest, delegation,
     implementation, authorityEvidence, restrictions: input.restrictions,
     grant: shortFailure ? null : input.shortDecision ? shortAuthority.grant : delegation?.verifiedGrant ?? input.grant };
@@ -697,6 +715,8 @@ export async function deliveryCommand(command, input, options) {
       const base = { ...deliveryStatus({ change: input.change }), state: closeout.archiveAccepted ?
         ((closeout.cleanupAction ?? closeout.action) === "closed" ? "closed" : "cleanup-pending") : "protected-closeout",
       mode: id?.mode ?? null, candidateSha: id?.candidate ?? null, planDigest: id?.planDigest ?? null,
+      ...(closeout.proofLevel ? { proofLevel: closeout.proofLevel, reviewProof: closeout.reviewProof,
+        closureReviewProof: closeout.closureReviewProof ?? null } : {}),
       stopPredicate: closeout.reason ?? closeout.sync?.reason ?? null,
       recommendedNextAction: next ? { code: "PROTECTED_CLOSEOUT_NEXT", subject: input.change } : null };
       return { ...closeout, status: decorateStatus(base, input, { policy: id, identity: id,
@@ -709,6 +729,10 @@ export async function deliveryCommand(command, input, options) {
         const result = await assessProposal(input);
         const base = deliveryStatus({ change: input.change });
         if (result.policy) base.mode = result.policy.mode;
+        if (result.policy?.proofLevel) {
+          base.proofLevel = result.policy.proofLevel;
+          base.reviewProof = result.charter?.reviewProof ?? result.reviewProof ?? null;
+        }
         if (result.reason) base.stopPredicate = /^[A-Z_]+$/.test(result.reason) ? result.reason : "PLANNING_CONVERGENCE_STOPPED";
         return { ...result, status: decorateStatus(base, input, { policy: result.policy, implementation: result.workspace },
           { proposal: result, detail: result.reason }) };
@@ -808,7 +832,7 @@ export async function deliveryCommand(command, input, options) {
             // from the primary checkout's shared object history.
             snapshot ??= { ...candidate({ repo: input.repo, base: context.parent, plan: context.plan, mode: policy.mode,
               target: context.target, head: input.head, change: context.change, "expect-plan": e.identity.planDigest }, false), change: context.change };
-            if (snapshot.tasksComplete) closure = { verified: true, change: e.identity.change, candidateSha: snapshot.head };
+            if (snapshot.tasksComplete && !context.proofLevel) closure = { verified: true, change: e.identity.change, candidateSha: snapshot.head };
           }
         } catch { /* Incomplete retained readback cannot prove closure. */ }
       }

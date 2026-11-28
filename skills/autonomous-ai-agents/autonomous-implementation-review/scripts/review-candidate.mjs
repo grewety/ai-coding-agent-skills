@@ -11,7 +11,7 @@ import { absolute, checkExport, checkSealedDirectory, digest, equal, fields, fil
 import { observeDirectRuntime, runDirectPacket } from "./review-runtime.mjs";
 import { reviewBackends } from "./review-direct-supervisor.mjs";
 import { checkPacketTurns, reviewClock, trustedJson } from "./review-preflight.mjs";
-import { checkReviewSpend, withDirectReviewSettlement } from "./review-spend.mjs";
+import { checkProbeSpend, checkReviewSpend, withDirectReviewSettlement, withProbeSettlement } from "./review-spend.mjs";
 import { verifyHarnessSeal } from "./harness-result.mjs";
 import { checkRoleIndependence, validatePin } from "./role-config.mjs";
 import { auditVersion } from "./runtime-version.mjs";
@@ -24,7 +24,7 @@ import { packetConcurrency, replayPacketSchedule, schedulePackets } from "./revi
 import { directReviewSettings } from "./agent-role-adapters.mjs";
 import { directReviewHost, invocation, reviewerHelp, reviewerProvider } from "./review-direct-adapters.mjs";
 import { directPacketPrompt, verifyDirectPacket } from "./review-direct-receipt.mjs";
-import { usdMicros } from "./low-touch-policy.mjs";
+import { reviewProofLevels, usdMicros } from "./low-touch-policy.mjs";
 
 // Captures from a frozen parent have an independent status pin and retain
 // their original verifier identity at delivery. This reader has no transport.
@@ -303,6 +303,7 @@ async function checkPrior(request, expect, prepared) {
     packetConcurrency(retained.expect.packetConcurrency) === packetConcurrency(expect.packetConcurrency) &&
     equal(retained.expect.explicit, expect.explicit) && equal(retained.expect.generator, expect.generator) &&
     equal(retained.expect.runtime, expect.runtime) && retained.expect.maxBudgetUsd === expect.maxBudgetUsd &&
+    retained.expect.proofLevel === expect.proofLevel && equal(retained.request.policy, request.policy) &&
     equal(retained.request.worker.identity.inputs, request.worker.identity.inputs) &&
     equal(retained.request.attachments, request.attachments) && equal(retained.request.limits, request.limits) &&
     equal(retained.request.snapshot.record, request.snapshot.record) &&
@@ -428,6 +429,8 @@ const commands = {
   "--check": ["request", "expect", "export"],
   "--mode": ["request", "expect", "export", "output", "host-config"],
   "--verify": ["request", "expect", "export", "output"],
+  "--probe-check": ["host-config"],
+  "--probe": ["host-config", "expect", "admission", "output"],
 };
 
 function cli(argv) {
@@ -436,7 +439,7 @@ function cli(argv) {
   const budgetOptions = ["budget-extension", "operator-key", "operator-key-sha256"];
   const optional = {
     "--prepare": ["host-config"], "--check": ["host-config", "admission", ...budgetOptions],
-    "--mode": ["admission", ...budgetOptions], "--verify": [],
+    "--mode": ["admission", ...budgetOptions], "--verify": [], "--probe-check": [], "--probe": [],
   }[command];
   const args = arguments_.slice();
   const mode = command === "--mode" ? args.shift() : null;
@@ -457,7 +460,7 @@ function cli(argv) {
   return { command, mode, options };
 }
 
-function settingsFromRuntime(runtime) {
+function settingsFromRuntime(runtime, proofLevel) {
   const { provider, version, executableSha256, capabilitySha256, environmentRootsSha256, supervisor, ...settings } = runtime;
   need(typeof version === "string" && /^\d+\.\d+\.\d+[0-9A-Za-z.+-]*$/.test(version) &&
     digest(executableSha256) && digest(environmentRootsSha256),
@@ -467,7 +470,7 @@ function settingsFromRuntime(runtime) {
     "Invalid independently retained native supervisor identity");
   need(equal(settings, directReviewSettings(settings)), "Direct-CLI runtime settings are incomplete");
   need(provider === reviewerProvider(settings), "Direct-CLI reviewer provider differs from the effective settings");
-  need(capabilitySha256 === hash(jsonBytes(reviewerHelp(settings, version))), "Native CLI capability binding differs");
+  need(capabilitySha256 === hash(jsonBytes(reviewerHelp(settings, version, proofLevel))), "Native CLI capability binding differs");
   return settings;
 }
 
@@ -476,14 +479,15 @@ async function loadDirectInputs(requestFile, expectFile) {
   validateReviewRequest(request);
   const expect = await readJson(expectFile);
   fields(expect, ["schemaVersion", "requestSha256", "exportSha256", "configurationSha256", "model"],
-    "independent Direct-CLI expectation", ["statusSha256", "harness", "runtime", "maxBudgetUsd"]);
+    "independent Direct-CLI expectation", ["statusSha256", "harness", "runtime", "maxBudgetUsd", "proofLevel"]);
   need(expect.schemaVersion === 2 && expect.requestSha256 === hash(jsonBytes(request)) &&
     (expect.exportSha256 === null || digest(expect.exportSha256)) && digest(expect.configurationSha256) &&
     typeof expect.model === "string" && (expect.statusSha256 === undefined || digest(expect.statusSha256)),
   "Direct-CLI request differs from independently retained binding");
+  need(expect.proofLevel === undefined || reviewProofLevels.includes(expect.proofLevel), "Invalid retained review proof level");
   need((expect.runtime === undefined) === (expect.maxBudgetUsd === undefined), "Incomplete Direct-CLI runtime expectation");
   if (expect.runtime) {
-    settingsFromRuntime(expect.runtime);
+    settingsFromRuntime(expect.runtime, expect.proofLevel);
     usdMicros(expect.maxBudgetUsd);
     need(expect.runtime.model === expect.model, "Direct-CLI runtime model differs");
   }
@@ -507,9 +511,11 @@ function failureFrom(request, index, launch) {
 function directPacket(request, expect, prepared, index, launch, stdout) {
   try {
     return verifyDirectPacket({ request, context: receiptContext(request, prepared), prepared, index, launch,
-      stdout, runtime: expect.runtime, maxBudgetUsd: expect.maxBudgetUsd, reference: "direct-cli:" + request.session });
-  } catch {
-    return failureFrom(request, index, launch);
+      stdout, runtime: expect.runtime, maxBudgetUsd: expect.maxBudgetUsd, proofLevel: expect.proofLevel, reference: "direct-cli:" + request.session });
+  } catch (error) {
+    const failure = failureFrom(request, index, launch);
+    return expect.proofLevel ? { ...failure, reason: /framing|markers|preamble/.test(error.message) ?
+      "receipt-framing" : "packet-proof" } : failure;
   }
 }
 
@@ -554,12 +560,17 @@ async function deriveDirect(directory, request, expect, prepared, launches, sche
   }
   const failure = replayPacketSchedule(schedule, expect.runtime.packetConcurrency, observations, true);
   const phase = failure?.failure ?? (launches.length === prepared.manifest.packets.length ? "complete" : "incomplete-packets");
-  const coverage = phase === "complete" && observations.every((item) => item.coverage === "whole-file") ? "whole-file" : "receipt-only";
+  const { proofLevel } = expect;
+  const complete = phase === "complete";
+  const wholeFile = complete && observations.every((item) => item.coverage === "whole-file");
+  const coverage = proofLevel === "receipt-only" ? (complete ? "receipt-only" : null) :
+    wholeFile ? "whole-file" : proofLevel ? null : "receipt-only";
+  const proof = proofLevel ? { proofLevel, proofComplete: complete && (proofLevel === "receipt-only" || wholeFile) } : {};
   const native = Buffer.from(observations.flatMap((item) => item.report ? [item.report.trimEnd()] : []).join("\n\n") +
     (observations.some((item) => item.report) ? "\n" : ""));
   const runtime = directRuntime(expect, request.session);
   const record = { schemaVersion: 2, transport: "direct-cli", requestSha256: expect.requestSha256,
-    exportSha256: expect.exportSha256, configurationSha256: expect.configurationSha256, launches, schedule, captures };
+    exportSha256: expect.exportSha256, configurationSha256: expect.configurationSha256, ...proof, launches, schedule, captures };
   const files = { "launch.json": jsonBytes(record),
     "stdout.jsonl": Buffer.concat(captures.map(jsonBytes)), "stderr.log": Buffer.concat(diagnostics.map(jsonBytes)) };
   const requestBytes = workerRequestBytes(request.worker);
@@ -570,8 +581,8 @@ async function deriveDirect(directory, request, expect, prepared, launches, sche
   let result;
   if (phase === "complete" && request.mode === "candidate") {
     files["native.txt"] = native;
-    files["receipt.json"] = jsonBytes({ coverage, packets: observations.map((item) => item.receipt) });
-    const review = observations.map(({ receipt, coverage: packetCoverage }) => packetCoverage === "whole-file" ? receipt :
+    files["receipt.json"] = jsonBytes({ coverage, ...proof, packets: observations.map((item) => item.receipt) });
+    const review = observations.map(({ receipt, coverage: packetCoverage }) => packetCoverage === "whole-file" || proofLevel === "receipt-only" ? receipt :
       { ...receipt, coverageLimitations: [...receipt.coverageLimitations, "Receipt-only packet has no independent whole-file coverage"] });
     handoff = candidateResult(bound, runtime, review, files, describe);
     result = handoff;
@@ -579,10 +590,14 @@ async function deriveDirect(directory, request, expect, prepared, launches, sche
     files["report.md"] = native;
     if (phase === "complete") {
       const accepted = observations[0].receipt;
-      // The charter's existing pass rules require verified packet coverage.
-      if (coverage === "whole-file") approach = accepted.admission;
-      files["receipt.json"] = jsonBytes({ coverage, packets: [accepted.receipt] });
-      result = { schemaVersion: 2, mode: "approach", phase, coverage, native: accepted.receipt,
+      if (wholeFile || proofLevel === "receipt-only") {
+        approach = accepted.admission;
+        if (proofLevel && approach.action === "freeze-ready" &&
+            (accepted.receipt.coverageLimitations.length || approach.record.ledger.some(({ scope, status }) =>
+              scope === "in-scope" && status === "open"))) approach = { ...approach, action: "blocked" };
+      }
+      files["receipt.json"] = jsonBytes({ coverage, ...proof, packets: [accepted.receipt] });
+      result = { schemaVersion: 2, mode: "approach", phase, coverage, ...proof, native: accepted.receipt,
         approachAction: approach?.action ?? null, report: describe("report.md", native) };
     } else {
       result = { schemaVersion: 2, mode: request.mode, phase, ...(failure?.rejection ? { rejection: failure.rejection } : {}),
@@ -590,12 +605,12 @@ async function deriveDirect(directory, request, expect, prepared, launches, sche
     }
   }
   const status = (resultBytes) => jsonBytes({ schemaVersion: 2, transport: "direct-cli", requestSha256: expect.requestSha256,
-    configurationSha256: expect.configurationSha256, exportSha256: expect.exportSha256, phase, sessions, coverage,
+    configurationSha256: expect.configurationSha256, exportSha256: expect.exportSha256, phase, sessions, coverage, ...proof,
     ...(failure?.rejection ? { rejection: failure.rejection } : {}),
     deliveryAccepted: false,
     files: [...Object.entries(files), ["request.md", requestBytes], ["result.json", resultBytes]]
       .map(([name, bytes]) => describe(name, bytes)) });
-  return { phase, sessions, coverage, runtime, handoff, approach, result, files, status, failure, bound };
+  return { phase, sessions, coverage, proof, runtime, handoff, approach, result, files, status, failure, bound };
 }
 
 async function verifyDirect(directory, request, expect, prepared) {
@@ -619,7 +634,7 @@ async function verifyDirect(directory, request, expect, prepared) {
   need(statusBytes.equals(replay.status(resultBytes)) &&
     equal((await readdir(directory)).sort(), ["request.md", "result.json", "status.json", "raw", ...Object.keys(replay.files)].sort()),
     "Direct-CLI evidence inventory or disposition differs");
-  return { phase: replay.phase, transport: "direct-cli", coverage: replay.coverage, sessions: replay.sessions,
+  return { phase: replay.phase, transport: "direct-cli", coverage: replay.coverage, ...replay.proof, sessions: replay.sessions,
     ...(replay.failure?.rejection ? { rejection: replay.failure.rejection } : {}),
     result: replay.result, ...(replay.approach ? { approach: replay.approach } : {}), deliveryAccepted: false };
 }
@@ -646,7 +661,7 @@ async function directLaunch({ directory, request, expect, prepared, config, exec
     const schedule = await schedulePackets(count, config.packetConcurrency, clock, async (packet, begin, halt, stop) => {
       const index = packet - 1;
       const session = index === 0 ? request.session : randomUUID();
-      const prompt = directPacketPrompt(request, context, prepared, index, session, config.reviewer, config.maxBudgetUsd);
+      const prompt = directPacketPrompt(request, context, prepared, index, session, config.reviewer, config.maxBudgetUsd, expect.proofLevel);
       const observation = await runDirectPacket({ request, expect, prepared, config, executable, python, exportDirectory,
         excluded: [...excluded, directory], index, session, prompt, begin,
         signal: AbortSignal.any([cancellation.signal, stop]) });
@@ -676,7 +691,7 @@ async function directLaunch({ directory, request, expect, prepared, config, exec
     await sealDirectories(directory);
     const statusSha256 = hash(status);
     const verified = await verifyDirect(directory, request, { ...expect, statusSha256 }, prepared);
-    return { phase: verified.phase, transport: verified.transport, coverage: verified.coverage, statusSha256,
+    return { phase: verified.phase, transport: verified.transport, coverage: verified.coverage, ...replay.proof, statusSha256,
       ...(verified.rejection ? { rejection: verified.rejection } : {}),
       settled: launches.every(({ process }) => process.quiescent === true), deliveryAccepted: false };
   } finally {
@@ -691,6 +706,9 @@ async function directCommand(command, mode, options) {
   const workspace = request.worker.identity.workspace;
   const policy = await reviewPolicy(request);
   need(policy?.directReviewer, "The exact integrated parent has not adopted Direct-CLI review");
+  const { proofLevel } = policy;
+  need(expect.proofLevel === proofLevel || command === "--prepare" && expect.proofLevel === undefined,
+    "Retained review proof level differs from the integrated parent");
   const protectedRoots = [workspace, options.request, options.expect, ...request.worker.evidenceRoots];
   need(protectedRoots.every((root) => separate(exportDirectory, root)), "Export overlaps retained review inputs or evidence");
   const excluded = [...protectedRoots, exportDirectory];
@@ -706,8 +724,13 @@ async function directCommand(command, mode, options) {
   need(hostFile, "Direct-CLI preflight requires a pinned external host.json");
   const host = await trustedJson(hostFile, excluded);
   need(host.configurationSha256 === expect.configurationSha256, "Direct-CLI host configuration pin differs");
-  const config = directReviewHost(host.value);
-  need(config.model === expect.model && (!expect.runtime || equal(settingsFromRuntime(expect.runtime), config.reviewer) &&
+  const hostConfig = directReviewHost(host.value);
+  need(hostConfig.proofLevel === undefined || hostConfig.proofLevel === (proofLevel ?? "whole-file-read"),
+    "Host review proof level differs from the integrated parent");
+  const config = { ...hostConfig, proofLevel };
+  need(proofLevel === "receipt-only" || config.client === "claude",
+    "Selected reviewer cannot provide structured whole-file reads");
+  need(config.model === expect.model && (!expect.runtime || equal(settingsFromRuntime(expect.runtime, proofLevel), config.reviewer) &&
     config.maxBudgetUsd === expect.maxBudgetUsd), "Direct-CLI configuration differs from independent expectation");
   if (request.mode === "approach") need(config.client === request.snapshot.record.binding.client,
     "Direct-CLI client differs from the approach binding");
@@ -716,12 +739,12 @@ async function directCommand(command, mode, options) {
     need(equal(retained.value, expect), "Host expectation changed during admission");
   }
   const preflight = (prepared) => {
-    if (config.client === "claude") checkPacketTurns(prepared, 128);
+    if (config.client === "claude" && proofLevel !== "receipt-only") checkPacketTurns(prepared, 128);
     const context = receiptContext(request, prepared);
     for (const [index, packet] of prepared.manifest.packets.entries()) {
       const files = new Map(packet.paths.map((name) => [name, prepared.files.get(name)]));
       const session = request.session;
-      const prompt = directPacketPrompt(request, context, prepared, index, session, config.reviewer, config.maxBudgetUsd);
+      const prompt = directPacketPrompt(request, context, prepared, index, session, config.reviewer, config.maxBudgetUsd, proofLevel);
       invocation({ config, session, prompt, files, cwd: "packet", promptFile: "packet-prompt.txt" });
     }
     if (request.mode !== "candidate") return;
@@ -735,7 +758,7 @@ async function directCommand(command, mode, options) {
   const observed = await observeDirectRuntime(config, [...excluded, hostFile]);
   const { python } = observed;
   if (expect.runtime) need(equal(expect.runtime, observed.runtime), "Installed Direct-CLI runtime differs from independent expectation");
-  const runtimeReadback = { runtime: observed.runtime, maxBudgetUsd: config.maxBudgetUsd };
+  const runtimeReadback = { runtime: observed.runtime, maxBudgetUsd: config.maxBudgetUsd, ...(proofLevel ? { proofLevel } : {}) };
   if (command === "--prepare") return { exportSha256: await prepareExport(exportDirectory, request, expect.exportSha256, preflight),
     ...runtimeReadback };
   const prepared = await checkExport(exportDirectory, expect.exportSha256, request);
@@ -760,8 +783,63 @@ async function directCommand(command, mode, options) {
       options["operator-key"], options["budget-extension"], observed.executable, python].filter(Boolean) }));
 }
 
+async function directProbe(command, options) {
+  const hostFile = options["host-config"];
+  const excluded = [options.expect, options.admission, options.output].filter(Boolean);
+  const host = await trustedJson(hostFile, excluded);
+  const config = directReviewHost(host.value);
+  need(config.proofLevel && config.client === "claude" && config.maxBudgetUsd <= 0.01 &&
+    config.timeoutMs <= 30_000 && (config.runTimeoutMs ?? config.timeoutMs) <= 30_000 &&
+    config.packetConcurrency === 1 && !config.localHarness,
+  "Probe requires an explicit proof level, native cost enforcement, one packet and bounds of $0.01 and 30 seconds");
+  const observed = await observeDirectRuntime(config, [...excluded, hostFile], { probe: true });
+  const pin = { schemaVersion: 1, kind: "standalone-review-probe", proofLevel: config.proofLevel,
+    runtime: observed.runtime, configurationSha256: host.configurationSha256, maxBudgetUsd: config.maxBudgetUsd,
+    timeoutMs: Math.min(config.timeoutMs, config.runTimeoutMs ?? config.timeoutMs) };
+  const explicitRuntimeSha256 = hash(jsonBytes(pin));
+  if (command === "--probe-check") return { ...pin, explicitRuntimeSha256 };
+  const directory = options.output;
+  const protectedPaths = [hostFile, observed.executable, observed.python, ...excluded];
+  need(protectedPaths.filter((file) => file !== directory).every((file) => separate(directory, file)),
+    "Probe output overlaps protected inputs");
+  const expectation = await trustedJson(options.expect, protectedPaths.filter((file) => file !== options.expect), true);
+  need(equal(expectation.value, pin), "Standalone probe expectation differs from the exact runtime or bounds");
+  const spend = await checkProbeSpend({ file: options.admission, configurationSha256: pin.configurationSha256,
+    maxBudgetUsd: pin.maxBudgetUsd, explicitRuntimeSha256, excluded: protectedPaths.filter((file) => file !== options.admission) });
+  await protectedParent(directory);
+  await newAttemptPath(directory);
+  return withProbeSettlement(spend, async () => {
+    await mkdir(directory, { mode: 0o700 });
+    const session = randomUUID();
+    const name = "target/smoke.txt";
+    const bytes = Buffer.from("Synthetic compatibility fixture.\n");
+    const manifest = { files: [{ name, bytes: bytes.length, sha256: hash(bytes) }], packets: [{ paths: [name] }] };
+    const prepared = { manifest, files: new Map([[name, bytes]]) };
+    const request = { mode: "candidate", session, snapshot: { target: hash(bytes).slice(0, 40) } };
+    const context = receiptContext(request, prepared);
+    const prompt = directPacketPrompt(request, context, prepared, 0, session, config.reviewer, pin.maxBudgetUsd, pin.proofLevel);
+    const expect = { ...pin, exportSha256: hash(jsonBytes(manifest)) };
+    const observation = await runDirectPacket({ request, expect, prepared, config, executable: observed.executable,
+      python: observed.python, excluded: [...protectedPaths, spend.grant.ledger], index: 0, session, prompt,
+      begin: () => pin.timeoutMs, probe: true });
+    const { launch, stdout } = observation;
+    const packet = directPacket(request, expect, prepared, 0, launch, stdout);
+    const compatible = !packet.failure && packet.receipt.verdict === "Verdict: No findings" &&
+      packet.receipt.coverageLimitations.length === 0;
+    const result = { ...pin, explicitRuntimeSha256, compatible, session, packetSha256: launch.inventorySha256,
+      classification: packet.failure ?? (compatible ? "compatible" : "review-incomplete"), ...(packet.reason ? { reason: packet.reason } : {}),
+      settled: launch.process.quiescent === true, qualification: false, deliveryAccepted: false };
+    await writeJson(directory, "launch.json", launch);
+    await writeClosed(path.join(directory, "stdout.jsonl"), stdout, true);
+    await writeJson(directory, "result.json", result);
+    await sealDirectories(directory);
+    return { ...result, resultSha256: hash(jsonBytes(result)) };
+  });
+}
+
 export async function reviewCommand(argv) {
   const { command, mode, options } = cli(argv);
+  if (["--probe-check", "--probe"].includes(command)) return directProbe(command, options);
   const schemaVersion = (await readJson(options.expect)).schemaVersion;
   if (schemaVersion === 2) return directCommand(command, mode, options);
   const { request, expect } = await loadInputs(options.request, options.expect);

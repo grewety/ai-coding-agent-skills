@@ -186,6 +186,8 @@ export function operatorStatus(base, { policy, workspace, identity, preflight, c
     `### Next step`,
     `${show(change)} · ${show(base.mode)} · ${show(base.state)} · ${show(result.branch)} @ ${show(result.head)}`,
     `Plan ${show(result.plan)} / ${show(base.planDigest)} · policy ${show(result.policyRevision)} · attempt ${show(base.activeAttemptId)}`,
+    ...(result.proofLevel ? [`Review proof ${show(result.proofLevel)} · ${result.reviewProof ?
+      `coverage ${show(result.reviewProof.coverage)} · zero waiver ${show(String(result.reviewProof.zeroWaiver))}` : "evidence pending"}`] : []),
     `Checkpoint ${show(result.checkpoint)} · evidence ${show(result.evidence)} · PR/checks ${result.pullRequest ? show(JSON.stringify(result.pullRequest)) : "pending"}`,
     `P1–P8 ${preflight?.items?.map(({ id, state }) => `${id} ${state}`).join(", ") ?? "pending"} · first unresolved ${show(preflight?.followUp ?? (preflight?.ready ? "none" : null))}`,
     `Stop ${show(base.stopPredicate ?? (proposalFreeze ? "none" : null))}${detail ? ` (${show(detail)})` : ""}`,

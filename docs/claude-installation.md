@@ -182,8 +182,8 @@ Bump the affected plugin version in the catalog whenever its selected skills or
 support files change; skill versions alone do not update the enclosing plugin.
 See [external AI roles and backend setup](configurable-backends.md) for host setup and qualification status after installation.
 
-The source catalog's `openspec-development` 1.12.0 includes `openspec-delivery`
-1.12.0 with its shared `scripts/git-environment.mjs` and
+The source catalog's `openspec-development` 1.13.0 includes `openspec-delivery`
+1.13.0 with its shared `scripts/git-environment.mjs` and
 `references/git-environment.md` for the Git guard/workspace helpers. Also preserve
 `references/evidence-retention.md`, `scripts/evidence-retention.mjs`,
 `scripts/evidence-cli.mjs`, `scripts/delivery-cli.mjs` and
@@ -193,7 +193,7 @@ skill/plugin ZIP exports. The evidence command supports authorized exact-SHA gat
 capture and offline readback. Keep next's `references/routing.md` and
 `scripts/next.mjs` with that skill. If direct packages load from different scopes,
 use the router's explicit trusted runtime path. The optional
-`autonomous-orchestration` is 1.16.6 (core skill 0.26.6) and `openspec-next` is
+`autonomous-orchestration` is 1.17.0 (core skill 0.27.0) and `openspec-next` is
 0.9.0. The current source version of `delivery-operations` and both of its
 skills is 1.0.1. Check the public marketplace and downloads for published versions.
 Preserve delivery's policy/task-authoring references and `delivery-policy.mjs`,

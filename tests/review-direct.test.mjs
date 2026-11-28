@@ -5,11 +5,12 @@ import { chmod, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { directAdapter, directReviewHost, installedReviewer, invocation,
-  reviewerAuthVariable, reviewerEnvironmentRoots, reviewerProvider } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-direct-adapters.mjs";
+  reviewerAuthVariable, reviewerEnvironmentRoots, reviewerHelp, reviewerProvider } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-direct-adapters.mjs";
 import { resolveInstalledExecutable } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/agent-discovery.mjs";
-import { sanitizeNative } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-direct-receipt.mjs";
+import { classifyNativeOutputError, sanitizeNative } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-direct-receipt.mjs";
 import { superviseReview, supervisorCommand } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-direct-supervisor.mjs";
 import { hash, jsonBytes } from "../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-inputs.mjs";
+import { spawnFixtureSync } from "./test-shards.mjs";
 import { directFixture, session, windowsDescendant } from "./review-direct-fixture.mjs";
 
 const cli = fileURLToPath(new URL("../skills/autonomous-ai-agents/autonomous-implementation-review/scripts/review-candidate.mjs", import.meta.url));
@@ -17,11 +18,13 @@ const clients = { claude: "--print", codex: "exec", grok: "--single", pi: "--no-
   hermes: "--oneshot", opencode: "run", kilo: "run", agy: "--input-format" };
 const reasoning = { claude: ["--effort", "xhigh"], codex: ["-c", 'model_reasoning_effort="high"'], grok: ["--effort", "high"],
   pi: ["--thinking", "max"], opencode: ["--model", "openai/model#high"], kilo: ["--variant", "high"], agy: ["--effort", "high"] };
+const grokHelp = { args: ["--no-auto-update", "--help"],
+  flags: ["--single", "--session-id", "--tools", "--allow", "--no-subagents", "--disable-web-search"] };
 
 function runFixture(f, ...args) {
   const offlinePath = process.platform === "win32" ? f.gitDirs : f.file("empty-path");
   const env = args[0] === "--verify" ? { ...f.env, PATH: offlinePath } : f.env;
-  const result = spawnSync(process.execPath, [cli, ...args], { env, stdio: ["ignore", "pipe", "pipe"], encoding: "utf8", timeout: 120000 });
+  const result = spawnFixtureSync(process.execPath, [cli, ...args], { env, encoding: "utf8", timeout: 120000 });
   if (!result.stdout && result.status === 1) return { error: result.stderr };
   assert.ok(result.stdout, result.stderr || result.error?.message);
   return JSON.parse(result.stdout);
@@ -151,9 +154,54 @@ test("native process passes each adapter argument form and prompt without shell 
     assert.equal(command.fingerprint, invocation({ ...offline, environmentRootsSha256: hash(jsonBytes(roots)) }).fingerprint);
     assert.notEqual(command.fingerprint, invocation({ ...offline, environmentRootsSha256: "0".repeat(64) }).fingerprint);
     if (client === "agy") assert.equal(JSON.parse(actual.settings).toolPermission, "strict");
-    if (client === "grok") assert.equal(command.args.at(-1), prompt);
+    if (client === "grok") {
+      assert.deepEqual(command.args, ["--no-auto-update", "--no-plan", "--no-subagents", "--no-memory", "--disable-web-search",
+        "--model", "openai/model", "--tools", "Read", "--allow", "Read", "--session-id", session,
+        "--output-format", "plain", "--single", prompt]);
+      assert.equal(command.attachment, undefined);
+      assert.deepEqual(invocation({ ...offline, config: { ...config, proofLevel: "whole-file-read" } }), invocation(offline));
+      assert.throws(() => invocation({ ...offline, prompt: "x".repeat(14001) }), /portable Windows quoting bound/);
+      for (const proofLevel of [undefined, "whole-file-read"]) {
+        assert.deepEqual(reviewerHelp(config.reviewer, "0.2.0", proofLevel), grokHelp);
+      }
+    }
     if (client === "kilo") assert.equal(command.env.KILO_NO_DAEMON, "1");
   }
+});
+
+test("Grok receipt-only sends large distinct file bodies through a native prompt file", async (t) => {
+  const f = await directFixture(t);
+  const python = supervisorCommand();
+  const environmentRoots = reviewerEnvironmentRoots(process.execPath, python);
+  const config = directReviewHost({ schemaVersion: 3, reviewer: { client: "grok", model: "fixture-model" },
+    proofLevel: "receipt-only", maxBudgetUsd: 1 });
+  const prompt = "Review the assigned packet.";
+  const contents = ["first é\r\n".repeat(6500), "second λ\n".repeat(6500), "third Δ\t".repeat(6500)];
+  const files = new Map(contents.map((body, index) => [`target/file-${index}.txt`, Buffer.from(body)]));
+  const promptFile = f.file("prompt with spaces.txt");
+  const command = invocation({ config, executable: process.execPath, session, prompt, files, cwd: f.workspace,
+    promptFile, environmentRoots, env: { XAI_API_KEY: "fixture-only" } });
+  assert.deepEqual(command.args, ["--no-auto-update", "--no-plan", "--no-subagents", "--no-memory", "--disable-web-search",
+    "--model", "fixture-model", "--tools", "Read", "--allow", "Read", "--session-id", session,
+    "--output-format", "plain", "--prompt-file", promptFile]);
+  assert.equal(command.input, "");
+  assert.ok(Buffer.byteLength(command.attachment) > 128 * 1024);
+  await writeFile(promptFile, command.attachment);
+  const args = ["-e", `const fs = require('node:fs');
+    const args = process.argv.slice(1);
+    const attachment = fs.readFileSync(args[args.indexOf('--prompt-file') + 1]);
+    fs.writeSync(1, attachment);`, "--", ...command.args];
+  const captured = await superviseReview(python, { ...command, args }, { cwd: f.workspace, timeoutMs: 3000 });
+  assert.equal(captured.code, 0);
+  assert.equal(captured.quiescent, true);
+  assert.deepEqual(captured.stdout, Buffer.from(command.attachment));
+  const [instructions, serialized] = captured.stdout.toString("utf8").split("\n\nAssigned files encoded as JSON data:\n");
+  assert.equal(instructions, prompt);
+  assert.deepEqual(JSON.parse(serialized), [...files].map(([name, bytes]) => ({ name, text: bytes.toString() })));
+  const offline = { config, session, prompt, files, cwd: "packet", promptFile: "packet-prompt.txt",
+    environmentRootsSha256: hash(jsonBytes(environmentRoots)) };
+  assert.equal(command.fingerprint, invocation(offline).fingerprint);
+  assert.notEqual(command.fingerprint, invocation({ ...offline, files: new Map(files).set("target/file-0.txt", Buffer.from("changed")) }).fingerprint);
 });
 
 async function checkQualifiedEnvironment(f) {
@@ -179,7 +227,7 @@ async function checkQualifiedEnvironment(f) {
     assert.equal(env.PATH, ${JSON.stringify(expected.PATH)});
     for (const name of ${JSON.stringify(blocked)}) assert.equal(env[name], undefined, name);
     assert.equal(env.ANTHROPIC_API_KEY, metadata ? undefined : 'fx-review');
-    assert.equal(env.HOME, metadata ? path.join(process.cwd(), 'home') : undefined);
+    assert.equal(env.HOME, metadata ? path.join(process.cwd(), 'home') : ${JSON.stringify(f.env.HOME)});
     assert.equal(env.XDG_CONFIG_HOME, metadata ? path.join(process.cwd(), 'home', 'config') : undefined);
     assert.equal(env.TMPDIR, metadata ? process.cwd() : path.dirname(process.cwd()));
   }
@@ -376,7 +424,7 @@ test("native approach readback binds the charter without approving the plan", as
 });
 
 test("synthetic Antigravity dispatch uses the sealed strict settings and admits receipt-only replay", async (t) => {
-  const f = await directFixture(t, "ok", { client: "agy" });
+  const f = await directFixture(t, "limitation", { client: "agy", proofLevel: "receipt-only" });
   const prep = await prepareFixture(f);
   assert.equal(prep.runtime.client, "agy");
   const { verified } = await replayFixture(f, "complete");
@@ -386,7 +434,7 @@ test("synthetic Antigravity dispatch uses the sealed strict settings and admits 
 });
 
 test("synthetic Kilo packet and offline receipt bind the explicit model provider", async (t) => {
-  const f = await directFixture(t, "ok", { client: "kilo" });
+  const f = await directFixture(t, "ok", { client: "kilo", proofLevel: "receipt-only" });
   const hostFile = f.file("host.json");
   const host = JSON.parse(await readFile(hostFile, "utf8"));
   host.reviewer.model = f.expect.model = "openrouter/vendor/fixture-model";
@@ -418,6 +466,127 @@ test("synthetic Kilo packet and offline receipt bind the explicit model provider
   assert.equal(verified.coverage, "receipt-only");
   assert.equal(verified.result.runtime.provider, "openrouter");
 });
+
+test("explicit receipt-only proof admits fresh full planning and candidate results for supported clients",
+  { skip: process.platform === "win32" }, async (t) => {
+    for (const client of ["grok", "codex", "agy", "pi", "claude"]) {
+      for (const mode of ["approach", "candidate"]) {
+        const f = await directFixture(t, "ok", { mode, client, proofLevel: "receipt-only" });
+        if (client === "grok") await writeFile(f.file("fixture.cjs"), String.raw`
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const assert = require('node:assert/strict');
+          const args = process.argv.slice(2);
+          if (args.includes('--version')) { console.log('grok-build 1.0.92'); process.exit(0); }
+          if (args.includes('--help')) {
+            console.log('--single --session-id --tools --allow --no-subagents --disable-web-search --prompt-file');
+            process.exit(0);
+          }
+          assert.ok(!args.includes('--single'), '--single conflicts with --prompt-file');
+          assert.equal(args.filter((arg) => arg === '--prompt-file').length, 1);
+          assert.equal(args.at(-2), '--prompt-file');
+          assert.equal(args.at(-1), path.join(path.dirname(process.cwd()), 'prompt.txt'));
+          assert.equal(fs.readFileSync(0, 'utf8'), '');
+          const stat = fs.lstatSync(args.at(-1));
+          assert.ok(stat.isFile());
+          assert.equal(stat.mode & 0o777, 0o400);
+          const [prompt, payload] = fs.readFileSync(args.at(-1), 'utf8').split('\n\nAssigned files encoded as JSON data:\n');
+          assert.match(prompt, /Review exactly the assigned file bodies supplied as JSON data\. Do not call tools\./);
+          const files = JSON.parse(payload);
+          assert.ok(new Set(files.map(({ text }) => text)).size > 1);
+          const assigned = prompt.split('\n').filter((line) => /^(?:target|base|plan|diff|context)\//.test(line) || line === 'review-context.json');
+          assert.deepEqual(files, assigned.map((name) => ({ name, text: fs.readFileSync(name, 'utf8') })));
+          const frame = prompt.match(/BEGIN_REVIEW_RECEIPT[\s\S]*?END_REVIEW_RECEIPT/g).at(-1);
+          fs.writeSync(1, frame);
+        `);
+        const prep = await prepareFixture(f);
+        assert.equal(prep.proofLevel, "receipt-only");
+        const { verified } = await replayFixture(f, "complete");
+        assert.equal(verified.proofComplete, true);
+        assert.equal(verified.coverage, "receipt-only");
+        assert.equal(verified.proofLevel, "receipt-only");
+        if (mode === "approach") assert.equal(verified.approach.action, "freeze-ready");
+        else assert.equal(verified.result.verdict, "no_findings");
+        const launch = await readFile(path.join(f.output, "launch.json"), "utf8");
+        assert.ok(!launch.includes(f.env.HOME) && !launch.includes("fixture-host-login"));
+        const legacyRuntime = client === "grok" ? { ...prep.runtime, capabilitySha256: hash(jsonBytes(grokHelp)) } : prep.runtime;
+        if (client === "grok") {
+          const capabilitySha256 = hash(jsonBytes({ ...grokHelp, flags: [...grokHelp.flags, "--prompt-file"] }));
+          assert.equal(prep.runtime.capabilitySha256, capabilitySha256);
+          assert.equal(JSON.parse(launch).launches[0].runtime.capabilitySha256, capabilitySha256);
+          await writeFile(f.file("expect.json"), jsonBytes({ ...f.expect, runtime: legacyRuntime }));
+          assert.match(runFixture(f, "--verify", ...f.flags, ...f.evidenceFlags).error, /Native CLI capability binding differs/);
+        }
+        for (const proofLevel of [undefined, "whole-file-read"]) {
+          await writeFile(f.file("expect.json"), jsonBytes({ ...f.expect, runtime: legacyRuntime, proofLevel }));
+          assert.match(runFixture(f, "--verify", ...f.flags, ...f.evidenceFlags).error, /proof level differs/);
+        }
+      }
+    }
+  });
+
+test("Grok receipt-only rejects native help without --prompt-file before inference",
+  { skip: process.platform === "win32" }, async (t) => {
+    const f = await directFixture(t, "ok", { client: "grok", proofLevel: "receipt-only" });
+    const script = f.file("fixture.cjs");
+    const started = f.file("inference-started");
+    const legacyMock = await readFile(script, "utf8");
+    await writeFile(script, "if (!process.argv.includes('--version') && !process.argv.includes('--help')) {\n" +
+      "  require('node:fs').writeFileSync(" + JSON.stringify(started) + ", 'started');\n}\n" + legacyMock);
+    assert.match(runFixture(f, "--prepare", ...f.flags, ...f.hostFlags).error ?? "",
+      /grok native help lacks required options: --prompt-file/);
+    await assert.rejects(readFile(started), { code: "ENOENT" });
+    await assert.rejects(readFile(f.file("export/manifest.json")), { code: "ENOENT" });
+  });
+
+test("strict proof requires exact structured bytes and rejects weaker adapter and host pin",
+  { skip: process.platform === "win32" }, async (t) => {
+    const proofLevel = "whole-file-read";
+    for (const behavior of ["ok", "missing-byte", "preamble", "epilogue"]) {
+      const f = await directFixture(t, behavior, { proofLevel });
+      await prepareFixture(f);
+      const phase = behavior === "ok" ? "complete" : behavior === "missing-byte" ? "invalid-native-output" : "receipt-invalid";
+      const { verified } = await replayFixture(f, phase);
+      assert.equal(verified.proofLevel, proofLevel);
+      assert.equal(verified.proofComplete, behavior === "ok");
+      assert.equal(verified.coverage, behavior === "ok" ? "whole-file" : null);
+    }
+    for (const client of ["agy", "grok"]) {
+      const strict = await directFixture(t, "ok", { client, proofLevel });
+      assert.match(runFixture(strict, "--prepare", ...strict.flags, ...strict.hostFlags).error, /structured whole-file/);
+      const unmarked = await directFixture(t, "ok", { client });
+      assert.match(runFixture(unmarked, "--prepare", ...unmarked.flags, ...unmarked.hostFlags).error, /structured whole-file/);
+    }
+    const mismatch = await directFixture(t, "ok", { proofLevel, hostProofLevel: "receipt-only" });
+    assert.match(runFixture(mismatch, "--prepare", ...mismatch.flags, ...mismatch.hostFlags).error, /Host review proof level differs/);
+  });
+
+test("single authorized smoke probe reserves finite cost and seals only synthetic compatibility",
+  { skip: process.platform === "win32" }, async (t) => {
+    const f = await directFixture(t, "ok", { proofLevel: "receipt-only" });
+    const host = JSON.parse(await readFile(f.file("host.json"), "utf8"));
+    const probeHost = { ...host, maxBudgetUsd: 0.01, runTimeoutMs: 3000 };
+    await writeFile(f.file("host.json"), jsonBytes(probeHost));
+    const { explicitRuntimeSha256, ...pin } = runFixture(f, "--probe-check", ...f.hostFlags);
+    assert.match(explicitRuntimeSha256, /^[a-f0-9]{64}$/);
+    await writeFile(f.file("expect.json"), jsonBytes(pin));
+    const args = ["--probe", ...f.hostFlags, "--expect", f.file("expect.json"), ...f.admissionFlags, ...f.evidenceFlags];
+    assert.match(runFixture(f, ...args).error, /probe grant/);
+    const grant = { schemaVersion: 1, kind: "standalone-review-probe", reference: "fixture standalone grant", verified: true,
+      runs: 1, configurationSha256: pin.configurationSha256, upperUsdMicros: 10000, explicitRuntimeSha256, ledger: f.file("ledger") };
+    await writeFile(f.file("admission.json"), jsonBytes(grant));
+    const result = runFixture(f, ...args);
+    assert.equal(result.compatible, true, JSON.stringify(result));
+    assert.equal(result.settled, true);
+    assert.equal(result.qualification, false);
+    assert.equal(result.deliveryAccepted, false);
+    assert.equal(hash(await readFile(f.file("output/result.json"))), result.resultSha256);
+    const retry = [...args.slice(0, -1), f.file("retry")];
+    assert.match(runFixture(f, ...retry).error, /already consumed/);
+    const unsafeHost = { ...probeHost, maxBudgetUsd: 0.02 };
+    await writeFile(f.file("host.json"), jsonBytes(unsafeHost));
+    assert.match(runFixture(f, "--probe-check", ...f.hostFlags).error, /bounds/);
+  });
 
 test("Claude Direct-CLI stream audit accepts builtin-only plugins and rejects non-builtin plugins", () => {
   const cwd = path.resolve("fixture-workspace");
@@ -485,5 +654,5 @@ test("Claude Direct-CLI stream audit accepts builtin-only plugins and rejects no
   assert.throws(() => sanitizeNative({
     stdout: Buffer.concat([withAdvisories[0], { type: "system", subtype: "hook_started", session_id: session }, ...withAdvisories.slice(9)].map(jsonBytes)),
     format: "claude-read", cwd, files, redactions: [], launch, maxBudgetUsd: 2.5,
-  }), (err) => /Unexpected Claude stream event/.test(err.message) && err.diagnosticDetail === "system/hook_started");
+  }), (err) => /Unexpected Claude stream event/.test(err.message) && classifyNativeOutputError(err) === "unexpected-event");
 });

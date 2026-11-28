@@ -1,7 +1,7 @@
 import { privatePath } from "./agent-configuration.mjs";
 import { resolveInstalledExecutable } from "./agent-discovery.mjs";
 import { customPlanningPath, planningBudget, planningLayout, validatePlanningInputs } from "./planning-inventory.mjs";
-import { directReviewAdopted, readLowTouchPolicy } from "./low-touch-policy.mjs";
+import { directReviewAdopted, readLowTouchPolicy, readReviewProofLevel } from "./low-touch-policy.mjs";
 import { relocatedPlan } from "./review-archive.mjs";
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
@@ -435,6 +435,8 @@ export async function reviewPolicy(request) {
   need(Number.isSafeInteger(size) && size <= 4 * 1024 * 1024, "Root policy exceeds planning bounds");
   const rootContract = utf8(git(workspace, "cat-file", "blob", entry.oid));
   const policy = readLowTouchPolicy(rootContract);
+  const directReviewer = Boolean(policy && directReviewAdopted(rootContract));
+  const proofLevel = readReviewProofLevel(rootContract, directReviewer);
   if (!policy) { need(!binding, "Integrated parent has not adopted low-touch policy"); return null; }
   need(binding?.parent === parent && utf8(git(workspace, "rev-parse", "--verify", binding.target + "^{commit}")).trim() === binding.target,
     "Missing exact integrated policy binding");
@@ -444,8 +446,7 @@ export async function reviewPolicy(request) {
     need(draft === parent || draftParents.length === 1 && draftParents[0] === parent,
       "Draft is not at the integrated parent or its frozen predecessor");
   }
-  const directReviewer = directReviewAdopted(rootContract);
-  return directReviewer ? { ...policy, directReviewer: true } : policy;
+  return directReviewer ? { ...policy, directReviewer: true, ...(proofLevel ? { proofLevel } : {}) } : policy;
 }
 
 function chargePlan(budget, file, size, directories) {

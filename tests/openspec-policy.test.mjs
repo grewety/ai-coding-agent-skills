@@ -2,6 +2,28 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { access } from "node:fs/promises";
 
+import { readReviewProofLevel, reviewProofMatches } from "../skills/software-development/openspec-delivery/scripts/low-touch-policy.mjs";
+
+test("Direct-CLI proof markers accept exactly one explicit integrated level", () => {
+  const direct = "<!-- openspec-reviewer: direct-cli-v1 -->";
+  const receipt = "<!-- openspec-review-proof: receipt-only -->";
+  const whole = "<!-- openspec-review-proof: whole-file-read -->";
+  assert.equal(readReviewProofLevel(direct, true), undefined);
+  assert.equal(readReviewProofLevel([direct, receipt].join("\n"), true), "receipt-only");
+  assert.equal(readReviewProofLevel([direct, whole].join("\n"), true), "whole-file-read");
+  assert.equal(readReviewProofLevel([direct, "```markdown", receipt, "```"].join("\n"), true), undefined);
+  for (const lines of [[direct, receipt, receipt], [direct, receipt, whole], [direct, receipt.replace("receipt-only", "unsupported")],
+    [direct, " " + receipt], ["```", direct, "```", receipt]]) {
+    assert.throws(() => readReviewProofLevel(lines.join("\n"), true), /unsupported integrated review/);
+  }
+  assert.throws(() => readReviewProofLevel([direct, receipt].join("\n"), false), /unsupported integrated review/);
+  const proof = { transport: "direct-cli", coverage: "receipt-only", proofLevel: "receipt-only", proofComplete: true };
+  assert.equal(reviewProofMatches({ directReviewer: true, proofLevel: "receipt-only" }, proof), true);
+  assert.equal(reviewProofMatches({ directReviewer: true, proofLevel: "whole-file-read" }, proof), false);
+  assert.equal(reviewProofMatches({ directReviewer: true }, proof), false);
+  assert.equal(reviewProofMatches({ directReviewer: true, proofLevel: "receipt-only" }, { ...proof, proofComplete: false }), false);
+});
+
 const policyUrl = new URL("../skills/software-development/openspec-delivery/scripts/delivery-policy.mjs", import.meta.url);
 async function policy() {
   assert.equal(await access(policyUrl).then(() => true, () => false), true, "delivery policy checks are available");

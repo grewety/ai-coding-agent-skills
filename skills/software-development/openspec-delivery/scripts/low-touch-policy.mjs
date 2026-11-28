@@ -50,6 +50,40 @@ export function directReviewAdopted(source) {
   return markers.length === 1;
 }
 
+export const reviewProofLevels = Object.freeze(["receipt-only", "whole-file-read"]);
+
+export function readReviewProofLevel(source, adopted) {
+  const markers = [];
+  const transports = [];
+  let fence;
+  let comment = false;
+  for (const line of source.split(/\r?\n/)) {
+    const delimiter = /^ {0,3}(`{3,}|~{3,})(.*)$/.exec(line);
+    if (fence) {
+      if (delimiter && delimiter[1][0] === fence[0] && delimiter[1].length >= fence.length &&
+          !delimiter[2].trim()) fence = undefined;
+      continue;
+    }
+    if (comment) { if (line.includes("-->")) comment = false; continue; }
+    if (delimiter) { fence = delimiter[1]; continue; }
+    if (/^\s*<!--\s*openspec-review-proof\b/.test(line)) markers.push(line);
+    else if (/^\s*<!--\s*openspec-reviewer\b/.test(line)) transports.push(line);
+    else if (line.includes("<!--") && !line.includes("-->")) comment = true;
+  }
+  if (!markers.length) return undefined;
+  const level = /^<!-- openspec-review-proof: ([a-z-]+) -->$/.exec(markers[0])?.[1];
+  need(adopted && transports.length === 1 && transports[0] === "<!-- openspec-reviewer: direct-cli-v1 -->" &&
+    markers.length === 1 && reviewProofLevels.includes(level),
+    "Ambiguous or unsupported integrated review proof marker");
+  return level;
+}
+
+export function reviewProofMatches(policy, { transport, coverage, proofLevel, proofComplete } = {}) {
+  if (!policy.directReviewer) return proofLevel === undefined;
+  return transport === "direct-cli" && proofLevel === policy.proofLevel && (!proofLevel || proofComplete === true) &&
+    coverage === (policy.proofLevel === "receipt-only" ? "receipt-only" : "whole-file");
+}
+
 export function readLowTouchPolicy(source) {
   const markers = [];
   let fence;

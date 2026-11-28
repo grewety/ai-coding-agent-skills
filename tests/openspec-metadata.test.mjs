@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { closeSync, mkdtempSync, openSync, readFileSync, rmSync } from "node:fs";
-import { cp, mkdir, mkdtemp, open, readFile, rename, rm, symlink, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, open, readFile, readdir, rename, rm, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -56,6 +56,7 @@ const testingOverhaul = "testing-overhaul-and-low-touch-friction-01m8b4nava84t4q
 const tier1Reviewer = "tier1-non-claude-contained-reviewer-01m8by1bvkhr053edzgtt5t0cm";
 const tieredContainment = "tiered-cross-platform-os-containment-01m8cnxjetveec864xxmbp7vyb";
 const directCli = "direct-cli-reviewer-simplification-01m8deqc2446agfqswc0cb0gex";
+const reviewProof = "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt";
 const currentSpecs = path.join(root, "openspec", "specs");
 const requirement = /^### Requirement: ([^\n]+)\n[\s\S]*?(?=^#{1,3} |(?![\s\S]))/gm;
 
@@ -210,14 +211,30 @@ test("tiered containment promotes all three frozen deltas within the review expo
 
 test("Direct-CLI promotes each frozen requirement and keeps the integration export within its budget", async () => {
   const deltaRoot = await deltaDirectory(directCli);
+  const superseding = await readCapabilitySpec(await deltaDirectory(reviewProof), "contained-independent-review");
   for (const [capability, expected] of [["contained-independent-review", 12], ["exclusive-worker-runtime", 2], ["openspec-integration", 11]]) {
     const delta = await readCapabilitySpec(deltaRoot, capability);
     const current = await readCapabilitySpec(currentSpecs, capability);
-    assert.equal(checkPromotion({ capability, delta, current }), expected, capability);
+    const retained = capability === "contained-independent-review" ?
+      withoutSupersededRequirements(delta, superseding, "Strict offline review receipt replay") : delta;
+    assert.equal(checkPromotion({ capability, delta: retained, current }) + (retained === delta ? 0 : 1), expected, capability);
     assert.ok(current.startsWith(header("spec", `capability: ${capability}\n`)));
     assert.ok(Buffer.byteLength(current) <= (capability === "openspec-integration" ? 63488 : 65536), capability);
   }
 });
+test("proof policy promotion is exact and every current spec fits its pinned export", async () => {
+  const capability = "contained-independent-review";
+  const delta = await readCapabilitySpec(await deltaDirectory(reviewProof), capability);
+  const current = await readCapabilitySpec(currentSpecs, capability);
+  assert.equal(checkPromotion({ capability, delta, current }), 6);
+  const files = (await readdir(currentSpecs, { recursive: true })).filter((name) => path.basename(name) === "spec.md");
+  assert.ok(files.includes(path.join("openspec-integration", "spec.md")));
+  for (const name of files) {
+    const limit = name === path.join("openspec-integration", "spec.md") ? 63_488 : 65_536;
+    assert.ok((await readFile(path.join(currentSpecs, name))).length <= limit, name);
+  }
+});
+
 async function fixture(t) {
   const repo = await mkdtemp(path.join(os.tmpdir(), "openspec-metadata-"));
   t.after(() => rm(repo, { recursive: true, force: true }));

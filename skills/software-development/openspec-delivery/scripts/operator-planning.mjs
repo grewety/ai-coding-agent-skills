@@ -3,6 +3,7 @@ import path from "node:path";
 import { readBounded, separate, sha256 } from "./evidence-retention.mjs";
 import { need, observed, same, sealedObservation, text } from "./operator-records.mjs";
 import { planningLayout } from "./planning-inventory.mjs";
+import { reviewProofMatches } from "./low-touch-policy.mjs";
 
 function grantMatches(grant, context, workspace) {
   return observed(grant) && grant.change === context.change && grant.policyRevision === context.parent &&
@@ -39,6 +40,7 @@ export async function charterObservation(input, context, proposal, workspace) {
     grantMatches(input.planningGrant, context, workspace.workspace) && input.planningGrant.review === true &&
     same(retained.record.binding, input.planningGrant.reviewBinding) &&
     (!context.lowTouch || same(retained.planningModes, context.modes)), "Charter differs from the fixed grant, goal or qualified reviewer");
+  let reviewProof;
   if (context.directReviewer) {
     const proof = selected.reviewEvidence;
     need(proof && ["request", "expect", "exportDirectory", "output", "verifier"].every((name) =>
@@ -50,12 +52,28 @@ export async function charterObservation(input, context, proposal, workspace) {
     const { reviewCommand } = await import(pathToFileURL(proof.verifier).href);
     const replay = await reviewCommand(["--verify", "--request", proof.request, "--expect", proof.expect,
       "--export", proof.exportDirectory, "--output", proof.output]);
-    need(replay.phase === "complete" && replay.transport === "direct-cli" && replay.coverage === "whole-file" &&
+    need(replay.phase === "complete" && reviewProofMatches(context, replay) &&
       replay.sessions[0] === retained.review?.identity?.reviewerSession && same(replay.result.native, retained.review),
     "Direct-CLI charter receipt differs from the retained planning observation");
+    if (context.proofLevel) {
+      const request = JSON.parse(readBounded(proof.request, 1024 * 1024));
+      const expect = JSON.parse(readBounded(proof.expect, 1024 * 1024));
+      need(request.mode === "approach" && request.policy?.parent === context.parent && request.policy.target === context.target &&
+        request.worker.identity.change === context.change && same(request.worker.identity.inputs, context.inputs) &&
+        same(request.policy.planningModes, context.modes) && same(request.snapshot.record, retained.record) &&
+        expect.proofLevel === context.proofLevel && /^[a-f0-9]{64}$/.test(expect.statusSha256 ?? "") &&
+        sha256(readBounded(proof.request, 1024 * 1024)) === proof.requestSha256 &&
+        sha256(readBounded(proof.expect, 1024 * 1024)) === proof.expectSha256,
+      "Direct-CLI planning proof does not bind the current integrated parent and full raw planning identity");
+      reviewProof = { proofLevel: replay.proofLevel, coverage: replay.coverage, reviewedPlan: replay.result.native.identity,
+        statusSha256: expect.statusSha256, reference: replay.result.native.reference, session: replay.sessions[0],
+        zeroWaiver: replay.approach?.action === "freeze-ready" && replay.result.native.findings.length === 0 &&
+          replay.result.native.coverageLimitations.length === 0 };
+    }
   }
   const accepted = core.acceptConvergenceReview({ ...retained, currentInputs: context.inputs });
-  if (input.proposal.phase !== "correct") return context.lowTouch ? { ...accepted, planningModes: context.modes } : accepted;
+  if (input.proposal.phase !== "correct") return context.lowTouch ?
+    { ...accepted, planningModes: context.modes, ...(reviewProof ? { reviewProof } : {}) } : accepted;
   need(accepted.action !== "freeze-ready", "Accepted charter requires no correction");
   const correction = input.correction;
   const layout = planningLayout(context.change, Boolean(context.lowTouch));
@@ -97,15 +115,23 @@ function validatedDraft(input, context) {
 }
 
 export function proposalFreeze({ input, context, policy, proposal, workspace, charter }) {
-  const stop = (reason) => ({ action: "stop", reason, proposal, workspace, policy, planApproved: false, executionAuthorized: false });
+  const stop = (reason) => ({ action: "stop", reason, proposal, workspace, policy,
+    ...(charter?.reviewProof ? { reviewProof: charter.reviewProof } : {}), planApproved: false, executionAuthorized: false });
   const validation = validatedDraft({ ...input, workspace: workspace.workspace }, context);
   if (!validation) return stop("NATIVE_VALIDATION_PENDING");
   const review = charter ?? input.reviewAcceptance;
+  const proof = review?.reviewProof;
+  const matchingProof = context.proofLevel && proof?.zeroWaiver === true &&
+    reviewProofMatches(context, { ...proof, transport: "direct-cli", proofComplete: true }) &&
+    typeof proof.statusSha256 === "string" && /^[a-f0-9]{64}$/.test(proof.statusSha256) &&
+    proof.reference === review.reference && text(proof.session) &&
+    same(proof.reviewedPlan?.inputs, context.inputs);
   const matchingPolicy = policy.approachPolicy === "charter-v1" ? review?.policy === "charter-v1" :
     review?.policy === undefined || review.policy === "strict";
   if ((proposal.reviewRequested || policy.requireApproachReview) &&
       (!matchingPolicy || review?.action !== "freeze-ready" || !same(review.inputs, context.inputs) || !text(review.reference) ||
-        context.lowTouch && !same(review.planningModes, context.modes))) {
+        context.lowTouch && !same(review.planningModes, context.modes) ||
+        context.proofLevel && !matchingProof)) {
     return stop("APPROACH_REVIEW_PENDING");
   }
   if (!proposal.proposeToFreeze || !policy.proposeToFreeze || proposal.draftOnly) return stop("UNCOMMITTED_DRAFT_BOUNDARY");
@@ -127,5 +153,6 @@ export function proposalFreeze({ input, context, policy, proposal, workspace, ch
   }
   return { ...stop(null), action: "freeze-ready", change: context.change, inputs: context.inputs,
     policyRevision: context.parent, ...(context.lowTouch ? { modes: context.modes } : {}), grantReference: grant.reference,
-    validationReference: validation.reference, reviewReference: review?.reference ?? null };
+    validationReference: validation.reference, reviewReference: review?.reference ?? null,
+    ...(matchingProof ? { reviewProof: proof } : {}) };
 }

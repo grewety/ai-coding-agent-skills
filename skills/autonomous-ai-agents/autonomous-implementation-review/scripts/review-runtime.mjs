@@ -48,7 +48,7 @@ async function rejectAmbientConfiguration(client, scratch, { SystemRoot }) {
   }
 }
 
-export async function observeDirectRuntime(config, excluded) {
+export async function observeDirectRuntime(config, excluded, { probe = false } = {}) {
   const executable = installedReviewer(config, excluded);
   const python = supervisorCommand(excluded);
   const roots = reviewerEnvironmentRoots(executable, python);
@@ -81,10 +81,11 @@ export async function observeDirectRuntime(config, excluded) {
     const versionArgs = config.client === "grok" ? ["--no-auto-update", "--version"] : ["--version"];
     const version = reportedVersion(await metadata(versionArgs, "version"), label);
     need(version, "Unable to bind native version for " + config.client);
-    const { args, flags } = reviewerHelp(config.reviewer, version);
+    const { args, flags } = reviewerHelp(config.reviewer, version, config.proofLevel);
     const help = await metadata(args, "help");
     const supported = new Set(help.match(/(?<![\w-])--[\w-]+/g));
-    const missing = flags.filter((flag) => !supported.has(flag));
+    const required = probe ? [...flags, "--max-budget-usd", "--max-turns"] : flags;
+    const missing = required.filter((flag) => !supported.has(flag));
     need(missing.length === 0, `${config.client} native help lacks required options: ${missing.join(", ")}`);
     need(pinFile().sha256 === executableSha256, "Installed reviewer changed during native capability preflight");
     return { executable, python, runtime: { ...config.reviewer, provider: reviewerProvider(config.reviewer), version, executableSha256,
@@ -121,8 +122,11 @@ async function packetCopyStatus(root, files) {
 }
 
 export async function runDirectPacket({ request, expect, prepared, config, executable, python, exportDirectory,
-  excluded, index, session, prompt, begin, signal }) {
-  const workspace = request.worker.identity.workspace;
+  excluded, index, session, prompt, begin, signal, probe = false }) {
+  const workspace = probe ? null : request.worker.identity.workspace;
+  const checkSource = () => probe ? true : checkExport(exportDirectory, expect.exportSha256, request);
+  const observeSource = () => probe ? { head: request.snapshot.target, statusSha256: hash("synthetic"),
+    contentSha256: expect.exportSha256 } : observeWorktree(workspace);
   const files = new Map(prepared.manifest.packets[index].paths.map((name) => [name, prepared.files.get(name)]));
   const temp = await realpath(tmpdir());
   const scratch = await mkdtemp(path.join(temp, "direct-review-"));
@@ -137,8 +141,8 @@ export async function runDirectPacket({ request, expect, prepared, config, execu
   try {
     const supportFiles = new Map();
     try {
-      launch.before = await observeWorktree(workspace);
-      await checkExport(exportDirectory, expect.exportSha256, request);
+      launch.before = await observeSource();
+      await checkSource();
       launch.exportBefore = true;
       need(excluded.every((root) => separate(scratch, root)) && privatePath(scratch), "Disposable workspace is not separate and private");
       await safePath(scratch);
@@ -186,16 +190,13 @@ export async function runDirectPacket({ request, expect, prepared, config, execu
         if (outcome !== "exit" || code !== 0 || !quiescent) launch.diagnostic = directDiagnostic(proc);
         else {
           try {
-            const redactions = [workspace, scratch, homedir(), ...Object.entries(command.env)
+            const redactions = [workspace, scratch, homedir(), command.env.HOME, command.env.USERPROFILE, ...Object.entries(command.env)
               .filter(([key, value]) => /KEY|TOKEN|CREDENTIAL/.test(key) && value.length >= 8).map(([, value]) => value)];
             stdout = sanitizeNative({ stdout: proc.stdout, format: command.format, cwd, files, redactions,
-              launch, maxBudgetUsd: config.maxBudgetUsd });
+              launch, maxBudgetUsd: config.maxBudgetUsd, proofLevel: expect.proofLevel });
           } catch (error) {
             launch.diagnostic = "invalid-native-output";
             launch.diagnosticReason = classifyNativeOutputError(error);
-            if (typeof error?.diagnosticDetail === "string" && /^[a-z0-9_/:.-]{1,64}$/.test(error.diagnosticDetail)) {
-              launch.diagnosticDetail = error.diagnosticDetail;
-            }
           }
         }
       }
@@ -206,9 +207,9 @@ export async function runDirectPacket({ request, expect, prepared, config, execu
       }
       launch.diagnostic = "preflight-failed";
     } finally {
-      try { launch.after = await observeWorktree(workspace); } catch { /* Missing postflight is a stop. */ }
+      try { launch.after = await observeSource(); } catch { /* Missing postflight is a stop. */ }
       try {
-        await checkExport(exportDirectory, expect.exportSha256, request);
+        await checkSource();
         launch.exportAfter = true;
       } catch { /* Preserve changed originals. */ }
       try {

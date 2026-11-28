@@ -137,7 +137,7 @@ export function finishReadiness(input, result, completion, requireCheckout = tru
     }
   }
   return { schemaVersion: 1, change, head, ready: true, predicate: null, issue: null, promoted,
-    ...(taskCompletion ? { taskCompletion } : {}), authority: "separate-finish-grant-required" };
+    ...(taskCompletion ? { taskCompletion } : {}), ...(result.reviewProof ? { reviewProof: result.reviewProof } : {}), authority: "separate-finish-grant-required" };
 }
 
 export async function finishPrFixReadiness(input, result, ref, verifyHandover, options) {
@@ -150,7 +150,7 @@ export async function finishPrFixReadiness(input, result, ref, verifyHandover, o
       { ...options, acceptedAncestorGate: result.gateReference, approvedTaskGates: result.approvedTaskGates });
     need(result.head === proof.reviewedAncestor && result.gateReference === proof.ancestorGate &&
       options.reviewReference === proof.ancestorReview.reference, "Accepted ancestor review or gates differ");
-    return { ...readiness, prFixLineage: proof, ...(gateAuthority ? { gateAuthority } : {}) };
+    return { ...readiness, prFixLineage: proof, ...(proof.ancestorReview.reviewProof ? { reviewProof: proof.ancestorReview.reviewProof } : {}), ...(gateAuthority ? { gateAuthority } : {}) };
   } catch (error) {
     return { ...readiness, ready: false, predicate: "FULL_EXACT_HEAD_REVIEW_REQUIRED", issue: error.message };
   }

@@ -7,7 +7,7 @@ import { fixtureTest as test } from "./test-shards.mjs";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { deliveryCommand } from "../skills/software-development/openspec-delivery/scripts/delivery-cli.mjs";
-import { planning } from "../skills/software-development/openspec-delivery/scripts/change-guard.mjs";
+import { planning, verifyArchive } from "../skills/software-development/openspec-delivery/scripts/change-guard.mjs";
 import { createRepresentation, sha256, stableJson } from "../skills/software-development/openspec-delivery/scripts/evidence-retention.mjs";
 import { protectedFinish, skillSyncDecision } from "../skills/software-development/openspec-delivery/scripts/protected-finish.mjs";
 
@@ -17,7 +17,7 @@ const git = (cwd, ...argv) => execFileSync("git", argv, { cwd, encoding: "utf8",
 const verified = (reference, fields = {}) => ({ verified: true, reference, ...fields });
 const iso = (time) => new Date(time).toISOString();
 
-function fixture(t, standingTriggers, localHarness) {
+function fixture(t, standingTriggers, localHarness, proofLevel, taskChild = false) {
   const root = realpathSync(mkdtempSync(path.join(os.tmpdir(), "protected-finish-")));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const repo = path.join(root, "repo");
@@ -36,7 +36,8 @@ function fixture(t, standingTriggers, localHarness) {
   git(repo, "config", "user.name", "Fixture");
   git(repo, "config", "user.email", "fixture@example.invalid");
   writeFileSync(path.join(repo, "AGENTS.md"), "# Fixture\n" +
-    (standingTriggers ? `<!-- openspec-low-touch: ${JSON.stringify({ standingTriggers })} -->\n` : ""));
+    (standingTriggers ? `<!-- openspec-low-touch: ${JSON.stringify({ standingTriggers })} -->\n` : "") +
+    (proofLevel ? `<!-- openspec-reviewer: direct-cli-v1 -->\n<!-- openspec-review-proof: ${proofLevel} -->\n` : ""));
   writeFileSync(path.join(repo, ".gitignore"), "*.ignored\n");
   mkdirSync(path.join(repo, "openspec"));
   writeFileSync(path.join(repo, "openspec", "config.yaml"), "schema: spec-driven\n");
@@ -58,6 +59,12 @@ function fixture(t, standingTriggers, localHarness) {
   git(workspace, "add", ".");
   git(workspace, "commit", "-m", "plan");
   const plan = git(workspace, "rev-parse", "HEAD");
+  if (taskChild) {
+    writeFileSync(path.join(workspace, "accepted.txt"), "synthetic implementation\n");
+    git(workspace, "add", ".");
+    git(workspace, "commit", "-m", "reviewed source");
+  }
+  const reviewedParent = git(workspace, "rev-parse", "HEAD");
   writeFileSync(tasks, "## 1. Test\n\n- [x] 1.1 Prove behavior\n");
   git(workspace, "commit", "-am", "candidate");
   const head = git(workspace, "rev-parse", "HEAD");
@@ -65,7 +72,7 @@ function fixture(t, standingTriggers, localHarness) {
   const url = "https://github.com/" + repository + "/pull/";
   const issue = "https://github.com/" + repository + "/issues/9";
   const identity = { repo, workspace, repository, branch, change, candidate: head, policyRevision: base,
-    mode: "task-guided", plan, planDigest: planning(repo, plan, change).digest, target: "main", targetRevision: base, issue };
+    mode: "task-guided", plan, planDigest: planning(repo, plan, change, Boolean(proofLevel)).digest, target: "main", targetRevision: base, issue };
   const now = Date.now();
   const startedAt = iso(now - 20_000);
   const observedAt = iso(now - 100);
@@ -93,10 +100,43 @@ function fixture(t, standingTriggers, localHarness) {
     const wrapperSha256 = sha256(stableJson(payload));
     return { ref: save(label, { ...payload, wrapperSha256 }), wrapperSha256 };
   };
-  const hostConfiguration = localHarness === undefined ? undefined : save("host", { schemaVersion: 1, localHarness });
+  const hostConfiguration = proofLevel ? save("host", { schemaVersion: 3, reviewer: { client: "grok", model: "fixture" },
+    maxBudgetUsd: 1, proofLevel }) :
+    localHarness === undefined ? undefined : save("host", { schemaVersion: 1, localHarness });
+  const makeReview = (target, baseRevision, gateSha, label, finishReference) => {
+    const session = label + "-reviewer";
+    const reference = sha256(label + "-report");
+    const coverage = proofLevel === "receipt-only" ? "receipt-only" : "whole-file";
+    const proof = { proofLevel, coverage, reviewedHead: target, reviewedPlan: plan, reviewedPlanDigest: identity.planDigest,
+      statusSha256: sha256(label + "-sealed"), reference, session, zeroWaiver: true };
+    const id = { candidate: target, change, workspace: path.join(root, label + "-review-checkout"),
+      inputs: planning(repo, plan, change, true).inputs, task: "1.1" };
+    const replay = { phase: "complete", transport: "direct-cli", coverage, proofLevel, proofComplete: true, reviewProof: proof,
+      reviewTransport: "direct-cli", reviewCoverage: coverage, reviewConfigurationSha256: hostConfiguration.sha256,
+      reviewSnapshot: { target, base: baseRevision, plan, planDigest: identity.planDigest },
+      reviewPolicyBinding: { parent: base, target: base, finishReference },
+      request: { identity: id, acceptance: [`gate-run:${gateSha}`] },
+      result: { identity: id, runtime: { session, readOnly: true }, report: { sha256: reference }, status: "completed",
+        verdict: "no_findings", nativeVerdict: "Verdict: No findings", findings: [], coverageLimitations: [] } };
+    const ref = save(label + "-review-replay", replay);
+    return { proof, session, reference, handover: { kind: "review-candidate", requestFileSha256: ref.sha256, expectFileSha256: ref.sha256,
+      request: ref.file, expect: ref.file, output: ref.file, exportDirectory: ref.file } };
+  };
+  const verifyHandover = async (handover) => {
+    const bytes = readFileSync(handover.request);
+    assert.equal(sha256(bytes), handover.expectFileSha256);
+    return JSON.parse(bytes);
+  };
   const implementationGate = gate(head, "implementation-gate");
+  const parentGate = taskChild ? gate(reviewedParent, "reviewed-parent-gate") : implementationGate;
+  const opened = proofLevel && makeReview(taskChild ? reviewedParent : head, plan, parentGate.wrapperSha256, "implementation");
   const anchor = save("anchor", bound("ready", { kind: "finish-readiness-readback", ready: true, keepWorktree: false,
-    implementationReview: verified("review-1", { session: "implementation-reviewer", head }),
+    implementationReview: opened ? verified(opened.reference, { session: opened.session,
+      head: opened.proof.reviewedHead, reviewProof: opened.proof }) :
+      verified("review-1", { session: "implementation-reviewer", head }),
+    ...(opened ? taskChild ? { taskCompletion: { reviewedParent, acceptanceChild: head, taskIds: ["1.1"],
+      acceptedTaskIds: ["1.1"], reviewedGate: parentGate.ref, reviewedGateReference: parentGate.wrapperSha256,
+      handover: opened.handover } } : { implementationHandover: opened.handover } : {}),
     ...(hostConfiguration ? { hostConfigurationSha256: hostConfiguration.sha256 } : {}),
     implementationGate: implementationGate.ref, implementationGateSha256: implementationGate.wrapperSha256 }));
   const protection = (pullRequest, revision) => {
@@ -141,7 +181,8 @@ function fixture(t, standingTriggers, localHarness) {
     return { repo, change, head, finishCheckpoint, finishRemote, finishReply, skillSync, hostConfiguration };
   }
   const call = (verb, args) => deliveryCommand(verb === "inspect" ? "status" : verb, request(args));
-  return { root, repo, workspace, records, change, active, head, identity, request, call, pr, gate, save, bound, url, issue, now, hostConfiguration };
+  return { root, repo, workspace, records, change, active, head, identity, request, call, pr, gate, save, bound, url, issue, now, hostConfiguration,
+    opened, makeReview, verifyHandover, reviewedParent };
 }
 
 test("protected publication reserves the paid PR trigger after both event inventories pass", async (t) => {
@@ -492,6 +533,83 @@ async function closureFixture(t, adopted = false) {
   assert.equal(selected.sync.action, "offer-sync");
   assert.equal(selected.profileWrites, false);
 }
+
+test("protected finish preserves explicit review proof through exact head, task child and committed archive replay", async (t) => {
+  for (const taskChild of [false, true]) {
+    const f = fixture(t, [], undefined, "receipt-only", taskChild);
+    const { repo, workspace, head, opened, change, identity, url } = f;
+    const reviewedHead = opened.proof.reviewedHead;
+    const implementation = f.pr(1, head, "MERGED", head);
+    const integrated = f.bound("integrated", { head, mergeCommit: head, gate: f.gate(head, "integrated-gates").ref });
+    const closureAbsent = f.bound("closure-absent", { state: "ABSENT", complete: true, url: null, target: "main" });
+    let args = { remote: { implementation, integrated, closure: closureAbsent } };
+    const call = () => protectedFinish(f.request(args), undefined, f.now, f.verifyHandover);
+    const ready = await call();
+    assert.equal(ready.action, "prepare-closure");
+    assert.deepEqual(ready.reviewProof, opened.proof);
+    assert.equal(ready.reviewProof.reviewedHead, taskChild ? f.reviewedParent : head);
+    assert.equal(ready.reviewProof.coverage, "receipt-only");
+    assert.equal(ready.reviewProof.zeroWaiver, true);
+    await assert.rejects(protectedFinish(f.request(args), undefined, f.now, async (handover) => {
+      const replay = await f.verifyHandover(handover);
+      return { ...replay, proofComplete: false, reviewCoverage: null };
+    }), /proof|zero-waiver/i);
+
+    git(repo, "merge", "--ff-only", head);
+    const archiveWorkspace = path.join(f.root, "archive");
+    git(repo, "worktree", "add", "-b", "closure/sample", archiveWorkspace, head);
+    const archive = "openspec/changes/archive/2026-11-25-sample";
+    mkdirSync(path.join(archiveWorkspace, "openspec/changes/archive"));
+    git(archiveWorkspace, "mv", f.active, archive);
+    const gates = (commit) => [{ command: "npm test", commit, exitCode: 0, evidence: "synthetic gate" }];
+    const receipt = { schemaVersion: 1, change, issueUrl: f.issue, head, plan: identity.plan, planDigest: identity.planDigest,
+      base: identity.policyRevision, integrated: head, verified: head, integrationReference: url + "1",
+      reviewProof: ready.reviewProof, ...(taskChild ? { taskCompletion: { reviewedParent: reviewedHead, acceptanceChild: head, taskIds: ["1.1"] } } : {}),
+      gates: gates(head), review: { schemaVersion: 1, change, issueUrl: f.issue, head: reviewedHead, planDigest: identity.planDigest,
+        verdict: "pass", findings: [], reviewer: opened.session, reference: opened.reference, gates: gates(reviewedHead) } };
+    const receiptPath = archive + "/evidence/receipt.json";
+    mkdirSync(path.join(archiveWorkspace, archive, "evidence"));
+    const makeClosure = (record) => {
+      writeFileSync(path.join(archiveWorkspace, receiptPath), JSON.stringify(record));
+      git(archiveWorkspace, "add", ".");
+      git(archiveWorkspace, "commit", "-m", "archive");
+      const closureHead = git(archiveWorkspace, "rev-parse", "HEAD");
+      const gate = f.gate(closureHead, "closure-gate");
+      const retained = f.save("receipt", record);
+      const closureCandidate = f.bound("closure-candidate", { head: closureHead, archive, integrated: head,
+        receiptSha256: retained.sha256, receiptPath, receipt: retained, gate: gate.ref });
+      return { closureHead, gate, closureCandidate };
+    };
+    const forged = makeClosure({ ...receipt, reviewProof: { ...ready.reviewProof, proofLevel: "whole-file-read" } });
+    args = { remote: { implementation, integrated, closureCandidate: forged.closureCandidate } };
+    await assert.rejects(call(), /Receipt review proof differs/);
+    git(archiveWorkspace, "reset", "--hard", head);
+    mkdirSync(path.join(archiveWorkspace, "openspec/changes/archive"), { recursive: true });
+    git(archiveWorkspace, "mv", f.active, archive);
+    mkdirSync(path.join(archiveWorkspace, archive, "evidence"));
+    const { closureHead, gate, closureCandidate } = makeClosure(receipt);
+    const closure = f.pr(2, closureHead, "MERGED", closureHead);
+    const closed = f.makeReview(closureHead, head, gate.wrapperSha256, "closure", "finish-1");
+    const closureReview = f.bound(closed.reference, { kind: "independent-closure-review", head: closureHead,
+      gateSha256: gate.ref.sha256, session: closed.session, verdict: "pass", factual: true, findings: [],
+      reviewProof: closed.proof, handover: closed.handover });
+    const pinned = { prs: { implementation: url + "1", closure: url + "2" }, closureHead };
+    args = { ...pinned, remote: { implementation, integrated, closureCandidate, closure, closureReview } };
+    await assert.rejects(protectedFinish(f.request({ ...args, remote: { ...args.remote,
+      closureReview: { ...closureReview, reviewProof: { ...closed.proof, statusSha256: "f".repeat(64) } } } }),
+      undefined, f.now, f.verifyHandover), /review lacks matching proof/);
+    const closeout = await call();
+    assert.equal(closeout.archiveAccepted, true);
+    assert.deepEqual(closeout.closureReviewProof, closed.proof);
+    const { finishCheckpoint, finishRemote } = f.request(args);
+    const replay = await verifyArchive({ repo, change, verified: head, head: closureHead, archive, receiptSha256: closureCandidate.receiptSha256,
+      receiptFile: closureCandidate.receipt.file, committedReceiptPath: receiptPath, issue: f.issue, policyTarget: identity.policyRevision,
+      integrationReference: url + "1", finishCheckpoint, finishRemote, verifyHandover: f.verifyHandover });
+    assert.deepEqual(replay.reviewProof, opened.proof);
+    assert.deepEqual(replay.closureReviewProof, closed.proof);
+    assert.equal(replay.taskCompletion?.reviewedParent, taskChild ? reviewedHead : undefined);
+  }
+});
 
 test("post-release sync is advisory and strictly matches profile, installer scope, provenance and fresh session", (t) => {
   const f = fixture(t);

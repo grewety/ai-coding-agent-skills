@@ -72,7 +72,7 @@ ledger. Reservations and uncertain charges carry across extension and expiry.
 See `references/review-candidate.md` inside the separate
 `autonomous-implementation-review` package.
 
-An adopting integrated parent uses Direct-CLI review. Reserve every planned
+An adopting integrated parent uses Direct-CLI review. Select receipt-only proof explicitly in the integrated root contributor contract. Whole-file reads remain the default. Reserve every planned
 packet session under the exact host pin and retained phase authority. Earlier
 parent policies retain their original pinned verifier and spend scope.
 

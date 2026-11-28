@@ -120,7 +120,8 @@ export function auditClaudeStream(proc, runtime, assigned, probe, files) {
           const match = /^ *(\d+)[\t→]([\s\S]*)$/.exec(numbered[index]);
           return match && Number(match[1]) === index + 1 && match[2] === line;
         }));
-        need(normalizedFile(file.content) === content && forms.some((form) => file.numLines === form.length) &&
+        const exactResponse = runtime.proofLevel !== "whole-file-read" || Buffer.from(file.content).equals(bytes);
+        need(exactResponse && normalizedFile(file.content) === content && forms.some((form) => file.numLines === form.length) &&
           (delivered === content || rendered),
           "Native Read differs from the full exported file");
       }
@@ -130,7 +131,7 @@ export function auditClaudeStream(proc, runtime, assigned, probe, files) {
       throw new Error("Unexpected native stream event");
     }
   }
-  need(!pending.size && paths.size === seenPaths.size && finalText.join("") === end.result, "Native Read coverage or final stream text mismatch");
+  need(!pending.size && (runtime.proofLevel === "receipt-only" || paths.size === seenPaths.size) && finalText.join("") === end.result, "Native Read coverage or final stream text mismatch");
   if (probe) need(end.result === "REVIEW_PROBE_OK", "Unexpected probe result");
   return end.result;
 }

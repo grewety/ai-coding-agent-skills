@@ -18,7 +18,7 @@ Maintain portable AI coding-agent playbooks and publish complete Agent Skills pa
 
 ## Local Contracts
 
-- An integrated parent bearing the reviewer marker selects Direct-CLI independent review. Keep fresh sessions, disposable packet inputs, workspace integrity and offline evidence exact. Earlier parents keep their original pinned verifier and original authority. See [Direct-CLI review](docs/claude-reviewer.md).
+- An integrated parent bearing the reviewer marker selects Direct-CLI independent review. Keep fresh sessions, disposable packet inputs, workspace integrity and offline evidence exact. Later plans can select a proof level only through their verified integrated parent. Whole-file reads are the default. Earlier parents keep their original pinned verifier and original authority. See [Direct-CLI review](docs/claude-reviewer.md).
 
 
 - The external role setup and pilot disposition contract lives in `docs/configurable-backends.md`. Setup writes only confirmed external files. Preserve original approved legacy pins and require separate live qualification for explicit pilots.

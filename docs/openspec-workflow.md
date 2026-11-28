@@ -832,9 +832,14 @@ Supervisor handoff and evidence-bound Markdown wiki maintenance. It adds no
 OpenSpec workflow or orchestration prerequisite. Tasks and delivery evidence
 stay with native OpenSpec.
 
-Current source versions are delivery 1.12.0 and `openspec-next` 0.9.0 in
-`openspec-development` 1.12.0, and core skill 0.26.6 in
-`autonomous-orchestration` 1.16.6. The `delivery-operations` bundle and both of
+The integrated plan parent governs Direct-CLI review proof. Whole-file read is
+the default. Explicit receipt-only selection carries the exact review identity
+and sealed proof through finish and archive replay. See
+[Direct-CLI independent review](claude-reviewer.md).
+
+Current source versions are delivery 1.13.0 and `openspec-next` 0.9.0 in
+`openspec-development` 1.13.0, and core skill 0.27.0 in
+`autonomous-orchestration` 1.17.0. The `delivery-operations` bundle and both of
 its skills are 1.0.1.
 Representation support adds no upstream workflow, runtime dependency or
 installation route. Package availability/byte checks do not establish account
