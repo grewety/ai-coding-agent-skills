@@ -34,3 +34,35 @@ If the Driver enters a native human-input wait, use its qualified native decisio
 Arm and read back the verified one-shot or equivalent in-session monitor from the main playbook in the same turn as launch or unblock, including uncertain startup or delivery. Bind the check to the original Driver and request and keep at most one outstanding check. Rearm while work is active under the held authority.
 
 Confirm acceptance and actual phase using native evidence tied to the same session and exact request. A transport acknowledgment, pane output or status change alone leaves delivery unproven. If startup or delivery is uncertain, treat the original Driver as potentially active and inspect the same session, request and relevant repository evidence. Retry only when positive evidence shows the action did not take effect, the original request cannot still run, and the same grant still permits retry.
+
+## Local-CLI Trust-Boundary Filter
+
+Use this triage with any qualified adapter. Read the pinned verifier's
+declared trust model and trace the finding through its actual inputs, checks
+and evidence custody. A local verifier that can accept changed evidence under
+the original digest has an integrity defect. A request for independent remote
+attestation may assume a trust service outside the declared local model.
+Check each concrete claim against the local boundary before proposing a
+disposition.
+
+Preserve the finding, evidence and reasoning. Route any required disposition
+through the adopting project's existing review authority. Have the authorized
+implementer repair genuine logic, integrity or custody defects with regression
+coverage, then reverify and obtain the applicable independent disposition.
+A trust-model objection gives no clearance for a concrete defect.
+
+## Plan for a second PR-fix review packet
+
+If an eligible targeted PR-fix delta review might need a second packet, ask
+for up to two packets in the original scoped grant, within the applicable cap.
+Bind the grant to the exact approved fix scope, reviewed ancestor, ordered
+fix range and final head under the adopting review and finish rules. Verify
+packet feasibility offline and reserve the full cost of the admitted packet
+set before provider contact. A second planned packet covers spillover within
+that scope. A retry requires separate authority.
+
+Require independent coverage of the complete postimage, zero unresolved or
+waived findings and passing final-head gates. Preserve the verified lineage
+and separate finish authority. If the scope, cap or proof cannot admit the
+targeted review, stop that route and use the applicable full exact-candidate
+review procedure once authorized.

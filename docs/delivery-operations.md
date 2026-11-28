@@ -9,9 +9,11 @@ delivery evidence.
 ## Install and verify
 
 - In Claude's [marketplace or ZIP installer](claude-installation.md), select
-  `delivery-operations` 1.0.0, containing only `release-train-supervisor` and
-  `wiki-delivery-sync`, both 1.0.0. The standalone ZIPs carry one complete
-  package each. The OpenSpec and orchestration bundles have their own selections.
+  `delivery-operations`, which contains only `release-train-supervisor` and
+  `wiki-delivery-sync`. The current source version of the bundle and both
+  skills is 1.0.1. Check the installer for published versions. The standalone
+  ZIPs carry one complete package each. The OpenSpec and orchestration bundles
+  have their own selections.
 - For Hermes, use the [published endpoint and normal scanner](../README.md#install-with-hermes).
 - For a targeted native install, select the client's user or project skills
   directory in the [copy guide](../README.md#advanced-native-directory-installation).

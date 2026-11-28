@@ -40,10 +40,10 @@ review budgets, host pins and harness bindings.
    `group 1`, `no commits`, and `keep the worktree`. Preserve original
    settlement evidence and finite budgets across corrections.
 
-At a verified checkpoint use the footer's starter and concrete paths. The
-Codex launcher is `codex --approve-for-me -C "$change_worktree" --add-dir
-"$change_records"` with workspace-write and automatic approval review. Read back
-the original grant, HEAD, plan digest, ownership and settlement before
+At a verified checkpoint use the footer's starter and concrete paths. Follow
+the [Codex CLI launch and approval guidance](openspec-operator-tutorial.md#codex-cli-launch-and-approvals)
+for the launch template, writable-root check and approval troubleshooting.
+Read back the original grant, HEAD, plan digest, ownership and settlement before
 resuming. For a qualified Herdr relay, use the separately authorized
 [checkpoint rotation](../skills/software-development/openspec-delivery/references/operator-workflow.md#read-only-status-and-checkpoint-relay)
 with the predecessor preserved through successor acknowledgement.

@@ -1,7 +1,7 @@
 ---
 name: release-train-supervisor
 description: Supervise OpenSpec Drivers with verified one-shot checks.
-version: 1.0.0
+version: 1.0.1
 ---
 
 # Supervise a release train

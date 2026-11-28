@@ -835,7 +835,7 @@ stay with native OpenSpec.
 Current source versions are delivery 1.12.0 and `openspec-next` 0.9.0 in
 `openspec-development` 1.12.0, and core skill 0.26.6 in
 `autonomous-orchestration` 1.16.6. The `delivery-operations` bundle and both of
-its skills are 1.0.0.
+its skills are 1.0.1.
 Representation support adds no upstream workflow, runtime dependency or
 installation route. Package availability/byte checks do not establish account
 sync, host execution, native client discovery, Desktop acceptance or scanner approval.

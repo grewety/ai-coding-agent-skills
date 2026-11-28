@@ -30,7 +30,7 @@
     },
     {
       "name": "delivery-operations",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "description": "Optional release-train supervision and evidence-bound Markdown wiki coordination for adopting projects.",
       "source": "./",
       "strict": false,
