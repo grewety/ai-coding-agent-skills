@@ -1,0 +1,331 @@
+{
+  "schemaVersion": 1,
+  "change": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27",
+  "issueUrl": "https://github.com/grewety/ai-coding-agent-skills/issues/86",
+  "mode": "goal-first",
+  "base": "115db08d0ea972069565456fa5b527095a6334a5",
+  "head": "89ecb8ee73cf3621ce34c6028fa7af739c3cab0a",
+  "plan": "af36114d03ef7d9a7b8dfb301f28e0e0418f5284",
+  "planDigest": "897c1374bd2ab7d509c21b96b9d800b1c0ed867e87565bc7c9706d8bc08564bb",
+  "integrated": "fb9b4e43f5d80a5d720c12f0a1a491fd642d31a0",
+  "verified": "fb9b4e43f5d80a5d720c12f0a1a491fd642d31a0",
+  "integrationReference": "https://github.com/grewety/ai-coding-agent-skills/pull/87",
+  "mergedAt": "2026-11-28T07:12:00Z",
+  "mergeReadback": {
+    "record": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27/finish-authorized/implementation-merged/pr.json",
+    "sha256": "2f0d238f3d8eca695e3319e92b9565b2cc2eb4a4cfd9ae4f1ae143201bd362fd"
+  },
+  "mainReadback": {
+    "record": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27/finish-authorized/implementation-merged/main.json",
+    "sha256": "1bd6b0101cd90c5cf2a3e05a26a656d0f37db347c42df6353ee469bfec3718ad"
+  },
+  "protectedReadback": {
+    "record": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27/finish-authorized/implementation-merged/assertion-check.json",
+    "sha256": "f2637700aaf412e591d95b371fc883567b36539a439f0ac9097cdf523b52bdf2"
+  },
+  "promotedCurrentSpecs": [
+    {
+      "capability": "delivery-wiki",
+      "requirements": 1
+    },
+    {
+      "capability": "openspec-integration",
+      "requirements": 3
+    },
+    {
+      "capability": "release-train-supervision",
+      "requirements": 1
+    }
+  ],
+  "review": {
+    "schemaVersion": 1,
+    "change": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27",
+    "issueUrl": "https://github.com/grewety/ai-coding-agent-skills/issues/86",
+    "head": "ea44ab1141b5fd2fdae7d5855b0327d43822d087",
+    "planDigest": "897c1374bd2ab7d509c21b96b9d800b1c0ed867e87565bc7c9706d8bc08564bb",
+    "verdict": "pass",
+    "nativeVerdict": "Verdict: No findings",
+    "findings": [],
+    "coverageLimitations": [],
+    "waivers": 0,
+    "reviewer": "015328e6-19d3-4a08-be4e-065110d61ec7",
+    "reference": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27/execution-af36114/candidate-clean/review-retry/output/report.md",
+    "report": {
+      "record": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27/execution-af36114/candidate-clean/review-retry/output/report.md",
+      "sha256": "5f23e5fe5d4c0dbbdcb4845787018fcfb26bab54e18da5b2fead1c7e9a8b6d4e"
+    },
+    "replay": {
+      "record": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27/execution-af36114/candidate-clean/review-retry/replayed.json",
+      "sha256": "dfe98733311c3157de880b232109edaa986e35215a494fe50825b249fd53b70e"
+    },
+    "gates": [
+      {
+        "command": "npm test",
+        "argv": [
+          "npm",
+          "test"
+        ],
+        "commit": "ea44ab1141b5fd2fdae7d5855b0327d43822d087",
+        "exitCode": 0,
+        "observedAt": "2026-11-28T06:46:08.178Z",
+        "evidence": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27/execution-af36114/candidate-clean/disposable-gate-run.json",
+        "evidenceSha256": "94959aba120a5e161e66f9de2cb47d27af2fc3b4ff368e8906728024bee11a5a",
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "npm run build",
+        "argv": [
+          "npm",
+          "run",
+          "build"
+        ],
+        "commit": "ea44ab1141b5fd2fdae7d5855b0327d43822d087",
+        "exitCode": 0,
+        "observedAt": "2026-11-28T06:46:08.729Z",
+        "evidence": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27/execution-af36114/candidate-clean/disposable-gate-run.json",
+        "evidenceSha256": "94959aba120a5e161e66f9de2cb47d27af2fc3b4ff368e8906728024bee11a5a",
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "openspec validate --all --strict",
+        "argv": [
+          "openspec",
+          "validate",
+          "--all",
+          "--strict"
+        ],
+        "commit": "ea44ab1141b5fd2fdae7d5855b0327d43822d087",
+        "exitCode": 0,
+        "observedAt": "2026-11-28T06:46:08.971Z",
+        "evidence": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27/execution-af36114/candidate-clean/disposable-gate-run.json",
+        "evidenceSha256": "94959aba120a5e161e66f9de2cb47d27af2fc3b4ff368e8906728024bee11a5a",
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "npm run validate:openspec -- --require-issue",
+        "argv": [
+          "npm",
+          "run",
+          "validate:openspec",
+          "--",
+          "--require-issue"
+        ],
+        "commit": "ea44ab1141b5fd2fdae7d5855b0327d43822d087",
+        "exitCode": 0,
+        "observedAt": "2026-11-28T06:46:09.241Z",
+        "evidence": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27/execution-af36114/candidate-clean/disposable-gate-run.json",
+        "evidenceSha256": "94959aba120a5e161e66f9de2cb47d27af2fc3b4ff368e8906728024bee11a5a",
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "git diff --check",
+        "argv": [
+          "git",
+          "diff",
+          "--check"
+        ],
+        "commit": "ea44ab1141b5fd2fdae7d5855b0327d43822d087",
+        "exitCode": 0,
+        "observedAt": "2026-11-28T06:46:09.293Z",
+        "evidence": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27/execution-af36114/candidate-clean/disposable-gate-run.json",
+        "evidenceSha256": "94959aba120a5e161e66f9de2cb47d27af2fc3b4ff368e8906728024bee11a5a",
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  "taskCompletion": {
+    "reviewedParent": "ea44ab1141b5fd2fdae7d5855b0327d43822d087",
+    "acceptanceChild": "89ecb8ee73cf3621ce34c6028fa7af739c3cab0a",
+    "taskIds": [
+      "1.1"
+    ]
+  },
+  "candidateGates": [
+    {
+      "command": "npm test",
+      "argv": [
+        "npm",
+        "test"
+      ],
+      "commit": "89ecb8ee73cf3621ce34c6028fa7af739c3cab0a",
+      "exitCode": 0,
+      "observedAt": "2026-11-28T06:52:50.148Z",
+      "evidence": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27/execution-af36114/final-clean/disposable-gate-run.json",
+      "evidenceSha256": "d67c8cf7e56a1245836d93010bd499655b8a97ce57b5489a02cfadafeb4d47fb",
+      "stdoutSha256": "db232407dd06a872b40ec0cea1374219e147a3a10983473a19152caeb2b31fa6",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "npm run build",
+      "argv": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "commit": "89ecb8ee73cf3621ce34c6028fa7af739c3cab0a",
+      "exitCode": 0,
+      "observedAt": "2026-11-28T06:52:50.696Z",
+      "evidence": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27/execution-af36114/final-clean/disposable-gate-run.json",
+      "evidenceSha256": "d67c8cf7e56a1245836d93010bd499655b8a97ce57b5489a02cfadafeb4d47fb",
+      "stdoutSha256": "4f49517da2a2f9102e3a4960eb8765aa34e180e612bee13acd414519e063f2cb",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "openspec validate --all --strict",
+      "argv": [
+        "openspec",
+        "validate",
+        "--all",
+        "--strict"
+      ],
+      "commit": "89ecb8ee73cf3621ce34c6028fa7af739c3cab0a",
+      "exitCode": 0,
+      "observedAt": "2026-11-28T06:52:50.936Z",
+      "evidence": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27/execution-af36114/final-clean/disposable-gate-run.json",
+      "evidenceSha256": "d67c8cf7e56a1245836d93010bd499655b8a97ce57b5489a02cfadafeb4d47fb",
+      "stdoutSha256": "df68a1072540e0259017ae8e4020e8619bad26c5ecef6caa2a9edf2f72173dae",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "npm run validate:openspec -- --require-issue",
+      "argv": [
+        "npm",
+        "run",
+        "validate:openspec",
+        "--",
+        "--require-issue"
+      ],
+      "commit": "89ecb8ee73cf3621ce34c6028fa7af739c3cab0a",
+      "exitCode": 0,
+      "observedAt": "2026-11-28T06:52:51.209Z",
+      "evidence": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27/execution-af36114/final-clean/disposable-gate-run.json",
+      "evidenceSha256": "d67c8cf7e56a1245836d93010bd499655b8a97ce57b5489a02cfadafeb4d47fb",
+      "stdoutSha256": "b552b84635773139d7cf104b933612a541fe972266d8992bba7ecfa8d11a55c7",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "git diff --check",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "commit": "89ecb8ee73cf3621ce34c6028fa7af739c3cab0a",
+      "exitCode": 0,
+      "observedAt": "2026-11-28T06:52:51.264Z",
+      "evidence": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27/execution-af36114/final-clean/disposable-gate-run.json",
+      "evidenceSha256": "d67c8cf7e56a1245836d93010bd499655b8a97ce57b5489a02cfadafeb4d47fb",
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "gates": [
+    {
+      "command": "npm test",
+      "argv": [
+        "npm",
+        "test"
+      ],
+      "commit": "fb9b4e43f5d80a5d720c12f0a1a491fd642d31a0",
+      "exitCode": 0,
+      "observedAt": "2026-11-28T07:13:23.536Z",
+      "evidence": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27/finish-authorized/integrated-gates/disposable-gate-run.json",
+      "evidenceSha256": "a9f7c3bdcb1d91ba89291c086a54b5c2878605c52453cb941a3de93bd1c02a2e",
+      "stdoutSha256": "bd048a15c434828c56d3bcb70fc10fb7646140fe0021dcf82e6e23eff96acfd8",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "npm run build",
+      "argv": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "commit": "fb9b4e43f5d80a5d720c12f0a1a491fd642d31a0",
+      "exitCode": 0,
+      "observedAt": "2026-11-28T07:13:24.095Z",
+      "evidence": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27/finish-authorized/integrated-gates/disposable-gate-run.json",
+      "evidenceSha256": "a9f7c3bdcb1d91ba89291c086a54b5c2878605c52453cb941a3de93bd1c02a2e",
+      "stdoutSha256": "2e47618bd256e83b6e73048271d8bfe73a178dfae1d2aa646837d9e5cd33595c",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "openspec validate --all --strict",
+      "argv": [
+        "openspec",
+        "validate",
+        "--all",
+        "--strict"
+      ],
+      "commit": "fb9b4e43f5d80a5d720c12f0a1a491fd642d31a0",
+      "exitCode": 0,
+      "observedAt": "2026-11-28T07:13:24.342Z",
+      "evidence": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27/finish-authorized/integrated-gates/disposable-gate-run.json",
+      "evidenceSha256": "a9f7c3bdcb1d91ba89291c086a54b5c2878605c52453cb941a3de93bd1c02a2e",
+      "stdoutSha256": "df68a1072540e0259017ae8e4020e8619bad26c5ecef6caa2a9edf2f72173dae",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "npm run validate:openspec -- --require-issue",
+      "argv": [
+        "npm",
+        "run",
+        "validate:openspec",
+        "--",
+        "--require-issue"
+      ],
+      "commit": "fb9b4e43f5d80a5d720c12f0a1a491fd642d31a0",
+      "exitCode": 0,
+      "observedAt": "2026-11-28T07:13:24.632Z",
+      "evidence": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27/finish-authorized/integrated-gates/disposable-gate-run.json",
+      "evidenceSha256": "a9f7c3bdcb1d91ba89291c086a54b5c2878605c52453cb941a3de93bd1c02a2e",
+      "stdoutSha256": "b552b84635773139d7cf104b933612a541fe972266d8992bba7ecfa8d11a55c7",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "git diff --check",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "commit": "fb9b4e43f5d80a5d720c12f0a1a491fd642d31a0",
+      "exitCode": 0,
+      "observedAt": "2026-11-28T07:13:24.684Z",
+      "evidence": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27/finish-authorized/integrated-gates/disposable-gate-run.json",
+      "evidenceSha256": "a9f7c3bdcb1d91ba89291c086a54b5c2878605c52453cb941a3de93bd1c02a2e",
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "security": {
+    "exitCode": 1,
+    "baselineScan": {
+      "record": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27/protected-finish-scan-14q04act/baseline/scanner-report.json",
+      "sha256": "91a174bdd88b4f09680af353b2ce3ddb050e09980986255f0542c87653a60f73"
+    },
+    "candidateScan": {
+      "record": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27/protected-finish-scan-14q04act/candidate/scanner-report.json",
+      "sha256": "91a174bdd88b4f09680af353b2ce3ddb050e09980986255f0542c87653a60f73"
+    },
+    "acceptedUnchangedCautions": [
+      "autonomous-implementation-review",
+      "openspec-delivery"
+    ],
+    "publicationDisposition": {
+      "record": "operator-prompting-docs-01m8fezeakft1fhnsjxjp1md27/finish-authorized/scanner-disposition.json",
+      "sha256": "5fd1e1c6fecdbf28965828e14550090ebc05bb5e58e5feda5510e100d1197040"
+    }
+  },
+  "pendingAtReceipt": [
+    "Exact archive gates and independent factual review",
+    "Protected record-only closure and archive acceptance",
+    "Explicit issue closure and worktree retirement",
+    "Live GitHub Pages parity assigned to the Supervisor"
+  ]
+}
