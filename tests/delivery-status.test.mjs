@@ -46,6 +46,28 @@ test("status is deterministic and leaves unavailable identity fields explicit", 
   assert.deepEqual([active.activeAttemptId, active.contextHint], [id.attempt, "fresh-session"]);
 });
 
+test("status distinguishes receipt-only coverage, zero waiver and missing proof at the actual reviewed parent", () => {
+  const reviewedHead = "d".repeat(40);
+  const proofLevel = "receipt-only";
+  const reviewProof = { proofLevel, coverage: "receipt-only", reviewedHead, statusSha256: "e".repeat(64),
+    reference: "f".repeat(64), session: "fixture-reviewer", zeroWaiver: true };
+  const base = { change, identity, candidate, policy: { ...policy, proofLevel },
+    decision: { action: "accept-result", head: reviewedHead, reviewProof },
+    finish: { head, ready: true, taskCompletion: { acceptanceChild: head, reviewedParent: reviewedHead }, reviewProof } };
+  assert.equal(deliveryStatus(base).state, "finish-ready");
+  assert.deepEqual(deliveryStatus(base).reviewProof, reviewProof);
+  const status = (value) => deliveryStatus({ ...base, decision: { ...base.decision, reviewProof: value },
+    finish: { ...base.finish, reviewProof: value } });
+  assert.equal(status(undefined).reviewProof, null);
+  assert.equal(status(undefined).stopPredicate, "REVIEW_PROOF_UNVERIFIED");
+  assert.equal(status({ ...reviewProof, zeroWaiver: false }).reviewProof.zeroWaiver, false);
+  assert.equal(status({ ...reviewProof, coverage: "whole-file" }).reviewProof, null);
+  assert.equal(status({ ...reviewProof, reviewedHead: head }).reviewProof, null);
+  const adverse = { ...reviewProof, reviewedHead: head, zeroWaiver: false };
+  assert.deepEqual(deliveryStatus({ ...base, finish: null, decision: { action: "queue", reason: "EXACT_REVIEW_PENDING" },
+    handoff: { reviewProof: adverse } }).reviewProof, adverse);
+});
+
 const spec = (body, capability = "fixture") => `---\nmetadata_version: 1\nartifact: spec\ncapability: ${capability}\n---\n# Fixture\n\n## Requirements\n\n${body}\n`;
 test("finish promotion matches native add, modify, remove and rename and validates current spec identity", () => {
   const delta = "# Delta\n\n## RENAMED Requirements\n\n- FROM: `### Requirement: Before`\n- TO: `### Requirement: After`\n" +

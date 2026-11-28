@@ -258,6 +258,12 @@ native route for standalone Goal-First and exclusive assignments.
 
 ### Role 3 · Direct-CLI independent review
 
+Use the proof level derived from the verified integrated plan parent. An
+explicit receipt-only level still requires every packet receipt and zero-waiver
+acceptance. Retain the level with the exact reviewed revision and host pin.
+The one-file compatibility probe has its own authority and evidence contract.
+See [Direct-CLI independent review](claude-reviewer.md).
+
 Pin the external schema 3 `host.json` and the offline runtime readback.
 The reviewer uses normal host authentication and a fresh disposable packet
 workspace. Confirm the exact phase grant and reserve the complete cost before

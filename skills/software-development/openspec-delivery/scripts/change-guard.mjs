@@ -6,7 +6,7 @@ import { closeSync, constants, fstatSync, lstatSync, openSync, readFileSync, ope
 import path from "node:path";
 import { parseArgs } from "node:util";
 import { gitEnvironment } from "./git-environment.mjs";
-import { directReviewAdopted, readLowTouchPolicy } from "./low-touch-policy.mjs";
+import { directReviewAdopted, readLowTouchPolicy, readReviewProofLevel } from "./low-touch-policy.mjs";
 import { planningBudget, planningLayout, planningLimits, safePlanningPath } from "./planning-inventory.mjs";
 import { readBounded, sha256, stableJson, verifyGateRun } from "./evidence-retention.mjs";
 import { goalContractIdentity, readGoalContract, withinScope } from "./delivery-control.mjs";
@@ -647,7 +647,7 @@ async function receipt(o, requireCheckout = true) {
   identity(record.value, o);
   const mode = record.value.mode ?? "task-guided";
   const lineage = record.value.prFixLineage;
-  const policyTarget = o.policyTarget ?? lineage?.policyTarget ?? o.target;
+  const policyTarget = o.policyTarget ?? o["policy-target"] ?? lineage?.policyTarget ?? o.target;
   if (lineage) {
     requireThat(archivePattern(o.change).test(o["receipt-path"] ?? ""), "PR-fix receipt must be read back from committed archive custody");
     ancestor(o.repo, commit(o.repo, policyTarget), commit(o.repo, o.target));
@@ -687,7 +687,27 @@ async function receipt(o, requireCheckout = true) {
     requireThat(proof.acceptanceChild === completion.acceptanceChild && JSON.stringify(proof.taskIds) === JSON.stringify(completion.taskIds),
       "Receipt task completion differs from Git proof");
   }
-  review(record.value.review, { ...snapshot, head: completion?.reviewedParent ?? fix?.reviewedAncestor ?? snapshot.head }, o);
+  const reviewedHead = completion?.reviewedParent ?? fix?.reviewedAncestor ?? snapshot.head;
+  review(record.value.review, { ...snapshot, head: reviewedHead }, o);
+  const policy = commitParents(o.repo, snapshot.plan).length === 1 ?
+    policyContext({ repo: o.repo, change: o.change, plan: snapshot.plan, target: policyTarget }) : null;
+  let reviewProof;
+  let closureReviewProof;
+  if (policy?.proofLevel) {
+    requireThat(o.finishCheckpoint && o.finishRemote, "Receipt is missing independently retained review proof custody");
+    const { replayFinishReviewProvenance } = await import("./protected-finish.mjs");
+    const replay = await replayFinishReviewProvenance({ repo: o.repo, change: o.change, head: snapshot.head, base: snapshot.base,
+      plan: snapshot.plan, mode, target: policyTarget, "expect-plan": snapshot.planDigest },
+    { ...o, pullRequest: record.value.integrationReference, integrated, verified, archiveHead: target });
+    ({ reviewProof, closureReviewProof } = replay);
+    const anchoredCompletion = replay.completion;
+    requireThat(Boolean(completion) === Boolean(anchoredCompletion) &&
+      (!completion || completion.reviewedParent === anchoredCompletion.reviewedParent &&
+        completion.acceptanceChild === anchoredCompletion.acceptanceChild && stableJson(completion.taskIds) === stableJson(anchoredCompletion.taskIds)) &&
+      stableJson(reviewProof) === stableJson(record.value.reviewProof) && reviewProof.reviewedHead === reviewedHead &&
+      record.value.review.reference === reviewProof.reference && record.value.review.reviewer === reviewProof.session,
+    "Receipt review proof differs from the independently sealed review");
+  } else requireThat(record.value.reviewProof === undefined, "Unexpected review proof for an earlier parent");
   const prPrefix = o.issue === null ? null : o.issue.split("/issues/")[0] + "/pull/";
   requireThat((o.integrationReference === undefined || record.value.integrationReference === o.integrationReference) &&
     (prPrefix === null ? text(o.integrationReference) : typeof record.value.integrationReference === "string" &&
@@ -716,7 +736,8 @@ async function receipt(o, requireCheckout = true) {
   // Integrated verification may run detached at this exact target SHA. Candidate
   // and review checks still require an attached implementation branch.
   if (requireCheckout) clean(o.repo, target, false);
-  return { ...snapshot, integrated, verified, target, receiptSha256: record.sha256, ...(completion ? { taskCompletion: completion } : {}), ...(fix ? { prFixLineage: fix } : {}) };
+  return { ...snapshot, integrated, verified, target, receiptSha256: record.sha256, ...(reviewProof ? { reviewProof } : {}),
+    ...(closureReviewProof ? { closureReviewProof } : {}), ...(completion ? { taskCompletion: completion } : {}), ...(fix ? { prFixLineage: fix } : {}) };
 }
 export function integratedPolicyContext(repo, parent, target, allowUnintegratedParent = false) {
   repository(repo);
@@ -753,7 +774,8 @@ export function integratedPolicyContext(repo, parent, target, allowUnintegratedP
   const proposeToFreeze = integrated && proposals.length === 1 && proposals[0][1] === "propose-to-freeze";
   const lowTouch = integrated ? readLowTouchPolicy(rootContractSource) : null;
   const directReviewer = Boolean(lowTouch && directReviewAdopted(rootContractSource));
-  return { ok: integrated, parent, target, contractInputs, ...(lowTouch ? { lowTouch } : {}),
+  const proofLevel = integrated ? readReviewProofLevel(rootContractSource, directReviewer) : undefined;
+  return { ok: integrated, parent, target, contractInputs, ...(lowTouch ? { lowTouch } : {}), ...(proofLevel ? { proofLevel } : {}),
     ...(directReviewer ? { directReviewer } : {}), goalFirstOptIn: integrated && goalFirstOptIn, delegatedRuntime, proposeToFreeze };
 }
 
@@ -792,7 +814,7 @@ async function main() {
   const args = process.argv.slice(3);
   const receiptRefs = ["pr-fix-lineage", "finish-checkpoint", "finish-readback"];
   const receiptOptions = receiptRefs.flatMap((key) => [key, `${key}-sha256`]);
-  const names = ["repo", "change", ...(command === "planning-worktree" ? ["parent", "target"] : command === "policy-context" ? ["plan", "target"] : command === "planning" ? ["head", "plan", "target"] : command === "receipt" ? ["target", "receipt", "issue", "receipt-path", "max-closure-commits", ...receiptOptions] : ["base", "head", "plan", "expect-plan", "gate-run", "gate-run-sha256", "mode", "target", ...(command === "review" ? ["issue", "review"] : [])])];
+  const names = ["repo", "change", ...(command === "planning-worktree" ? ["parent", "target"] : command === "policy-context" ? ["plan", "target"] : command === "planning" ? ["head", "plan", "target"] : command === "receipt" ? ["target", "receipt", "issue", "receipt-path", "policy-target", "max-closure-commits", ...receiptOptions] : ["base", "head", "plan", "expect-plan", "gate-run", "gate-run-sha256", "mode", "target", ...(command === "review" ? ["issue", "review"] : [])])];
   const seen = new Set();
   for (const arg of args) {
     const match = /^--([A-Za-z][A-Za-z-]*)(?:=|$)/.exec(arg);
@@ -801,7 +823,7 @@ async function main() {
     seen.add(match[1]);
   }
   const { values: o } = parseArgs({ args, options: Object.fromEntries(names.map((key) => [key, { type: "string" }])), strict: true, allowPositionals: false });
-  for (const key of names.filter((key) => !["parent", ...(command === "planning" ? ["plan"] : []), "expect-plan", "gate-run", "gate-run-sha256", "mode", "target", "receipt-path", "max-closure-commits", ...receiptOptions].includes(key))) requireThat(text(o[key]), `Missing --${key}`);
+  for (const key of names.filter((key) => !["parent", ...(command === "planning" ? ["plan"] : []), "expect-plan", "gate-run", "gate-run-sha256", "mode", "target", "receipt-path", "policy-target", "max-closure-commits", ...receiptOptions].includes(key))) requireThat(text(o[key]), `Missing --${key}`);
   if (o["expect-plan"] !== undefined) requireThat(/^[a-f0-9]{64}$/.test(o["expect-plan"]), "Expected a full plan digest");
   repository(o.repo);
   if (command === "planning-worktree") {
@@ -822,6 +844,10 @@ async function main() {
   if (command === "review") {
     requireThat(o.mode !== "goal-first", "Use the packaged delivery result decision for Goal-First review");
     const snapshot = candidate(o);
+    if (o.target && commitParents(o.repo, snapshot.plan).length === 1) {
+      const context = policyContext({ repo: o.repo, change: o.change, plan: snapshot.plan, target: o.target });
+      requireThat(!context.proofLevel, "Use sealed Direct-CLI handover for governed review admission");
+    }
     review(evidence(o.review).value, snapshot, o);
     return writeFileSync(1, `${JSON.stringify({ ok: true, ...snapshot })}\n`);
   }
@@ -833,7 +859,7 @@ async function main() {
     requireThat(Boolean(file) === Boolean(sha256), `Supply both --${key} and --${key}-sha256`);
     return file && { file, sha256 };
   });
-  const verifyHandover = prFixLineage ? (await import("./delivery-cli.mjs")).verifyHandover : undefined;
+  const verifyHandover = prFixLineage || finishCheckpoint ? (await import("./delivery-cli.mjs")).verifyHandover : undefined;
   writeFileSync(1, `${JSON.stringify({ ok: true, ...await receipt({ ...o, limit, prFixLineage, verifyHandover, finishCheckpoint, finishRemote }) })}\n`);
 }
 function isMain() {

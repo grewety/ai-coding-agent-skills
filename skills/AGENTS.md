@@ -14,7 +14,7 @@ Own optional, versioned agent playbooks that contributors can install and reuse 
 
 ## Local Contracts
 
-- Keep the shared Direct-CLI settings, discovery and setup modules identical across the delivery and orchestration packages. Orchestration owns launch, strict receipt replay and supervision. Delivery owns phase and finish admission.
+- Keep the shared Direct-CLI settings, discovery and setup modules identical across the delivery and orchestration packages. Orchestration owns launch, receipt replay under the integrated proof level and supervision. Delivery owns phase admission and proof provenance through protected finish.
 
 
 - Keep external role configuration, discovery, version policy and setup modules byte-identical across delivery and orchestration packages.

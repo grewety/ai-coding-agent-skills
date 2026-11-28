@@ -6,6 +6,10 @@ execution through qualified adapters. No automatic package dependency is added.
 If either optional policy is selected and that package is unavailable, stop before
 freeze or execution. Its core checks need no Hermes or Herdr installation.
 
+Direct-CLI proof comes from the verified integrated plan parent. Whole-file
+read is the default. Both explicit levels bind review evidence to the original
+parent, exact host pin, and actual reviewed identity.
+
 ## Read-only inventory and integrated parent
 
 Resolve `<guard>` to this package's `scripts/change-guard.mjs` and invoke through

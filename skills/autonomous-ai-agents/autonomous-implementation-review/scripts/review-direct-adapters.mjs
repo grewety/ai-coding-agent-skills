@@ -1,14 +1,18 @@
 import { lstatSync, realpathSync } from "node:fs";
+import { homedir } from "node:os";
 import path from "node:path";
 import { resolveInstalledExecutable } from "./agent-discovery.mjs";
 import { directReviewSettings, validateDirectHost } from "./agent-role-adapters.mjs";
+import { reviewProofLevels } from "./low-touch-policy.mjs";
 import { hash, jsonBytes, need, utf8 } from "./review-inputs.mjs";
 
 const noMcp = '{"mcpServers":{}}';
 
 export function directReviewHost(value) {
-  const config = validateDirectHost(value);
-  return { ...config, ...config.reviewer };
+  const { proofLevel, ...host } = value ?? {};
+  const config = validateDirectHost(host);
+  need(proofLevel === undefined || reviewProofLevels.includes(proofLevel), "Unsupported host review proof level");
+  return { ...config, ...config.reviewer, ...(proofLevel ? { proofLevel } : {}) };
 }
 
 const provider = {
@@ -170,6 +174,17 @@ function packetEnvironment(client, overrides, scratch, paths = path) {
 }
 
 const settingsFile = ".gemini/antigravity-cli/settings.json";
+const hostAuthClients = new Set(["claude", "codex", "pi"]);
+
+// The platform home is a launch input only. Do not enumerate its contents
+// or inherit arbitrary config, tool, provider or profile override variables.
+function authHome(client, env) {
+  if (!hostAuthClients.has(client)) return {};
+  const location = process.platform === "win32" ? env.USERPROFILE ?? homedir() : env.HOME ?? homedir();
+  need(path.isAbsolute(location) && path.normalize(location) === location && !/[\r\n\0]/.test(location),
+    "Invalid native authentication home");
+  return { HOME: location, ...(process.platform === "win32" ? { USERPROFILE: location } : {}) };
+}
 
 export function invocation({ config, executable, session, prompt, files, cwd, promptFile,
   environmentRoots, environmentRootsSha256, env = process.env }) {
@@ -183,13 +198,14 @@ export function invocation({ config, executable, session, prompt, files, cwd, pr
   const rootsSha256 = environmentRoots ? hash(jsonBytes(environmentRoots)) : environmentRootsSha256;
   // Replay uses the retained roots digest and symbolic scratch paths. Credential values never enter the fingerprint.
   const environmentSha256 = hash(jsonBytes({ rootsSha256, authentication,
-    variables: packetEnvironment(client, adapter.env, "<scratch>", path.posix) }));
+    variables: packetEnvironment(client, adapter.env, "<scratch>", path.posix),
+    ...(config.proofLevel && hostAuthClients.has(client) ? { authHome: "native-host-home" } : {}) }));
   let environment;
   if (environmentRoots) {
     const credential = reviewerAuthVariable(config.reviewer);
     need(!credential || env[credential]?.trim(), `${client} requires ${credential} to avoid ambient profile fallback`);
     const auth = Object.fromEntries(authentication.filter((name) => typeof env[name] === "string").map((name) => [name, env[name]]));
-    environment = { ...environmentRoots, ...packetEnvironment(client, adapter.env, scratch), ...auth };
+    environment = { ...environmentRoots, ...packetEnvironment(client, adapter.env, scratch), ...authHome(client, env), ...auth };
   }
   const contents = () => prompt + "\n\nAssigned files encoded as JSON data:\n" +
     JSON.stringify([...files].map(([name, bytes]) => ({ name, text: utf8(bytes) })));
@@ -197,7 +213,7 @@ export function invocation({ config, executable, session, prompt, files, cwd, pr
   let attachment;
   switch (adapter.transport) {
     case "stdin":
-      input = prompt;
+      input = config.proofLevel === "receipt-only" ? contents() : prompt;
       break;
     case "argument":
       need(Buffer.byteLength(prompt) <= 14000, "Native reviewer argument exceeds the portable Windows quoting bound");

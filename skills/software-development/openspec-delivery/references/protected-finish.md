@@ -112,7 +112,15 @@ Use UTC timestamps with milliseconds.
    outcome remains pending.
 4. After integrated gates pass, prepare the receipt and record-only archive.
    The bound `closureCandidate` identifies the `integrated` verification SHA,
-   closure `head`, exact `archive` path, `receipt` file reference, `receiptPath`
+   For plans with explicit proof selection, put the finish observation's
+   `reviewProof` in the receipt and retain its report reference and session
+   in the receipt's review record. The finish anchor carries the same proof
+   and the implementation handover or lineage handover. A task-only child
+   keeps its reviewed parent SHA and separate final-head gates. The archive
+   review has a distinct finish-bound handover and proof in its readback.
+   It follows the receipt commit, which fixes the archive review's exact SHA.
+
+   Record the closure `head`, exact `archive` path, `receipt` file reference, `receiptPath`
    in the archive, committed
    `receiptSha256`, and
    `gate` reference once complete. Use the

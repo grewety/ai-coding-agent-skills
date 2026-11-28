@@ -1,15 +1,20 @@
 import path from "node:path";
+import { lstatSync } from "node:fs";
 import { ancestor, candidate as candidateSnapshot, committedDocument, exactTree, policyContext, proveTaskCompletion, verifyArchive } from "./change-guard.mjs";
 import { retirementInventory } from "./change-workspace.mjs";
 import { evidenceCommand } from "./evidence-cli.mjs";
-import { readBounded, sha256, verifyGateRun, verifyRepresentation } from "./evidence-retention.mjs";
+import { readBounded, sha256, verifyGateRun, verifyRepresentation, scopedPath, separate } from "./evidence-retention.mjs";
 import { verifyLocalHarness } from "./local-harness.mjs";
+import { verifyHarnessSeal } from "./harness-result.mjs";
+import { validateDirectHost } from "./agent-role-adapters.mjs";
+import { parseStrictJson } from "./agent-configuration.mjs";
 import { verifyPrFixIntegration, verifyPrFixLineage } from "./pr-fix-lineage.mjs";
 import { finishReadiness } from "./finish-readiness.mjs";
 import { pushTriggerDecision, standingTriggerDecision, retainedExternalReservation, uiAcceptanceDecision } from "./external-verification.mjs";
 import { finishCreditDecision, finishCreditGrant, finishCreditJournal, paidFinishTrigger,
   settleFinishCredit, zeroCostRetryTrigger } from "./finish-trigger-credits.mjs";
 import { need, observed, privateRecords, same, sealedObservation, text } from "./operator-records.mjs";
+import { reviewProofMatches } from "./low-touch-policy.mjs";
 
 const sha = (value) => typeof value === "string" && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(value);
 const digest = (value) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
@@ -81,6 +86,29 @@ export function protectedCheckDecision({ pr, head, protection, checks, review, o
       pollAt: new Date(Math.min(time(deadline), time(pr.observedAt) + 15_000)).toISOString() });
   }
   return result("merge-ready", null, fields);
+}
+
+export function verifyReviewHostHarness(policy, options) {
+  if (!policy.directReviewer) return verifyLocalHarness(options);
+  const { hostConfiguration: ref, excluded, harness, candidate, now } = options;
+  need(text(ref?.file) && excluded.every((root) => separate(root, ref.file)), "Host file overlaps candidate");
+  const filename = scopedPath(ref.file);
+  const stat = lstatSync(filename);
+  need(stat.isFile() && stat.nlink === 1 && (stat.mode & 0o022) === 0 &&
+    (process.getuid === undefined || [process.getuid(), 0].includes(stat.uid)), "Host file is untrusted");
+  const bytes = readBounded(filename, 64 * 1024);
+  need(sha256(bytes) === ref.sha256, "Host file SHA-256 mismatch");
+  const { proofLevel, ...host } = parseStrictJson(bytes);
+  if (proofLevel === undefined) return verifyLocalHarness(options);
+  need(proofLevel === (policy.proofLevel ?? "whole-file-read"), "Host proof level differs from the integrated parent");
+  const { localHarness: binding } = validateDirectHost(host);
+  if (!binding) {
+    need(!harness, "Unexpected harness evidence without a host binding");
+    return null;
+  }
+  const result = verifyHarnessSeal({ reference: harness, binding, configurationSha256: ref.sha256,
+    candidate, excluded: [...excluded, ref.file], now });
+  return { sha256: harness.sha256, observedAt: result.observedAt };
 }
 
 function gatePass(ref, records, identity, head, gates) {
@@ -286,6 +314,53 @@ function readFinishRemote({ checkpoint, grant, identity, read }, ref, now, archi
   return remote;
 }
 
+async function verifyGovernedReview({ policy, identity, records, readback, handover, head, base, gate, host, verifyHandover,
+  finishReference }) {
+  need(verifyHandover && handover?.kind === "review-candidate" && handover.waivers === undefined &&
+    digest(handover.requestFileSha256) && digest(handover.expectFileSha256) &&
+    ["request", "expect", "output", "exportDirectory"].every((key) => retainedPath(records, { file: handover[key] })),
+  "Missing independently sealed finish review");
+  const replay = await verifyHandover(handover);
+  const proof = replay.reviewProof;
+  const { result: reviewed, request, reviewSnapshot: snapshot, reviewPolicyBinding: binding } = replay;
+  need(reviewProofMatches(policy, replay) && replay.phase === "complete" && proof?.zeroWaiver === true &&
+    same(proof, readback.reviewProof) && digest(proof.statusSha256) &&
+    proof.reviewedHead === head && proof.reviewedPlan === identity.plan && proof.reviewedPlanDigest === policy.planDigest &&
+    proof.session === readback.session && proof.reference === readback.reference &&
+    reviewed.identity.candidate === head && reviewed.identity.change === identity.change &&
+    [identity.repo, identity.workspace].every((root) => separate(root, reviewed.identity.workspace)) &&
+    same(reviewed.identity.inputs, policy.inputs) && reviewed.runtime.readOnly === true &&
+    snapshot?.target === head && snapshot.base === base && snapshot.plan === identity.plan &&
+    snapshot.planDigest === policy.planDigest && !snapshot.prFix &&
+    binding?.parent === identity.policyRevision && binding.target === identity.targetRevision &&
+    (finishReference === undefined || binding.finishReference === finishReference) &&
+    replay.reviewConfigurationSha256 === host && digest(host) &&
+    request.acceptance.includes(`gate-run:${gate.reference}`) &&
+    (finishReference !== undefined || identity.mode !== "goal-first" ||
+      request.acceptance.includes(`goal-contract:${identity.planDigest}`)),
+  "Finish review lacks matching proof, zero-waiver evidence or exact retained identity");
+  return proof;
+}
+
+async function verifyGovernedImplementation(state, policy, anchor, implementationGate, fix, verifyHandover) {
+  const { identity, records } = state;
+  if (!policy.proofLevel) return undefined;
+  const readback = anchor.implementationReview;
+  if (fix) {
+    const proof = fix.ancestorReview.reviewProof;
+    need(proof?.zeroWaiver && same(proof, readback.reviewProof) && proof.reviewedHead === fix.reviewedAncestor,
+      "PR-fix proof differs from the accepted review anchor");
+    return proof;
+  }
+  const completion = anchor.taskCompletion;
+  const head = completion?.reviewedParent ?? identity.candidate;
+  const gate = completion ? gatePass(completion.reviewedGate, records, identity, head, implementationGate.gateCommands) : implementationGate;
+  need(gate.passed && (!completion || completion.reviewedGateReference === gate.reference),
+    "Actual reviewed SHA lacks its exact original gates");
+  return verifyGovernedReview({ policy, identity, records, readback, head, base: identity.plan, gate,
+    handover: completion?.handover ?? anchor.implementationHandover, host: anchor.hostConfigurationSha256, verifyHandover });
+}
+
 async function verifyFinishPrFix(request, { checkpoint, records, identity }, anchor, implementationGate, verifyHandover) {
   need(checkpoint.prs.implementation && digest(anchor.hostConfigurationSha256),
     "PR-fix finish requires the retained implementation PR and host pin");
@@ -337,6 +412,56 @@ export async function replayTaskGuidedFinish(request, {
   const gate = integratedFinishGate(request.repo, state, remote, merged, lineage.gateAuthority, finishCheckpoint.sha256);
   need(gate?.passed, "Missing or failed exact verified Task-Guided PR-fix gate run");
   return lineage;
+}
+
+export async function replayFinishReviewProvenance(request, { finishCheckpoint, finishRemote, prFixLineage,
+  verifyHandover, issue, pullRequest, integrated, verified, archiveHead }) {
+  const now = Date.now();
+  const state = readFinishCheckpoint({ ...request, finishCheckpoint }, now, true);
+  const { checkpoint, identity, grant, records } = state;
+  need(identity.plan === request.plan && identity.planDigest === request["expect-plan"] && identity.mode === request.mode &&
+    identity.policyRevision === request.base && identity.targetRevision === request.target &&
+    identity.issue === issue && checkpoint.prs.implementation === pullRequest,
+  "Receipt differs from its protected finish identity");
+  const policy = policyContext({ repo: request.repo, change: identity.change, plan: identity.plan, target: identity.targetRevision });
+  const anchor = readFinishAnchor(state);
+  need(policy.proofLevel && same(anchor.prFixLineage, prFixLineage), "Receipt review lineage differs from the held checkpoint");
+  const remote = readFinishRemote(state, finishRemote, now, true);
+  const { merged } = publication(identity, grant, remote, "implementation", identity.candidate, checkpoint, time(remote.observedAt));
+  need(merged && merged.mergeCommit === integrated && remote.integrated?.head === verified &&
+    await protectedEvidence(merged, records), "Receipt does not match the protected implementation merge");
+  const replayIdentity = { ...identity, repo: request.repo };
+  const gate = gatePass(anchor.implementationGate, records, replayIdentity, identity.candidate);
+  need(gate.passed && gate.reference === anchor.implementationGateSha256, "Receipt implementation gates differ");
+  const stateForReplay = { ...state, identity: replayIdentity };
+  const lineage = prFixLineage ? await verifyFinishPrFix(request, stateForReplay, anchor, gate, verifyHandover) : null;
+  const fix = lineage?.proof;
+  const integratedGate = integratedFinishGate(request.repo, state, remote, merged, lineage?.gateAuthority, finishCheckpoint.sha256);
+  need(integratedGate?.passed, "Receipt lacks exact integrated gate evidence");
+  const reviewProof = await verifyGovernedImplementation(stateForReplay, policy, anchor, gate, fix, verifyHandover);
+  let closureReviewProof;
+  if (remote.closure?.state === "MERGED") {
+    const closure = remote.closureCandidate;
+    need(bound(closure, identity, grant) && closure.integrated === verified && closure.head === checkpoint.closureHead &&
+      Array.isArray(grant.closureGates) && grant.closureGates.some((argv) => same(argv, ["npm", "test"])),
+    "Archived closure lacks exact candidate and declared gates");
+    const { merged: closed } = publication(identity, grant, remote, "closure", closure.head, checkpoint, time(remote.observedAt));
+    need(closed && await protectedEvidence(closed, records), "Archived closure lacks protected merge readback");
+    ancestor(request.repo, closure.head, closed.mergeCommit);
+    // A readback can verify the closure candidate while the closeout guard
+    // separately compares the eventual archive at or after the merge.
+    if (archiveHead !== closure.head) ancestor(request.repo, closed.mergeCommit, archiveHead);
+    const closureGate = gatePass(closure.gate, records, replayIdentity, closure.head, grant.closureGates);
+    need(closureGate.passed && closureReviewPass(remote.closureReview, identity, grant,
+      { ...closure, gateObservedAt: closureGate.observedAt }, anchor.implementationReview) &&
+      time(remote.closureReview.observedAt) <= time(remote.observedAt), "Archived closure review or gates differ");
+    closureReviewProof = await verifyGovernedReview({ policy, identity: replayIdentity, records, readback: remote.closureReview,
+      handover: remote.closureReview.handover, head: closure.head, base: verified, gate: closureGate,
+      host: anchor.hostConfigurationSha256, finishReference: grant.reference, verifyHandover });
+    need(!fix || closureReviewProof.session !== fix.deltaReview.session && closureReviewProof.reference !== fix.deltaReview.reference,
+      "Archived closure review must use independent evidence from the PR-fix review");
+  }
+  return { reviewProof, closureReviewProof, completion: anchor.taskCompletion };
 }
 
 export async function protectedFinish(input, readiness, now = Date.now(), verifyHandover, triggerCommand) {
@@ -405,7 +530,8 @@ export async function protectedFinish(input, readiness, now = Date.now(), verify
     const parentGate = gatePass(completion.reviewedGate, records, identity, proof.reviewedParent, implementationGate.gateCommands);
     const parent = await verifyHandover(completion.handover);
     const reviewed = parent.result;
-    need((!policy.directReviewer || parent.reviewTransport === "direct-cli" && parent.reviewCoverage === "whole-file") &&
+    need((!policy.directReviewer || reviewProofMatches(policy, { transport: parent.reviewTransport, coverage: parent.reviewCoverage,
+      proofLevel: parent.proofLevel, proofComplete: parent.proofComplete })) &&
       parentGate.passed && parentGate.reference === completion.reviewedGateReference &&
       parent.reviewPolicyBinding?.parent === identity.policyRevision && parent.reviewPolicyBinding.target === identity.targetRevision &&
       parent.reviewSnapshot?.base === identity.plan && parent.reviewSnapshot.plan === identity.plan &&
@@ -424,6 +550,7 @@ export async function protectedFinish(input, readiness, now = Date.now(), verify
       need(readback.ready, "Promoted current specs or exact child checkout are unverified");
     }
   }
+  const reviewProof = await verifyGovernedImplementation(state, policy, anchor, implementationGate, fix, verifyHandover);
   const reply = input.resume === "continue" ? read(input.finishReply) : null;
   if (input.resume === "continue") {
     need(bound(reply, identity, grant) && reply.kind === "finish-reply" && reply.reply === "continue" &&
@@ -436,6 +563,7 @@ export async function protectedFinish(input, readiness, now = Date.now(), verify
       ["plan", "planDigest", "mode", "policyRevision", "workspace", "branch", "targetRevision"].every((key) => readiness[key] === identity[key]) &&
       (!readiness.gateReference || readiness.gateReference === implementationGate.reference) &&
       (!readiness.reviewReference || readiness.reviewReference === anchor.implementationReview.reference) &&
+      (!policy.proofLevel || same(readiness.reviewProof, reviewProof)) &&
       (!readiness.keepWorktree || checkpoint.keepWorktree) &&
       (completion ? readiness.taskCompletion && same(readiness.taskCompletion, {
         reviewedParent: completion.reviewedParent, acceptanceChild: completion.acceptanceChild, taskIds: completion.taskIds,
@@ -449,7 +577,9 @@ export async function protectedFinish(input, readiness, now = Date.now(), verify
     need(time(remote.observedAt) >= time(reply.observedAt) && time(current?.observedAt) >= time(reply.observedAt),
       "Continue requires a new exact remote PR readback");
   }
-  const observe = (value) => ({ ...value, identity, checkpoint: input.finishCheckpoint.file, checkpointSha256: input.finishCheckpoint.sha256,
+  let closureReviewProof;
+  const observe = (value) => ({ ...value, identity,
+    ...(policy.proofLevel ? { proofLevel: policy.proofLevel, reviewProof, ...(closureReviewProof ? { closureReviewProof } : {}) } : {}), checkpoint: input.finishCheckpoint.file, checkpointSha256: input.finishCheckpoint.sha256,
     records, grantReference: grant.reference, deadline: checkpoint.deadline,
     readback: input.finishRemote.file, ...(fix ? { prFixLineage: fix } : {}), keepWorktree: checkpoint.keepWorktree || input.restrictions?.keepWorktree === true });
   const triggerPolicy = credits ? { standingTriggers: [], ...policy.lowTouch, strictInventory: true } : policy.lowTouch;
@@ -462,7 +592,7 @@ export async function protectedFinish(input, readiness, now = Date.now(), verify
     return observe({ ...decision, ...finishCreditDecision(credits, decision, input.finishRemote.sha256, selection, now) });
   };
   if (policy.lowTouch && remote.implementation?.state === "ABSENT") {
-    verifyLocalHarness({ hostConfiguration: input.hostConfiguration, harness: remote.implementation.harness,
+    verifyReviewHostHarness(policy, { hostConfiguration: input.hostConfiguration, harness: remote.implementation.harness,
       candidate, excluded: [repo, workspace], now });
     need(input.hostConfiguration.sha256 === anchor.hostConfigurationSha256, "Finish host binding changed");
   }
@@ -498,12 +628,12 @@ export async function protectedFinish(input, readiness, now = Date.now(), verify
     receiptFile: retainedPath(records, closure.receipt), committedReceiptPath: closure.receiptPath,
     issue: identity.issue, policyTarget: identity.targetRevision,
     integrationReference: merged.url, prFixLineage: fixRef, verifyHandover,
-    ...(taskGateAuthority ? { finishCheckpoint: input.finishCheckpoint, finishRemote: input.finishRemote } : {}) };
+    ...(taskGateAuthority || policy.proofLevel ? { finishCheckpoint: input.finishCheckpoint, finishRemote: input.finishRemote } : {}) };
   need(closure.receipt.sha256 === closure.receiptSha256, "Closure receipt declaration differs");
   const receipt = await verifyArchive({ ...archive, head: closure.head });
   need(receipt.integrated === merged.mergeCommit && receipt.verified === integrated.head && receipt.head === candidate &&
     receipt.planDigest === identity.planDigest && receipt.plan === identity.plan && receipt.base === identity.policyRevision &&
-    receipt.receiptSha256 === closure.receiptSha256 && same(receipt.prFixLineage, fix) &&
+    receipt.receiptSha256 === closure.receiptSha256 && same(receipt.prFixLineage, fix) && same(receipt.reviewProof, reviewProof) &&
     (completion ? same(receipt.taskCompletion, { reviewedParent: completion.reviewedParent,
       acceptanceChild: completion.acceptanceChild, taskIds: completion.taskIds }) : !receipt.taskCompletion), "Closure receipt does not bind the accepted implementation and integrated gates");
   if (!closure.gate) return observe(result("verify-closure", "FULL_ARCHIVE_TEST_PENDING", { head: closure.head }));
@@ -517,8 +647,15 @@ export async function protectedFinish(input, readiness, now = Date.now(), verify
       !(time(remote.closureReview.observedAt) <= now)) {
     return observe(result("review-closure", "EXACT_CLOSURE_REVIEW_PENDING", { head: closure.head }));
   }
+  if (policy.proofLevel) {
+    closureReviewProof = await verifyGovernedReview({ policy, identity, records, readback: remote.closureReview,
+      handover: remote.closureReview.handover, head: closure.head, base: integrated.head, gate: closureGate,
+      host: anchor.hostConfigurationSha256, finishReference: grant.reference, verifyHandover });
+    need(!fix || closureReviewProof.session !== fix.deltaReview.session && closureReviewProof.reference !== fix.deltaReview.reference,
+      "Closure review must use independent evidence from the PR-fix review");
+  }
   if (policy.lowTouch && ["ABSENT", "OPEN"].includes(remote.closure?.state)) {
-    const harness = verifyLocalHarness({ hostConfiguration: input.hostConfiguration, harness: closure.harness,
+    const harness = verifyReviewHostHarness(policy, { hostConfiguration: input.hostConfiguration, harness: closure.harness,
       candidate: closure.head, excluded: [repo, workspace], now });
     need(input.hostConfiguration.sha256 === anchor.hostConfigurationSha256 &&
       (!harness || remote.closureReview.harnessSha256 === harness.sha256 &&

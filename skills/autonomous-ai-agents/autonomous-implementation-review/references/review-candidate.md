@@ -7,6 +7,13 @@ configuration, evidence roots and packet copy disjoint. The client uses normal h
 authentication and an independent session. Protected checkout approval remains
 with the orchestrator. Earlier frozen parents use their original pinned verifier.
 
+For later plans the verified integrated root contributor contract may
+explicitly select `<!-- openspec-review-proof: receipt-only -->` or
+`<!-- openspec-review-proof: whole-file-read -->`. Whole-file read remains the
+default. Require any host proof pin to agree. Bind an explicit selection to
+the expectation and sealed status. Refuse ambiguity or unsupported settings
+before a paid launch. Preserve the original verifier for frozen reviews.
+
 For Codex Auto-review, prepare and check offline, then use the standalone Node
 launch under the exact scoped paid authority. Host permission checks still apply.
 The launch reserves cost for every assigned packet before exposing approved inputs.
@@ -39,7 +46,7 @@ Stop new packets after failure and settle original processes before readback.
 Sanitized captures retain packet/session bindings, bounded supervisor results,
 the argument and input digest, before/after workspace and export checks, exact framed receipts and
 findings. Whole-file coverage requires independently matched structured Read
-results. Mark all other verified observations receipt-only. Read-only planning,
+results. Record receipt-only coverage when the selected policy accepts sealed receipts. Every final reply must consist solely of its one receipt frame. Read-only planning,
 candidate and finish acceptance remains subject to the applicable coverage policy.
 
 Use native Git and Python. Linux settlement requires procfs and pidfds. Windows

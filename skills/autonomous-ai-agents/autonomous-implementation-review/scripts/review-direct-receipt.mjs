@@ -14,11 +14,12 @@ function packetBytes(prepared, index) {
   return new Map(prepared.manifest.packets[index].paths.map((name) => [name, prepared.files.get(name)]));
 }
 
-export function directPacketPrompt(request, context, prepared, index, session, settings, maxBudgetUsd) {
+export function directPacketPrompt(request, context, prepared, index, session, settings, maxBudgetUsd, proofLevel) {
   const adapter = directAdapter(settings, session, maxBudgetUsd);
   return reviewPrompt(request, context, prepared.manifest.packets[index], index, prepared.manifest.packets.length,
     "direct-cli:" + request.session, { binding: packetIdentity(prepared, index, session), assigned: "",
-      inline: ["inline", "file", "agy"].includes(adapter.transport) });
+      inline: ["inline", "file", "agy"].includes(adapter.transport) ||
+        settings.client === "claude" && proofLevel === "receipt-only" });
 }
 
 function jsonl(bytes) {
@@ -180,29 +181,32 @@ function sanitizeClaude(events, cwd, paths, redactions) {
       need(session_id === undefined || session_id === events[0]?.session_id, "Unexpected Claude advisory session");
       continue;
     } else {
-      const tag = typeof type === "string" ? (typeof subtype === "string" ? `${type}/${subtype}` : type) : "unknown";
-      const err = new Error("Unexpected Claude stream event");
-      err.diagnosticDetail = diagnosticDetailPattern.test(tag) ? tag : "unknown";
-      throw err;
+      throw new Error("Unexpected Claude stream event");
     }
   }
   return projected;
 }
 
-export function sanitizeNative({ stdout, format, cwd, files, redactions, launch, maxBudgetUsd }) {
+export function sanitizeNative({ stdout, format, cwd, files, redactions = [], launch, maxBudgetUsd, proofLevel }) {
   if (format === "claude-read") {
     const events = sanitizeClaude(jsonl(stdout), cwd, [...files.keys()], redactions);
     const normalized = Buffer.concat(events.map(jsonBytes));
+    need(redactions.every((value) => !value || !normalized.includes(value)),
+      "Native structured output exposed a host path or environment value");
     auditClaudeStream({ ...launch.process, stdout: normalized }, {
-      ...launch.runtime, session: launch.session, direct: true, maxBudgetUsd,
+      ...launch.runtime, session: launch.session, direct: true, maxBudgetUsd, proofLevel,
     }, [...files.keys()], false, files);
     return normalized;
   }
   const observed = format === "text" ? { answer: utf8(stdout), nativeSession: null } :
     reviewAnswer(jsonl(stdout), format, { cwd, session: launch.session });
   need(observed.nativeSession === null || /^[a-zA-Z0-9_.-]{1,128}$/.test(observed.nativeSession), "Invalid native session identifier");
+  need(!observed.nativeSession || redactions.every((value) => !value || !observed.nativeSession.includes(value)),
+    "Native session exposed a host path or environment value");
   need(boundModel(observed, launch.runtime.model), "Native reviewer model differs");
-  return Buffer.concat(evidenceForReport(format, { ...observed, answer: safeReport(observed.answer, redactions) }).map(jsonBytes));
+  const projected = Buffer.concat(evidenceForReport(format, { ...observed, answer: safeReport(observed.answer, redactions) }).map(jsonBytes));
+  need(redactions.every((value) => !value || !projected.includes(value)), "Native structured output exposed an environment value");
+  return projected;
 }
 
 export const nativeOutputReasons = Object.freeze([
@@ -228,7 +232,7 @@ export function classifyNativeOutputError(error) {
 
 const passProcess = (process) => process.quiescent === true && process.code === 0 && process.signal === null && process.outcome === "exit";
 
-export function verifyDirectPacket({ request, context, prepared, index, launch, stdout, runtime, maxBudgetUsd, reference }) {
+export function verifyDirectPacket({ request, context, prepared, index, launch, stdout, runtime, maxBudgetUsd, proofLevel, reference }) {
   fields(launch, ["schemaVersion", "packet", "session", "runtime", "inventorySha256", "invocationSha256", "backend", "timeoutMs",
     "before", "after", "exportBefore", "exportAfter", "copyBefore", "copyAfter", "process", "diagnostic"],
   "Direct-CLI launch", ["diagnosticReason", "diagnosticDetail"]);
@@ -241,8 +245,8 @@ export function verifyDirectPacket({ request, context, prepared, index, launch, 
   const settings = Object.fromEntries(["client", "model", "reasoningEffort", "timeoutMs", "packetConcurrency"]
     .filter((field) => Object.hasOwn(runtime, field)).map((field) => [field, runtime[field]]));
   const files = packetBytes(prepared, index);
-  const prompt = directPacketPrompt(request, context, prepared, index, launch.session, settings, maxBudgetUsd);
-  const { format, fingerprint } = invocation({ config: { reviewer: settings, maxBudgetUsd }, session: launch.session,
+  const prompt = directPacketPrompt(request, context, prepared, index, launch.session, settings, maxBudgetUsd, proofLevel);
+  const { format, fingerprint } = invocation({ config: { reviewer: settings, maxBudgetUsd, proofLevel }, session: launch.session,
     prompt, files, cwd: "packet", promptFile: "packet-prompt.txt", environmentRootsSha256: runtime.environmentRootsSha256 });
   need(digest(runtime.environmentRootsSha256) && (launch.invocationSha256 === fingerprint ||
     launch.invocationSha256 === null && launch.diagnostic !== null && launch.process.outcome === "not-started"),
@@ -254,7 +258,7 @@ export function verifyDirectPacket({ request, context, prepared, index, launch, 
       (launch.diagnosticReason === undefined ||
         (launch.diagnostic === "invalid-native-output" && nativeOutputReasons.includes(launch.diagnosticReason))) &&
       (launch.diagnosticDetail === undefined ||
-        (launch.diagnostic === "invalid-native-output" && typeof launch.diagnosticDetail === "string" &&
+        (launch.diagnostic === "invalid-native-output" && !proofLevel && typeof launch.diagnosticDetail === "string" &&
           diagnosticDetailPattern.test(launch.diagnosticDetail))) &&
       stdout.length === 0, "Invalid Direct-CLI failure evidence");
     return { failure: launch.diagnostic,
@@ -267,17 +271,19 @@ export function verifyDirectPacket({ request, context, prepared, index, launch, 
     need(/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/.test(observation.head) &&
       digest(observation.statusSha256) && digest(observation.contentSha256), "Invalid worktree identity");
   }
-  need(equal(launch.before, launch.after) && launch.exportBefore === true && launch.exportAfter === true &&
+  need(equal(launch.before, launch.after) &&
+    (!proofLevel || request.mode !== "candidate" || launch.before.head === request.snapshot.target) &&
+    launch.exportBefore === true && launch.exportAfter === true &&
     launch.copyBefore === true && launch.copyAfter === true && passProcess(launch.process),
   "Unproved worktree, export, packet copy, or process settlement");
   let coverage = "receipt-only";
   let nativeSession;
   let report;
   if (format === "claude-read") {
-    report = auditClaudeStream({ ...launch.process, stdout }, { ...runtime, session: launch.session, direct: true, maxBudgetUsd },
+    report = auditClaudeStream({ ...launch.process, stdout }, { ...runtime, session: launch.session, direct: true, maxBudgetUsd, proofLevel },
       [...files.keys()], false, files);
     nativeSession = launch.session;
-    coverage = "whole-file";
+    if (proofLevel !== "receipt-only") coverage = "whole-file";
   } else {
     const events = jsonl(stdout);
     let observed;
@@ -295,8 +301,9 @@ export function verifyDirectPacket({ request, context, prepared, index, launch, 
     need(stdout.equals(Buffer.concat(evidenceForReport(format, { ...observed, answer: report }).map(jsonBytes))),
       "Retained native evidence differs from selected adapter");
   }
+  need(proofLevel !== "whole-file-read" || coverage === "whole-file", "Missing structured whole-file proof");
   const receipt = admitReceipt(request, context, report, index, reference, prepared.manifest.packets[index], {
-    framedOnly: true, binding: packetIdentity(prepared, index, launch.session),
+    framedOnly: true, strictFrame: Boolean(proofLevel), binding: packetIdentity(prepared, index, launch.session),
   });
   return { coverage, nativeSession, report, receipt };
 }

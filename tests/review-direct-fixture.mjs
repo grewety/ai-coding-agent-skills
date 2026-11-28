@@ -39,7 +39,7 @@ function privateWindowsRoot(root) {
     { env: { SystemRoot: system, WINDIR: system, FIXTURE_ROOT: root }, timeout: 15000 });
 }
 
-export async function directFixture(t, behavior = "ok", { mode = "candidate", count = 1, concurrency = 1, client = "claude" } = {}) {
+export async function directFixture(t, behavior = "ok", { mode = "candidate", count = 1, concurrency = 1, client = "claude", proofLevel, hostProofLevel = proofLevel } = {}) {
   const root = await mkdtemp(path.join(await realpath(tmpdir()), "direct-fixture-"));
   t.after(async () => {
     async function unlock(directory) {
@@ -66,13 +66,16 @@ export async function directFixture(t, behavior = "ok", { mode = "candidate", co
     TMPDIR: root, TEMP: root, TMP: root, XDG_CONFIG_HOME: file("home"), XDG_DATA_HOME: file("home"),
     XDG_CACHE_HOME: file("home"), XDG_STATE_HOME: file("home") };
   if (client === "agy") env.GEMINI_API_KEY = "fixture-only";
+  if (client === "grok") env.XAI_API_KEY = "fixture-only";
+  if (["claude", "codex", "pi"].includes(client)) await writeFile(file("home/review-login"), "fixture-host-login");
   const git = (...args) => execFileSync(gitPath, ["-c", "core.hooksPath=" + nullDevice, "-c", "core.autocrlf=false",
     "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", ...args], {
     cwd: workspace, stdio: ["ignore", "pipe", "pipe"],
     env: { ...env, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: nullDevice },
   }).toString();
   git("init", "-q");
-  await writeFile(path.join(workspace, "AGENTS.md"), "<!-- openspec-low-touch: {} -->\n<!-- openspec-reviewer: direct-cli-v1 -->\n");
+  await writeFile(path.join(workspace, "AGENTS.md"), "<!-- openspec-low-touch: {} -->\n<!-- openspec-reviewer: direct-cli-v1 -->\n" +
+    (proofLevel ? `<!-- openspec-review-proof: ${proofLevel} -->\n` : ""));
   git("add", ".");
   git("commit", "-qm", "adopt direct review");
   const parent = git("rev-parse", "HEAD").trim();
@@ -126,13 +129,13 @@ export async function directFixture(t, behavior = "ok", { mode = "candidate", co
     request.worker.authority.approvalReference = null;
     request.attachments = {};
     request.snapshot = { record: { schemaVersion: 1, change, goal: "Review the synthetic implementation", passRule: "charter-v1",
-      binding: { route: "direct-cli", client: "claude", model, qualified: true, independent: true, readOnly: true, permissions: ["read"] },
+      binding: { route: "direct-cli", client, model, qualified: true, independent: true, readOnly: true, permissions: ["read"] },
       charter: { clauses: ["scope"], boundaries: ["fixture"], tasks: ["1.1"], gates: ["fixture"] },
       budget: 2, cumulativeCycles: 0, entries: [], ledger: [] }, correction: null,
     authority: { reference: "execution", write: true, validate: true, review: true }, priorLaunches: [] };
   }
   const host = jsonBytes({ schemaVersion: 3, reviewer: { client, model, timeoutMs: 5000, packetConcurrency: concurrency },
-    runTimeoutMs: 120000, maxBudgetUsd: 1 });
+    runTimeoutMs: 120000, maxBudgetUsd: 1, ...(hostProofLevel ? { proofLevel: hostProofLevel } : {}) });
   const expect = { schemaVersion: 2, requestSha256: hash(jsonBytes(request)), exportSha256: null, configurationSha256: hash(host),
     model };
   await writeFile(file("request.json"), jsonBytes(request), { mode: 0o600 });
@@ -150,25 +153,51 @@ const path = require("node:path");
 const { spawn } = require("node:child_process");
 const arg = (name) => process.argv[process.argv.indexOf(name) + 1];
 const client = ${JSON.stringify(client)};
+const proofLevel = ${JSON.stringify(proofLevel ?? null)};
 if (process.argv.includes("--version")) {
-  fs.writeSync(1, client === "agy" ? "agy 1.6.0\\n" : "2.1.330 (Claude Code)\\n");
+  fs.writeSync(1, ({ agy: "agy 1.6.0", codex: "codex-cli 0.130.0", grok: "grok-build 0.2.0", pi: "pi 1.5.2" }[client] ?? "2.1.330 (Claude Code)") + "\\n");
   process.exit(0);
 }
 if (process.argv.includes("--help")) {
-  fs.writeSync(1, client === "agy" ? "--settings --input-format --output-format --disable-slash-commands --effort\\n" :
-    "--print --session-id --safe-mode --restricted --strict-mcp-config --permission-prompts --no-session-persistence --tools --effort\\n");
+  fs.writeSync(1, ({ agy: "--settings --input-format --output-format --disable-slash-commands --effort\\n",
+     codex: "--sandbox --json --ephemeral --ignore-user-config --ignore-rules\\n",
+     grok: "--single --session-id --tools --allow --no-subagents --disable-web-search\\n",
+     pi: "--mode --no-session --session-id --no-tools --no-mcp\\n" }[client]) ??
+    "--print --session-id --safe-mode --restricted --strict-mcp-config --permission-prompts --no-session-persistence --tools --effort --max-budget-usd --max-turns\\n");
   process.exit(0);
 }
 const sid = arg("--session-id");
 const model = arg("--model");
 const cwd = process.cwd();
 const raw = fs.readFileSync(0, "utf8");
-const prompt = client === "agy" ? JSON.parse(raw).message.content : raw;
+const prompt = client === "agy" ? JSON.parse(raw).message.content : client === "grok" ? process.argv.at(-1) : raw;
 const begin = prompt.lastIndexOf("BEGIN_REVIEW_RECEIPT");
 const end = prompt.indexOf("END_REVIEW_RECEIPT", begin) + "END_REVIEW_RECEIPT".length;
 let frame = prompt.slice(begin, end);
 const files = prompt.split("\\n").filter((line) => /^(?:target|base|plan|diff|context)\\//.test(line) || line === "review-context.json");
 const behavior = ${JSON.stringify(behavior)};
+if (behavior === "preamble") frame = "Extra prose\\n" + frame;
+if (behavior === "epilogue") frame += "\\nExtra prose";
+if (behavior === "limitation") {
+  const rows = frame.split("\\n");
+  const data = JSON.parse(rows[3]);
+  data.coverageLimitations = ["An assigned file was unavailable"];
+  rows[3] = JSON.stringify(data);
+  frame = rows.join("\\n");
+}
+if (["claude", "codex", "pi"].includes(client) &&
+    fs.readFileSync(path.join(process.env.HOME, "review-login"), "utf8") !== "fixture-host-login") process.exit(32);
+if (client === "grok") { fs.writeSync(1, frame); process.exit(0); }
+if (client === "codex" || client === "pi") {
+  const id = require("node:crypto").randomUUID();
+  const events = client === "codex" ? [{ type: "thread.started", thread_id: id },
+    { type: "item.completed", item: { type: "agent_message", text: frame } }, { type: "turn.completed" }] :
+    [{ type: "session", id: sid, cwd },
+      { type: "message_end", message: { role: "assistant", model, provider: "fixture", stopReason: "stop",
+        content: [{ type: "text", text: frame }] } }, { type: "agent_settled", aborted: false }];
+  for (const event of events) fs.writeSync(1, JSON.stringify(event) + "\\n");
+  process.exit(0);
+}
 if (client === "agy") {
   const config = JSON.parse(fs.readFileSync(arg("--settings"), "utf8"));
   if (process.env.HOME !== path.join(path.dirname(cwd), "home") || config.toolPermission !== "strict" ||
@@ -196,9 +225,9 @@ if (behavior === "descendant" && process.platform !== "win32") {
 const emit = (event) => console.log(JSON.stringify({ session_id: sid, ...event }));
 emit({ type: "system", subtype: "init", model, cwd, permissionMode: "dontAsk", claude_code_version: "2.1.330",
   tools: ["Read"], mcp_servers: [], skills: [], slash_commands: [], plugins: [] });
-for (const [n, file] of files.entries()) {
+for (const [n, file] of (proofLevel === "receipt-only" ? [] : files).entries()) {
   const file_path = path.join(cwd, file);
-  const content = behavior === "partial" && n === 0 ? "Incomplete fixture bytes" : fs.readFileSync(file_path, "utf8").replace(/\\n$/, "");
+  const content = behavior === "partial" && n === 0 ? "Incomplete fixture bytes" : fs.readFileSync(file_path, "utf8").replace(proofLevel === "whole-file-read" && behavior !== "missing-byte" ? /(?!) / : /\\n$/, "");
   const id = "call-" + n;
   emit({ type: "assistant", message: { id, content: [{ type: "tool_use", id, name: "Read", input: { file_path } }] } });
   emit({ type: "user", message: { content: [{ type: "tool_result", tool_use_id: id, content }] },

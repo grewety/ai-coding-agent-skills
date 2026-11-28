@@ -792,9 +792,9 @@ OpenSpec companion workflow from the opt-in orchestration and delivery operation
 bundles. Bump every affected plugin's version when its bundled content changes.
 See the [Claude release checks](docs/claude-installation.md#maintainer-verification).
 
-Current source versions are delivery 1.12.0 and its affected
-`openspec-development` plugin 1.12.0; `openspec-next` is 0.9.0 and
-`autonomous-orchestration` is 1.16.6 (core skill 0.26.6). The `delivery-operations`
+Current source versions are delivery 1.13.0 and its affected
+`openspec-development` plugin 1.13.0; `openspec-next` is 0.9.0 and
+`autonomous-orchestration` is 1.17.0 (core skill 0.27.0). The `delivery-operations`
 bundle and its two skills are 1.0.1. Complete well-known output,
 skill ZIPs, workflow plugin ZIP and isolated native copies must retain all support
 files byte-for-byte, including delivery's runtime and evidence commands and next's

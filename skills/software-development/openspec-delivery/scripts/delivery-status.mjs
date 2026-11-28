@@ -23,7 +23,8 @@ export function preflight({ live, auth, local, reviewer, reviewerSettings, relay
     ["P3", "local-baseline", local, () => sha(live?.head) && source && source.branch === `refs/heads/${live.branch}` &&
       source.head === live.head && source.targetHead === live.head && source.trackingHead === live.head && source.dirty === false && local.activeChangeInventoryVerified === true],
     ["P4", direct ? "reviewer-offline-preflight" : "reviewer-probe", reviewer, () => reviewer.outcome === "pass" &&
-      (!direct || reviewer.transport === "direct-cli" && reviewer.packetFeasible === true) && digest(reviewer.configurationSha256) &&
+      (!direct || reviewer.transport === "direct-cli" && reviewer.packetFeasible === true &&
+        reviewer.proofLevel === policy.proofLevel) && digest(reviewer.configurationSha256) &&
       reviewer.configurationSha256 === reviewer.expectedConfigurationSha256 && digest(reviewer.packageSha256) &&
       reviewer.packageSha256 === companions?.expected?.reviewer &&
       (!delegation || reviewer.configurationSha256 === delegation.configuration && reviewer.packageSha256 === delegation.inventory)],
@@ -63,6 +64,11 @@ export function deliveryStatus({ change, policy, identity, candidate, decision, 
   const activeAttemptId = boundAttempt === attempt?.id && attemptId(boundAttempt) ? boundAttempt : null;
   const contextHint = activeAttemptId && ["same-session", "fresh-session"].includes(context) ? context : null;
 
+  const proofLevel = policy?.proofLevel;
+  const proof = finish?.reviewProof ?? decision?.reviewProof ?? handoff?.reviewProof;
+  const reviewProof = proofLevel && proof?.proofLevel === proofLevel && proof.reviewedHead === reviewed &&
+    digest(proof.statusSha256) && digest(proof.reference) && text(proof.session) &&
+    proof.coverage === (proofLevel === "receipt-only" ? "receipt-only" : "whole-file") ? proof : null;
   let state = selected ? "draft" : "unresolved";
   let stopPredicate = null;
   let code = selected ? "ASSESS_DRAFT" : "RESOLVE_CHANGE";
@@ -94,6 +100,10 @@ export function deliveryStatus({ change, policy, identity, candidate, decision, 
       state = "blocked";
       stopPredicate = reasonPattern.test(decision.reason ?? "") ? decision.reason : "DELIVERY_OBSERVATIONS_UNVERIFIED";
       code = decision.reason === "LOCAL_AUTHORITY_PENDING" ? "RECORD_LOCAL_EXECUTION_GRANT" : "RESOLVE_STOP";
+    } else if (decision.action === "accept-result" && reviewed === decision.head && proofLevel && !reviewProof?.zeroWaiver) {
+      state = "blocked";
+      stopPredicate = "REVIEW_PROOF_UNVERIFIED";
+      code = "VERIFY_EXACT_RESULT_REVIEW";
     } else if (decision.action === "accept-result" && reviewed === decision.head) {
       state = "local-verified";
       code = "ASSESS_FINISH_READINESS";
@@ -120,5 +130,6 @@ export function deliveryStatus({ change, policy, identity, candidate, decision, 
     }
   }
   return { schemaVersion: 1, change: selected, mode, state, candidateSha: pinned, planDigest,
+    ...(proofLevel ? { proofLevel, reviewProof } : {}),
     activeAttemptId, stopPredicate, contextHint, recommendedNextAction: code ? { code, subject: selected } : null };
 }

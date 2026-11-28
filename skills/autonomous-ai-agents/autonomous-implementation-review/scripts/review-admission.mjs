@@ -65,8 +65,8 @@ export function reviewPrompt(request, context, packet, index, count, reference, 
   ].join("\n");
 }
 
-export function admitReceipt(request, context, report, index, reference, packet, { framedOnly = false, binding } = {}) {
-  let lines = report.trimEnd().split("\n");
+export function admitReceipt(request, context, report, index, reference, packet, { framedOnly = false, strictFrame = false, binding } = {}) {
+  let lines = (strictFrame ? report.replace(/\n$/, "") : report.trimEnd()).split("\n");
   if (binding) {
     const markers = lines.filter((line) => [beginReceipt, endReceipt].includes(line.trim()));
     need(equal(markers, [beginReceipt, endReceipt]) && lines[0] === beginReceipt, "Unexpected Direct-CLI receipt markers or preamble");

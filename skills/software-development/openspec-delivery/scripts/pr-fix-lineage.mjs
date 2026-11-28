@@ -4,6 +4,7 @@ import { withinScope } from "./delivery-control.mjs";
 import { readBounded, scopedPath, separate, sha256, verifyGateRun, verifyRepresentation } from "./evidence-retention.mjs";
 import { need, privateRecords, same, text } from "./operator-records.mjs";
 import { safePlanningPath } from "./planning-inventory.mjs";
+import { reviewProofMatches } from "./low-touch-policy.mjs";
 
 const digest = (value) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
 const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -70,12 +71,15 @@ function checkReview(handoff, snapshot, context, gate, base, host, kind) {
       request.authority.writer].includes(session) &&
     review.base === base && review.target === snapshot.head && id.candidate === snapshot.head &&
     id.change === context.change && review.plan === snapshot.plan && review.planDigest === context.planDigest &&
-    same(id.inputs, context.inputs) && (!context.directReviewer ||
-      handoff.reviewTransport === "direct-cli" && handoff.reviewCoverage === "whole-file") &&
+    same(id.inputs, context.inputs) && (!context.directReviewer || reviewProofMatches(context, { transport: handoff.reviewTransport,
+      coverage: handoff.reviewCoverage, proofLevel: handoff.proofLevel, proofComplete: handoff.proofComplete })) &&
     handoff.reviewPolicyBinding?.parent === context.parent &&
     handoff.reviewPolicyBinding.target === context.target && handoff.reviewConfigurationSha256 === host &&
     request.acceptance.includes(`gate-run:${gate.reference}`), `Invalid zero-waiver PR-fix ${kind} review`);
-  return { session, reference: result.report.sha256 };
+  if (context.proofLevel) need(handoff.reviewProof?.zeroWaiver && handoff.reviewProof.reviewedHead === snapshot.head &&
+    handoff.reviewProof.reference === result.report.sha256 && handoff.reviewProof.session === session,
+  "PR-fix review proof does not bind the actual reviewed SHA");
+  return { session, reference: result.report.sha256, ...(handoff.reviewProof ? { reviewProof: handoff.reviewProof } : {}) };
 }
 
 export async function verifyPrFixLineage(input, ref, verifyHandover, options = {}) {

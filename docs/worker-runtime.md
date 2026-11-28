@@ -7,9 +7,9 @@ For an adopting parent, use a schema 4 pair with independently pinned schema 2 r
 ## Install and bind
 
 1. Follow the [OpenSpec prerequisites](openspec-installation.md). Install
-   complete delivery 1.12.0 and next 0.9.0 packages from the
-   `openspec-development` 1.12.0 bundle and the separately selected
-   orchestration 0.26.6 package from `autonomous-orchestration` 1.16.6.
+   complete delivery 1.13.0 and next 0.9.0 packages from the
+   `openspec-development` 1.13.0 bundle and the separately selected
+   orchestration 0.27.0 package from `autonomous-orchestration` 1.17.0.
    Check the exact CLI and supporting file bytes outside the workspace before
    enabling the project route. Use the normal collision, backup and fresh
    session checks when updating or removing a package.
