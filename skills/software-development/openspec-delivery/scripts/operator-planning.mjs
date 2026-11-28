@@ -120,12 +120,18 @@ export function proposalFreeze({ input, context, policy, proposal, workspace, ch
   const validation = validatedDraft({ ...input, workspace: workspace.workspace }, context);
   if (!validation) return stop("NATIVE_VALIDATION_PENDING");
   const review = charter ?? input.reviewAcceptance;
+  const proof = review?.reviewProof;
+  const matchingProof = context.proofLevel && proof?.zeroWaiver === true &&
+    reviewProofMatches(context, { ...proof, transport: "direct-cli", proofComplete: true }) &&
+    typeof proof.statusSha256 === "string" && /^[a-f0-9]{64}$/.test(proof.statusSha256) &&
+    proof.reference === review.reference && text(proof.session) &&
+    same(proof.reviewedPlan?.inputs, context.inputs);
   const matchingPolicy = policy.approachPolicy === "charter-v1" ? review?.policy === "charter-v1" :
     review?.policy === undefined || review.policy === "strict";
   if ((proposal.reviewRequested || policy.requireApproachReview) &&
       (!matchingPolicy || review?.action !== "freeze-ready" || !same(review.inputs, context.inputs) || !text(review.reference) ||
         context.lowTouch && !same(review.planningModes, context.modes) ||
-        context.proofLevel && (charter?.reviewProof?.proofLevel !== context.proofLevel || charter.reviewProof.zeroWaiver !== true))) {
+        context.proofLevel && !matchingProof)) {
     return stop("APPROACH_REVIEW_PENDING");
   }
   if (!proposal.proposeToFreeze || !policy.proposeToFreeze || proposal.draftOnly) return stop("UNCOMMITTED_DRAFT_BOUNDARY");
@@ -147,5 +153,6 @@ export function proposalFreeze({ input, context, policy, proposal, workspace, ch
   }
   return { ...stop(null), action: "freeze-ready", change: context.change, inputs: context.inputs,
     policyRevision: context.parent, ...(context.lowTouch ? { modes: context.modes } : {}), grantReference: grant.reference,
-    validationReference: validation.reference, reviewReference: review?.reference ?? null };
+    validationReference: validation.reference, reviewReference: review?.reference ?? null,
+    ...(matchingProof ? { reviewProof: proof } : {}) };
 }

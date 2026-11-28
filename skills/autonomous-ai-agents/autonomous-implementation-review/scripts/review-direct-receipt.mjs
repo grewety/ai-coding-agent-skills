@@ -15,7 +15,7 @@ function packetBytes(prepared, index) {
 }
 
 export function directPacketPrompt(request, context, prepared, index, session, settings, maxBudgetUsd, proofLevel) {
-  const adapter = directAdapter(settings, session, maxBudgetUsd);
+  const adapter = directAdapter(settings, session, maxBudgetUsd, proofLevel);
   return reviewPrompt(request, context, prepared.manifest.packets[index], index, prepared.manifest.packets.length,
     "direct-cli:" + request.session, { binding: packetIdentity(prepared, index, session), assigned: "",
       inline: ["inline", "file", "agy"].includes(adapter.transport) ||

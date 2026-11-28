@@ -81,7 +81,7 @@ export async function observeDirectRuntime(config, excluded, { probe = false } =
     const versionArgs = config.client === "grok" ? ["--no-auto-update", "--version"] : ["--version"];
     const version = reportedVersion(await metadata(versionArgs, "version"), label);
     need(version, "Unable to bind native version for " + config.client);
-    const { args, flags } = reviewerHelp(config.reviewer, version);
+    const { args, flags } = reviewerHelp(config.reviewer, version, config.proofLevel);
     const help = await metadata(args, "help");
     const supported = new Set(help.match(/(?<![\w-])--[\w-]+/g));
     const required = probe ? [...flags, "--max-budget-usd", "--max-turns"] : flags;

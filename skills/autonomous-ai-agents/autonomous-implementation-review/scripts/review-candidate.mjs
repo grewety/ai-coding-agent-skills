@@ -460,7 +460,7 @@ function cli(argv) {
   return { command, mode, options };
 }
 
-function settingsFromRuntime(runtime) {
+function settingsFromRuntime(runtime, proofLevel) {
   const { provider, version, executableSha256, capabilitySha256, environmentRootsSha256, supervisor, ...settings } = runtime;
   need(typeof version === "string" && /^\d+\.\d+\.\d+[0-9A-Za-z.+-]*$/.test(version) &&
     digest(executableSha256) && digest(environmentRootsSha256),
@@ -470,7 +470,7 @@ function settingsFromRuntime(runtime) {
     "Invalid independently retained native supervisor identity");
   need(equal(settings, directReviewSettings(settings)), "Direct-CLI runtime settings are incomplete");
   need(provider === reviewerProvider(settings), "Direct-CLI reviewer provider differs from the effective settings");
-  need(capabilitySha256 === hash(jsonBytes(reviewerHelp(settings, version))), "Native CLI capability binding differs");
+  need(capabilitySha256 === hash(jsonBytes(reviewerHelp(settings, version, proofLevel))), "Native CLI capability binding differs");
   return settings;
 }
 
@@ -487,7 +487,7 @@ async function loadDirectInputs(requestFile, expectFile) {
   need(expect.proofLevel === undefined || reviewProofLevels.includes(expect.proofLevel), "Invalid retained review proof level");
   need((expect.runtime === undefined) === (expect.maxBudgetUsd === undefined), "Incomplete Direct-CLI runtime expectation");
   if (expect.runtime) {
-    settingsFromRuntime(expect.runtime);
+    settingsFromRuntime(expect.runtime, expect.proofLevel);
     usdMicros(expect.maxBudgetUsd);
     need(expect.runtime.model === expect.model, "Direct-CLI runtime model differs");
   }
@@ -730,7 +730,7 @@ async function directCommand(command, mode, options) {
   const config = { ...hostConfig, proofLevel };
   need(proofLevel === "receipt-only" || config.client === "claude",
     "Selected reviewer cannot provide structured whole-file reads");
-  need(config.model === expect.model && (!expect.runtime || equal(settingsFromRuntime(expect.runtime), config.reviewer) &&
+  need(config.model === expect.model && (!expect.runtime || equal(settingsFromRuntime(expect.runtime, proofLevel), config.reviewer) &&
     config.maxBudgetUsd === expect.maxBudgetUsd), "Direct-CLI configuration differs from independent expectation");
   if (request.mode === "approach") need(config.client === request.snapshot.record.binding.client,
     "Direct-CLI client differs from the approach binding");

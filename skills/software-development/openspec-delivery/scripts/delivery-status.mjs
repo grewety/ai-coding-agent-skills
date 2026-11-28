@@ -67,7 +67,7 @@ export function deliveryStatus({ change, policy, identity, candidate, decision, 
   const proofLevel = policy?.proofLevel;
   const proof = finish?.reviewProof ?? decision?.reviewProof ?? handoff?.reviewProof;
   const reviewProof = proofLevel && proof?.proofLevel === proofLevel && proof.reviewedHead === reviewed &&
-    digest(proof.statusSha256) && digest(proof.reference) && text(proof.session) &&
+    digest(proof.statusSha256) && digest(proof.reference) && text(proof.session) && typeof proof.zeroWaiver === "boolean" &&
     proof.coverage === (proofLevel === "receipt-only" ? "receipt-only" : "whole-file") ? proof : null;
   let state = selected ? "draft" : "unresolved";
   let stopPredicate = null;
@@ -100,7 +100,7 @@ export function deliveryStatus({ change, policy, identity, candidate, decision, 
       state = "blocked";
       stopPredicate = reasonPattern.test(decision.reason ?? "") ? decision.reason : "DELIVERY_OBSERVATIONS_UNVERIFIED";
       code = decision.reason === "LOCAL_AUTHORITY_PENDING" ? "RECORD_LOCAL_EXECUTION_GRANT" : "RESOLVE_STOP";
-    } else if (decision.action === "accept-result" && reviewed === decision.head && proofLevel && !reviewProof?.zeroWaiver) {
+    } else if (decision.action === "accept-result" && reviewed === decision.head && proofLevel && reviewProof?.zeroWaiver !== true) {
       state = "blocked";
       stopPredicate = "REVIEW_PROOF_UNVERIFIED";
       code = "VERIFY_EXACT_RESULT_REVIEW";

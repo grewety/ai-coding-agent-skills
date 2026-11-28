@@ -60,7 +60,15 @@ test("status distinguishes receipt-only coverage, zero waiver and missing proof 
     finish: { ...base.finish, reviewProof: value } });
   assert.equal(status(undefined).reviewProof, null);
   assert.equal(status(undefined).stopPredicate, "REVIEW_PROOF_UNVERIFIED");
-  assert.equal(status({ ...reviewProof, zeroWaiver: false }).reviewProof.zeroWaiver, false);
+  const rejected = status({ ...reviewProof, zeroWaiver: false });
+  assert.equal(rejected.state, "blocked");
+  assert.equal(rejected.reviewProof.zeroWaiver, false);
+  for (const zeroWaiver of ["true", 1, [], {}]) {
+    const malformed = status({ ...reviewProof, zeroWaiver });
+    assert.equal(malformed.state, "blocked");
+    assert.equal(malformed.stopPredicate, "REVIEW_PROOF_UNVERIFIED");
+    assert.equal(malformed.reviewProof, null);
+  }
   assert.equal(status({ ...reviewProof, coverage: "whole-file" }).reviewProof, null);
   assert.equal(status({ ...reviewProof, reviewedHead: head }).reviewProof, null);
   const adverse = { ...reviewProof, reviewedHead: head, zeroWaiver: false };

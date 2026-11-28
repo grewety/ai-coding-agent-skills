@@ -28,7 +28,7 @@ const agySettings = { toolPermission: "strict", agentMode: "", allowNonWorkspace
 const openCodeSettings = { permissions: [{ action: "*", resource: "*", effect: "deny" }],
   policies: ["tool.use", "mcp.use", "plugin.use", "skill.use"].map((action) => ({ action, resource: "*", effect: "deny" })) };
 
-export function directAdapter(settings, session, maxBudgetUsd) {
+export function directAdapter(settings, session, maxBudgetUsd, proofLevel) {
   const { client, model, reasoningEffort } = directReviewSettings(settings);
   switch (client) {
     case "claude":
@@ -45,7 +45,8 @@ export function directAdapter(settings, session, maxBudgetUsd) {
     case "grok":
       return { args: ["--no-auto-update", "--no-plan", "--no-subagents", "--no-memory", "--disable-web-search",
         "--model", model, ...effort("--effort", reasoningEffort), "--tools", "Read", "--allow", "Read",
-        "--session-id", session, "--output-format", "plain", "--single"], format: "text", transport: "argument",
+        "--session-id", session, "--output-format", "plain", ...(proofLevel === "receipt-only" ? [] : ["--single"])], format: "text",
+      transport: proofLevel === "receipt-only" ? "file" : "argument",
       env: Object.fromEntries(["CURSOR", "CLAUDE"].flatMap((source) => ["SKILLS", "RULES", "AGENTS", "MCPS", "HOOKS"]
         .map((feature) => [`GROK_${source}_${feature}_ENABLED`, "0"]))) };
     case "pi":
@@ -77,7 +78,7 @@ export function installedReviewer(config, excluded) {
   return resolveInstalledExecutable(config.client, { excluded });
 }
 
-export function reviewerHelp(settings, version) {
+export function reviewerHelp(settings, version, proofLevel) {
   const { client, reasoningEffort } = settings;
   need(client !== "hermes", "Hermes chat --oneshot delegates to an independently owned gateway without bounded turn settlement");
   if (client === "opencode") need(/^2\./.test(version), "OpenCode requires V2 standalone supervision and V2 tool policies");
@@ -91,6 +92,7 @@ export function reviewerHelp(settings, version) {
     agy: [[], ["--settings", "--input-format", "--output-format", "--disable-slash-commands"]],
   };
   const [args, flags] = probes[client];
+  if (client === "grok" && proofLevel === "receipt-only") flags.push("--prompt-file");
   const effortFlag = { claude: "--effort", grok: "--effort", pi: "--thinking", kilo: "--variant", agy: "--effort" }[client];
   return { args: [...args, "--help"], flags: reasoningEffort && effortFlag ? [...flags, effortFlag] : flags };
 }
@@ -188,7 +190,7 @@ function authHome(client, env) {
 
 export function invocation({ config, executable, session, prompt, files, cwd, promptFile,
   environmentRoots, environmentRootsSha256, env = process.env }) {
-  const adapter = directAdapter(config.reviewer, session, config.maxBudgetUsd);
+  const adapter = directAdapter(config.reviewer, session, config.maxBudgetUsd, config.proofLevel);
   const { client } = config.reviewer;
   const args = [...adapter.args];
   const scratch = path.dirname(cwd);
@@ -227,7 +229,8 @@ export function invocation({ config, executable, session, prompt, files, cwd, pr
       input = JSON.stringify({ event: "user", message: { content: contents() } }) + "\n";
       break;
     case "file":
-      args.push(promptFile, "--", "Review the supplied packet and follow its output contract.");
+      if (client === "grok") args.push("--prompt-file", promptFile);
+      else args.push(promptFile, "--", "Review the supplied packet and follow its output contract.");
       attachment = contents();
       break;
   }
