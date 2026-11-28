@@ -1,0 +1,324 @@
+{
+  "schemaVersion": 1,
+  "change": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt",
+  "issueUrl": "https://github.com/grewety/ai-coding-agent-skills/issues/89",
+  "mode": "goal-first",
+  "base": "eb95501b39a8446ae25888c5f72a24ebda484413",
+  "head": "eae66f6ba5aaa1c83e06dcdbbfa9e8fa40c8adf0",
+  "plan": "3f01963ade443f48d0b08dd0ee55746763f2836c",
+  "planDigest": "fca589479e79197927c0e901e1a99aefa9fe1709e4ca148b422f427b676d0b51",
+  "integrated": "9ad4ce2cf520b644f127b9269c19642a6a707b81",
+  "verified": "9ad4ce2cf520b644f127b9269c19642a6a707b81",
+  "integrationReference": "https://github.com/grewety/ai-coding-agent-skills/pull/90",
+  "mergedAt": "2026-11-28T09:53:32Z",
+  "mergeReadback": {
+    "record": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt/pr90-fix-p4UgJrE6/protected-finish/implementation-merged/pr.json",
+    "sha256": "5385596dd13911f7ef8c499371748056b102144d87f37e6827832e463bf9408e"
+  },
+  "mainReadback": {
+    "record": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt/pr90-fix-p4UgJrE6/protected-finish/implementation-merged/main.json",
+    "sha256": "0475b90777376c5518a9d241d58a5e1be76d8f5f1d066a175fde09c490d760a4"
+  },
+  "protectedReadback": {
+    "record": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt/pr90-fix-p4UgJrE6/protected-finish/implementation-merged/assertion-check.json",
+    "sha256": "2557550eded55e454ac0a2e8f439c486a31f6cb1e05b7881732a8eaf34d86091"
+  },
+  "promotedCurrentSpecs": [
+    {
+      "capability": "contained-independent-review",
+      "requirements": 6
+    }
+  ],
+  "review": {
+    "schemaVersion": 1,
+    "change": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt",
+    "issueUrl": "https://github.com/grewety/ai-coding-agent-skills/issues/89",
+    "head": "eae66f6ba5aaa1c83e06dcdbbfa9e8fa40c8adf0",
+    "planDigest": "fca589479e79197927c0e901e1a99aefa9fe1709e4ca148b422f427b676d0b51",
+    "verdict": "pass",
+    "transport": "direct-cli",
+    "coverage": "whole-file",
+    "nativeVerdict": "Verdict: No findings",
+    "findings": [],
+    "coverageLimitations": [],
+    "waivers": 0,
+    "reviewer": "15f8958e-efa9-4131-9a9c-e280ade0f295",
+    "reference": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt/pr90-fix-p4UgJrE6/full-review/output/report.md",
+    "report": {
+      "record": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt/pr90-fix-p4UgJrE6/full-review/output/report.md",
+      "sha256": "a5f6fd18413d8844c84d2792a72b666467bdf58c8d4b3828b5526cc2db5afd8c"
+    },
+    "replay": {
+      "record": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt/pr90-fix-p4UgJrE6/full-review/offline-verified.json",
+      "sha256": "095f6def58b35290eaeba6b95b77bf64450b046ec79016ae9565812d55085b4a"
+    },
+    "gates": [
+      {
+        "command": "npm test",
+        "argv": [
+          "npm",
+          "test"
+        ],
+        "commit": "eae66f6ba5aaa1c83e06dcdbbfa9e8fa40c8adf0",
+        "exitCode": 0,
+        "observedAt": "2026-11-28T09:44:02.030Z",
+        "evidence": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt/pr90-fix-p4UgJrE6/successor-gates-final/disposable-gate-run.json",
+        "evidenceSha256": "31f7c8e19e3140384f47adb4ab5aa5772383a2b74baeac0b8054c231ed8f43d8",
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "npm run build",
+        "argv": [
+          "npm",
+          "run",
+          "build"
+        ],
+        "commit": "eae66f6ba5aaa1c83e06dcdbbfa9e8fa40c8adf0",
+        "exitCode": 0,
+        "observedAt": "2026-11-28T09:44:02.556Z",
+        "evidence": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt/pr90-fix-p4UgJrE6/successor-gates-final/disposable-gate-run.json",
+        "evidenceSha256": "31f7c8e19e3140384f47adb4ab5aa5772383a2b74baeac0b8054c231ed8f43d8",
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "openspec validate --all --strict",
+        "argv": [
+          "openspec",
+          "validate",
+          "--all",
+          "--strict"
+        ],
+        "commit": "eae66f6ba5aaa1c83e06dcdbbfa9e8fa40c8adf0",
+        "exitCode": 0,
+        "observedAt": "2026-11-28T09:44:02.799Z",
+        "evidence": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt/pr90-fix-p4UgJrE6/successor-gates-final/disposable-gate-run.json",
+        "evidenceSha256": "31f7c8e19e3140384f47adb4ab5aa5772383a2b74baeac0b8054c231ed8f43d8",
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "npm run validate:openspec -- --require-issue",
+        "argv": [
+          "npm",
+          "run",
+          "validate:openspec",
+          "--",
+          "--require-issue"
+        ],
+        "commit": "eae66f6ba5aaa1c83e06dcdbbfa9e8fa40c8adf0",
+        "exitCode": 0,
+        "observedAt": "2026-11-28T09:44:03.059Z",
+        "evidence": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt/pr90-fix-p4UgJrE6/successor-gates-final/disposable-gate-run.json",
+        "evidenceSha256": "31f7c8e19e3140384f47adb4ab5aa5772383a2b74baeac0b8054c231ed8f43d8",
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      {
+        "command": "git diff --check",
+        "argv": [
+          "git",
+          "diff",
+          "--check"
+        ],
+        "commit": "eae66f6ba5aaa1c83e06dcdbbfa9e8fa40c8adf0",
+        "exitCode": 0,
+        "observedAt": "2026-11-28T09:44:03.108Z",
+        "evidence": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt/pr90-fix-p4UgJrE6/successor-gates-final/disposable-gate-run.json",
+        "evidenceSha256": "31f7c8e19e3140384f47adb4ab5aa5772383a2b74baeac0b8054c231ed8f43d8",
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    ]
+  },
+  "candidateGates": [
+    {
+      "command": "npm test",
+      "argv": [
+        "npm",
+        "test"
+      ],
+      "commit": "eae66f6ba5aaa1c83e06dcdbbfa9e8fa40c8adf0",
+      "exitCode": 0,
+      "observedAt": "2026-11-28T09:44:02.030Z",
+      "evidence": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt/pr90-fix-p4UgJrE6/successor-gates-final/disposable-gate-run.json",
+      "evidenceSha256": "31f7c8e19e3140384f47adb4ab5aa5772383a2b74baeac0b8054c231ed8f43d8",
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "npm run build",
+      "argv": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "commit": "eae66f6ba5aaa1c83e06dcdbbfa9e8fa40c8adf0",
+      "exitCode": 0,
+      "observedAt": "2026-11-28T09:44:02.556Z",
+      "evidence": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt/pr90-fix-p4UgJrE6/successor-gates-final/disposable-gate-run.json",
+      "evidenceSha256": "31f7c8e19e3140384f47adb4ab5aa5772383a2b74baeac0b8054c231ed8f43d8",
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "openspec validate --all --strict",
+      "argv": [
+        "openspec",
+        "validate",
+        "--all",
+        "--strict"
+      ],
+      "commit": "eae66f6ba5aaa1c83e06dcdbbfa9e8fa40c8adf0",
+      "exitCode": 0,
+      "observedAt": "2026-11-28T09:44:02.799Z",
+      "evidence": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt/pr90-fix-p4UgJrE6/successor-gates-final/disposable-gate-run.json",
+      "evidenceSha256": "31f7c8e19e3140384f47adb4ab5aa5772383a2b74baeac0b8054c231ed8f43d8",
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "npm run validate:openspec -- --require-issue",
+      "argv": [
+        "npm",
+        "run",
+        "validate:openspec",
+        "--",
+        "--require-issue"
+      ],
+      "commit": "eae66f6ba5aaa1c83e06dcdbbfa9e8fa40c8adf0",
+      "exitCode": 0,
+      "observedAt": "2026-11-28T09:44:03.059Z",
+      "evidence": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt/pr90-fix-p4UgJrE6/successor-gates-final/disposable-gate-run.json",
+      "evidenceSha256": "31f7c8e19e3140384f47adb4ab5aa5772383a2b74baeac0b8054c231ed8f43d8",
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "git diff --check",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "commit": "eae66f6ba5aaa1c83e06dcdbbfa9e8fa40c8adf0",
+      "exitCode": 0,
+      "observedAt": "2026-11-28T09:44:03.108Z",
+      "evidence": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt/pr90-fix-p4UgJrE6/successor-gates-final/disposable-gate-run.json",
+      "evidenceSha256": "31f7c8e19e3140384f47adb4ab5aa5772383a2b74baeac0b8054c231ed8f43d8",
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "gates": [
+    {
+      "command": "npm test",
+      "argv": [
+        "npm",
+        "test"
+      ],
+      "commit": "9ad4ce2cf520b644f127b9269c19642a6a707b81",
+      "exitCode": 0,
+      "observedAt": "2026-11-28T09:55:26.054Z",
+      "evidence": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt/pr90-fix-p4UgJrE6/protected-finish/integrated-gates/disposable-gate-run.json",
+      "evidenceSha256": "76667c59f7234b6efb9359f65ac1abe2e3c9394fb71865638b085dc8ca15673b",
+      "stdoutSha256": "74ef7a7195b1fee2a93afa632bd858cc4630d8cdd38c1a919c94d635d81a2357",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "npm run build",
+      "argv": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "commit": "9ad4ce2cf520b644f127b9269c19642a6a707b81",
+      "exitCode": 0,
+      "observedAt": "2026-11-28T09:55:26.586Z",
+      "evidence": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt/pr90-fix-p4UgJrE6/protected-finish/integrated-gates/disposable-gate-run.json",
+      "evidenceSha256": "76667c59f7234b6efb9359f65ac1abe2e3c9394fb71865638b085dc8ca15673b",
+      "stdoutSha256": "2e2573553b301e7506c1c20dd8ab142a781fa5d0b5135952aa1591c2781e19bf",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "openspec validate --all --strict",
+      "argv": [
+        "openspec",
+        "validate",
+        "--all",
+        "--strict"
+      ],
+      "commit": "9ad4ce2cf520b644f127b9269c19642a6a707b81",
+      "exitCode": 0,
+      "observedAt": "2026-11-28T09:55:26.811Z",
+      "evidence": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt/pr90-fix-p4UgJrE6/protected-finish/integrated-gates/disposable-gate-run.json",
+      "evidenceSha256": "76667c59f7234b6efb9359f65ac1abe2e3c9394fb71865638b085dc8ca15673b",
+      "stdoutSha256": "116a805c80c516e933daf3cddb30587986fd9bb2a409e38672214e041e52b45c",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "npm run validate:openspec -- --require-issue",
+      "argv": [
+        "npm",
+        "run",
+        "validate:openspec",
+        "--",
+        "--require-issue"
+      ],
+      "commit": "9ad4ce2cf520b644f127b9269c19642a6a707b81",
+      "exitCode": 0,
+      "observedAt": "2026-11-28T09:55:27.090Z",
+      "evidence": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt/pr90-fix-p4UgJrE6/protected-finish/integrated-gates/disposable-gate-run.json",
+      "evidenceSha256": "76667c59f7234b6efb9359f65ac1abe2e3c9394fb71865638b085dc8ca15673b",
+      "stdoutSha256": "e5726e448f987557cad033ea33a8e36f2bd3abf08013778e1cb36193993f8c2c",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "git diff --check",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "commit": "9ad4ce2cf520b644f127b9269c19642a6a707b81",
+      "exitCode": 0,
+      "observedAt": "2026-11-28T09:55:27.142Z",
+      "evidence": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt/pr90-fix-p4UgJrE6/protected-finish/integrated-gates/disposable-gate-run.json",
+      "evidenceSha256": "76667c59f7234b6efb9359f65ac1abe2e3c9394fb71865638b085dc8ca15673b",
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "security": {
+    "exitCode": 1,
+    "scanner": "skills-guard-v16",
+    "baselineScan": {
+      "record": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt/protected-finish-scan-NxXGqi5a/baseline/report-v16.json",
+      "sha256": "91a174bdd88b4f09680af353b2ce3ddb050e09980986255f0542c87653a60f73"
+    },
+    "candidateScan": {
+      "record": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt/pr90-fix-p4UgJrE6/hermes-final/report.json",
+      "sha256": "9e19bc1e7b4099a41529ad0611de3308351b8a3c82de0a2a22ebcf0989927c35"
+    },
+    "comparison": {
+      "record": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt/pr90-fix-p4UgJrE6/hermes-final/comparison.json",
+      "sha256": "ea402bace4a658cdbdf9c231afda3bab2f1d47aaeb9f9b7f44451098c50e15f4"
+    },
+    "additionalFindings": 0,
+    "acceptedUnchangedCautions": [
+      "autonomous-implementation-review",
+      "openspec-delivery"
+    ],
+    "publicationDisposition": {
+      "record": "review-proof-levels-policy-01m8evnwasn9sct0hwapqfchkt/pr90-fix-p4UgJrE6/protected-finish/scanner-disposition.json",
+      "sha256": "1ba34b1f5bbdfdc91f3575480145f26af7fadcdeb674cc14be5c49d88733dd88"
+    }
+  },
+  "pendingAtReceipt": [
+    "Exact archive gates and independent factual review",
+    "Protected record-only closure and archive acceptance",
+    "Explicit issue closure and worktree retirement",
+    "Live GitHub Pages parity assigned to the Supervisor"
+  ]
+}
